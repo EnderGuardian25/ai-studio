@@ -107,32 +107,32 @@ Two migrations, one per phase, deliberately not merged — a single migration wo
 
 ### Wave 3 — Phase 2: the taxonomy and verification modules
 
-- [ ] `T12` — The single per-class table
+- [x] `T12` — The single per-class table
   - Files: `src/lib/agent/instructionClasses.ts` (new), unit tests
   - Estimate: medium
   - Kind: impl
   - Notes: FR-03, FR-06, AC-19. One exported object keyed by `add`/`replace`/`remove`/`constrain`, each carrying `semantics` (prose rendered into the prompt) and `postCondition` (null for `add`). This is the _only_ definition — the prompt builder and the verifier both import it, so they cannot drift. Include the worked `constrain` example the spec owes (party-ba).
 
-- [ ] `T13` — Refine envelope parser
+- [x] `T13` — Refine envelope parser
   - Files: `src/lib/agent/refineEnvelope.ts` (new), unit tests
   - Estimate: medium
   - Kind: impl
   - Notes: FR-01. Parses `{ classes[], supersedes[], html }` from the reply. **Reuse `extractHtmlDocument`** (`src/lib/agent/htmlDocument.ts`) for the document cut rather than writing a second boundary — it already tolerates model narration, which is the bug it was written for. Missing/unparseable classes resolve to the preserving default (FR-05). Pure, no I/O.
 
-- [ ] `T14` — Verification module with three-state result
+- [x] `T14` — Verification module with three-state result
   - Files: `src/lib/drafts/refineVerify.ts` (new), unit tests
   - Estimate: large
   - Kind: impl
   - Depends: T12
   - Notes: FR-08/09/10, FR-14b, AC-12/13/14/20b. The `add` verifier call is **pinned to Haiku** inside this module — it takes no model parameter, so proposal 008's model picker can never route it elsewhere. Result is `pass` | `miss` | `unavailable`, and **`unavailable` routes exactly as `miss`** — there is no default-commit path. Structural post-conditions for `remove`/`constrain`/`replace` spend zero model calls. Only `add` calls a model, receiving extracted facts (element presence, text lengths) plus delimited content declared as data, never the raw document as ground truth. Verdict must be machine-readable; unparseable is a miss.
 
-- [ ] `T15` — Phase 2 migration: not-applied outcome and rejected-render retention
+- [x] `T15` — Phase 2 migration: not-applied outcome and rejected-render retention
   - Files: `prisma/schema.prisma`, `prisma/migrations/*`
   - Estimate: small
   - Kind: migration
   - Notes: FR-12/13/14. A distinct not-applied field on `Draft` (separate from `pendingActionError`, so "did not do what you asked" reads differently from "the run crashed"), and a rejected flag on `DraftRevision`. Kept separate from T8's migration so Phase 1 stays independently revertible.
 
-- [ ] `T16` — Exclude rejected revisions from every consumer
+- [x] `T16` — Exclude rejected revisions from every consumer
   - Files: `src/app/api/drafts/[id]/revisions/route.ts`, `.../revisions/[rev]/restore/route.ts`, `.../route.ts`, `.../inline-edit/route.ts`, `.../refine/route.ts`, `.../regenerate-design/route.ts`, `src/lib/drafts/revisions.ts`, `src/lib/drafts/recovery.ts`, `src/lib/agent/generateDraft.ts`
   - Estimate: medium
   - Kind: impl
@@ -142,11 +142,22 @@ Two migrations, one per phase, deliberately not merged — a single migration wo
 ### Wave 4 — Phase 2: wiring, UI, and test seams
 
 - [ ] `T17` — Wire classification, verification, retry-once and the not-applied outcome into the refine route
-  - Files: `src/app/api/drafts/[id]/refine/route.ts`, `src/lib/agent/prompts/refine.ts`
+  - Files: `src/app/api/drafts/[id]/refine/route.ts`, `src/lib/agent/prompts/refine.ts`, `src/lib/agent/designAgentCli.ts`, `src/lib/agent/designAgent.ts`, `src/lib/drafts/revisions.ts`, `src/lib/drafts/draftActions.ts`, `src/lib/drafts/refineVerify.ts`, `src/lib/agent/inlineAssets.ts` (comment only) _(widened 2026-09-28 by the Wave 3 final review)_
   - Estimate: large
   - Kind: impl
-  - Depends: T11, T12, T13, T14, T15, T16
+  - Depends: T11, T12, T13, T14, T15, T16, T20
   - Notes: FR-04/05/07/11/12/13, AC-08/09/10/11/15/16/17. Verification sits **above `runDesignAgentCli`, in the refine route only** — `regenerate-design` and `regenerate-copy` must remain byte-identical (AC-20, NFR-03). The route enforces non-empty `supersedes` before any destructive class; the prompt is not trusted to have required it. Hard cap: at most 2 refine calls and 2 verifier calls, any input. Wire T11's `mismatch` to the same not-applied path. Prompt semantics render from T12's table; bump `PROMPT_VERSION`.
+  - Carried in from Waves 2–3 (binding rulings, SDD ledger 2026-09-28):
+    - **Runners:** add an opt-in refine mode to `runDesignAgentCli` and `runDesignAgent` that returns `{ raw, modelHtml }` (tokens intact) without rendering; default behaviour unchanged (AC-20). Render + upload the export only after the result is accepted, so a missed attempt leaves no orphaned export. Wire the envelope into both CLI and API branches (mock E2E only exercises the API branch).
+    - **Reconcile (T11) semantics:** run on `env.html` only, never the raw reply. A missing token covered by a `replace`/`remove` supersedes fragment is intended (commit with it gone); an uncovered missing token is a preservation miss (retry path). Verify and commit the same document. Fix the `inlineAssets.ts` "spliced back in" comment. A truncated `__INLINE_ASSET_` prefix not consumed by a well-formed sent token → mismatch; cap the mismatch reason length.
+    - **AC-10:** a downgraded destructive class (`replace`/`remove` with empty supersedes, per `effectiveClasses`) counts as a miss — the retry prompt says why, a second downgrade ends as not applied. A downgraded `constrain` stays `add` (Haiku verifier). Tell them apart with `INSTRUCTION_CLASSES[c].destructive`.
+    - **Truncation:** a reply document with no closing `</html>` is not applied.
+    - **Rejection record:** add a typed `RejectionDiagnostics` (zod) + `recordRejectedRender()` in `revisions.ts` (classes, downgraded, reasons, verdict kind, reconcile outcome); never persist classes on committed rows (FR-02/FR-13 ruling).
+    - **Not-applied lifecycle:** clear `notApplied*` in `commitDraftRevision` and on every successful draft action (incl. regenerate-design/copy — a DB side effect only; AC-20 shapes unchanged); stamp the superseded rejected row's `discardedAt` whenever `notApplied*` is cleared or replaced.
+    - **Retry prompt:** fence the verifier's miss reasons with `fenceUntrusted`.
+    - **Retry cost:** pass precomputed before-facts into `verifyRefine` (optional input) so the retry does not re-extract; optional: one `withRenderedPage` for after-facts + screenshot.
+    - **Baseline:** full mock E2E was 183/4/0 at the Wave 3 final fix; re-run first.
+    - **Flat supersedes:** replace-text + remove currently fails closed unless the new text is strictly shorter (e.g. "change the headline to X and remove the logo"). Make supersedes per-clause (`{ fragment, clause: "replace" | "remove" }`) or add the replace-only exemption (phrase absent AND no counterpart), and correct the `instructionClasses.ts` known-limits header wording.
 
 - [ ] `T18` — Surface not-applied as a failure in the UI
   - Files: `src/components/drafts/RefinementPanel.tsx`, `src/app/api/drafts/[id]/route.ts` (poll response)
@@ -154,13 +165,15 @@ Two migrations, one per phase, deliberately not merged — a single migration wo
   - Kind: impl
   - Depends: T17
   - Notes: FR-14, AC-18. Name the poll field explicitly — party-architect's point is that client and server halves of one merge disagree without it. Hard failure, not a dismissible warning on a committed revision.
+  - Carried in: dereference `notAppliedRevisionId` as `{ id, draftId, rejectedAt: { not: null } }` — never trust the FK alone.
 
 - [ ] `T19` — "Use anyway": adopt a rejected render _(added 2026-09-23)_
-  - Files: `src/app/api/drafts/[id]/revisions/[rev]/adopt/route.ts` (new), `src/lib/drafts/revisions.ts`, `src/components/drafts/RefinementPanel.tsx`, `prisma/schema.prisma` (fold into T15's migration)
+  - Files: `src/app/api/drafts/[id]/rejected/[revisionId]/adopt/route.ts` (new — rejected rows have no revision number, so they are addressed by row id; path changed 2026-09-28), `src/lib/drafts/revisions.ts`, `src/components/drafts/RefinementPanel.tsx` — schema already landed in T15's migration (`adoptedAt`, `adoptedRevisionNumber`, `discardedAt`)
   - Estimate: medium
   - Kind: impl
   - Depends: T16, T18
   - Notes: FR-14a, AC-20a. The not-applied failure shows the rejected render's preview + **Use anyway**. The route claims `pendingAction` (single-flight, 409 on contention), then commits the rejected row's snapshot + export as a **fresh** normal revision via `commitDraftRevision`, marked user-accepted, and advances the pointer. The rejected row is never itself pointed at — T16's filter invariant holds. Record the adoption on the rejected row so a second adopt is a 409. Team-scoped like every draft route (cross-team → 404).
+  - Carried in: adopt only when `row.id === draft.notAppliedRevisionId`, `adoptedAt` is null and `discardedAt` is null; otherwise 409.
 
 - [ ] `T20` — Deterministic verification-miss seam
   - Files: `src/lib/testHooks.ts`
@@ -168,6 +181,7 @@ Two migrations, one per phase, deliberately not merged — a single migration wo
   - Kind: test
   - Depends: T14
   - Notes: FR-24. Follows the existing sentinel pattern (`shouldMockGenerateFail`, `__FAIL_*__` in the brief topic). Without this the retry and twice-failed branches are unreachable in tests — exactly the structural blindness this change exists to fix.
+  - Carried in: must land **before or with T17** — under `MOCK_PUPPETEER`, `#id`/`.class` fragments and constrain targets never resolve, so any mock E2E refine would otherwise always miss once T17 wires verification. The seam must be able to force pass / miss / unavailable.
 
 - [ ] `T21` — E2E coverage for the refine fidelity contract
   - Files: `tests/e2e/agui-refinement.test.ts`, new cases
@@ -175,6 +189,7 @@ Two migrations, one per phase, deliberately not merged — a single migration wo
   - Kind: test
   - Depends: T17, T18, T20
   - Notes: AC-08 through AC-20b (incl. adopt-once and the Haiku-pinned verifier). Must include the two reported failures as regression cases: "reduce the text" (a `remove` whose output must be measurably shorter) and "use the uploaded image as the background" (a `replace` whose superseded element must be absent — the duplicate-image export must fail this).
+  - Carried in: assert CHECK constraint names in TC-REJ-03 instead of bare `.rejects.toThrow()`; note that E2E covers only the API-mode refine branch (`DESIGN_PROVIDER=claude-html`) — the prod CLI branch is unit-covered only; add the §U entry to `docs/e2e-test-plan.md` alongside the new cases; record the constrain "decrease passes by truncating text" known limit.
 
 ### Wave 5 — Phase 3: element-targeted editing
 

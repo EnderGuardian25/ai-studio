@@ -58,7 +58,7 @@ INSTRUCTION_CLASSES = {
 
 **Not-applied outcome.** `Draft.pendingActionError` already carries a string the poll surfaces, but the UI treats it as an error. A distinct field is needed so "the model ran fine and did not do what you asked" reads differently from "the run crashed". The rejected render is stored as a `DraftRevision`-shaped row that the pointer never references — see Key Decisions.
 
-**Use anyway (added 2026-09-23).** The not-applied failure shows the retained render's preview and a **Use anyway** action — a new `POST /api/drafts/[id]/revisions/[rev]/adopt`. It claims `pendingAction` like every draft action (so it is single-flight), then commits the rejected row's snapshot and export as a normal revision via `commitDraftRevision`, recorded as user-accepted. The rejected row itself is not flipped into the chain; the adopted revision is a fresh row, so the "rejected rows are never referenced by the pointer" invariant from Key Decisions still holds everywhere. A second adopt of the same rejected row is a 409 (the rejected row records that it was adopted).
+**Use anyway (added 2026-09-23).** The not-applied failure shows the retained render's preview and a **Use anyway** action — a new `POST /api/drafts/[id]/rejected/[revisionId]/adopt` (rejected rows carry no revision number — T15 — so they are addressed by row id; changed 2026-09-28). It claims `pendingAction` like every draft action (so it is single-flight), then commits the rejected row's snapshot and export as a normal revision via `commitDraftRevision`, recorded as user-accepted. The rejected row itself is not flipped into the chain; the adopted revision is a fresh row, so the "rejected rows are never referenced by the pointer" invariant from Key Decisions still holds everywhere. A second adopt of the same rejected row is a 409 (the rejected row records that it was adopted).
 
 **Verifier model (added 2026-09-23).** `refineVerify.ts` pins the `add` verifier call to Haiku rather than taking a model from the caller, so proposal 008's per-surface model choice can never route the verifier to Opus. The retry-once re-runs the refine on the model the route received.
 
@@ -73,26 +73,26 @@ Extends the existing inline-edit rather than adding a writer. The current surfac
 
 ## File Changes Map
 
-| File                                                             | Change                                                               | Phase |
-| ---------------------------------------------------------------- | -------------------------------------------------------------------- | ----- |
-| `Dockerfile`                                                     | add monochrome symbol font to runner stage                           | 1     |
-| `src/lib/renderer/fontSet.ts` _(new)_                            | compute/expose installed font-set identifier                         | 1     |
-| `src/lib/agent/inlineAssets.ts`                                  | add `reconcileInlineAssets`                                          | 1     |
-| `tests/e2e/helpers/rasterize.ts` _(new)_                         | real-render harness + tofu assertion                                 | 1     |
-| `tests/e2e/render-fidelity.test.ts` _(new)_                      | harness cases                                                        | 1     |
-| `src/lib/agent/instructionClasses.ts` _(new)_                    | the one table: semantics + post-conditions                           | 2     |
-| `src/lib/agent/prompts/refine.ts`                                | render semantics from the table; envelope output protocol            | 2     |
-| `src/lib/agent/refineEnvelope.ts` _(new)_                        | parse `{classes, supersedes, html}`, reusing `extractHtmlDocument`   | 2     |
-| `src/lib/drafts/refineVerify.ts` _(new)_                         | structural post-conditions + `add` model call; three-state result    | 2     |
-| `src/app/api/drafts/[id]/refine/route.ts`                        | wire classification, verification, retry-once, not-applied outcome   | 2     |
-| `src/components/drafts/RefinementPanel.tsx`                      | surface not-applied as failure; rejected preview + Use anyway        | 2     |
-| `src/app/api/drafts/[id]/revisions/[rev]/adopt/route.ts` _(new)_ | adopt a rejected render as a normal revision                         | 2     |
-| `src/lib/agent/prompts/shared.ts`                                | no-emoji line in `SCRIPT_SUPPORT_NOTE`                               | 1     |
-| `src/lib/testHooks.ts`                                           | deterministic verification-miss seam                                 | 2     |
-| `prisma/schema.prisma` + migration                               | not-applied outcome field, font-set stamp, rejected-render retention | 1–2   |
-| `src/lib/drafts/inlineEdit.ts`                                   | node-scoped text write; colour/size grammar                          | 3     |
-| `src/app/api/drafts/[id]/inline-edit/route.ts`                   | element-scoped mode                                                  | 3     |
-| `src/components/drafts/InlineEditModal.tsx`                      | click-to-select element mode                                         | 3     |
+| File                                                                   | Change                                                               | Phase |
+| ---------------------------------------------------------------------- | -------------------------------------------------------------------- | ----- |
+| `Dockerfile`                                                           | add monochrome symbol font to runner stage                           | 1     |
+| `src/lib/renderer/fontSet.ts` _(new)_                                  | compute/expose installed font-set identifier                         | 1     |
+| `src/lib/agent/inlineAssets.ts`                                        | add `reconcileInlineAssets`                                          | 1     |
+| `tests/e2e/helpers/rasterize.ts` _(new)_                               | real-render harness + tofu assertion                                 | 1     |
+| `tests/e2e/render-fidelity.test.ts` _(new)_                            | harness cases                                                        | 1     |
+| `src/lib/agent/instructionClasses.ts` _(new)_                          | the one table: semantics + post-conditions                           | 2     |
+| `src/lib/agent/prompts/refine.ts`                                      | render semantics from the table; envelope output protocol            | 2     |
+| `src/lib/agent/refineEnvelope.ts` _(new)_                              | parse `{classes, supersedes, html}`, reusing `extractHtmlDocument`   | 2     |
+| `src/lib/drafts/refineVerify.ts` _(new)_                               | structural post-conditions + `add` model call; three-state result    | 2     |
+| `src/app/api/drafts/[id]/refine/route.ts`                              | wire classification, verification, retry-once, not-applied outcome   | 2     |
+| `src/components/drafts/RefinementPanel.tsx`                            | surface not-applied as failure; rejected preview + Use anyway        | 2     |
+| `src/app/api/drafts/[id]/rejected/[revisionId]/adopt/route.ts` _(new)_ | adopt a rejected render as a normal revision                         | 2     |
+| `src/lib/agent/prompts/shared.ts`                                      | no-emoji line in `SCRIPT_SUPPORT_NOTE`                               | 1     |
+| `src/lib/testHooks.ts`                                                 | deterministic verification-miss seam                                 | 2     |
+| `prisma/schema.prisma` + migration                                     | not-applied outcome field, font-set stamp, rejected-render retention | 1–2   |
+| `src/lib/drafts/inlineEdit.ts`                                         | node-scoped text write; colour/size grammar                          | 3     |
+| `src/app/api/drafts/[id]/inline-edit/route.ts`                         | element-scoped mode                                                  | 3     |
+| `src/components/drafts/InlineEditModal.tsx`                            | click-to-select element mode                                         | 3     |
 
 ## Key Decisions
 
