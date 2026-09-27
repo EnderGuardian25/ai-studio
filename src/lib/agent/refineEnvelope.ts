@@ -39,6 +39,10 @@
 // header into the document. So if the cut contains a header before its first
 // <head>/<body>/<style> (before any real document structure) and another
 // document start follows that header, the document is re-cut after the header.
+// A doctype that preceded the header is carried onto the re-cut document when
+// it has none of its own — the header may sit in a comment between the real
+// <!DOCTYPE html> and <html>, and dropping the doctype would put the render in
+// quirks mode (the 2026-08-03 class).
 //
 // ── Defaults (FR-05) ─────────────────────────────────────────────────────────
 // No header, unparseable JSON, a missing/non-array `classes`, or no known class
@@ -184,7 +188,9 @@ const STRUCTURE_RE = /<(head|body|style)\b/i
 
 // Where the document sits in raw: extractHtmlDocument's cut, re-cut once past a
 // header it swallowed (see the header comment).
-function locateDocument(raw: string): { at: number; html: string } | null {
+// `at`/`length` locate the raw slice the document came from; `html` may
+// additionally carry a doctype rescued from before the header.
+function locateDocument(raw: string): { at: number; length: number; html: string } | null {
   const doc = extractHtmlDocument(raw)
   if (!doc || !doc.html) return null
   // extractHtmlDocument's html is a slice of raw beginning at the first
@@ -197,13 +203,15 @@ function locateDocument(raw: string): { at: number; html: string } | null {
   const swallowed = findHeaders(region)
     .filter((h) => docStarts.some((i) => i >= h.span.end))
     .at(-1)
-  if (!swallowed) return { at, html: doc.html }
+  if (!swallowed) return { at, length: doc.html.length, html: doc.html }
 
   const restAt = at + swallowed.span.end
   const rest = raw.slice(restAt)
   const recut = extractHtmlDocument(rest)
-  if (!recut || !recut.html) return { at, html: doc.html }
-  return { at: restAt + rest.indexOf(recut.html), html: recut.html }
+  if (!recut || !recut.html) return { at, length: doc.html.length, html: doc.html }
+  const doctype = /<!doctype[^>]*>/i.exec(doc.html.slice(0, swallowed.span.start))
+  const html = doctype && !/^<!doctype\b/i.test(recut.html) ? `${doctype[0]}\n${recut.html}` : recut.html
+  return { at: restAt + rest.indexOf(recut.html), length: recut.html.length, html }
 }
 
 export function parseRefineEnvelope(raw: string): RefineEnvelope | null {
@@ -211,7 +219,7 @@ export function parseRefineEnvelope(raw: string): RefineEnvelope | null {
   if (!doc) return null
 
   const before = raw.slice(0, doc.at)
-  const after = raw.slice(doc.at + doc.html.length)
+  const after = raw.slice(doc.at + doc.length)
 
   const beforeHeader = findHeaders(before).at(-1)
   const afterHeader = beforeHeader ? undefined : findHeaders(after)[0]

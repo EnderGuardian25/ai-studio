@@ -278,3 +278,26 @@ describe('renderEnvelopeProtocol — the output protocol T17 puts in the prompt'
     expect(p).not.toMatch(/verbatim/i)
   })
 })
+
+describe('parseRefineEnvelope — the doctype survives the header rescue (fix round 2, finding 4)', () => {
+  it('keeps the doctype when the header sits in a comment between <!DOCTYPE html> and <html>', () => {
+    const tail = '<html><head></head><body>a</body></html>'
+    const out = parseRefineEnvelope(`<!DOCTYPE html>\n<!-- {"classes":["remove"],"supersedes":["Hi"]} -->\n${tail}`)
+    expect(out?.html.startsWith('<!DOCTYPE html>')).toBe(true)
+    expect(out?.html.endsWith(tail)).toBe(true)
+    expect(out?.html).not.toContain('"classes"')
+  })
+
+  it('keeps the doctype when narration is only a doctype followed by the header and an <html> document', () => {
+    const tail = '<html><head><style>h1{}</style></head><body><h1>Hi</h1></body></html>'
+    const out = parseRefineEnvelope(`<!DOCTYPE html>\n{"classes":["remove"],"supersedes":["Hi"]}\n${tail}`)
+    expect(out?.html.startsWith('<!DOCTYPE html>')).toBe(true)
+    expect(out?.html).not.toContain('"classes"')
+    expect(out?.classes).toEqual(['remove'])
+  })
+
+  it('does not double the doctype when the re-cut document carries its own', () => {
+    const out = parseRefineEnvelope(`Returning a <!DOCTYPE html> page.\n{"classes":["remove"],"supersedes":["Hi"]}\n${DOC}`)
+    expect(out?.html).toBe(DOC)
+  })
+})
