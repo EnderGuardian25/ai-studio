@@ -20,7 +20,10 @@ function claudeCommand(): { cmd: string; shell: boolean } {
 // Accepts a CLI alias ("sonnet"/"opus"/"haiku") or a full model id. A value of
 // "default" (from either source) omits --model and uses the account default
 // (the costly Opus tier) — the reason we never want that implicitly.
-function claudeModelArgs(explicitModel?: string): string[] {
+function claudeModelArgs(explicitModel?: string, pinned = false): string[] {
+  // A pinned call (the refine add-verifier, change 004 FR-14b) runs on exactly
+  // the model it names: the global override must not route it elsewhere.
+  if (pinned && explicitModel?.trim()) return ["--model", explicitModel.trim()]
   const override = (env.CLAUDE_CLI_MODEL ?? "").trim()
   const model = override || (explicitModel ?? "haiku").trim()
   if (!model || model.toLowerCase() === "default") return []
@@ -36,6 +39,10 @@ export interface ClaudeCliOptions {
   // Per-call model (CLI alias or full id). Path A design passes "haiku", Path B
   // "sonnet". Overridden by CLAUDE_CLI_MODEL when that env var is set.
   model?: string
+  // When true, `model` is used verbatim and CLAUDE_CLI_MODEL does NOT override
+  // it. Only for calls whose model is a fixed policy rather than a preference —
+  // the refine add-verifier is pinned to Haiku (change 004 FR-14b).
+  pinModel?: boolean
   // Tools the headless run may use without a permission prompt (maps to
   // --allowedTools). Empty/undefined ⇒ no tools (the default single-shot text
   // generation). Vision extraction passes ["Read"] so the CLI can ingest an
@@ -172,7 +179,7 @@ export async function runClaudeCliOnce(
   tokenOverride: string | undefined,
 ): Promise<string> {
   const { cmd, shell } = claudeCommand()
-  const { timeoutMs = 180_000, maxBuffer = 16 * 1024 * 1024, label = "", model, allowedTools } = opts
+  const { timeoutMs = 180_000, maxBuffer = 16 * 1024 * 1024, label = "", model, pinModel, allowedTools } = opts
 
   // CLI-mode auth is REQUIRED — there is no env/dev-session fallback tier.
   // Order of preference:
@@ -208,7 +215,7 @@ export async function runClaudeCliOnce(
   // Drive, Atlassian, … connectors), adding startup latency, bloating the prompt
   // context with dozens of unused tool definitions, and raising token cost — none
   // of which a single-shot HTML/copy generation needs.
-  const modelArgs = claudeModelArgs(model)
+  const modelArgs = claudeModelArgs(model, pinModel)
   // --allowedTools lets specific built-in tools run without an interactive
   // permission prompt (which would hang a headless run). Only passed when a
   // caller opts in (e.g. vision extraction needs "Read"); omitted ⇒ no tools.

@@ -225,3 +225,13 @@ export function buildMockConflict(): string {
       '<!DOCTYPE html><html><body data-mock-override="true" style="margin:0;width:1080px;height:1080px;background:#ff00ff">OVERRIDDEN MOCK DESIGN</body></html>',
   })
 }
+
+/**
+ * Deterministic reply of the refine add-verifier (MOCK_AI, change 004 T14).
+ * A raw string, not a verdict object, so the mock still runs through the real
+ * verdict parser. Always "applied" today; T20 extends this seam with sentinels
+ * that force a miss or an unparseable (unavailable) reply.
+ */
+export function buildMockVerifierReply(instruction: string): string {
+  return JSON.stringify({ applied: true, reason: `Mock verifier: applied. [${instruction.slice(0, 80)}]` })
+}
