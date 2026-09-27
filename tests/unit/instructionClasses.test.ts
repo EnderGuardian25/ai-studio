@@ -361,7 +361,7 @@ describe('remove — named content reduced, and the document measurably smaller'
     const after = facts([bgLayer(), headline(), body(LONG_BODY.replace('workshops', 'workshop')), logo()])
     const r = check('remove', { after, supersedes: ['hands-on workshops'] })
     expect(r.ok).toBe(false)
-    if (!r.ok) expect(r.reason).toMatch(/word count/)
+    if (!r.ok) expect(r.reason).toMatch(/word count|whole words/)
   })
 
   it('accepts an image removal ("remove the logo") when every fragment is an image', () => {
@@ -488,5 +488,103 @@ describe('constrain — the named target changes in the stated direction, nothin
     const after = facts([bgLayer(), headline(72), body(), logo()])
     expect(check('constrain', { after, constrains: [] }).ok).toBe(false)
     expect(check('constrain', { after, constrains: [{ fragment: '  ' }] }).ok).toBe(false)
+  })
+})
+
+// ── Fix round 2 probes ────────────────────────────────────────────────────────
+
+describe('fix round 2 — a named text passage must lose words (finding 1)', () => {
+  const reworded = LONG_BODY.replace('an unforgettable evening', 'a truly memorable evening')
+
+  // Probe I1a: the named phrase is reworded out, the passage gets LONGER, and an
+  // add clause stands the whole-document word count down.
+  it('remove+add: fails when the phrase is reworded out and the passage grows', () => {
+    const after = facts([bgLayer(), headline(), body(reworded), el({ tag: 'p', classes: ['caption'], text: 'New caption here' }), logo()])
+    const r = check('remove', { after, supersedes: ['unforgettable evening'], classes: ['remove', 'add'] })
+    expect(r.ok).toBe(false)
+  })
+
+  it('replace+remove: fails the same rewording through the replace-with-remove path', () => {
+    const after = facts([bgLayer(UPLOAD), headline(), body(reworded), logo()])
+    const r = check('replace', { after, supersedes: [OLD_BG, 'unforgettable evening'], classes: ['replace', 'remove'] })
+    expect(r.ok).toBe(false)
+  })
+
+  it('remove+add: fails when the phrase survives but the passage only swaps a word', () => {
+    const after = facts([bgLayer(), headline(), body(LONG_BODY.replace('region', 'nation')), el({ tag: 'p', classes: ['caption'], text: 'Cap' }), logo()])
+    expect(check('remove', { after, supersedes: ['unforgettable evening'], classes: ['remove', 'add'] }).ok).toBe(false)
+  })
+
+  it('remove+add: passes when the passage genuinely loses words (phrase kept)', () => {
+    const after = facts([
+      bgLayer(),
+      headline(),
+      body('Join us for an unforgettable evening of workshops.'),
+      el({ tag: 'p', classes: ['caption'], text: 'A caption with many many many many many many many many many many words' }),
+      logo(),
+    ])
+    expect(check('remove', { after, supersedes: ['unforgettable evening'], classes: ['remove', 'add'] })).toEqual({ ok: true })
+  })
+
+  it('remove: passes when the phrase is reworded out and the passage loses words', () => {
+    const after = facts([bgLayer(), headline(), body('Join us for a memorable evening of workshops.'), logo()])
+    expect(check('remove', { after, supersedes: ['unforgettable evening'] })).toEqual({ ok: true })
+  })
+})
+
+describe('fix round 2 — a token on an element with an image AND its own text covers both (finding 2)', () => {
+  const BADGE = 'http://minio.local/images/badge.png'
+  const badge = (src: string | null, text = 'LIMITED SEATS') =>
+    el({ tag: 'div', classes: ['promo-badge'], text, imageSources: src ? [src] : [] })
+  const before = facts([bgLayer(), headline(), badge(BADGE)])
+
+  it('replace .promo-badge: fails when the image is swapped but the old text kept', () => {
+    const after = facts([bgLayer(), headline(), badge(UPLOAD)])
+    expect(check('replace', { before, after, supersedes: ['.promo-badge'] }).ok).toBe(false)
+  })
+
+  it('replace .promo-badge: fails when the image is dropped and the old text moved to a <span> beside a new badge', () => {
+    const after = facts([
+      bgLayer(),
+      headline(),
+      el({ tag: 'span', text: 'LIMITED SEATS' }),
+      el({ tag: 'div', classes: ['new-badge'], text: 'SOLD OUT' }),
+    ])
+    expect(check('replace', { before, after, supersedes: ['.promo-badge'] }).ok).toBe(false)
+  })
+
+  it('remove .promo-badge: fails when the image is gone but the text moved to a <span>', () => {
+    const after = facts([bgLayer(), headline(), el({ tag: 'span', text: 'LIMITED SEATS' })], { elementCount: 3 })
+    expect(check('remove', { before, after, supersedes: ['.promo-badge'] }).ok).toBe(false)
+  })
+
+  it('replace .promo-badge: passes when both the image and the text are replaced on the same element', () => {
+    const after = facts([bgLayer(), headline(), badge(UPLOAD, 'SOLD OUT')])
+    expect(check('replace', { before, after, supersedes: ['.promo-badge'] })).toEqual({ ok: true })
+  })
+
+  it('a container whose text contains a child element\'s shorter text is not a leaf: its images alone identify it', () => {
+    // .hero carries the background AND wraps the headline (its text is the headline's).
+    const hero = (src: string) => el({ tag: 'section', classes: ['hero'], imageSources: [src], text: 'INDUSTRY READINESS PROGRAMME Apply' })
+    const b = facts([hero(OLD_BG), headline(), el({ tag: 'span', text: 'Apply' })], { text: 'INDUSTRY READINESS PROGRAMME Apply' })
+    const a = facts([hero(UPLOAD), headline(), el({ tag: 'span', text: 'Apply' })], { text: 'INDUSTRY READINESS PROGRAMME Apply' })
+    expect(check('replace', { before: b, after: a, supersedes: ['.hero'] })).toEqual({ ok: true })
+  })
+})
+
+describe('fix round 2 — constrain measures the target, not a same-shape newcomer (finding 3)', () => {
+  it('constrain+add: fails when the body is untouched and a short same-shape <p> is inserted before it', () => {
+    const after = facts([bgLayer(), headline(), body('Short new caption.'), body(), logo()])
+    const r = check('constrain', {
+      after,
+      constrains: [{ fragment: 'hands-on workshops', direction: 'decrease' }],
+      classes: ['constrain', 'add'],
+    })
+    expect(r.ok).toBe(false)
+  })
+
+  it('falls back to position when the targeted phrase is gone', () => {
+    const after = facts([bgLayer(), headline(), body('Join us for an evening.'), logo()])
+    expect(check('constrain', { after, constrains: [{ fragment: 'hands-on workshops', direction: 'decrease' }] })).toEqual({ ok: true })
   })
 })

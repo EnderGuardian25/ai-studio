@@ -33,12 +33,14 @@
 // fragments copied from the ORIGINAL document (HTML entities such as &amp; are
 // decoded before matching). Each is resolved against the `before` facts into
 // the CONTENT it identifies:
-//   - `#id` / `.class` matching an element → that element's image sources, or,
-//     for an element that carries no image, its visible text. The element itself
-//     may survive an edit — swapping the image on the same `.bg` element is a
-//     correct replace. (DomFacts has no parent links, so "the element's own
-//     content" is approximated this way: an image-bearing container is
-//     identified by its images, not by the text of its children.) A token that
+//   - `#id` / `.class` matching an element → that element's image sources AND,
+//     when it is a leaf (no other element's non-empty text is a strictly
+//     shorter substring of its text) or carries no image, its visible text. The
+//     element itself may survive an edit — swapping the image on the same `.bg`
+//     element is a correct replace, but a badge whose image is swapped while its
+//     old text stays is not. (DomFacts has no parent links; the leaf test keeps
+//     an image-bearing container from being identified by its children's
+//     text.) A token that
 //     matches no element falls through to the rules below, so a hashtag such as
 //     "#IRP" is matched as visible text.
 //   - a substring of an image source (URL, filename, `url('…')`, or an
@@ -50,9 +52,11 @@
 // named something that is not there, so its absence afterwards proves nothing.
 //
 // A text passage counts as reduced only when it no longer appears INTACT in the
-// document's text: re-wrapping a phrase in <strong>, or splitting a paragraph
+// document's text (re-wrapping a phrase in <strong>, or splitting a paragraph
 // into several elements, shrinks the innermost container without removing a
-// character, and must not pass.
+// character, and must not pass) AND its innermost container lost words or is
+// gone — whether or not the named phrase survives, since rewording the phrase
+// out while growing the passage is not a reduction.
 //
 // ── AC-08 relies on a text fragment ──────────────────────────────────────────
 // "reduce the text" is verified by visible word count, which only applies when
@@ -200,6 +204,19 @@ function innermost(facts: DomFacts, phrase: string): { elements: DomElementFact[
 
 const unique = <T>(xs: T[]) => [...new Set(xs)]
 
+// A leaf carries text of its own: no other element's non-empty text is a
+// strictly shorter substring of its text. (DomFacts has no parent links; a
+// container's subtree text contains its children's shorter texts.)
+function isLeaf(facts: DomFacts, el: DomElementFact): boolean {
+  const t = fold(el.text)
+  if (!t) return false
+  return !facts.elements.some((o) => {
+    if (o === el) return false
+    const ot = fold(o.text)
+    return ot.length > 0 && ot.length < t.length && t.includes(ot)
+  })
+}
+
 // What a fragment identified in `before`.
 interface ResolvedFragment {
   raw: string
@@ -222,7 +239,9 @@ function resolveFragment(facts: DomFacts, rawFragment: string): ResolvedFragment
     const els = tokenElements(facts, needle)
     if (els.length > 0) {
       const images = unique(els.flatMap((e) => e.imageSources))
-      const passages = images.length ? [] : unique(els.map((e) => fold(e.text)).filter(Boolean))
+      const passages = unique(
+        els.filter((e) => e.imageSources.length === 0 || isLeaf(facts, e)).map((e) => fold(e.text)).filter(Boolean),
+      )
       return { raw, kind: 'token', images, imageSubstring: false, phrase: null, passages, elements: els }
     }
   }
@@ -261,19 +280,23 @@ function contentAbsent(after: DomFacts, r: ResolvedFragment): boolean {
 // passage no longer survives intact.
 function contentReduced(before: DomFacts, after: DomFacts, r: ResolvedFragment): boolean {
   if (imagesPresent(after, r)) return false
-  if (r.kind === 'image') return true
-  if (passageIntact(after, r)) return false
+  if (r.passages.length === 0) return true // image-only content, and it is gone
+  if (passageIntact(after, r)) return false // re-wrapped or split, not reduced
+  const words = (els: DomElementFact[]) => els.reduce((n, e) => n + wordCount(e.text), 0)
   if (r.kind === 'text') {
-    if (!fold(after.text).includes(r.phrase!)) return true
-    const was = innermost(before, r.phrase!).length
-    const now = innermost(after, r.phrase!).length
-    return was !== null && now !== null && now < was
+    // The phrase crossed element boundaries: only its disappearance counts.
+    if (r.elements.length === 0) return !fold(after.text).includes(r.phrase!)
+    // Each innermost container must lose words or be gone — whether or not the
+    // named phrase survives (rewording it out while growing the passage is not
+    // a reduction).
+    return r.elements.every((e) => {
+      const now = counterpart(before, after, e, r.raw, 'text')
+      return !now || wordCount(now.text) < wordCount(e.text)
+    })
   }
-  // Token with text content: the element is gone, or its text got shorter.
-  const token = decodeHtmlEntities(r.raw)
-  const sum = (els: DomElementFact[]) => els.reduce((n, e) => n + textLength(e.text), 0)
-  const now = tokenElements(after, token)
-  return now.length === 0 || sum(now) < sum(r.elements)
+  // Token with text content: the element is gone, or its text lost words.
+  const now = tokenElements(after, decodeHtmlEntities(r.raw))
+  return now.length === 0 || words(now) < words(r.elements)
 }
 
 const hasText = (r: ResolvedFragment) => r.passages.length > 0
@@ -302,15 +325,29 @@ function resolveSupersedes(cls: InstructionClass, input: PostConditionInput): Re
 
 // ── Constrain target measurement ─────────────────────────────────────────────
 
-// The `after` element corresponding to a `before` target: same id; else the
+// The `after` element corresponding to a `before` element identified by a
+// fragment. A TEXT fragment is re-resolved in `after` first (its innermost
+// container, preferring the same tag+classes), so a same-shape element that an
+// add clause inserted ahead of it is never measured instead; only when the
+// phrase is gone does it fall back to position. Otherwise: same id; else the
 // same tag+classes at the same ordinal; else the fragment re-resolved in after.
-function counterpart(before: DomFacts, after: DomFacts, el: DomElementFact, fragment: string): DomElementFact | null {
-  if (el.id) return after.elements.find((e) => e.id === el.id) ?? null
+function counterpart(
+  before: DomFacts,
+  after: DomFacts,
+  el: DomElementFact,
+  fragment: string,
+  kind: ResolvedFragment['kind'],
+): DomElementFact | null {
   const sameShape = (e: DomElementFact) => e.tag === el.tag && e.classes.join(' ') === el.classes.join(' ')
+  const again = resolveFragment(after, fragment)
+  if (kind === 'text' && again?.kind === 'text' && again.elements.length > 0) {
+    return again.elements.find(sameShape) ?? again.elements[0]
+  }
+  if (el.id) return after.elements.find((e) => e.id === el.id) ?? null
   const ordinal = before.elements.filter(sameShape).indexOf(el)
   const candidate = after.elements.filter(sameShape)[ordinal]
   if (candidate) return candidate
-  return resolveFragment(after, fragment)?.elements[0] ?? null
+  return kind === 'text' ? null : (again?.elements[0] ?? null)
 }
 
 function measures(e: DomElementFact): Record<string, number | null> {
@@ -375,7 +412,7 @@ const targetTextShorter: PostCondition = (input, table) => {
   if (unreduced.length > 0) {
     return {
       ok: false,
-      reason: `remove: ${quoted(unreduced.map((r) => r.raw))} was neither removed nor shortened (the original passage is still intact)`,
+      reason: `remove: ${quoted(unreduced.map((r) => r.raw))} was neither removed nor shortened by whole words (the original passage is still intact, or its element lost no words)`,
     }
   }
   if (othersAdditive(input, table, 'remove')) return { ok: true }
@@ -409,7 +446,7 @@ const boundedAttributeHolds: PostCondition = (input) => {
       return { ok: false, reason: `constrain: target ${JSON.stringify(t.fragment)} does not identify an element in the original design` }
     }
     for (const el of r.elements) {
-      const now = counterpart(before, after, el, t.fragment)
+      const now = counterpart(before, after, el, t.fragment, r.kind)
       if (!now) return { ok: false, reason: `constrain: target ${JSON.stringify(t.fragment)} is gone — a constrain must not delete` }
       const miss = targetMiss(el, now, t.direction)
       if (miss) return { ok: false, reason: `constrain: target ${JSON.stringify(t.fragment)} ${miss}` }
