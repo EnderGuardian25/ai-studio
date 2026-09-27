@@ -76,13 +76,13 @@ Review proposals 005–012 with the user, then `/specclaw:plan` them in roadmap 
 The post-merge run for PR #41 ([run 34988162569](https://github.com/bistec-oss/studio/actions/runs/34988162569)) built and pushed the image to GHCR, then **Coolify returned `401`** on the redeploy call. `COOLIFY_API_TOKEN` is dead, and the scheduler redeploy step never ran. No harm yet, but **the next code merge will silently not ship**, and the `v2` merge would be that merge. CLAUDE.md's "a green `main` build **does** redeploy prod" is **no longer true** until this is fixed.
 
 - The **token** is rotated by the Coolify administrator (user decision: not the user, not Claude). Send them `docs/coolify-token-rotation.md`.
-- The **code hardening** is 004 **Wave 0** (T0b–T0f): readable deploy failures, both redeploys always attempted, a public `/api/health` → `{ ok, commit }` with the SHA baked into the image, CI verifying prod serves the new commit, `docker-publish.yml` actions off Node 20, and `node:20-alpine` → `node:22-alpine`.
+- The **code hardening** is 004 **Wave 1** (T2–T6; renumbered 2026-09-27 — was T0b–T0f): readable deploy failures, both redeploys always attempted, a public `/api/health` → `{ ok, commit }` with the SHA baked into the image, CI verifying prod serves the new commit, `docker-publish.yml` actions off Node 20, and `node:20-alpine` → `node:22-alpine`.
 - Not related: the two E2E failures on PR #41 (`Start MinIO`) were already fixed inside that PR. Docker Hub withdrew `minio/minio`; every reference now uses `quay.io`.
 
 ### Next actions, in order
 
 1. **Send the Coolify handoff** to whoever administers Coolify. Ask them to also read the **scheduler** resource's first log lines, which identify the B4 cause (`docs/scheduler-b4-diagnosis-2026-08-03.md`).
-2. **Build 004 Phase 0.** `git switch main && git pull && git switch -c fix/ci-deploy-pipeline`, then T0b → T0f. Put **T0e (Node 22) in its own commit.** It needs Docker Desktop running for `docker build`, and a real render + `claude --version` inside the image. Open the PR to `main`. Merge only on the user's go-ahead. After merging, **merge `main` into `v2`** so `v2` carries it.
+2. **Build 004 Phase 0.** `git switch main && git pull && git switch -c fix/ci-deploy-pipeline`, then T2 → T6. Put **T5 (Node 22) in its own commit.** It needs Docker Desktop running for `docker build`, and a real render + `claude --version` inside the image. Open the PR to `main`. Merge only on the user's go-ahead. After merging, **merge `main` into `v2`** so `v2` carries it.
 3. **004 Phases 1 → 3 on `v2`** (Waves 1–4, hard-ordered). Phase 1's font fix (AC-01) is only provable inside the built image, never on Windows (host Chromium has Segoe UI Symbol).
 4. **Review proposals 005–012** with the user (each ends in open questions), then `/specclaw:plan` them one at a time in roadmap order: **011 foundation → 012 → 008 → 009 → 010**, then the rest. _(Revised later on 2026-09-23; see the section above.)_
 5. **Stage-0 ops still outstanding from July:** team Claude token on both prod teams; mark each team's IMAGE provider `isDefault`; B4.
@@ -91,8 +91,8 @@ The post-merge run for PR #41 ([run 34988162569](https://github.com/bistec-oss/s
 
 | Topic               | Decision                                                                                                                                                                                               |
 | ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 004 emoji           | Monochrome symbol coverage only (★ ✓ →). The design prompt tells the agent **never to use emoji** in rendered designs (T3a). Captions unaffected.                                                      |
-| 004 rejected refine | Preview + **Use anyway** adopts it as a normal revision (T11a, new `…/revisions/[rev]/adopt` route). Rejected rows are still never pointed at.                                                         |
+| 004 emoji           | Monochrome symbol coverage only (★ ✓ →). The design prompt tells the agent **never to use emoji** in rendered designs (T10). Captions unaffected.                                                      |
+| 004 rejected refine | Preview + **Use anyway** adopts it as a normal revision (T19, new `…/revisions/[rev]/adopt` route). Rejected rows are still never pointed at.                                                          |
 | 004 verifier model  | Pinned to **Haiku**; the retry uses the user's refine model (FR-14b).                                                                                                                                  |
 | 004 Phase 0         | All four hardening items; token rotated by the Coolify admin; ships as its own PR to `main`.                                                                                                           |
 | 008 model choice    | Per post / per chat, remembered per user, team defaults. **Opus allowed for everyone by default.**                                                                                                     |

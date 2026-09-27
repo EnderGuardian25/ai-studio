@@ -15,14 +15,14 @@ This repo contains planning documents for **bistec-studio**, an internal marketi
   - **Work lives on branch `v2`** (pushed). All roadmap work, 004–012, lands there and merges to `main` **in one go, only once confirmed working and on the user's go-ahead**. `main` auto-deploys, so nothing on `v2` is on prod. **Exception: 004 Phase 0** ships as its own PR to `main` on `fix/ci-deploy-pipeline`, because deploy steps only run on `main`.
   - **🔴 Merges to `main` build but do NOT deploy.** Since 2026-09-15 the Coolify redeploy returns **401**: `COOLIFY_API_TOKEN` is dead ([run 34988162569](https://github.com/bistec-oss/studio/actions/runs/34988162569)). Prod runs `9ea4c045`, the same code as `main`, because `09a38b71` was docs-only.
     - The token is rotated by the **Coolify administrator**, using [`docs/coolify-token-rotation.md`](docs/coolify-token-rotation.md).
-    - The code hardening is **004 Wave 0** (T0b–T0f): readable failures, both redeploys always attempted, `/api/health` → `{ ok, commit }`, CI verifying the deployed commit, actions off Node 20, Node 20 → 22.
+    - The code hardening is **004 Wave 1** (T2–T6; task IDs renumbered 2026-09-27, old→new table at the top of `tasks.md`): readable failures, both redeploys always attempted, `/api/health` → `{ ok, commit }`, CI verifying the deployed commit, actions off Node 20, Node 20 → 22.
     - **Until that lands, a green `main` build is not evidence of a deploy.**
   - **New proposals:**
     - **008** model selection: Haiku/Sonnet/Opus per surface; per post/chat, remembered; Opus open to all by default.
     - **009** hero imagery: the image model makes the subject, not wallpaper; measurable layout archetypes.
     - **010** WhatsApp **Channel** posting, **assisted**: Meta has no official Channel API.
     - **011** app visual redesign: a **new direction**, opaque floating surfaces.
-  - **004 re-planned to 24 tasks:** Phase 0 + T3a (design prompt says no emoji; monochrome symbols only) + T11a ("Use anyway" adopts a rejected refine). The verifier is pinned to Haiku.
+  - **004 re-planned to 24 tasks:** Phase 0 + T10 (design prompt says no emoji; monochrome symbols only) + T19 ("Use anyway" adopts a rejected refine). The verifier is pinned to Haiku.
   - **Gotcha:** specclaw `git.strategy` is now **`direct`**, so `/specclaw:build` commits to the checked-out branch. Switch to `fix/ci-deploy-pipeline` before building Phase 0.
 
 - **✅ 2026-08-03 — the model's chat preamble was being PAINTED onto exported posts.** Reported as "unnecessary text is printed on top" on a prod regenerate; the exported PNG carried a caption across its top edge reading _"The file write wasn't permitted, so here's the complete HTML document directly:"_ — the design model's own prose.

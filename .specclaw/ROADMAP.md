@@ -27,7 +27,7 @@ These are "B cannot work until A lands", not just preferences.
 B4 scheduler fix (ops) ───────────────► 010 scheduled WhatsApp handoffs
 005 item 3 (isDefault image fix) ─────► 009 (else most users get no image at all)
 012 (per-channel captions) ───────────► 010 (the WhatsApp caption + per-channel publish)
-004 T3 (rasterizing harness) ─────────► 009 safe-area verification
+004 T9 (rasterizing harness) ─────────► 009 safe-area verification
 ```
 
 ## Soft dependencies (ordering that avoids rework)
@@ -49,7 +49,7 @@ B4 scheduler fix (ops) ───────────────► 010 sche
 | Naming              | **012** renames "copy" → "caption" in UI, docs and the code it touches. The `COPY` provider slot keeps its name (it also drives brand-voice drafting). |
 | Image generation    | **005** owns _providers_ (Gemini, `isDefault` resolution). **009** owns _how images are used_ (hero, archetypes, references).                          |
 | Design rules        | **007** owns kit _rules and typography_. **009** owns _composition_. **004** owns _refine_.                                                            |
-| Real-render testing | Built once in **004** (T3); reused by 007, 009 and 011.                                                                                                |
+| Real-render testing | Built once in **004** (T9); reused by 007, 009 and 011.                                                                                                |
 | UI                  | **011** owns the app's look, and the app shell's floating **Create post** button. 008, 010 and 012 add screens _in_ that look; they do not restyle.    |
 
 ## Recommended order
