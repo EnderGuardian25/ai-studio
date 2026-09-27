@@ -1,14 +1,14 @@
 # 🦞 SpecClaw Dashboard
 
 **Project:** bistec-studio
-**Last Updated:** 2026-09-27 12:06 UTC
+**Last Updated:** 2026-09-27 13:14 UTC
 
 ## Active Changes
 
 - 🔨 **001-marketing-post-studio-v1** — 18/29 tasks (62%) | 0 failed
 - ✅ **002-brief-draft-recovery** — 6/6 tasks (100%) | 0 failed
 - ✅ **003-async-draft-actions** — 12/12 tasks (100%) | 0 failed
-- 📝 **004-design-instruction-fidelity** — tasks done | 0/24 tasks (0%) | 0 failed
+- 🔨 **004-design-instruction-fidelity** — build in-progress | 5/24 tasks (20%) | 0 failed
 
 ## Pending Proposals
 

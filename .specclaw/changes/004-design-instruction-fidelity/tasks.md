@@ -37,32 +37,32 @@ Two migrations, one per phase, deliberately not merged — a single migration wo
   - Deferred-Reason: ops task outside the codebase; still open as of 2026-09-27 — run 34988162569 is still the latest `docker-publish` run and has not been re-run.
   - Deferred-Blocked-On: Coolify administrator rotating `COOLIFY_API_TOKEN`
 
-- [ ] `T2` — Self-explaining, always-both redeploy step
+- [x] `T2` — Self-explaining, always-both redeploy step
   - Files: `.github/workflows/docker-publish.yml`
   - Estimate: small
   - Kind: config
   - Notes: FR-P0-1/2, AC-P0-1. One script step looping both UUIDs; status → reason mapping; both always attempted; fail at end. Never echo the token.
 
-- [ ] `T3` — Commit SHA in the image + public `/api/health`
+- [x] `T3` — Commit SHA in the image + public `/api/health`
   - Files: `Dockerfile` (runner `ARG`/`ENV GIT_SHA`), `.github/workflows/docker-publish.yml` (`build-args`), `src/app/api/health/route.ts` (new), `src/proxy.ts` (public allowlist)
   - Estimate: small
   - Kind: impl
   - Notes: FR-P0-3/4, AC-P0-3. Returns exactly `{ ok, commit }`; no auth; nothing else exposed. E2E case: 200 without a session.
 
-- [ ] `T4` — Post-deploy verification + current action majors
+- [x] `T4` — Post-deploy verification + current action majors
   - Files: `.github/workflows/docker-publish.yml`
   - Estimate: small
   - Kind: config
   - Depends: T2, T3
   - Notes: FR-P0-5/6, AC-P0-2/4. Poll prod `/api/health` until `commit == github.sha` (~10 min cap, to cover boot-time migrations); scheduler verified via the Coolify deployment status. Bump `checkout` and the `docker/*` actions to current majors: `actions/checkout@v7` (matches `e2e.yml`), `docker/setup-buildx-action@v4`, `docker/login-action@v4`, `docker/metadata-action@v6`, `docker/build-push-action@v7`. Dependabot PRs #31–#34 propose exactly these bumps one at a time; this task supersedes them — close them once Phase 0 merges (#26 `setup-node@v7` touches `e2e.yml` and stays separate).
 
-- [ ] `T5` — Node 20 → 22 _(separate commit, so it reverts alone)_
+- [x] `T5` — Node 20 → 22 _(separate commit, so it reverts alone)_
   - Files: `Dockerfile` (3 `FROM` lines), `.github/workflows/e2e.yml` (3× `node-version`), `package.json` (`engines`)
   - Estimate: medium
   - Kind: config
   - Notes: FR-P0-7, AC-P0-5. The risk is the native pieces in the runner image (Alpine `chromium`, Prisma linux-musl engines, the Claude Code CLI), not app code. Prove with `docker build` + full mock E2E + one **real** render inside the image + `claude --version` inside the image. Docker Desktop must be running locally.
 
-- [ ] `T6` — Correct the deploy note in CLAUDE.md
+- [x] `T6` — Correct the deploy note in CLAUDE.md
   - Files: `CLAUDE.md`
   - Estimate: small
   - Kind: docs
