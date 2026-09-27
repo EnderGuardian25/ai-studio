@@ -71,21 +71,21 @@ Two migrations, one per phase, deliberately not merged — a single migration wo
 
 ### Wave 2 — Phase 1: glyph coverage, real-render harness, placeholder reconciliation
 
-- [ ] `T7` — Install monochrome symbol font coverage in the runner image
+- [x] `T7` — Install monochrome symbol font coverage in the runner image
   - Files: `Dockerfile`
   - Estimate: small
   - Kind: config
   - Notes: Beside the existing `font-noto-sinhala` on the runner stage (`Dockerfile:68`). Monochrome symbol coverage only — not a full colour emoji set (FR-21). Chromium's fontconfig fallback picks it up OS-wide; no CSS or `@import` in generated HTML.
   - ⚠️ **Verification requires a Docker image build.** This task's effect exists only inside the built image. A local test run uses host Chromium, which on Windows already has symbol coverage via Segoe UI Symbol and will pass whether or not this task was done — a false green. Prove it with `docker build` and run the assertion inside the image, or rely on the CI docker-build job. **The Docker daemon must be running**; it was not available in the planning session, which is why this is called out here rather than discovered at verify time.
 
-- [ ] `T8` — Font-set identifier, stamped per draft
+- [x] `T8` — Font-set identifier, stamped per draft
   - Files: `src/lib/renderer/fontSet.ts` (new), `prisma/schema.prisma`, `prisma/migrations/*`, render/export call sites
   - Estimate: medium
   - Kind: migration
   - Depends: T7
   - Notes: FR-22. Compute a digest of the installed font packages at boot; store on `Draft` beside `promptVersion`. Nullable — drafts rendered before this exist and are not wrong, just unstamped (Edge Cases). This is Phase 1's only migration.
 
-- [ ] `T9` — Reusable rasterizing test harness with glyph-agnostic tofu assertion
+- [x] `T9` — Reusable rasterizing test harness with glyph-agnostic tofu assertion
   - Files: `tests/e2e/helpers/rasterize.ts` (new), `tests/e2e/render-fidelity.test.ts` (new)
   - Estimate: large
   - Kind: test
@@ -93,13 +93,13 @@ Two migrations, one per phase, deliberately not merged — a single migration wo
   - Notes: FR-23, AC-01/02/03. Runs real `renderHtmlToPng` with `MOCK_PUPPETEER` **off**. Tofu detection compares the candidate glyph against a known-covered control glyph at the same size rather than matching an absolute pattern — a replacement box has a uniform-rectangle signature no real glyph has. This harness is the compounding asset: proposal 007 and every future font/render question reuse it. Include a `★` case that fails without T7 and passes with it.
   - ⚠️ **Split what this proves.** AC-02 (the harness detects tofu) is provable locally. AC-01 (the runner image actually has the glyph) is **not** — see T7. The `★` case will pass locally on Windows regardless of T7, so a green local run is not evidence the font fix works. Make the harness runnable inside the image so CI and a local `docker build` can both execute it.
 
-- [ ] `T10` — No-emoji guidance in the shared design prompt note _(added 2026-09-23)_
+- [x] `T10` — No-emoji guidance in the shared design prompt note _(added 2026-09-23)_
   - Files: `src/lib/agent/prompts/shared.ts`, `src/lib/agent/prompts/*` (version constant)
   - Estimate: small
   - Kind: impl
   - Notes: FR-21a, AC-07a. One line in `SCRIPT_SUPPORT_NOTE`: use symbols from the covered set (★ ✓ → etc.), never emoji, in the rendered design. Captions unaffected. Bump `PROMPT_VERSION`. User decision 2026-09-23: monochrome coverage only, so emoji must not be emitted into designs.
 
-- [ ] `T11` — Inline-asset reconciliation replacing detection
+- [x] `T11` — Inline-asset reconciliation replacing detection
   - Files: `src/lib/agent/inlineAssets.ts`, unit tests
   - Estimate: medium
   - Kind: impl
