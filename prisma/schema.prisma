@@ -491,6 +491,8 @@ model Draft {
 
   @@index([briefId])
   @@index([teamId])
+  // FK lookup side for ON DELETE SET NULL when a rejected DraftRevision is removed.
+  @@index([notAppliedRevisionId])
 }
 
 model Post {
