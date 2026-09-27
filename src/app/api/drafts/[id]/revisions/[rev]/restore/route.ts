@@ -7,6 +7,7 @@ import { canAccessContent } from '@/lib/authz/visibility'
 import { renderHtmlToPng } from '@/lib/renderer/puppeteer'
 import { uploadObject, resolveExportUrl, exportKey, BUCKET_EXPORTS } from '@/lib/storage/minio'
 import { dimensionsFor } from '@/lib/aspectRatio'
+import { findCommittedRevision } from '@/lib/drafts/revisions'
 
 export const maxDuration = 120
 
@@ -36,9 +37,11 @@ export const POST = withTeamAuth<Params>(async (_req, { params }, user) => {
     )
   }
 
-  const revision = await prisma.draftRevision.findFirst({
-    where: { draftId: params.id, revisionNumber },
-  })
+  // Committed chain rows only — this is also Undo's path (the client restores
+  // the revision number it captured before an action). A rejected refine render
+  // has no revision number, so it can never be restored or undone to; it is
+  // adopted only through "Use anyway", which commits a fresh revision (T19).
+  const revision = await findCommittedRevision(params.id, revisionNumber)
   if (!revision) return NextResponse.json({ error: 'Revision not found' }, { status: 404 })
 
   // Switching versions just moves the pointer and reuses the revision's ALREADY

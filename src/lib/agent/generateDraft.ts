@@ -97,7 +97,9 @@ async function produceDesign(
 }
 
 // Persist a freshly generated design onto a draft AND record it as revision v1
-// (the append-only history's origin — see F2). One transaction.
+// (the append-only history's origin — see F2). One transaction. The literal 1
+// is safe: a draft only gains other rows (refines, including rejected renders)
+// after it has a finished design, and rejected rows carry no number anyway.
 async function finalizeDraftV1(
   draftId: string,
   design: ProducedDesign,
