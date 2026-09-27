@@ -29,9 +29,22 @@ A 401 means Coolify didn't accept the token in the `COOLIFY_API_TOKEN` GitHub se
    - GitHub → `bistec-oss/studio` → **Settings → Secrets and variables → Actions** → `COOLIFY_API_TOKEN` → **Update**, or
    - from a terminal with repo admin rights: `gh secret set COOLIFY_API_TOKEN --repo bistec-oss/studio`, then paste the value when prompted. This keeps it out of shell history.
 3. **Prove it.** How depends on whether the Phase 0 pipeline fix (the redeploy/verify rewrite this doc already refers to above) has merged to `main` yet:
-   - **If Phase 0 has NOT merged:** re-run the failed job — `gh run rerun 34988162569 --failed --repo bistec-oss/studio`, or **Re-run failed jobs** in the Actions UI. Both **Redeploy app on Coolify** and **Redeploy scheduler on Coolify** should go green, and each resource's **Deployments** tab in Coolify should show a new deployment for the `sha-09a38b71…` image.
+   - **If Phase 0 has NOT merged, do not re-run 34988162569 either.** That run calls `/api/v1/deploy` with GET. Coolify v4.2.0 and later answer GET with **405** ("This endpoint has changed to a POST request") even when the token is good, so a red re-run tells you nothing about the new token. Prove the token directly instead, from any terminal:
+
+     ```sh
+     read -rs COOLIFY_TOKEN   # paste the token; it is not echoed or saved to shell history
+     curl -sS -X POST -H "Authorization: Bearer $COOLIFY_TOKEN" \
+       "https://coolify.bistecglobal.com/api/v1/deploy?uuid=nck8s530pseqdcfxt50hndl5&force=false"
+     ```
+
+     - **Good:** the reply contains a `deployment_uuid`. This really redeploys the app with the current `:latest` image (`sha-09a38b71…`, the same code prod already runs), so it is harmless. Repeat with the scheduler UUID `warr96qhvzrie5ndwv8oteeu`.
+     - **Then check the `read` ability:** `curl -sS -H "Authorization: Bearer $COOLIFY_TOKEN" "https://coolify.bistecglobal.com/api/v1/deployments/<deployment_uuid>"` should return 200 with a `status` field.
+     - **HTTP 401 or 403:** the token is rejected; recheck step 1.
+     - **HTTP 200 with `"Unauthorized to deploy this application."` and no `deployment_uuid`:** the token belongs to a Member; recreate it as an Admin or Owner (step 1).
+     - Finish with `unset COOLIFY_TOKEN`.
+
    - **If Phase 0 HAS merged, do not re-run 34988162569.** A re-run rebuilds and pushes that old `09a38b71` commit as `:latest` instead of whatever is actually on `main` by then — and separately, that run's redeploy step still sends the pre-fix GET to `/api/v1/deploy`, which Coolify ≥4.2.0 answers with 405 ("This endpoint has changed to a POST request"); Phase 0 switches to POST, but a pre-merge run never picks that up. Instead trigger a fresh run on `main`: `gh workflow run docker-publish.yml --ref main --repo bistec-oss/studio`, or **Actions → Build and push Docker image → Run workflow** with `main` selected. Success looks like: the **Redeploy on Coolify (app + scheduler, both always attempted)** step prints both lines as `HTTP 200 (ok)` with a deployment queued — not "Coolify accepted the call but queued no deployment: …", which is the Unauthorized-to-deploy shape a Member token produces (see step 1) — the **Verify deploy (prod /api/health + scheduler deployment status)** step goes green, and `https://studio.bistecglobal.com/api/health` returns the commit SHA that's on `main`.
-   - **⚠️ Never re-run a pre-merge run after the merge** — it redeploys stale code behind a green checkmark that looks identical to a real deploy.
+   - **⚠️ Never re-run a pre-merge run after the merge.** On Coolify older than v4.2.0 it redeploys stale code behind a green checkmark that looks identical to a real deploy; on v4.2.0 and later it just fails with 405.
 4. **Tell the dev team** so 004 Phase 0 can be marked unblocked.
 
 ## While you're in Coolify
