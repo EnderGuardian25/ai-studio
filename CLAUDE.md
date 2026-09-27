@@ -25,6 +25,7 @@ This repo contains planning documents for **bistec-studio**, an internal marketi
     - **010** WhatsApp **Channel** posting, **assisted**: Meta has no official Channel API.
     - **011** app visual redesign: a **new direction**, opaque floating surfaces.
   - **004 re-planned to 24 tasks:** Phase 0 + T10 (design prompt says no emoji; monochrome symbols only) + T19 ("Use anyway" adopts a rejected refine). The verifier is pinned to Haiku.
+  - **004 Phase 1 (Wave 2) built on `v2`:** commits `744f4b83`, `da54f2fc`, `7f880b07`, `404b0030`, `3a7dc4d0` plus the Wave 2 fix commit. **One new migration `20260927120000_draft_font_set`** — a redeploy applies it; locally run `npx prisma migrate deploy` after pulling `v2`. New `npm run test:render` real-render harness.
   - **Gotcha:** specclaw `git.strategy` is now **`direct`**, so `/specclaw:build` commits to the checked-out branch. Switch to `fix/ci-deploy-pipeline` before building Phase 0.
 
 - **✅ 2026-08-03 — the model's chat preamble was being PAINTED onto exported posts.** Reported as "unnecessary text is printed on top" on a prod regenerate; the exported PNG carried a caption across its top edge reading _"The file write wasn't permitted, so here's the complete HTML document directly:"_ — the design model's own prose.

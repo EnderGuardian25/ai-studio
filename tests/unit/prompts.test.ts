@@ -174,8 +174,17 @@ describe('SCRIPT_SUPPORT_NOTE — no-emoji guidance', () => {
     expect(SCRIPT_SUPPORT_NOTE).toContain('captions are unaffected')
   })
 
+  it('carves emoji out of the exact-reproduction rule so the two rules cannot conflict', () => {
+    // The exact-reproduction rule (protects Sinhala and other scripts) must not
+    // fight the no-emoji-in-design rule: emoji get an explicit, narrow exception.
+    expect(SCRIPT_SUPPORT_NOTE).toContain('The only exception is emoji')
+    expect(SCRIPT_SUPPORT_NOTE).toContain('does NOT contradict the exact-reproduction rule')
+    expect(SCRIPT_SUPPORT_NOTE).toContain('leave those emoji out of the rendered design')
+    expect(SCRIPT_SUPPORT_NOTE).toContain('the caption text keeps the copy\'s original emoji unchanged')
+  })
+
   it('bumps PROMPT_VERSION alongside the note change', () => {
-    expect(PROMPT_VERSION).toBe('2026-09-27.1')
+    expect(PROMPT_VERSION).toBe('2026-09-27.2')
   })
 })
 

@@ -234,11 +234,13 @@ jobs:
       # the image's node_modules; --entrypoint skips the migrate-on-boot step.
       - name: Glyph coverage inside the runner image
         run: |
-          docker run --rm \
+          docker run --rm --network none \
             -v "$PWD/scripts/glyph-check:/app/glyph-check:ro" \
             --entrypoint node bistec-studio:ci /app/glyph-check/check-glyphs.mjs
 
       # Change 004 FR-23: the rasterizing harness (tests/render/**) through the
-      # real renderHtmlToPng on the runner's Google Chrome, MOCK_PUPPETEER off.
+      # real renderHtmlToPng, MOCK_PUPPETEER off. The runner has no Google Chrome;
+      # puppeteer.ts's COMMON_LINUX_PATHS resolves /usr/bin/chromium-browser first
+      # (a Chromium symlink), so this runs on Chromium, not Chrome.
       - name: Render-fidelity harness (real Chromium)
         run: npm run test:render

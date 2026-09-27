@@ -117,6 +117,8 @@ async function launchBrowser(): Promise<Browser> {
   const executablePath = resolveExecutablePath()
   const browser = await puppeteer.launch({
     executablePath,
+    // Keep in sync with scripts/glyph-check/check-glyphs.mjs (launch args and
+    // deviceScaleFactor are duplicated there).
     args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"],
   })
   // If Chromium crashes or is killed, drop the cached handle so the next render
@@ -152,6 +154,8 @@ async function renderOnce(
   const browser = await getBrowser()
   const page = await browser.newPage()
   try {
+    // Keep in sync with scripts/glyph-check/check-glyphs.mjs (launch args and
+    // deviceScaleFactor are duplicated there).
     await page.setViewport({ width, height, deviceScaleFactor: 2 })
     await page.setRequestInterception(true)
     page.on("request", (req) => {
