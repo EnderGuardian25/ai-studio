@@ -6,7 +6,7 @@ import type { PipelineMode } from '@/lib/agent/config'
 
 // Bump when prompt content changes materially; persisted on Draft.promptVersion
 // so output quality can be correlated with prompt revisions.
-export const PROMPT_VERSION = '2026-07-28.1'
+export const PROMPT_VERSION = '2026-09-27.1'
 
 // Multilingual/script fidelity, applied to every design surface (Path A/B +
 // refine). The copy generator can emit non-Latin scripts (Sinhala especially,
@@ -18,7 +18,8 @@ export const PROMPT_VERSION = '2026-07-28.1'
 export const SCRIPT_SUPPORT_NOTE = `
 Text & language fidelity:
 - The copy may contain non-Latin scripts, including Sinhala (සිංහල). Reproduce every character of the copy EXACTLY as given — never transliterate, romanize, drop, or substitute glyphs.
-- Sinhala (and other Unicode) text renders correctly in the output. You may name "Noto Sans Sinhala" explicitly in a font-family for Sinhala text, but the renderer also falls back to it automatically, so unstyled Sinhala still renders.`
+- Sinhala (and other Unicode) text renders correctly in the output. You may name "Noto Sans Sinhala" explicitly in a font-family for Sinhala text, but the renderer also falls back to it automatically, so unstyled Sinhala still renders.
+- In the rendered design, use monochrome symbols from the covered set (e.g. ★ ✓ → • ✦) — never emoji; colour emoji glyphs are not installed and render as boxes. This applies to the design only; captions are unaffected.`
 
 // Instruction to preserve externalized inline-asset tokens (see inlineAssets.ts).
 // Included whenever the model sees HTML whose data: URIs were tokenized.
