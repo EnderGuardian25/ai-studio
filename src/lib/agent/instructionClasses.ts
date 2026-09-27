@@ -51,6 +51,21 @@
 // A fragment that resolves to nothing in `before` is always a miss: the model
 // named something that is not there, so its absence afterwards proves nothing.
 //
+// Finding the passage afterwards (counterpart): a surviving phrase is followed
+// to the shortest element holding it with the passage's own tag+classes; a
+// vanished phrase to the same-shape element sharing at least half the
+// passage's words; otherwise the passage is "gone". Known limits:
+//   - N5 (open, minor): a passage that is re-tagged (a <p class="body-copy">
+//     rewritten as <div class="lead">) with its phrase reworded out has no
+//     counterpart and counts as gone — a remove passes it.
+//   - A constrain whose target phrase vanishes and whose passage keeps under
+//     half its words reads as gone (a miss). The constrain semantics ask for a
+//     target phrase that stays in the result.
+//   - N7 (accepted, fail-closed): an image-bearing container whose only text is
+//     a single child (section.hero wrapping just an <h1>) is indistinguishable
+//     from a leaf, so "replace .hero" that keeps the headline misses. The
+//     prompt steers backgrounds to image-URL fragments, which do not hit this.
+//
 // A text passage counts as reduced only when it no longer appears INTACT in the
 // document's text (re-wrapping a phrase in <strong>, or splitting a paragraph
 // into several elements, shrinks the innermost container without removing a
@@ -123,7 +138,8 @@ export interface DomFacts {
   // Count of rendered (display != none) elements under <body>.
   elementCount: number
   // Every rendered element that carries visible text or an image source, in
-  // document order.
+  // document (pre-)order — an element's descendants immediately follow it. The
+  // leaf test in this module relies on that order.
   elements: DomElementFact[]
 }
 
@@ -204,17 +220,29 @@ function innermost(facts: DomFacts, phrase: string): { elements: DomElementFact[
 
 const unique = <T>(xs: T[]) => [...new Set(xs)]
 
-// A leaf carries text of its own: no other element's non-empty text is a
-// strictly shorter substring of its text. (DomFacts has no parent links; a
-// container's subtree text contains its children's shorter texts.)
+// A leaf carries text of its own rather than only its descendants' text.
+// DomFacts has no parent links, but `elements` is in pre-order, so an
+// element's descendants are the contiguous run right after it. The scan walks
+// that run and stops at the first element that cannot be a descendant:
+//   - its text is not contained in the element's text, or
+//   - the document text shows it FOLLOWING the element (the element's text
+//     immediately followed by its own) — a next sibling such as a "SEATS" label
+//     right after a "LIMITED SEATS" badge.
+// Inside the run, a non-empty strictly shorter text means the element wraps a
+// child's text: a container, not a leaf. Unrelated labels elsewhere in the
+// document no longer matter.
 function isLeaf(facts: DomFacts, el: DomElementFact): boolean {
   const t = fold(el.text)
   if (!t) return false
-  return !facts.elements.some((o) => {
-    if (o === el) return false
-    const ot = fold(o.text)
-    return ot.length > 0 && ot.length < t.length && t.includes(ot)
-  })
+  const doc = fold(facts.text)
+  const i = facts.elements.indexOf(el)
+  for (let j = i + 1; j < facts.elements.length; j++) {
+    const ot = fold(facts.elements[j].text)
+    if (!t.includes(ot)) break
+    if (ot && (doc.includes(`${t} ${ot}`) || doc.includes(t + ot))) break
+    if (ot.length > 0 && ot.length < t.length) return false
+  }
+  return true
 }
 
 // What a fragment identified in `before`.
@@ -326,11 +354,18 @@ function resolveSupersedes(cls: InstructionClass, input: PostConditionInput): Re
 // ── Constrain target measurement ─────────────────────────────────────────────
 
 // The `after` element corresponding to a `before` element identified by a
-// fragment. A TEXT fragment is re-resolved in `after` first (its innermost
-// container, preferring the same tag+classes), so a same-shape element that an
-// add clause inserted ahead of it is never measured instead; only when the
-// phrase is gone does it fall back to position. Otherwise: same id; else the
-// same tag+classes at the same ordinal; else the fragment re-resolved in after.
+// fragment. Returns null when it is gone.
+//
+// TEXT fragment (the element is the phrase's innermost container, the passage):
+//   - phrase survives → the SHORTEST after element holding the phrase with the
+//     same tag+classes as the passage — not an innermost <strong> wrapper or a
+//     new pull-quote repeating it; the innermost holder only if none has that
+//     shape;
+//   - phrase gone → the same-tag+classes element sharing the most words with the
+//     original passage, provided it shares at least half of them (an inserted
+//     caption ahead of it is not the passage); else the same id; else gone.
+// Other fragments: same id; else the same tag+classes at the same ordinal; else
+// the fragment re-resolved in after.
 function counterpart(
   before: DomFacts,
   after: DomFacts,
@@ -340,14 +375,27 @@ function counterpart(
 ): DomElementFact | null {
   const sameShape = (e: DomElementFact) => e.tag === el.tag && e.classes.join(' ') === el.classes.join(' ')
   const again = resolveFragment(after, fragment)
-  if (kind === 'text' && again?.kind === 'text' && again.elements.length > 0) {
-    return again.elements.find(sameShape) ?? again.elements[0]
+
+  if (kind === 'text') {
+    const phrase = fold(decodeHtmlEntities(fragment).trim())
+    const holders = after.elements.filter((e) => fold(e.text).includes(phrase))
+    if (holders.length > 0) {
+      const same = holders.filter(sameShape).sort((a, b) => textLength(a.text) - textLength(b.text))[0]
+      return same ?? (again?.kind === 'text' ? again.elements[0] : undefined) ?? holders[0]
+    }
+    const passageWords = new Set(fold(el.text).split(' ').filter(Boolean))
+    const overlap = (e: DomElementFact) => fold(e.text).split(' ').filter((w) => passageWords.has(w)).length
+    const best = after.elements.filter(sameShape).sort((a, b) => overlap(b) - overlap(a))[0]
+    if (best && overlap(best) * 2 >= passageWords.size) return best
+    if (el.id) return after.elements.find((e) => e.id === el.id) ?? null
+    return null
   }
+
   if (el.id) return after.elements.find((e) => e.id === el.id) ?? null
   const ordinal = before.elements.filter(sameShape).indexOf(el)
   const candidate = after.elements.filter(sameShape)[ordinal]
   if (candidate) return candidate
-  return kind === 'text' ? null : (again?.elements[0] ?? null)
+  return again?.elements[0] ?? null
 }
 
 function measures(e: DomElementFact): Record<string, number | null> {
@@ -498,7 +546,7 @@ export const INSTRUCTION_CLASSES: InstructionClassTable = {
   },
   constrain: {
     semantics:
-      'Bound a measurable size or length of existing content — font size, element size, text length or word count — without adding anything: no new elements, images or text. Name the target in constrains with the direction of the change. Examples: "make the headline smaller" → constrains [{"fragment": "<the headline\'s #id, .class or a phrase of its text>", "direction": "decrease"}] and reduce its font-size; "keep the body text under 12 words" → constrains [{"fragment": "<a phrase of the body text>", "direction": "decrease"}]. supersedes stays empty — a constrain deletes nothing.',
+      'Bound a measurable size or length of existing content — font size, element size, text length or word count — without adding anything: no new elements, images or text. Name the target in constrains with the direction of the change; a text phrase used as the target must still be present after your edit. Examples: "make the headline smaller" → constrains [{"fragment": "<the headline\'s #id, .class or a phrase of its text>", "direction": "decrease"}] and reduce its font-size; "keep the body text under 12 words" → constrains [{"fragment": "<a phrase of the body text>", "direction": "decrease"}]. supersedes stays empty — a constrain deletes nothing.',
     postCondition: boundedAttributeHolds,
     destructive: false,
     additive: false,

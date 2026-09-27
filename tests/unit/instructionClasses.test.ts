@@ -123,6 +123,7 @@ describe('INSTRUCTION_CLASSES — the single per-class table', () => {
     expect(INSTRUCTION_CLASSES.constrain.semantics).toMatch(/make the headline smaller/i)
     expect(INSTRUCTION_CLASSES.constrain.semantics).toMatch(/constrains/)
     expect(INSTRUCTION_CLASSES.constrain.semantics).toMatch(/"direction": "decrease"/)
+    expect(INSTRUCTION_CLASSES.constrain.semantics).toMatch(/still be present after/i) // fix round 3
   })
 })
 
@@ -583,8 +584,137 @@ describe('fix round 2 — constrain measures the target, not a same-shape newcom
     expect(r.ok).toBe(false)
   })
 
-  it('falls back to position when the targeted phrase is gone', () => {
-    const after = facts([bgLayer(), headline(), body('Join us for an evening.'), logo()])
+  it('phrase gone: a moderately cut passage is found by word overlap', () => {
+    const after = facts([bgLayer(), headline(), body(LONG_BODY.replace('hands-on workshops', 'workshops')), logo()])
     expect(check('constrain', { after, constrains: [{ fragment: 'hands-on workshops', direction: 'decrease' }] })).toEqual({ ok: true })
+  })
+
+  // Fix round 3 ruling: with the phrase gone, a passage keeping under half its
+  // words has no counterpart and reads as gone — fail-closed for a constrain.
+  it('phrase gone: a passage that kept under half its words reads as gone (fail closed)', () => {
+    const after = facts([bgLayer(), headline(), body('Join us for an evening.'), logo()])
+    const r = check('constrain', { after, constrains: [{ fragment: 'hands-on workshops', direction: 'decrease' }] })
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.reason).toMatch(/gone/)
+  })
+})
+
+// ── Fix round 3 probes ────────────────────────────────────────────────────────
+
+describe('fix round 3 — the passage counterpart, not an innermost wrapper or a newcomer (findings 1 & 2)', () => {
+  const swapped = LONG_BODY.replace('region', 'nation')
+  const reworded = LONG_BODY.replace('an unforgettable evening', 'a truly memorable evening')
+  const pullQuote = (text: string, fontSizePx = 40) =>
+    el({ tag: 'blockquote', classes: ['pull-quote'], text, fontSizePx, box: { width: 600, height: 80 } })
+
+  // N1: one word swapped in the body, the phrase also wrapped in <strong>, caption added.
+  it('N1 remove+add: fails when the phrase is wrapped in <strong> and the body only swaps a word', () => {
+    const after = nested(`INDUSTRY READINESS PROGRAMME ${swapped} Cap`, [
+      bgLayer(),
+      headline(),
+      body(swapped),
+      el({ tag: 'strong', text: 'unforgettable evening' }),
+      el({ tag: 'p', classes: ['caption'], text: 'Cap' }),
+    ])
+    expect(check('remove', { after, supersedes: ['unforgettable evening'], classes: ['remove', 'add'] }).ok).toBe(false)
+  })
+
+  // N2: a new pull-quote repeats the phrase; the body only swaps a word.
+  it('N2 remove+add: fails when a new pull-quote repeats the phrase and the body only swaps a word', () => {
+    const after = facts([bgLayer(), headline(), body(swapped), pullQuote('An unforgettable evening'), logo()])
+    expect(check('remove', { after, supersedes: ['unforgettable evening'], classes: ['remove', 'add'] }).ok).toBe(false)
+  })
+
+  // N3: the regression from the round-2 counterpart — the pull-quote was measured instead of the body.
+  it('N3 constrain+add: fails when the body is untouched and a smaller pull-quote repeats the target phrase', () => {
+    const after = facts([bgLayer(), headline(), body(), logo(), pullQuote('Hands-on workshops', 28)])
+    const r = check('constrain', {
+      after,
+      constrains: [{ fragment: 'hands-on workshops', direction: 'decrease' }],
+      classes: ['constrain', 'add'],
+    })
+    expect(r.ok).toBe(false)
+  })
+
+  // N4 / N4b: phrase reworded out, passage grows, a short same-shape <p> inserted BEFORE it.
+  it('N4 remove+add: fails when the phrase is reworded out and a short same-shape <p> is inserted before the grown passage', () => {
+    const after = facts([bgLayer(), headline(), body('Short new caption.'), body(reworded), logo()])
+    expect(check('remove', { after, supersedes: ['unforgettable evening'], classes: ['remove', 'add'] }).ok).toBe(false)
+  })
+
+  it('N4b replace+remove: fails the same with the background swapped', () => {
+    const after = facts([bgLayer(UPLOAD), headline(), body('Short new caption.'), body(reworded), logo()])
+    const input = { after, supersedes: [OLD_BG, 'unforgettable evening'], classes: ['replace', 'remove'] as InstructionClass[] }
+    expect(check('replace', input).ok).toBe(false)
+    expect(check('remove', input).ok).toBe(false)
+  })
+
+  it('phrase gone: finds the same-shape passage by word overlap past an inserted caption', () => {
+    const cut = LONG_BODY.replace('hands-on workshops', 'workshops')
+    const after = facts([bgLayer(), headline(), body('Short new caption.'), body(cut), logo()])
+    expect(
+      check('constrain', { after, constrains: [{ fragment: 'hands-on workshops', direction: 'decrease' }], classes: ['constrain', 'add'] }),
+    ).toEqual({ ok: true })
+  })
+
+  it('phrase survives: the same-shape holder is measured even when a shorter wrapper also holds it', () => {
+    const shorter = 'Join us for an unforgettable evening of workshops.'
+    const after = nested(`INDUSTRY READINESS PROGRAMME ${shorter}`, [
+      bgLayer(),
+      headline(),
+      body(shorter),
+      el({ tag: 'strong', text: 'unforgettable evening' }),
+    ])
+    expect(check('remove', { after, supersedes: ['unforgettable evening'], classes: ['remove', 'add'] })).toEqual({ ok: true })
+  })
+})
+
+describe('fix round 3 — a short label elsewhere does not make a badge a container (finding 3)', () => {
+  const BADGE = 'http://minio.local/images/badge.png'
+  const badge = (src: string, text: string) => el({ tag: 'div', classes: ['promo-badge'], text, imageSources: [src] })
+  const cases: Array<[string, string]> = [
+    ['LIMITED SEATS', 'SEATS'],
+    ['APPLY NOW', 'Apply'],
+    ['IRP 2026', 'IRP'],
+  ]
+
+  for (const [badgeText, labelText] of cases) {
+    const label = el({ tag: 'span', classes: ['label'], text: labelText })
+
+    it(`label "${labelText}" BEFORE badge "${badgeText}": image swapped, text kept → miss`, () => {
+      const before = facts([label, headline(), badge(BADGE, badgeText)])
+      const after = facts([label, headline(), badge(UPLOAD, badgeText)])
+      expect(check('replace', { before, after, supersedes: ['.promo-badge'] }).ok).toBe(false)
+    })
+
+    it(`label "${labelText}" right AFTER badge "${badgeText}": image swapped, text kept → miss`, () => {
+      const before = facts([headline(), badge(BADGE, badgeText), label])
+      const after = facts([headline(), badge(UPLOAD, badgeText), label])
+      expect(check('replace', { before, after, supersedes: ['.promo-badge'] }).ok).toBe(false)
+    })
+  }
+
+  it('a badge whose text lives in a child <span> of the same text: image swapped, text kept → miss (N8)', () => {
+    const span = el({ tag: 'span', text: 'LIMITED SEATS' })
+    const before = nested('LIMITED SEATS', [badge(BADGE, 'LIMITED SEATS'), span])
+    const after = nested('LIMITED SEATS', [badge(UPLOAD, 'LIMITED SEATS'), span])
+    expect(check('replace', { before, after, supersedes: ['.promo-badge'] }).ok).toBe(false)
+  })
+
+  it('a container whose descendants follow it (pre-order) is still a container', () => {
+    const hero = (src: string) =>
+      el({ tag: 'section', classes: ['hero'], imageSources: [src], text: 'INDUSTRY READINESS PROGRAMME Apply now' })
+    const kids = [headline(), el({ tag: 'a', classes: ['cta'], text: 'Apply now' })]
+    const text = 'INDUSTRY READINESS PROGRAMME Apply now'
+    expect(check('replace', { before: nested(text, [hero(OLD_BG), ...kids]), after: nested(text, [hero(UPLOAD), ...kids]), supersedes: ['.hero'] })).toEqual({
+      ok: true,
+    })
+  })
+
+  // N7 — accepted as fail-closed: an image container whose ONLY text is one child
+  // is indistinguishable from a leaf, so "replace .hero" keeping the headline misses.
+  it('N7: a hero wrapping only its headline counts as a leaf (fail-closed, accepted)', () => {
+    const hero = (src: string) => el({ tag: 'section', classes: ['hero'], imageSources: [src], text: 'INDUSTRY READINESS PROGRAMME' })
+    expect(check('replace', { before: facts([hero(OLD_BG), headline()]), after: facts([hero(UPLOAD), headline()]), supersedes: ['.hero'] }).ok).toBe(false)
   })
 })
