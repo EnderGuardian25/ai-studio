@@ -5,7 +5,7 @@ import {
   renderEnvelopeProtocol,
   REFINE_ENVELOPE_EXAMPLE,
 } from '@/lib/agent/refineEnvelope'
-import { INSTRUCTION_CLASS_KEYS } from '@/lib/agent/instructionClasses'
+import { INSTRUCTION_CLASS_KEYS, SUPERSEDES_RULE, CONSTRAINS_RULE } from '@/lib/agent/instructionClasses'
 
 const DOC = `<!DOCTYPE html>
 <html><head><style>body{margin:0} .hero{background-image:url('http://minio.local/images/new.jpg')}</style></head>
@@ -20,6 +20,7 @@ describe('parseRefineEnvelope — the documented wire format', () => {
     expect(out).toEqual({
       classes: ['replace'],
       supersedes: ['http://minio.local/images/old.png'],
+      constrains: [],
       html: DOC,
       discarded: '',
       classificationDefaulted: false,
@@ -150,6 +151,69 @@ describe('parseRefineEnvelope — defaults (FR-05)', () => {
   })
 })
 
+describe('parseRefineEnvelope — constrains (fix round 1, ruling 4)', () => {
+  it('parses constrain targets with directions', () => {
+    const out = parseRefineEnvelope(
+      FENCED('{"classes":["constrain"],"supersedes":[],"constrains":[{"fragment":"#headline","direction":"decrease"},{"fragment":".logo","direction":"increase"}]}'),
+    )
+    expect(out?.constrains).toEqual([
+      { fragment: '#headline', direction: 'decrease' },
+      { fragment: '.logo', direction: 'increase' },
+    ])
+  })
+
+  it('accepts a bare string target, drops an invalid direction, and cleans the list', () => {
+    const out = parseRefineEnvelope(
+      FENCED('{"classes":["constrain"],"constrains":["#headline",{"fragment":" .logo ","direction":"Smaller"},{"fragment":""},{"direction":"decrease"},7,null,{"fragment":"#headline"}]}'),
+    )
+    expect(out?.constrains).toEqual([{ fragment: '#headline' }, { fragment: '.logo' }])
+  })
+
+  it('normalises direction case', () => {
+    const out = parseRefineEnvelope(FENCED('{"classes":["constrain"],"constrains":[{"fragment":"#h","direction":" DECREASE "}]}'))
+    expect(out?.constrains).toEqual([{ fragment: '#h', direction: 'decrease' }])
+  })
+
+  it('defaults a missing constrains to []', () => {
+    expect(parseRefineEnvelope(FENCED('{"classes":["add"]}'))?.constrains).toEqual([])
+  })
+
+  it('recognises a header that carries only constrains', () => {
+    const out = parseRefineEnvelope(FENCED('{"constrains":[{"fragment":"#h"}]}'))
+    expect(out?.constrains).toEqual([{ fragment: '#h' }])
+    expect(out?.classificationDefaulted).toBe(true)
+  })
+})
+
+describe('parseRefineEnvelope — narration that mentions a doctype (fix round 1, minor #5)', () => {
+  it('re-cuts the document after a header that extractHtmlDocument swallowed', () => {
+    const raw = `I'll return the header and then the full <!DOCTYPE html> document.
+${FENCED('{"classes":["remove"],"supersedes":["Join us for"]}')}`
+    const out = parseRefineEnvelope(raw)
+    expect(out?.classes).toEqual(['remove'])
+    expect(out?.supersedes).toEqual(['Join us for'])
+    expect(out?.classificationDefaulted).toBe(false)
+    expect(out?.html).toBe(DOC)
+    expect(out?.discarded).toContain("I'll return the header")
+  })
+
+  it('handles a mention of <html> with an unfenced header', () => {
+    const raw = `Here is your <html> page:
+{"classes":["constrain"],"constrains":[{"fragment":"#h","direction":"decrease"}]}
+${DOC}`
+    const out = parseRefineEnvelope(raw)
+    expect(out?.classes).toEqual(['constrain'])
+    expect(out?.html).toBe(DOC)
+  })
+
+  it('still ignores JSON inside the real document body', () => {
+    const docWithJson = DOC.replace('</body>', '<script type="application/json">{"classes":["remove"],"supersedes":["x"]}</script></body>')
+    const out = parseRefineEnvelope(`Mentioning <!DOCTYPE html> here.
+${docWithJson}`)
+    expect(out?.classificationDefaulted).toBe(true)
+  })
+})
+
 describe('effectiveClasses — FR-04 downgrade, for the route to call', () => {
   it('leaves a destructive class with a named element alone', () => {
     expect(effectiveClasses({ classes: ['replace', 'add'], supersedes: ['old.png'] })).toEqual({
@@ -161,7 +225,7 @@ describe('effectiveClasses — FR-04 downgrade, for the route to call', () => {
   // AC-10: an empty supersedes deletes nothing — it resolves to preserving.
   it('downgrades replace/remove with empty supersedes to the preserving class and reports it', () => {
     expect(effectiveClasses({ classes: ['replace'], supersedes: [] })).toEqual({ classes: ['add'], downgraded: ['replace'] })
-    expect(effectiveClasses({ classes: ['remove', 'constrain'], supersedes: [] })).toEqual({
+    expect(effectiveClasses({ classes: ['remove', 'constrain'], supersedes: [], constrains: [{ fragment: '#headline' }] })).toEqual({
       classes: ['add', 'constrain'],
       downgraded: ['remove'],
     })
@@ -178,8 +242,21 @@ describe('effectiveClasses — FR-04 downgrade, for the route to call', () => {
     })
   })
 
-  it('leaves non-destructive classes alone even with empty supersedes', () => {
-    expect(effectiveClasses({ classes: ['constrain'], supersedes: [] })).toEqual({ classes: ['constrain'], downgraded: [] })
+  it('leaves add alone with empty supersedes', () => {
+    expect(effectiveClasses({ classes: ['add'], supersedes: [], constrains: [] })).toEqual({ classes: ['add'], downgraded: [] })
+  })
+
+  // Fix round 1, ruling 4: an untargeted constrain cannot be verified.
+  it('downgrades a constrain with no usable target to add and reports it', () => {
+    expect(effectiveClasses({ classes: ['constrain'], supersedes: [], constrains: [] })).toEqual({ classes: ['add'], downgraded: ['constrain'] })
+    expect(effectiveClasses({ classes: ['constrain'], supersedes: [], constrains: [{ fragment: '   ' }] }).downgraded).toEqual(['constrain'])
+    expect(effectiveClasses({ classes: ['constrain', 'add'], supersedes: [] })).toEqual({ classes: ['add'], downgraded: ['constrain'] })
+  })
+
+  it('keeps a targeted constrain', () => {
+    expect(
+      effectiveClasses({ classes: ['constrain'], supersedes: [], constrains: [{ fragment: '#headline', direction: 'decrease' }] }),
+    ).toEqual({ classes: ['constrain'], downgraded: [] })
   })
 })
 
@@ -190,5 +267,14 @@ describe('renderEnvelopeProtocol — the output protocol T17 puts in the prompt'
     expect(p).toContain('"classes"')
     expect(p).toContain('"supersedes"')
     expect(p).toMatch(/before the (HTML )?document/i)
+    expect(p).toContain('"constrains"')
+  })
+
+  // Minor #8: the fragment rules are stated once, in renderClassSemantics.
+  it('does not restate the supersedes / constrains rules', () => {
+    const p = renderEnvelopeProtocol()
+    expect(p).not.toContain(SUPERSEDES_RULE)
+    expect(p).not.toContain(CONSTRAINS_RULE)
+    expect(p).not.toMatch(/verbatim/i)
   })
 })
