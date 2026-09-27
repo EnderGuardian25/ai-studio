@@ -25,8 +25,9 @@
 // because multi-clause instructions (AC-11) are verified class by class over the
 // SAME document. Where a co-present class is `additive` in the table (add,
 // replace) it legitimately grows the document, so the whole-document growth /
-// shrink checks of the other classes stand down. The per-fragment and
-// per-target checks never do.
+// shrink checks of the other classes stand down — remove's word count is then
+// narrowed to the named passages' shapes rather than dropped (see Known limits,
+// I3). The per-fragment and per-target checks never stand down.
 //
 // ── Fragments ────────────────────────────────────────────────────────────────
 // `supersedes` entries and `constrains[].fragment` are verbatim identifying
@@ -65,6 +66,19 @@
 //     a single child (section.hero wrapping just an <h1>) is indistinguishable
 //     from a leaf, so "replace .hero" that keeps the headline misses. The
 //     prompt steers backgrounds to image-URL fragments, which do not hit this.
+//   - The overlap counts DISTINCT shared words, so a newcomer repeating one
+//     passage word ("join join join …") is not taken for the passage (R3).
+//   - Remove with an additive class co-present (I3): the counterpart alone can
+//     be fooled — a passage split into same-shape halves, or a new same-shape
+//     element repeating the phrase, gives a shorter "counterpart". So the
+//     stood-down whole-document word count is replaced by the words summed
+//     over every element with each text passage's tag+classes, which must
+//     strictly decrease. Accepted consequences (fail-closed): a deliberately
+//     added paragraph of the passage's own shape counts against the reduction,
+//     and so does a replace+remove whose replacement TEXT, in the same shape,
+//     is longer than what it replaced. Nested same-shape elements (a class-less
+//     <div> inside another) are counted once per level, before and after
+//     alike.
 //
 // A text passage counts as reduced only when it no longer appears INTACT in the
 // document's text (re-wrapping a phrase in <strong>, or splitting a paragraph
@@ -328,6 +342,25 @@ function contentReduced(before: DomFacts, after: DomFacts, r: ResolvedFragment):
 }
 
 const hasText = (r: ResolvedFragment) => r.passages.length > 0
+
+const shapeKey = (e: DomElementFact) => [e.tag, ...e.classes].join('.')
+
+// For a TEXT fragment: each shape (tag+classes) of its passage elements whose
+// total word count, summed over EVERY element of that shape, did not strictly
+// decrease. Splitting the passage into same-shape halves, or re-adding its
+// phrase in a new same-shape element, cannot pass. Tokens are already measured
+// over every element carrying them (contentReduced); image fragments carry no
+// passage; a phrase that crossed element boundaries has no shape.
+function shapesNotShrunk(before: DomFacts, after: DomFacts, r: ResolvedFragment): string[] {
+  if (r.kind !== 'text') return []
+  const total = (facts: DomFacts, key: string) =>
+    facts.elements.filter((e) => shapeKey(e) === key).reduce((n, e) => n + wordCount(e.text), 0)
+  return unique(r.elements.map(shapeKey)).flatMap((key) => {
+    const w0 = total(before, key)
+    const w1 = total(after, key)
+    return w1 < w0 ? [] : [`${key} ${w0} → ${w1} words`]
+  })
+}
 const quoted = (fs: string[]) => fs.map((f) => JSON.stringify(f)).join(', ')
 
 const othersAdditive = (input: PostConditionInput, table: InstructionClassTable, self: InstructionClass) =>
@@ -384,7 +417,8 @@ function counterpart(
       return same ?? (again?.kind === 'text' ? again.elements[0] : undefined) ?? holders[0]
     }
     const passageWords = new Set(fold(el.text).split(' ').filter(Boolean))
-    const overlap = (e: DomElementFact) => fold(e.text).split(' ').filter((w) => passageWords.has(w)).length
+    // DISTINCT shared words — a newcomer repeating one passage word is not the passage.
+    const overlap = (e: DomElementFact) => new Set(fold(e.text).split(' ').filter((w) => passageWords.has(w))).size
     const best = after.elements.filter(sameShape).sort((a, b) => overlap(b) - overlap(a))[0]
     if (best && overlap(best) * 2 >= passageWords.size) return best
     if (el.id) return after.elements.find((e) => e.id === el.id) ?? null
@@ -449,9 +483,11 @@ const supersededElementAbsent: PostCondition = (input) => {
 // remove: every named fragment's content is reduced, AND the document shrank:
 //   - if any fragment carries text → visible WORD COUNT strictly lower;
 //   - if every fragment is image-only → fewer image sources or fewer elements.
-// The whole-document check stands down while an additive class is co-present;
-// the per-fragment check (which requires the original passage to be broken,
-// not merely re-wrapped) never does.
+// While an additive class is co-present the whole document may legitimately
+// grow, so that check is replaced by one scoped to each TEXT passage's shape:
+// the words across all elements with the passage's tag+classes must strictly
+// decrease. The per-fragment check (which requires the original passage to be
+// broken, not merely re-wrapped) always applies.
 const targetTextShorter: PostCondition = (input, table) => {
   const resolved = resolveSupersedes('remove', input)
   if (!Array.isArray(resolved)) return resolved
@@ -463,7 +499,17 @@ const targetTextShorter: PostCondition = (input, table) => {
       reason: `remove: ${quoted(unreduced.map((r) => r.raw))} was neither removed nor shortened by whole words (the original passage is still intact, or its element lost no words)`,
     }
   }
-  if (othersAdditive(input, table, 'remove')) return { ok: true }
+  if (othersAdditive(input, table, 'remove')) {
+    // The whole document may grow (the add/replace clause), so the count is
+    // scoped to the elements shaped like each named passage.
+    const grown = resolved.flatMap((r) => shapesNotShrunk(before, after, r).map((d) => `${JSON.stringify(r.raw)} (${d})`))
+    return grown.length === 0
+      ? { ok: true }
+      : {
+          ok: false,
+          reason: `remove: the text shaped like the named passage did not lose words overall — ${grown.join(', ')}; shortened text must not be split up or repeated in another element of the same kind`,
+        }
+  }
   if (resolved.some(hasText)) {
     const w0 = wordCount(before.text)
     const w1 = wordCount(after.text)

@@ -718,3 +718,95 @@ describe('fix round 3 — a short label elsewhere does not make a badge a contai
     expect(check('replace', { before: facts([hero(OLD_BG), headline()]), after: facts([hero(UPLOAD), headline()]), supersedes: ['.hero'] }).ok).toBe(false)
   })
 })
+
+// ── Final fix wave (Wave 3) probes ────────────────────────────────────────────
+
+describe('final fix — with an additive class co-present, remove counts words across the passage\'s shape (I3)', () => {
+  const swapped = LONG_BODY.replace('region', 'nation')
+  const reworded = LONG_BODY.replace('an unforgettable evening', 'a truly memorable evening')
+  const tagline = el({ tag: 'div', classes: ['tagline'], text: 'Your future starts here' })
+
+  // SPLIT: "reduce the text and add a tagline" — the body is split into two
+  // same-shape paragraphs with one word inserted (20 → 21 words) and a tagline
+  // added. The counterpart used to pick the shorter half.
+  it('SPLIT remove+add: fails when the body is split into two same-shape halves that together gained a word', () => {
+    const after = facts([
+      bgLayer(),
+      headline(),
+      body('Join us for an unforgettable evening of ideas, networking and hands-on workshops'),
+      body('led by top industry experts from across the region.'),
+      tagline,
+      logo(),
+    ])
+    const r = check('remove', { after, supersedes: ['unforgettable evening'], classes: ['remove', 'add'] })
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.reason).toMatch(/p\.body-copy/)
+  })
+
+  it('R1 remove+add: fails when the body swaps one word and a new same-shape <p> repeats the phrase', () => {
+    const after = facts([bgLayer(), headline(), body(swapped), body('An unforgettable evening awaits.'), logo()])
+    expect(check('remove', { after, supersedes: ['unforgettable evening'], classes: ['remove', 'add'] }).ok).toBe(false)
+  })
+
+  it('R1b remove+add: fails when the body is reworded longer and a new same-shape <p> repeats the phrase', () => {
+    const after = facts([bgLayer(), headline(), body(reworded), body('An unforgettable evening awaits.'), logo()])
+    expect(check('remove', { after, supersedes: ['unforgettable evening'], classes: ['remove', 'add'] }).ok).toBe(false)
+  })
+
+  it('R1 mid-passage remove+replace: fails when the background is swapped, the body swaps a word and a same-shape <p> repeats a mid-passage phrase', () => {
+    const after = facts([bgLayer(UPLOAD), headline(), body(swapped), body('Hands-on workshops await.'), logo()])
+    const results = checkPostConditions({
+      before: BEFORE,
+      after,
+      supersedes: [OLD_BG, 'hands-on workshops'],
+      constrains: [],
+      classes: ['replace', 'remove'],
+    })
+    expect(results.some((x) => !x.result.ok)).toBe(true)
+  })
+
+  // Guards: genuine reductions still pass with an additive class co-present.
+  it('remove+add: passes a split whose same-shape halves together lost words', () => {
+    const after = facts([
+      bgLayer(),
+      headline(),
+      body('Join us for an unforgettable evening of ideas.'),
+      body('Workshops led by industry experts.'),
+      tagline,
+      logo(),
+    ])
+    expect(check('remove', { after, supersedes: ['unforgettable evening'], classes: ['remove', 'add'] })).toEqual({ ok: true })
+  })
+
+  it('remove+replace: passes a shortened body with the background swapped', () => {
+    const after = facts([bgLayer(UPLOAD), headline(), body(SHORT_BODY), logo()])
+    const results = checkPostConditions({
+      before: BEFORE,
+      after,
+      supersedes: [OLD_BG, 'Join us for'],
+      constrains: [],
+      classes: ['replace', 'remove'],
+    })
+    expect(results.every((x) => x.result.ok)).toBe(true)
+  })
+
+  // Accepted consequence of the ruling: a deliberately added paragraph with the
+  // passage's own tag+classes counts against the reduction (fail closed).
+  it('remove+add: a long same-shape paragraph added alongside a shortened body fails closed (accepted)', () => {
+    const after = facts([bgLayer(), headline(), body(SHORT_BODY), body('A brand new paragraph that the add clause asked for, written at length.'), logo()])
+    expect(check('remove', { after, supersedes: ['Join us for'], classes: ['remove', 'add'] }).ok).toBe(false)
+  })
+})
+
+describe('final fix — the phrase-gone word overlap counts DISTINCT words (R3)', () => {
+  it('R3 constrain+add: fails when the passage is deleted and a same-shape <p> repeats one of its words', () => {
+    const after = facts([bgLayer(), headline(), body('join join join join join join join join join join join'), logo()])
+    const r = check('constrain', {
+      after,
+      constrains: [{ fragment: 'hands-on workshops', direction: 'decrease' }],
+      classes: ['constrain', 'add'],
+    })
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.reason).toMatch(/gone/)
+  })
+})
