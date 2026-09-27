@@ -455,6 +455,13 @@ model Draft {
   // Prompt revision that produced the current design (prompts/shared.ts
   // PROMPT_VERSION) — lets output quality be correlated with prompt changes.
   promptVersion   String?
+  // Digest of the installed font packages at render time (src/lib/renderer/
+  // fontSet.ts getFontSetId) — the glyph environment is global (an image
+  // rebuild can change how an already-approved draft renders) so this makes
+  // that attributable after the fact. Null for drafts rendered before this
+  // existed, or off a host with no apk database (e.g. local dev) — absent,
+  // not wrong.
+  fontSet         String?
   status          DraftStatus     @default(IN_PROGRESS)
   // Why the last generation attempt FAILED (model error, timeout, interruption).
   // Shown on the preview page's inline error card; cleared on a successful retry.
