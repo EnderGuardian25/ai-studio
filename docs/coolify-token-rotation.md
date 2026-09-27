@@ -22,7 +22,7 @@ A 401 means Coolify didn't accept the token in the `COOLIFY_API_TOKEN` GitHub se
 ## Steps
 
 1. **Create a new API token in Coolify.** In Coolify v4 this is under **Keys & Tokens → API tokens** (check the exact label in your version).
-   - Give it the **deploy** permission, which is all the workflow needs, rather than full root access.
+   - Give it the **deploy** and **read** permissions rather than full root access. `deploy` triggers the redeploys. `read` lets the workflow check the scheduler's deployment status afterwards (`GET /api/v1/deployments/<uuid>`), which the Phase 0 pipeline fix adds. A deploy-only token still redeploys, but that status check will fail with "token rejected".
    - It must belong to the team that owns both prod resources.
    - Copy the value; Coolify shows it once.
 2. **Save it as the GitHub secret.** Either:
