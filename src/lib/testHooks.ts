@@ -11,6 +11,12 @@
  *   MOCK_SOCIAL_FAIL — make the mock publishers throw (for FAILED/retry coverage)
  */
 
+import type { ConstrainTarget, InstructionClass } from '@/lib/agent/instructionClasses'
+// Type-only — erased at compile time (tsconfig isolatedModules), so this does
+// not create a runtime import cycle with refineVerify.ts, which imports this
+// module for MOCK_AI + the two seams below.
+import type { VerifyResult } from '@/lib/drafts/refineVerify'
+
 export const MOCK_AI = process.env.MOCK_AI === 'true'
 export const MOCK_PUPPETEER = process.env.MOCK_PUPPETEER === 'true'
 export const MOCK_SOCIAL = process.env.MOCK_SOCIAL === 'true'
@@ -234,4 +240,199 @@ export function buildMockConflict(): string {
  */
 export function buildMockVerifierReply(instruction: string): string {
   return JSON.stringify({ applied: true, reason: `Mock verifier: applied. [${instruction.slice(0, 80)}]` })
+}
+
+/**
+ * Deterministic verification-OUTCOME override (MOCK_AI, change 004 T20).
+ * Consulted at the very top of refineVerify.verifyRefine(), before any DOM
+ * extraction or model call — so it works even though, under MOCK_PUPPETEER,
+ * staticDomFacts() cannot resolve `#id`/`.class` fragments or constrain
+ * targets (domFacts.ts header) and structural checks would otherwise always
+ * miss. Without this seam the retry and twice-failed refine branches (T17)
+ * are unreachable in tests.
+ *
+ * Sentinels in the instruction, checked in this order (first match wins):
+ *   - "__VERIFY_UNAVAILABLE__" — unavailable on every attempt. FR-10 requires
+ *     the caller to route this exactly like a miss; this seam only produces
+ *     the outcome, the routing is T17's.
+ *   - "__VERIFY_FAIL_ALWAYS__" — miss on every attempt (the twice-failed
+ *     refine path, AC-16/17).
+ *   - "__VERIFY_FAIL_ONCE__"   — miss on attempt 1, pass on attempt 2 (the
+ *     one-retry-succeeds path, FR-11).
+ *   - "__VERIFY_PASS__"       — pass on every attempt (needed because the
+ *     mock's structural checks can't be trusted to pass on their own).
+ * No sentinel → null → verifyRefine runs its real logic unchanged (including
+ * buildMockVerifierReply's own MOCK_AI hook for the `add` class, untouched).
+ */
+export function mockVerifyOutcome(instruction: string, attempt: 1 | 2): VerifyResult | null {
+  if (instruction.includes('__VERIFY_UNAVAILABLE__')) {
+    return { kind: 'unavailable', reason: 'mock verifier: forced unavailable (__VERIFY_UNAVAILABLE__ sentinel)' }
+  }
+  if (instruction.includes('__VERIFY_FAIL_ALWAYS__')) {
+    return { kind: 'miss', reasons: ['mock verifier: forced miss on every attempt (__VERIFY_FAIL_ALWAYS__ sentinel)'] }
+  }
+  if (instruction.includes('__VERIFY_FAIL_ONCE__')) {
+    return attempt === 1
+      ? { kind: 'miss', reasons: ['mock verifier: forced miss on attempt 1 (__VERIFY_FAIL_ONCE__ sentinel)'] }
+      : { kind: 'pass' }
+  }
+  if (instruction.includes('__VERIFY_PASS__')) {
+    return { kind: 'pass' }
+  }
+  return null
+}
+
+// ── T20: deterministic refine-reply seam (change 004 Phase 2) ───────────────
+
+const INLINE_TOKEN_RE = /__INLINE_ASSET_\d+__/
+const IMAGE_ATTR_RE = /\bsrc\s*=\s*"([^"]+)"|url\(\s*['"]?([^'")]+)['"]?\s*\)/i
+const MOCK_NEW_IMAGE = 'https://mock.invalid/refine-new-image.png'
+
+/** The first `__INLINE_ASSET_n__` token, else the first `src="…"`/`url(…)` reference, in `html`. */
+function findImageRef(html: string): string | null {
+  const token = INLINE_TOKEN_RE.exec(html)?.[0]
+  if (token) return token
+  const m = IMAGE_ATTR_RE.exec(html)
+  return m ? (m[1] ?? m[2] ?? null) : null
+}
+
+/** A short leading phrase of `html`'s visible text (tags/script/style/comments stripped). */
+function findTextPhrase(html: string): string | null {
+  const text = html
+    .replace(/<script\b[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style\b[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<!--[\s\S]*?-->/g, ' ')
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+  if (!text) return null
+  const words = text.split(' ')
+  return words.slice(0, Math.min(6, words.length)).join(' ')
+}
+
+/** A minimal valid (or, with `closeHtml: false`, deliberately truncated) document. */
+function refineDoc(width: number, height: number, bodyInner: string, closeHtml = true): string {
+  const open = `<!DOCTYPE html>\n<html>\n<head><style>body{margin:0;width:${width}px;height:${height}px}</style></head>\n<body>${bodyInner}</body>`
+  return closeHtml ? `${open}\n</html>` : open
+}
+
+/** The fenced JSON header the wire format puts before the document (refineEnvelope.ts). */
+function refineHeader(classes: InstructionClass[], supersedes: string[] = [], constrains: ConstrainTarget[] = []): string {
+  return ['```json', JSON.stringify({ classes, supersedes, constrains }), '```'].join('\n')
+}
+
+/**
+ * Deterministic refine-model REPLY (MOCK_AI, change 004 T20). Returns a raw
+ * reply string in the real refine envelope wire format (refineEnvelope.ts
+ * header + `REFINE_ENVELOPE_EXAMPLE` / `parseRefineEnvelope`) — never a
+ * parsed object — so the real parser and `effectiveClasses` run on it
+ * unchanged. T17 wires this into the runners' refine-mode MOCK_AI branch;
+ * this module only builds the string.
+ *
+ * Default (no sentinel in the instruction): byte-identical to today's mock
+ * design agent, `buildMockHtml(promptContext, width, height)`'s bare
+ * document — NO envelope header at all. A bare document parses as no
+ * envelope (FR-05), defaulting to the preserving `add` class, so every
+ * existing refine E2E keeps passing unchanged.
+ *
+ * Sentinels (checked in this order; first match wins) are built from a text
+ * phrase or an image URL/token taken from `slimHtml` (the current document),
+ * because staticDomFacts (MOCK_PUPPETEER) resolves visible-text phrases and
+ * image URLs/tokens but never `#id`/`.class` (domFacts.ts header):
+ *   - "__REFINE_TRUNCATED__"        — reply has no closing `</html>` (T17's
+ *     truncation rule).
+ *   - "__REFINE_REDUCE_NOOP__"      — a `remove` whose reply leaves the
+ *     current document's text unchanged → structural miss (the reported
+ *     "reduce the text" bug, AC-08 regression).
+ *   - "__REFINE_REDUCE_REAL__"      — a `remove` whose reply visibly
+ *     shortens that text → pass.
+ *   - "__REFINE_IMAGE_DUP__"        — a `replace` whose reply keeps the
+ *     superseded image AND adds a new one → miss (the reported duplicate-
+ *     background bug, AC-09 regression).
+ *   - "__REFINE_IMAGE_REPLACE__"    — a `replace` whose reply drops the
+ *     superseded image and adds a new one → pass.
+ *   - "__REFINE_EMPTY_SUPERSEDES__" — a `replace` with `supersedes: []`
+ *     (AC-10 — `effectiveClasses` downgrades this to `add` before
+ *     verification).
+ *   - "__REFINE_TOKEN_RENAME__"     — renames an `__INLINE_ASSET_n__` token
+ *     found in `slimHtml` (AC-07 — `reconcileInlineAssets` sees an unknown
+ *     token).
+ *   - "__REFINE_MULTI_CLASS__"      — returns more than one class (AC-11):
+ *     `replace` (a passing image swap) plus `add`.
+ * The combinable modifier "__REFINE_FIX_ON_RETRY__" flips the reduce/image/
+ * empty-supersedes/token-rename/truncated sentinels above to their FIXED
+ * variant when `attempt` is 2 — the retry-succeeds path (FR-11). It has no
+ * effect alone, and no effect on multi-class (which has no broken/fixed pair).
+ *
+ * Every case degrades deterministically when `slimHtml` doesn't carry what it
+ * needs: the reduce cases fall back to `supersedes: []` when there is no
+ * visible text, and the image/token cases fall back to a synthetic reference
+ * that will not resolve in the current document — either way verification
+ * always misses (a downgrade or a fragment not found), never a crash and
+ * never a silent pass. T21 arranges a before-document that has one when the
+ * passing variant is required.
+ *
+ * Deterministic: no randomness, no Date.now().
+ */
+export function buildMockRefineReply(args: {
+  slimHtml: string
+  instruction: string
+  attempt: 1 | 2
+  width: number
+  height: number
+  // Extra context (e.g. the brand-kit system context) for the default
+  // reply's hex echo — see buildMockHtml. Optional; omitted → the neutral
+  // fallback colour.
+  promptContext?: string
+}): string {
+  const { slimHtml, instruction, attempt, width, height, promptContext } = args
+  const fixOnRetry = instruction.includes('__REFINE_FIX_ON_RETRY__') && attempt === 2
+
+  if (instruction.includes('__REFINE_TRUNCATED__')) {
+    return `${refineHeader(['add'])}\n${refineDoc(width, height, 'Mock truncated refine reply.', fixOnRetry)}`
+  }
+
+  if (instruction.includes('__REFINE_REDUCE_NOOP__') || instruction.includes('__REFINE_REDUCE_REAL__')) {
+    const wantsReal = instruction.includes('__REFINE_REDUCE_REAL__') || fixOnRetry
+    const phrase = findTextPhrase(slimHtml)
+    const supersedes = phrase ? [phrase] : []
+    if (!wantsReal) {
+      // No-op: echo the current document unchanged — the named passage stays intact.
+      return `${refineHeader(['remove'], supersedes)}\n${slimHtml}`
+    }
+    return `${refineHeader(['remove'], supersedes)}\n${refineDoc(width, height, 'Shortened.')}`
+  }
+
+  if (instruction.includes('__REFINE_IMAGE_DUP__') || instruction.includes('__REFINE_IMAGE_REPLACE__')) {
+    const wantsClean = instruction.includes('__REFINE_IMAGE_REPLACE__') || fixOnRetry
+    const ref = findImageRef(slimHtml) ?? MOCK_NEW_IMAGE // degrade: never resolves in the current document
+    const supersedes = [ref]
+    const body = wantsClean
+      ? `<div style="background-image:url('${MOCK_NEW_IMAGE}')"></div>`
+      : `<div style="background-image:url('${ref}')"></div><div style="background-image:url('${MOCK_NEW_IMAGE}')"></div>`
+    return `${refineHeader(['replace'], supersedes)}\n${refineDoc(width, height, body)}`
+  }
+
+  if (instruction.includes('__REFINE_EMPTY_SUPERSEDES__')) {
+    const named = fixOnRetry
+    const ref = findImageRef(slimHtml) ?? findTextPhrase(slimHtml) ?? MOCK_NEW_IMAGE
+    const supersedes = named ? [ref] : []
+    return `${refineHeader(['replace'], supersedes)}\n${refineDoc(width, height, 'Mock empty-supersedes refine reply.')}`
+  }
+
+  if (instruction.includes('__REFINE_TOKEN_RENAME__')) {
+    const token = INLINE_TOKEN_RE.exec(slimHtml)?.[0]
+    if (!token) return buildMockHtml(promptContext ?? '', width, height) // degrade: nothing to rename
+    const renamed = fixOnRetry ? token : `${token.slice(0, -2)}_RENAMED__`
+    return `${refineHeader(['add'])}\n${slimHtml.replace(token, renamed)}`
+  }
+
+  if (instruction.includes('__REFINE_MULTI_CLASS__')) {
+    const ref = findImageRef(slimHtml) ?? MOCK_NEW_IMAGE
+    const body = `<div style="background-image:url('${MOCK_NEW_IMAGE}')"></div>`
+    return `${refineHeader(['replace', 'add'], [ref])}\n${refineDoc(width, height, body)}`
+  }
+
+  // Default: byte-identical to today's mock design agent — no envelope header.
+  return buildMockHtml(promptContext ?? '', width, height)
 }

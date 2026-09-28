@@ -553,3 +553,65 @@ describe('MOCK_AI seam', () => {
     expect(modelCalls()).toBe(0)
   })
 })
+
+// T20 — the mockVerifyOutcome override sits at the very top of verifyRefine,
+// before fact extraction or any model call, so it works even when the
+// structural facts (h.extract) are never wired up for a given test.
+describe('T20: mockVerifyOutcome override (MOCK_AI only)', () => {
+  beforeEach(() => {
+    h.mockAi = true
+  })
+
+  it('no sentinel: falls through to real verification unchanged (extraction still runs)', async () => {
+    useFacts(BEFORE, BEFORE)
+    const r = await verifyRefine(input({ instruction: 'include a human character' }))
+    expect(r).toEqual({ kind: 'pass' }) // buildMockVerifierReply's default
+    expect(h.extract).toHaveBeenCalled()
+  })
+
+  it('__VERIFY_PASS__: pass without touching fact extraction or the model', async () => {
+    const r = await verifyRefine(input({ instruction: 'do it __VERIFY_PASS__', classes: ['replace'], supersedes: ['x'] }))
+    expect(r).toEqual({ kind: 'pass' })
+    expect(h.extract).not.toHaveBeenCalled()
+    expect(modelCalls()).toBe(0)
+  })
+
+  it('__VERIFY_FAIL_ALWAYS__: miss on attempt 1 and attempt 2 (twice-failed path, AC-16/17)', async () => {
+    const instruction = 'do it __VERIFY_FAIL_ALWAYS__'
+    const r1 = await verifyRefine(input({ instruction, attempt: 1 }))
+    const r2 = await verifyRefine(input({ instruction, attempt: 2 }))
+    expect(r1.kind).toBe('miss')
+    expect(r2.kind).toBe('miss')
+    expect(h.extract).not.toHaveBeenCalled()
+  })
+
+  it('__VERIFY_FAIL_ONCE__: miss on attempt 1, pass on attempt 2 (retry-succeeds path, FR-11)', async () => {
+    const instruction = 'do it __VERIFY_FAIL_ONCE__'
+    const r1 = await verifyRefine(input({ instruction, attempt: 1 }))
+    const r2 = await verifyRefine(input({ instruction, attempt: 2 }))
+    expect(r1.kind).toBe('miss')
+    expect(r2).toEqual({ kind: 'pass' })
+  })
+
+  it('attempt defaults to 1 when omitted', async () => {
+    const r = await verifyRefine(input({ instruction: 'do it __VERIFY_FAIL_ONCE__' }))
+    expect(r.kind).toBe('miss')
+  })
+
+  it('__VERIFY_UNAVAILABLE__: unavailable, routes exactly like a miss (FR-10)', async () => {
+    const r = await verifyRefine(input({ instruction: 'do it __VERIFY_UNAVAILABLE__' }))
+    expect(r.kind).toBe('unavailable')
+    expect(isAccepted(r)).toBe(false)
+    expect(h.extract).not.toHaveBeenCalled()
+  })
+
+  it('the override is inert when MOCK_AI is off, even with a sentinel present', async () => {
+    h.mockAi = false
+    useFacts(BEFORE, BEFORE)
+    const r = await verifyRefine(input({ instruction: 'do it __VERIFY_PASS__', classes: ['replace'], supersedes: ['nope'] }))
+    // Real verification runs: the fragment isn't in the facts, so it misses —
+    // proving the sentinel had no effect outside MOCK_AI.
+    expect(r.kind).toBe('miss')
+    expect(h.extract).toHaveBeenCalled()
+  })
+})

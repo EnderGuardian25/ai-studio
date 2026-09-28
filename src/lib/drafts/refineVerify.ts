@@ -66,7 +66,7 @@ import { runClaudeCli, stripCodeFences } from '@/lib/agent/claudeCli'
 import { isCliMode } from '@/lib/agent/config'
 import { UNTRUSTED_CONTENT_GUARD, fenceUntrusted } from '@/lib/agent/untrusted'
 import { resolveAnthropicApiKey } from '@/providers/registry'
-import { MOCK_AI, buildMockVerifierReply } from '@/lib/testHooks'
+import { MOCK_AI, buildMockVerifierReply, mockVerifyOutcome } from '@/lib/testHooks'
 
 // ── Public types ─────────────────────────────────────────────────────────────
 
@@ -99,6 +99,10 @@ export interface VerifyRefineInput {
   // credential set by withClaudeAuth / runWithClaudeAuth.
   teamId: string
   // Deliberately NO model field (FR-14b).
+  // Which refine attempt this is (FR-11's hard-capped one retry; T17 passes 2
+  // on the retry). Only the MOCK_AI override below (T20) reads it — real
+  // verification is attempt-agnostic. Defaults to 1.
+  attempt?: 1 | 2
 }
 
 // ── Pinned model and limits ──────────────────────────────────────────────────
@@ -330,7 +334,18 @@ function log(msg: string) {
 // Every outcome that is not a verdict is `unavailable` — including a throw from
 // a post-condition, an unknown class or a malformed input (fix round 1). The
 // returned promise never rejects.
+//
+// T20: a MOCK_AI-only override sits at the very top, before any DOM
+// extraction or model call — forces pass/miss/unavailable via
+// testHooks.mockVerifyOutcome() so the retry and twice-failed branches (T17)
+// are reachable in tests, where MOCK_PUPPETEER's static facts can't resolve
+// #id/.class or constrain targets. No sentinel in the instruction → null →
+// real verification runs unchanged.
 export async function verifyRefine(input: VerifyRefineInput): Promise<VerifyResult> {
+  if (MOCK_AI) {
+    const forced = mockVerifyOutcome(input.instruction, input.attempt ?? 1)
+    if (forced) return forced
+  }
   try {
     return await verifyOrThrow(input)
   } catch (err) {
