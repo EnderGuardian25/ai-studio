@@ -220,14 +220,14 @@ test.describe('§U — rejected revisions stay out of the chain', () => {
           htmlSnapshot: '<html></html>',
         },
       }),
-    ).rejects.toThrow()
+    ).rejects.toThrow(/DraftRevision_rejected_iff_unnumbered/)
 
     // Unnumbered but not rejected → CHECK violation.
     await expect(
       prisma!.draftRevision.create({
         data: { draftId: draft.id, revisionNumber: null, instruction: 'x', htmlSnapshot: '<html></html>' },
       }),
-    ).rejects.toThrow()
+    ).rejects.toThrow(/DraftRevision_rejected_iff_unnumbered/)
 
     // A committed row never carries classes / verifier output (FR-02).
     await expect(
@@ -240,7 +240,7 @@ test.describe('§U — rejected revisions stay out of the chain', () => {
           rejection: { classes: ['recolor'] },
         },
       }),
-    ).rejects.toThrow()
+    ).rejects.toThrow(/DraftRevision_rejection_fields_only_when_rejected/)
 
     // Adoption bookkeeping is all-or-nothing.
     await expect(
@@ -254,7 +254,7 @@ test.describe('§U — rejected revisions stay out of the chain', () => {
           htmlSnapshot: '<html></html>',
         },
       }),
-    ).rejects.toThrow()
+    ).rejects.toThrow(/DraftRevision_adoption_complete/)
 
     // Any number of rejected rows coexist under @@unique([draftId, revisionNumber]).
     await seedRejected(draft.id)
