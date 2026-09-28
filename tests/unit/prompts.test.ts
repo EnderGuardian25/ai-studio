@@ -184,7 +184,7 @@ describe('SCRIPT_SUPPORT_NOTE — no-emoji guidance', () => {
   })
 
   it('bumps PROMPT_VERSION alongside the note change', () => {
-    expect(PROMPT_VERSION).toBe('2026-09-27.2')
+    expect(PROMPT_VERSION).toBe('2026-09-28.1')
   })
 })
 
