@@ -1,0 +1,355 @@
+import { describe, it, expect } from 'vitest'
+import {
+  parseHtmlDocument,
+  resolveElementPath,
+  elementTextContent,
+  elementChildren,
+  normalizeFingerprintText,
+  decodeHtmlEntities,
+  escapeHtmlText,
+  replaceElementText,
+  setStyleDeclaration,
+  type HtmlElement,
+} from '@/lib/drafts/htmlLocator'
+
+// T22 (change 004 Phase 3, Ruling W5-A) — the pure server-side node locator.
+// Every "malformed / ambiguous" case must FAIL CLOSED (ok:false), never guess.
+
+const doc = (body: string, head = '') =>
+  `<!doctype html><html><head>${head}</head><body>${body}</body></html>`
+
+function body(html: string): HtmlElement {
+  const r = parseHtmlDocument(html)
+  if (!r.ok) throw new Error(`expected a parse, got: ${r.reason}`)
+  return r.body
+}
+
+function at(html: string, path: number[]): HtmlElement {
+  const el = resolveElementPath(body(html), path)
+  if (!el) throw new Error(`no element at ${JSON.stringify(path)}`)
+  return el
+}
+
+function src(html: string, el: HtmlElement): string {
+  return html.slice(el.start, el.end)
+}
+
+describe('parseHtmlDocument + resolveElementPath — well-formed documents', () => {
+  it('resolves element-child indices from <body> and returns exact source offsets', () => {
+    const html = doc('<div><h1>Hello</h1><p class="x">World</p></div>', '<style>.a{}</style>')
+    const p = at(html, [0, 1])
+    expect(p.tag).toBe('p')
+    expect(src(html, p)).toBe('<p class="x">World</p>')
+    expect(html.slice(p.openEnd, p.closeStart!)).toBe('World')
+    expect(at(html, [0]).tag).toBe('div')
+  })
+
+  it('the empty path is <body> itself', () => {
+    const html = doc('<p>x</p>')
+    expect(at(html, []).tag).toBe('body')
+  })
+
+  it('counts void elements (and <br>, <br/>) as childless elements', () => {
+    const html = doc('<div><img src="a.png" alt="a"><br><br/><span>X</span><hr></div>')
+    expect(at(html, [0, 0]).tag).toBe('img')
+    expect(at(html, [0, 0]).closeStart).toBeNull()
+    expect(at(html, [0, 1]).tag).toBe('br')
+    expect(at(html, [0, 2]).tag).toBe('br')
+    expect(at(html, [0, 3]).tag).toBe('span')
+    expect(at(html, [0, 4]).tag).toBe('hr')
+    expect(resolveElementPath(body(html), [0, 0, 0])).toBeNull()
+  })
+
+  it('ignores comments — including ones that contain markup or --!>', () => {
+    const html = doc('<!-- <div>fake</div> --><!--x--!><!--><!---><p>A</p>')
+    expect(at(html, [0]).tag).toBe('p')
+    expect(elementChildren(body(html))).toHaveLength(1)
+  })
+
+  it('treats <script> and <style> content as raw text (markup inside is not elements)', () => {
+    const html = doc(
+      '<script>var s = "<div></div>"; if (a < b) {}</script><style>a>b{color:red}</style><p>A</p>',
+    )
+    expect(at(html, [0]).tag).toBe('script')
+    expect(at(html, [1]).tag).toBe('style')
+    expect(at(html, [2]).tag).toBe('p')
+    expect(elementChildren(at(html, [0]))).toHaveLength(0)
+  })
+
+  it('raw-text end tags are matched case-insensitively and need a terminator', () => {
+    const html = doc('<script>x = "</scriptx>"</SCRIPT ><p>A</p>')
+    expect(at(html, [1]).tag).toBe('p')
+  })
+
+  it('handles attributes containing > in quoted values, and unquoted/boolean attributes', () => {
+    const html = doc(`<div data-x="a>b" title='c>d' hidden class=big><span>T</span></div>`)
+    const span = at(html, [0, 0])
+    expect(span.tag).toBe('span')
+    expect(src(html, span)).toBe('<span>T</span>')
+    const div = at(html, [0])
+    expect(div.attrs.map((a) => a.name)).toEqual(['data-x', 'title', 'hidden', 'class'])
+  })
+
+  it('nested same-tag elements match their own close tags', () => {
+    const html = doc('<div><div><div>in</div></div><div>second</div></div><div>third</div>')
+    expect(src(html, at(html, [0, 0, 0]))).toBe('<div>in</div>')
+    expect(src(html, at(html, [0, 1]))).toBe('<div>second</div>')
+    expect(src(html, at(html, [0, 0]))).toBe('<div><div>in</div></div>')
+    expect(src(html, at(html, [1]))).toBe('<div>third</div>')
+  })
+
+  it('lowercases tag names (case-insensitive HTML)', () => {
+    const html = doc('<DIV><P>x</P></DIV>')
+    expect(at(html, [0, 0]).tag).toBe('p')
+  })
+
+  it('a < that does not open a tag is text', () => {
+    const html = doc('<p>1 < 2 and 3 <= 4 and </ ok></p>')
+    expect(elementTextContent(at(html, [0]))).toContain('1 < 2 and 3 <= 4')
+  })
+
+  it('a path that runs out of range or through a leaf resolves to null', () => {
+    const html = doc('<div><p>a</p></div>')
+    expect(resolveElementPath(body(html), [1])).toBeNull()
+    expect(resolveElementPath(body(html), [0, 1])).toBeNull()
+    expect(resolveElementPath(body(html), [0, 0, 0])).toBeNull()
+  })
+
+  it('works on a document without <html>/<head> tags', () => {
+    const html = '<!doctype html><body><p>x</p></body>'
+    expect(at(html, [0]).tag).toBe('p')
+  })
+
+  it('accepts whitespace and comments around the document skeleton', () => {
+    const html = '<!doctype html>\n<!-- c -->\n<html>\n<head>\n<meta charset="utf-8">\n</head>\n<body>\n<p>x</p>\n</body>\n<!-- trailing -->\n</html>\n'
+    expect(at(html, [0]).tag).toBe('p')
+  })
+
+  it('parses SVG as foreign content: self-closing honoured, <style> not raw text', () => {
+    const html = doc(
+      '<svg viewBox="0 0 10 10"><rect/><style>.a{}</style><text x="1">Hi</text><foreignObject><div>in</div></foreignObject></svg><p>After</p>',
+    )
+    expect(at(html, [0]).tag).toBe('svg')
+    expect(at(html, [0, 0]).tag).toBe('rect')
+    expect(at(html, [0, 2]).tag).toBe('text')
+    expect(elementTextContent(at(html, [0, 2]))).toBe('Hi')
+    expect(at(html, [0, 3, 0]).tag).toBe('div')
+    expect(at(html, [1]).tag).toBe('p')
+  })
+
+  it('handles a valid nested list (li inside ul inside li)', () => {
+    const html = doc('<ul><li>a<ul><li>b</li></ul></li><li>c</li></ul>')
+    expect(elementTextContent(at(html, [0, 0, 0, 0]))).toBe('b')
+    expect(elementTextContent(at(html, [0, 1]))).toBe('c')
+  })
+
+  it('is linear on a multi-megabyte inline data: URI (Hearts Talk-sized templates)', () => {
+    const big = 'data:image/png;base64,' + 'A'.repeat(2_000_000)
+    const html = doc(`<div><img src="${big}"><h1>Title</h1></div>`)
+    const t0 = Date.now()
+    expect(at(html, [0, 1]).tag).toBe('h1')
+    expect(Date.now() - t0).toBeLessThan(1000)
+  })
+
+  it('handles a well-formed table with explicit tbody', () => {
+    const html = doc('<table><tbody><tr><td>1</td><td>2</td></tr></tbody></table>')
+    expect(elementTextContent(at(html, [0, 0, 0, 1]))).toBe('2')
+  })
+})
+
+describe('parseHtmlDocument — malformed or ambiguous markup fails closed', () => {
+  const bad: Array<[string, string]> = [
+    ['unclosed element', doc('<div><p>x</p>')],
+    ['mismatched end tag', doc('<div><span>x</div></span>')],
+    ['stray end tag', doc('<p>x</p></p>')],
+    ['end tag for a void element', doc('<p>x<br></br></p>')],
+    ['EOF inside a start tag', '<!doctype html><html><body><div class="x'],
+    ['EOF inside a comment', doc('<p>x</p>') + '<!-- never closed'],
+    ['EOF inside raw text', '<!doctype html><html><body><script>var x'],
+    ['non-void self-closing (browser ignores the slash)', doc('<div/><p>x</p>')],
+    ['block element inside <p> (implicit close)', doc('<p><div>x</div></p>')],
+    ['li directly inside li (implicit close)', doc('<ul><li>a<li>b</li></li></ul>')],
+    ['a inside a', doc('<a href="#"><span><a href="#">x</a></span></a>')],
+    ['heading inside heading', doc('<h1><h2>x</h2></h1>')],
+    ['tr directly in table (implied tbody)', doc('<table><tr><td>1</td></tr></table>')],
+    ['div inside table (foster parenting)', doc('<table><div>x</div></table>')],
+    ['text directly inside table', doc('<table>oops<tbody></tbody></table>')],
+    ['td outside a table', doc('<div><td>x</td></div>')],
+    ['noscript (parse depends on scripting)', doc('<noscript><p>x</p></noscript>')],
+    ['select', doc('<select><option>a</option></select>')],
+    ['math', doc('<math><mi>x</mi></math>')],
+    ['HTML breakout tag inside svg', doc('<svg><div>x</div></svg>')],
+    ['no <body>', '<!doctype html><html><head></head></html>'],
+    ['element after </body>', '<!doctype html><html><body><p>x</p></body><div>y</div></html>'],
+    ['text after </body>', '<!doctype html><html><body><p>x</p></body>tail</html>'],
+    ['element before <body>', '<!doctype html><html><div>x</div><body><p>y</p></body></html>'],
+    ['text before <html>', 'Here is your HTML: <!doctype html><html><body><p>y</p></body></html>'],
+    ['non-head element inside head', '<!doctype html><html><head><div>x</div></head><body></body></html>'],
+    ['nested <body>', doc('<body><p>x</p></body>')],
+    ['duplicate <body>', '<!doctype html><html><body></body><body></body></html>'],
+    ['<!-- inside script (script-data escape states)', doc('<script><!-- <script></script> --></script>')],
+  ]
+  for (const [name, html] of bad) {
+    it(name, () => {
+      const r = parseHtmlDocument(html)
+      expect(r.ok).toBe(false)
+    })
+  }
+})
+
+describe('elementTextContent + normalizeFingerprintText', () => {
+  it('decodes entities (named, numeric, hex) in the fingerprint text', () => {
+    const html = doc('<p>Fish &amp; Chips&nbsp;&#169; &#x2014; &lt;b&gt; &quot;q&quot; &hellip;</p>')
+    expect(elementTextContent(at(html, [0]))).toBe('Fish & Chips © — <b> "q" …')
+  })
+
+  it('concatenates descendant text and ignores comments', () => {
+    const html = doc('<div>Some <b>bold</b><!-- hidden --> text</div>')
+    expect(elementTextContent(at(html, [0]))).toBe('Some bold text')
+  })
+
+  it('excludes <template> content (it is not in the DOM tree)', () => {
+    const html = doc('<div>a<template><p>hidden</p></template>b</div>')
+    expect(elementTextContent(at(html, [0]))).toBe('ab')
+  })
+
+  it('keeps a bare & that is not an entity literal (AT&T)', () => {
+    const html = doc('<p>AT&T &amp co & more</p>')
+    expect(elementTextContent(at(html, [0]))).toBe('AT&T & co & more')
+  })
+
+  it('decodes a legacy no-semicolon entity in text (&copy2026)', () => {
+    const html = doc('<p>&copy2026</p>')
+    expect(elementTextContent(at(html, [0]))).toBe('©2026')
+  })
+
+  it('returns null (unverifiable) for an unknown named entity or a remapped numeric', () => {
+    expect(elementTextContent(at(doc('<p>&alpha;</p>'), [0]))).toBeNull()
+    expect(elementTextContent(at(doc('<p>&#150;</p>'), [0]))).toBeNull()
+    expect(elementTextContent(at(doc('<p>&#0;</p>'), [0]))).toBeNull()
+  })
+
+  it('normalizes whitespace runs (incl. nbsp and newlines) to one space and trims', () => {
+    expect(normalizeFingerprintText('  Fish\n\t &  Chips  ')).toBe('Fish & Chips')
+  })
+})
+
+describe('decodeHtmlEntities — attribute context', () => {
+  it('decodes &quot; and numerics', () => {
+    expect(decodeHtmlEntities('font-family:&quot;Poppins&quot;;x:&#65;', 'attribute')).toBe(
+      'font-family:"Poppins";x:A',
+    )
+  })
+  it('does not decode a legacy no-semicolon entity followed by an alphanumeric or = in an attribute', () => {
+    expect(decodeHtmlEntities('?a=1&copy=2', 'attribute')).toBe('?a=1&copy=2')
+  })
+})
+
+describe('escapeHtmlText', () => {
+  it('escapes &, < and >', () => {
+    expect(escapeHtmlText('<script>alert(1)</script> & co')).toBe(
+      '&lt;script&gt;alert(1)&lt;/script&gt; &amp; co',
+    )
+  })
+})
+
+describe('replaceElementText', () => {
+  it('writes escaped text into exactly that element; every other byte is unchanged', () => {
+    const html = doc('<div><h1 class="t">Old</h1><p>Keep</p></div>')
+    const h1 = at(html, [0, 0])
+    const out = replaceElementText(html, h1, '<script>alert(1)</script>')
+    expect(out).toBe(
+      html.slice(0, h1.openEnd) + '&lt;script&gt;alert(1)&lt;/script&gt;' + html.slice(h1.closeStart!),
+    )
+    const after = at(out, [0, 0])
+    expect(elementChildren(after)).toHaveLength(0)
+    expect(elementTextContent(after)).toBe('<script>alert(1)</script>')
+  })
+
+  it('refuses an element with no content range (void)', () => {
+    const html = doc('<img src="a.png">')
+    expect(() => replaceElementText(html, at(html, [0]), 'x')).toThrow()
+  })
+})
+
+describe('setStyleDeclaration', () => {
+  it('inserts a style attribute right after the tag name when there is none', () => {
+    const html = doc('<h1 class="t">Hi</h1>')
+    const r = setStyleDeclaration(html, at(html, [0]), 'color', '#ff0000')
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    expect(r.html).toBe(html.replace('<h1 class="t">', '<h1 style="color: #ff0000" class="t">'))
+  })
+
+  it('works on a self-closing svg element', () => {
+    const html = doc('<svg><rect/></svg>')
+    const r = setStyleDeclaration(html, at(html, [0, 0]), 'color', '#00ff00')
+    expect(r.ok && r.html).toBe(html.replace('<rect/>', '<rect style="color: #00ff00"/>'))
+  })
+
+  it('replaces an existing declaration of the same property (incl. !important) and keeps the rest', () => {
+    const html = doc('<p style="color:red !important; font-size: 12px">x</p>')
+    const r = setStyleDeclaration(html, at(html, [0]), 'color', '#aabbcc')
+    expect(r.ok && r.html).toBe(doc('<p style="font-size: 12px; color: #aabbcc">x</p>'))
+  })
+
+  it('keeps entity-encoded quotes in other declarations intact (re-encoded)', () => {
+    const html = doc('<p style="font-family:&quot;Poppins&quot;, sans-serif;color:blue">x</p>')
+    const r = setStyleDeclaration(html, at(html, [0]), 'font-size', '24px')
+    expect(r.ok && r.html).toBe(
+      doc('<p style="font-family:&quot;Poppins&quot;, sans-serif;color:blue; font-size: 24px">x</p>'),
+    )
+  })
+
+  it('does not split on a ; inside a string or url()', () => {
+    const html = doc(`<p style='background-image:url("a;b.png"); content: "x;y"'>x</p>`)
+    const r = setStyleDeclaration(html, at(html, [0]), 'background-color', '#000000')
+    expect(r.ok && r.html).toBe(
+      doc(
+        '<p style="background-image:url(&quot;a;b.png&quot;); content: &quot;x;y&quot;; background-color: #000000">x</p>',
+      ),
+    )
+  })
+
+  it('handles unquoted and valueless style attributes', () => {
+    const a = doc('<p style=color:red>x</p>')
+    expect(setStyleDeclaration(a, at(a, [0]), 'color', '#111111')).toEqual({
+      ok: true,
+      html: doc('<p style="color: #111111">x</p>'),
+    })
+    const b = doc('<p style>x</p>')
+    expect(setStyleDeclaration(b, at(b, [0]), 'color', '#111111')).toEqual({
+      ok: true,
+      html: doc('<p style="color: #111111">x</p>'),
+    })
+  })
+
+  it('only the style attribute changes — bytes outside it are identical', () => {
+    const html = doc('<div><p id="a" style="margin:0" data-k="v">x</p><p style="color:red">y</p></div>')
+    const p = at(html, [0, 0])
+    const r = setStyleDeclaration(html, p, 'font-size', '2em')
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    const styleAttr = p.attrs.find((a) => a.name === 'style')!
+    expect(r.html.slice(0, styleAttr.start)).toBe(html.slice(0, styleAttr.start))
+    expect(r.html.slice(r.html.length - (html.length - styleAttr.end))).toBe(html.slice(styleAttr.end))
+  })
+
+  it('fails closed on duplicate style attributes, an unterminated string, or an undecodable entity', () => {
+    const dup = doc('<p style="color:red" style="color:blue">x</p>')
+    expect(setStyleDeclaration(dup, at(dup, [0]), 'color', '#000000').ok).toBe(false)
+    const unterminated = doc(`<p style='content:"abc'>x</p>`)
+    expect(setStyleDeclaration(unterminated, at(unterminated, [0]), 'color', '#000000').ok).toBe(false)
+    const ent = doc('<p style="content:&alpha;">x</p>')
+    expect(setStyleDeclaration(ent, at(ent, [0]), 'color', '#000000').ok).toBe(false)
+  })
+
+  it('throws (programming error) on a value that is not already grammar-serialized', () => {
+    const html = doc('<p>x</p>')
+    const p = at(html, [0])
+    expect(() => setStyleDeclaration(html, p, 'color', 'red; background: url(x)')).toThrow()
+    expect(() => setStyleDeclaration(html, p, 'color', 'url(x)')).toThrow()
+    // @ts-expect-error — property outside the closed set
+    expect(() => setStyleDeclaration(html, p, 'background', '#000000')).toThrow()
+  })
+})
