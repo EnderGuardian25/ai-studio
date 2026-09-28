@@ -33,6 +33,7 @@ const fake = vi.hoisted(() => {
     notAppliedRevisionId: null as string | null,
     render: { calls: 0, fail: false },
     uploads: [] as string[],
+    txOptions: [] as unknown[],
   }
 
   function matches(row: Row, where: Record<string, unknown>): boolean {
@@ -147,7 +148,10 @@ const fake = vi.hoisted(() => {
         return {}
       },
     },
-    $transaction: async <T>(fn: (tx: unknown) => Promise<T>) => fn(client),
+    $transaction: async <T>(fn: (tx: unknown) => Promise<T>, opts?: unknown) => {
+      db.txOptions.push(opts)
+      return fn(client)
+    },
   }
   return { db, client }
 })
@@ -181,6 +185,7 @@ import {
   recordRejectedRender,
   rejectionDiagnosticsSchema,
   MAX_NOT_APPLIED_REASON,
+  TX_MAX_WAIT_MS,
   type RejectionDiagnostics,
 } from '@/lib/drafts/revisions'
 
@@ -220,6 +225,7 @@ beforeEach(() => {
   db.notAppliedRevisionId = null
   db.render = { calls: 0, fail: false }
   db.uploads = []
+  db.txOptions = []
 })
 
 describe('COMMITTED_REVISION / committedRevisionWhere', () => {
@@ -447,6 +453,28 @@ describe('recordRejectedRender (FR-12/13, Ruling D/E)', () => {
   it('refuses diagnostics beyond the hard caps (AC-15 is part of the schema)', async () => {
     await expect(recordRejectedRender(rejectArgs({ diagnostics: diagnostics({ refineCalls: 3 }) }))).rejects.toThrow()
     await expect(recordRejectedRender(rejectArgs({ diagnostics: diagnostics({ verifierCalls: 3 }) }))).rejects.toThrow()
+  })
+
+  // Fix round 1, Minor 2: validation happens BEFORE the render/upload, so an
+  // invalid record never orphans an export object.
+  it('validates the diagnostics before rendering or uploading anything', async () => {
+    const bad = diagnostics({ attempts: [{ ...diagnostics().attempts[0], verifierCalls: 2 }] })
+    await expect(recordRejectedRender(rejectArgs({ diagnostics: bad }))).rejects.toThrow()
+    expect(db.render.calls).toBe(0)
+    expect(db.uploads).toEqual([])
+    expect(db.rows).toEqual([])
+  })
+})
+
+// Fix round 1, I1: an interactive transaction may wait up to TX_MAX_WAIT_MS
+// for a pool connection (Prisma's 2 s default is shorter than one new
+// connection takes on the test host — P2028 after the 202 in TC-REG-H7a).
+describe('interactive transactions wait long enough for a pool connection', () => {
+  it('commitDraftRevision and recordRejectedRender both pass maxWait = TX_MAX_WAIT_MS (10 s)', async () => {
+    expect(TX_MAX_WAIT_MS).toBeGreaterThanOrEqual(10_000)
+    await commitDraftRevision({ draftId: 'd1', instruction: 'x', html: '<html/>', width: 1080, height: 1080, exportKey: 'k' })
+    await recordRejectedRender(rejectArgs())
+    expect(db.txOptions).toEqual([{ maxWait: TX_MAX_WAIT_MS }, { maxWait: TX_MAX_WAIT_MS }])
   })
 })
 

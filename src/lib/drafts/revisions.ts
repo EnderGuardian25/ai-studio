@@ -89,14 +89,28 @@ export async function nextRevisionNumber(
 // regenerate-design so their retry budgets can never drift again.
 const MAX_ATTEMPTS = 12
 
+// How long an interactive transaction may wait for a pool connection before
+// Prisma gives up with P2028 "Unable to start a transaction in the given time".
+// Prisma's default is 2000 ms, which is SHORTER than opening one new pool
+// connection can take: on the Windows dev/test host a new connection to
+// "localhost" costs ~2.1 s (the engine tries ::1 first; Postgres is published
+// on 127.0.0.1 only), so a commit issued while a burst of concurrent requests
+// grows the pool threw P2028 AFTER the 202 — the TC-REG-H7a "202 winner with
+// no revision" (T17 fix round 1; reproduced deterministically outside the app).
+// 10 s matches the engine's own pool_timeout for ordinary queries, so a
+// transaction is never the first thing to give up under the same load.
+export const TX_MAX_WAIT_MS = 10_000
+export const TX_OPTIONS = { maxWait: TX_MAX_WAIT_MS } as const
+
 export async function withNextRevisionNumber<T>(
   draftId: string,
   body: (tx: Prisma.TransactionClient, revisionNumber: number) => Promise<T>
 ): Promise<T> {
   for (let attempt = 1; ; attempt++) {
     try {
-      return await prisma.$transaction(async (tx) =>
-        body(tx, await nextRevisionNumber(tx, draftId))
+      return await prisma.$transaction(
+        async (tx) => body(tx, await nextRevisionNumber(tx, draftId)),
+        TX_OPTIONS,
       )
     } catch (err) {
       if (
@@ -293,10 +307,16 @@ export interface RecordRejectedRenderArgs {
 // Writes the not-applied outcome. A render/upload failure must not mask the
 // outcome (Ruling D): it is logged and the row is recorded without an export
 // (T19 409s an adopt of a row with no export).
+//
+// The diagnostics are validated FIRST, before anything is rendered or
+// uploaded: diagnostics that break the schema (e.g. more calls than the AC-15
+// caps allow) are a bug that must fail loudly, and failing after the upload
+// would orphan the export object.
 export async function recordRejectedRender(
   args: RecordRejectedRenderArgs,
 ): Promise<{ revisionId: string; exportKey: string | null }> {
   const { draftId, instruction, html, width, height } = args
+  const diagnostics = rejectionDiagnosticsSchema.omit({ export: true }).parse(args.diagnostics)
 
   let exportKey: string | null = null
   let exported: RejectionDiagnostics['export'] = 'none'
@@ -315,7 +335,7 @@ export async function recordRejectedRender(
     }
   }
 
-  const rejection = rejectionDiagnosticsSchema.parse({ ...args.diagnostics, export: exported })
+  const rejection: RejectionDiagnostics = { ...diagnostics, export: exported }
   const reason =
     args.reason.length > MAX_NOT_APPLIED_REASON ? `${args.reason.slice(0, MAX_NOT_APPLIED_REASON - 1)}…` : args.reason
 
@@ -338,7 +358,7 @@ export async function recordRejectedRender(
       data: { notAppliedReason: reason, notAppliedRevisionId: created.id },
     })
     return created
-  })
+  }, TX_OPTIONS)
 
   return { revisionId: row.id, exportKey }
 }

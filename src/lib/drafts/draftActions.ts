@@ -12,14 +12,37 @@ import { NOT_APPLIED_CLEARED, discardNotAppliedRender } from '@/lib/drafts/revis
 // Atomically claim the action slot: a conditional update where pendingAction
 // IS NULL, so there is no read-then-write race — exactly one concurrent
 // request wins. Returns false when an action is already in flight (or the
-// draft doesn't exist); the caller responds 409. Claiming also clears the
-// error from any previous action run.
+// draft doesn't exist); the caller responds 409.
+//
+// Claiming does NOT clear the previous run's pendingActionError (T17 fix round
+// 1). It used to, and that let a crash vanish: when two requests raced, the
+// first winner could crash AFTER its 202 and the second winner's claim erased
+// the error before anyone polled it (TC-REG-H7a). Now the error survives, and
+// every poll sees it, until the next run SETTLES — success clears it
+// (completeDraftAction), a not-applied refine clears it (releaseDraftAction
+// with no error), a crash replaces it. Consumers are unaffected: the draft UI
+// reads pendingActionError only on the transition of pendingAction to null,
+// by which point the settling run has already overwritten it. Every crash is
+// also logged by startDraftAction, so it is recorded even after a later
+// success clears the field.
 export async function claimDraftAction(draftId: string, action: DraftAction): Promise<boolean> {
   const { count } = await prisma.draft.updateMany({
     where: { id: draftId, pendingAction: null },
-    data: { pendingAction: action, pendingActionError: null },
+    data: { pendingAction: action },
   })
   return count === 1
+}
+
+// Heartbeat for a long-running claimed action: bumps Draft.updatedAt (which
+// the lazy stale-action sweep in drafts/recovery.ts measures against its
+// 15-min window) while the claim is still held. Guarded on the claim, so it
+// never revives an action the sweep already cleared. See the refine route for
+// the arithmetic that makes the sweep unable to fire on a live refine.
+export async function touchDraftAction(draftId: string, action: DraftAction): Promise<void> {
+  await prisma.draft.updateMany({
+    where: { id: draftId, pendingAction: action },
+    data: { updatedAt: new Date() },
+  })
 }
 
 // Release the action slot, optionally recording why the run failed.

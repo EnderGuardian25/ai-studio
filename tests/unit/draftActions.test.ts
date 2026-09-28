@@ -29,7 +29,7 @@ vi.mock('@/lib/agent/claudeAuth', () => ({
   runWithClaudeAuth: h.runWithClaudeAuth,
 }))
 
-const { claimDraftAction, releaseDraftAction, startDraftAction } = await import(
+const { claimDraftAction, releaseDraftAction, startDraftAction, touchDraftAction } = await import(
   '@/lib/drafts/draftActions'
 )
 
@@ -51,17 +51,46 @@ async function waitForRelease(calls: number) {
 }
 
 describe('claimDraftAction', () => {
-  it('claims atomically (pendingAction null in the where-clause) and clears the previous error', async () => {
+  it('claims atomically (pendingAction null in the where-clause) and does NOT wipe the previous error', async () => {
     expect(await claimDraftAction('draft-1', 'REFINE')).toBe(true)
     expect(h.updateMany).toHaveBeenCalledWith({
       where: { id: 'draft-1', pendingAction: null },
-      data: { pendingAction: 'REFINE', pendingActionError: null },
+      data: { pendingAction: 'REFINE' },
     })
+  })
+
+  // T17 fix round 1 (TC-REG-H7a): a winner that crashes after its 202 must not
+  // be erased by the next winner's claim before anyone polls it.
+  it('a crashed run keeps its error through the next claim; only the next run settling replaces it', async () => {
+    const row = { pendingAction: null as string | null, pendingActionError: null as string | null }
+    h.updateMany.mockImplementation(async ({ where, data }: { where: { pendingAction?: null }; data: Partial<typeof row> }) => {
+      if ('pendingAction' in where && row.pendingAction !== null) return { count: 0 }
+      Object.assign(row, data)
+      return { count: 1 }
+    })
+    await claimDraftAction('draft-1', 'REFINE')
+    await startDraftAction('draft-1', 'user-1', 'team-1', async () => {
+      throw new Error('Transaction API error: Unable to start a transaction in the given time.')
+    })
+    await vi.waitFor(() => expect(row.pendingAction).toBeNull())
+    expect(await claimDraftAction('draft-1', 'REFINE')).toBe(true)
+    // The second run is in flight — every poll still sees the first run's crash.
+    expect(row).toEqual({ pendingAction: 'REFINE', pendingActionError: expect.stringMatching(/Unable to start a transaction/) })
   })
 
   it('returns false when nothing matched (action already in flight)', async () => {
     h.updateMany.mockResolvedValue({ count: 0 })
     expect(await claimDraftAction('draft-1', 'REGENERATE_COPY')).toBe(false)
+  })
+})
+
+describe('touchDraftAction (stale-sweep heartbeat)', () => {
+  it('bumps updatedAt only while this claim is still held', async () => {
+    await touchDraftAction('draft-1', 'REFINE')
+    expect(h.updateMany).toHaveBeenCalledWith({
+      where: { id: 'draft-1', pendingAction: 'REFINE' },
+      data: { updatedAt: expect.any(Date) },
+    })
   })
 })
 
