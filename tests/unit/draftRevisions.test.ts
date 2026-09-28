@@ -171,6 +171,7 @@ vi.mock('@/lib/storage/minio', () => ({
   uploadObject: async (_b: Buffer, _bucket: string, key: string) => {
     fake.db.uploads.push(key)
   },
+  resolveExportUrl: async (key: string | null) => (key ? `https://signed.test/${key}` : null),
 }))
 
 import { prisma } from '@/lib/prisma'
@@ -183,6 +184,7 @@ import {
   withNextRevisionNumber,
   commitDraftRevision,
   recordRejectedRender,
+  resolveNotAppliedOutcome,
   rejectionDiagnosticsSchema,
   MAX_NOT_APPLIED_REASON,
   TX_MAX_WAIT_MS,
@@ -494,5 +496,92 @@ describe('commitDraftRevision clears the not-applied outcome', () => {
     row.adoptedAt = new Date()
     await commitDraftRevision({ draftId: 'd1', instruction: 'x', html: '<html/>', width: 1080, height: 1080, exportKey: 'k' })
     expect(row.discardedAt ?? null).toBeNull()
+  })
+})
+
+// ── T18: resolveNotAppliedOutcome — the draft poll's `notApplied` field ─────
+
+describe('resolveNotAppliedOutcome (T18, Ruling E)', () => {
+  it('is null when the draft carries no not-applied outcome at all', async () => {
+    expect(
+      await resolveNotAppliedOutcome({ id: 'd1', notAppliedReason: null, notAppliedRevisionId: null }),
+    ).toBeNull()
+  })
+
+  it('is null when notAppliedRevisionId is set but notAppliedReason is not (defensive — should never both-diverge)', async () => {
+    db.rows = [rejected('d1')]
+    expect(
+      await resolveNotAppliedOutcome({ id: 'd1', notAppliedReason: null, notAppliedRevisionId: db.rows[0].id }),
+    ).toBeNull()
+  })
+
+  it('reflects the live rejected row: reason from the draft, instruction/preview/time from the row', async () => {
+    const row = rejected('d1', 'make the logo bigger')
+    db.rows = [row]
+    const outcome = await resolveNotAppliedOutcome({
+      id: 'd1',
+      notAppliedReason: 'The edit could not be applied — it failed the check on both attempts.',
+      notAppliedRevisionId: row.id,
+    })
+    expect(outcome).toEqual({
+      reason: 'The edit could not be applied — it failed the check on both attempts.',
+      instruction: 'make the logo bigger',
+      revisionId: row.id,
+      previewUrl: `https://signed.test/${row.exportUrl}`,
+      rejectedAt: row.rejectedAt!.toISOString(),
+    })
+  })
+
+  it('previewUrl is null when the rejected row has no export (e.g. a truncated reply)', async () => {
+    const row = rejected('d1')
+    row.exportUrl = null
+    db.rows = [row]
+    const outcome = await resolveNotAppliedOutcome({
+      id: 'd1',
+      notAppliedReason: 'reason',
+      notAppliedRevisionId: row.id,
+    })
+    expect(outcome?.previewUrl).toBeNull()
+  })
+
+  it('never trusts the FK alone: a discarded row (replaced by a later not-applied refine) resolves to null', async () => {
+    const row = rejected('d1')
+    row.discardedAt = new Date()
+    db.rows = [row]
+    expect(
+      await resolveNotAppliedOutcome({ id: 'd1', notAppliedReason: 'reason', notAppliedRevisionId: row.id }),
+    ).toBeNull()
+  })
+
+  it('never trusts the FK alone: a row belonging to a DIFFERENT draft resolves to null', async () => {
+    const row = rejected('d2')
+    db.rows = [row]
+    expect(
+      await resolveNotAppliedOutcome({ id: 'd1', notAppliedReason: 'reason', notAppliedRevisionId: row.id }),
+    ).toBeNull()
+  })
+
+  it('never trusts the FK alone: a stale id that matches no row at all resolves to null', async () => {
+    db.rows = []
+    expect(
+      await resolveNotAppliedOutcome({ id: 'd1', notAppliedReason: 'reason', notAppliedRevisionId: 'ghost' }),
+    ).toBeNull()
+  })
+
+  it('never leaks htmlSnapshot or the rejection JSON', async () => {
+    const row = rejected('d1')
+    db.rows = [row]
+    const outcome = await resolveNotAppliedOutcome({
+      id: 'd1',
+      notAppliedReason: 'reason',
+      notAppliedRevisionId: row.id,
+    })
+    expect(Object.keys(outcome ?? {}).sort()).toEqual([
+      'instruction',
+      'previewUrl',
+      'reason',
+      'rejectedAt',
+      'revisionId',
+    ])
   })
 })

@@ -7,7 +7,7 @@ import { canAccessContent } from '@/lib/authz/visibility'
 import { resolveBrandKit } from '@/lib/brandkit/resolve'
 import { resolveExportUrl } from '@/lib/storage/minio'
 import { planDraftRecovery, STUCK_ACTION_REASON, STUCK_REASON } from '@/lib/drafts/recovery'
-import { COMMITTED_REVISION } from '@/lib/drafts/revisions'
+import { COMMITTED_REVISION, resolveNotAppliedOutcome } from '@/lib/drafts/revisions'
 
 type Params = { id: string }
 
@@ -130,6 +130,11 @@ async function loadDraft(id: string) {
 
   const kit = await resolveBrandKit(draft.teamId, draft.brief.campaignId ?? undefined, draft.brief.brandKitId ?? undefined)
 
+  // FR-14/AC-18: a twice-failed refine is a distinct outcome, not the
+  // existing error channel — re-derived from the retained rejected row on
+  // every poll (Ruling E), never trusted off the stored FK alone.
+  const notApplied = await resolveNotAppliedOutcome(draft)
+
   return {
     ownerId: draft.brief.userId,
     teamId: draft.teamId,
@@ -149,6 +154,7 @@ async function loadDraft(id: string) {
     conflict: pendingConflict
       ? { conflictId: pendingConflict.conflictId, explanation: pendingConflict.explanation }
       : null,
+    notApplied,
     createdAt: draft.createdAt,
     revisionCount: draft._count.revisions,
     currentRevisionNumber: draft.currentRevisionNumber,

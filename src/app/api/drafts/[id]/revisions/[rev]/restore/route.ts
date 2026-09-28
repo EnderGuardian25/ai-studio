@@ -7,7 +7,7 @@ import { canAccessContent } from '@/lib/authz/visibility'
 import { renderHtmlToPng } from '@/lib/renderer/puppeteer'
 import { uploadObject, resolveExportUrl, exportKey, BUCKET_EXPORTS } from '@/lib/storage/minio'
 import { dimensionsFor } from '@/lib/aspectRatio'
-import { findCommittedRevision } from '@/lib/drafts/revisions'
+import { findCommittedRevision, discardNotAppliedRender, NOT_APPLIED_CLEARED } from '@/lib/drafts/revisions'
 
 export const maxDuration = 120
 
@@ -60,17 +60,26 @@ export const POST = withTeamAuth<Params>(async (_req, { params }, user) => {
     await uploadObject(buffer, BUCKET_EXPORTS, key, 'image/png')
   }
 
-  await prisma.draft.update({
-    where: { id: params.id },
-    data: {
-      htmlContent: revision.htmlSnapshot,
-      exportUrl: key,
-      // Move the "current version" pointer — this is what makes reverting
-      // reversible: you can jump forward again to any other revision.
-      currentRevisionNumber: revisionNumber,
-      pendingConflict: Prisma.JsonNull,
-    },
-  })
+  // T18 (Ruling, T17 concern 4): a restore also clears any not-applied
+  // outcome. The rejected render a "Use anyway" would adopt was made from the
+  // PRE-restore design — leaving it live would let a later adopt silently
+  // undo this restore. Same two statements commitDraftRevision uses, batched
+  // (not interactive) since neither reads.
+  await prisma.$transaction([
+    discardNotAppliedRender(prisma, params.id),
+    prisma.draft.update({
+      where: { id: params.id },
+      data: {
+        htmlContent: revision.htmlSnapshot,
+        exportUrl: key,
+        // Move the "current version" pointer — this is what makes reverting
+        // reversible: you can jump forward again to any other revision.
+        currentRevisionNumber: revisionNumber,
+        pendingConflict: Prisma.JsonNull,
+        ...NOT_APPLIED_CLEARED,
+      },
+    }),
+  ])
 
   return NextResponse.json({ exportUrl: await resolveExportUrl(key) })
 })

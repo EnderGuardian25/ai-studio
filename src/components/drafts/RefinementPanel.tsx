@@ -4,15 +4,16 @@ import React, { useEffect, useRef, useState } from 'react'
 import { Send, Loader2, AlertTriangle, Check } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { GlassPanel } from '@/components/ui/GlassPanel'
+import { NotAppliedCard } from '@/components/drafts/NotAppliedCard'
 import { apiFetch } from '@/lib/apiFetch'
-import type { DraftAction } from '@/lib/api-types'
+import type { DraftAction, DraftNotApplied } from '@/lib/api-types'
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
 interface RefineMessage {
   id: string
   instruction: string
-  status: 'pending' | 'applied' | 'conflict' | 'error'
+  status: 'pending' | 'applied' | 'conflict' | 'not-applied' | 'error'
   detail?: string
 }
 
@@ -34,6 +35,10 @@ interface PendingResolution {
   instruction: string
   baselineRevision: number | null
   conflictIdAtSend: string | null
+  // Mirrors conflictIdAtSend's trick for the not-applied outcome (T18): a
+  // DIFFERENT revisionId than what was live at send means THIS refine is the
+  // one that produced it, not a stale outcome left over from before.
+  notAppliedRevisionIdAtSend: string | null
 }
 
 const SUGGESTIONS = [
@@ -48,6 +53,10 @@ export interface RefinementPanelProps {
   pendingAction: DraftAction | null
   pendingActionError: string | null
   conflict: { conflictId: string; explanation: string } | null
+  /** FR-14/AC-18: a twice-failed refine — a hard failure, separate from
+   *  `pendingActionError` (a crashed run). Cleared server-side by the next
+   *  successful action, so it disappears here on the next poll. */
+  notApplied: DraftNotApplied | null
   currentRevisionNumber: number | null
   /** Called right after an async action is accepted (202) so the parent can
    *  refetch the draft and start polling `pendingAction`. */
@@ -62,6 +71,7 @@ export function RefinementPanel({
   pendingAction,
   pendingActionError,
   conflict,
+  notApplied,
   currentRevisionNumber,
   onActionStarted,
   onRefined,
@@ -98,17 +108,20 @@ export function RefinementPanel({
         explanation: conflict.explanation,
         instruction: res.instruction,
       })
+    } else if (notApplied && notApplied.revisionId !== res.notAppliedRevisionIdAtSend) {
+      setStatus('not-applied', notApplied.reason)
     } else if (pendingActionError) {
       setStatus('error', pendingActionError)
     } else if (currentRevisionNumber !== res.baselineRevision) {
       setStatus('applied')
       onRefined()
     } else {
-      // Completed with no error, no new conflict and no new revision —
-      // shouldn't happen, but never leave the message spinning forever.
+      // Completed with no error, no new conflict, no not-applied outcome and
+      // no new revision — shouldn't happen, but never leave the message
+      // spinning forever.
       setStatus('error', 'The refinement finished without producing a new revision.')
     }
-  }, [pendingAction, pendingActionError, conflict, currentRevisionNumber, onRefined])
+  }, [pendingAction, pendingActionError, conflict, notApplied, currentRevisionNumber, onRefined])
 
   async function send(instruction: string, overrideConflictId?: string) {
     if (!instruction.trim() && !overrideConflictId) return
@@ -136,6 +149,7 @@ export function RefinementPanel({
           instruction,
           baselineRevision: currentRevisionNumber,
           conflictIdAtSend: conflict?.conflictId ?? null,
+          notAppliedRevisionIdAtSend: notApplied?.revisionId ?? null,
         }
         await apiFetch(`/api/drafts/${draftId}/refine`, {
           method: 'POST',
@@ -193,6 +207,11 @@ export function RefinementPanel({
                   <AlertTriangle size={11} /> Brand conflict
                 </span>
               )}
+              {m.status === 'not-applied' && (
+                <span className="text-red-600 dark:text-red-400 flex items-center gap-1" title={m.detail}>
+                  <AlertTriangle size={11} /> Not applied
+                </span>
+              )}
               {m.status === 'error' && (
                 <span className="text-red-500" title={m.detail}>
                   Failed: {m.detail}
@@ -202,6 +221,11 @@ export function RefinementPanel({
           </div>
         ))}
       </div>
+
+      {/* FR-14/AC-18 hard failure — driven directly by the polled `notApplied`
+          prop (not local message state), so it appears and clears exactly
+          when the server says so, on the next poll either way. */}
+      {notApplied && <NotAppliedCard notApplied={notApplied} />}
 
       {conflictCard && (
         <div className="mb-3 rounded-xl border border-amber-300 dark:border-amber-700/50 bg-amber-50 dark:bg-amber-900/20 p-3 animate-fade-in">

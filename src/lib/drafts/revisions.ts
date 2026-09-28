@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { PROMPT_VERSION } from '@/lib/agent/prompts/shared'
 import { INSTRUCTION_CLASS_KEYS } from '@/lib/agent/instructionClasses'
 import { getFontSetId } from '@/lib/renderer/fontSet'
+import type { DraftNotApplied } from '@/lib/api-types'
 
 // ── The revision chain vs. rejected renders (change 004 Phase 2, T15/T16) ────
 // DraftRevision holds two kinds of row. COMMITTED rows are the chain: numbered
@@ -361,4 +362,40 @@ export async function recordRejectedRender(
   }, TX_OPTIONS)
 
   return { revisionId: row.id, exportKey }
+}
+
+// ── The poll's notApplied field (T18, FR-14/AC-18, Ruling E) ────────────────
+// Re-derives the outcome from the rejected row on every read instead of
+// trusting Draft.notAppliedRevisionId as a bare pointer: the row must still
+// match draftId + rejectedAt set + NOT discarded (the carried-in note from the
+// task board — "never trust the FK alone"). If it doesn't, the outcome is
+// gone as far as the client is concerned, even if the column hasn't been
+// nulled out for some reason. Nothing off the row but instruction/export/time
+// ever reaches this return value — no htmlSnapshot, no rejection JSON.
+export async function resolveNotAppliedOutcome(draft: {
+  id: string
+  notAppliedReason: string | null
+  notAppliedRevisionId: string | null
+}): Promise<DraftNotApplied | null> {
+  if (!draft.notAppliedReason || !draft.notAppliedRevisionId) return null
+
+  const row = await prisma.draftRevision.findFirst({
+    where: {
+      id: draft.notAppliedRevisionId,
+      draftId: draft.id,
+      rejectedAt: { not: null },
+      discardedAt: null,
+    },
+    select: { id: true, instruction: true, exportUrl: true, rejectedAt: true },
+  })
+  if (!row || !row.rejectedAt) return null
+
+  const { resolveExportUrl } = await import('@/lib/storage/minio')
+  return {
+    reason: draft.notAppliedReason,
+    instruction: row.instruction,
+    revisionId: row.id,
+    previewUrl: await resolveExportUrl(row.exportUrl),
+    rejectedAt: row.rejectedAt.toISOString(),
+  }
 }

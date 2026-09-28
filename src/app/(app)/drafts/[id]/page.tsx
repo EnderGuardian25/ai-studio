@@ -272,6 +272,7 @@ export default function DraftDetailPage() {
               pendingAction={draft.pendingAction}
               pendingActionError={draft.pendingActionError}
               conflict={draft.conflict}
+              notApplied={draft.notApplied}
               currentRevisionNumber={draft.currentRevisionNumber}
               onActionStarted={fetchDraft}
               onRefined={refreshAfterChange}
