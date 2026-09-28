@@ -2,9 +2,30 @@
 
 This repo contains planning documents for **bistec-studio**, an internal marketing post generation tool for the Bistec marketing team.
 
-## ✅ Outstanding work — START HERE (updated 2026-09-23)
+## ✅ Outstanding work — START HERE (updated 2026-09-28)
 
-- **⏸️ 2026-09-23 — PICK UP HERE. Planning only, no product code changed.** Full detail: [`docs/handoff.md`](docs/handoff.md) top section. Order and dependencies: [`.specclaw/ROADMAP.md`](.specclaw/ROADMAP.md).
+- **⏸️ 2026-09-28 — PICK UP HERE. 004 Waves 1–3 are built, reviewed and pushed; 15/24 of its tasks are done. Next is Wave 4.** Full detail: [`docs/handoff.md`](docs/handoff.md) top section. The plan and binding rulings live in [`.specclaw/changes/004-design-instruction-fidelity/tasks.md`](.specclaw/changes/004-design-instruction-fidelity/tasks.md): task IDs were renumbered to T1–T24, and "Carried in" notes sit on T17–T21.
+  - **Open PRs:**
+    - **#42** `fix/ci-deploy-pipeline` → `main` holds 004 Phase 0 (deploy pipeline) plus the MinIO → silo switch. **Merge it only on the user's go-ahead**, then merge `main` into `v2`.
+    - **#43** `v2` → `main` is a **DRAFT that must never be merged**. It exists only so CI runs on `v2`.
+  - **🔴 Urgent ops for the Coolify administrator, not blocked on any merge:**
+    - **(1) Swap prod MinIO to `pgsty/silo`** following `docs/minio-silo-migration.md` (on the #42 branch). MinIO's community images are withdrawn everywhere. Prod's version has **CVE-2026-40344**, and our presigned URLs expose the access key.
+    - **(2) Rotate `COOLIFY_API_TOKEN`.** It needs **`deploy` + `read`** and must be made by a team **Admin/Owner**. Prove it with a direct POST, **not** by re-running run 34988162569, which still sends GET → 405.
+  - **Next:**
+    - check CI on #42/#43; #43's build job holds the first `ci-docker-build` proof of ★ inside the image;
+    - build 004 **Wave 4** on `v2`: **T20 → T17 → T18 → T19 → T21**. T19's route is `/api/drafts/[id]/rejected/[revisionId]/adopt`;
+    - then Wave 5, then `/specclaw:verify`.
+  - **Gates at `v2` head:** unit 562/562, `npm run test:render` 15/15, mock E2E 183/4/0.
+  - **New migrations on `v2`**, applied by a redeploy (locally, run `npx prisma migrate deploy`):
+    - `20260927120000_draft_font_set`;
+    - `20260927130000_refine_not_applied`. Its header documents an **order-sensitive down path**: delete the unnumbered rejected rows before any Phase 2 code revert.
+  - **Gotchas:**
+    - `export MSYS_NO_PATHCONV=1` before any docker command with a container path. Git Bash rewrites `/data`.
+    - Before a full E2E run: stop stray node processes, `rm -rf .next`, and drop/recreate the test DB (the 200-campaign cap).
+    - Never run two implementers in one checkout; lint-staged stashes. Use worktrees.
+    - specclaw `git.strategy` is `direct`.
+
+- **2026-09-23 — planning (superseded by the 2026-09-28 entry above for status; decisions still stand).** Order and dependencies: [`.specclaw/ROADMAP.md`](.specclaw/ROADMAP.md).
   - **Added later on 2026-09-23 (planning only):**
     - **New proposal 012: per-channel captions.** Instagram, LinkedIn and WhatsApp each get their own caption, panel, counter and regenerate, and each is published to its own channel.
       - It fixes a live bug: `Draft.copyText` is one unstructured string, and `publishDraft.ts` / `jobRunner.ts` send the **whole combined caption to every channel**.
@@ -16,7 +37,7 @@ This repo contains planning documents for **bistec-studio**, an internal marketi
   - **🔴 Merges to `main` build but do NOT deploy.** Since 2026-09-15 the Coolify redeploy returns **401**: `COOLIFY_API_TOKEN` is dead ([run 34988162569](https://github.com/bistec-oss/studio/actions/runs/34988162569)). Prod runs `9ea4c045`, the same code as `main`, because `09a38b71` was docs-only.
     - The token is rotated by the **Coolify administrator**, using [`docs/coolify-token-rotation.md`](docs/coolify-token-rotation.md). **The new token needs the `deploy` and `read` abilities**: the verify step reads the scheduler's deployment status, and Coolify gates that endpoint on `read`.
     - The code hardening is **004 Wave 1** (T2–T6; task IDs renumbered 2026-09-27, old→new table at the top of `tasks.md`): readable failures, both redeploys always attempted, `/api/health` → `{ ok, commit }`, CI verifying the deployed commit, actions off Node 20, Node 20 → 22.
-    - **Built 2026-09-27 on `fix/ci-deploy-pipeline`** (worktree `../designer-ci`, not yet pushed or merged). Commits: T2 redeploy step `8f45f9dd`; T3 `/api/health` `4c5b311d`; T4 verify + action majors `a7862026` + poll-auth/dispatch-guard fix `4c919162` + Coolify POST/scope hardening `d8d144c0`; T5 Node 22 `5f44828d` (its own commit, so it reverts alone). A manual `workflow_dispatch` only deploys `main`.
+    - **Built 2026-09-27 on `fix/ci-deploy-pipeline`** (worktree `../designer-ci`; pushed, **PR #42**, not merged; also carries the MinIO → silo commits `edb20b10`, `f52189e8`). Commits: T2 redeploy step `8f45f9dd`; T3 `/api/health` `4c5b311d`; T4 verify + action majors `a7862026` + poll-auth/dispatch-guard fix `4c919162` + Coolify POST/scope hardening `d8d144c0`; T5 Node 22 `5f44828d` (its own commit, so it reverts alone). A manual `workflow_dispatch` only deploys `main`.
     - **The deploy rule once that PR merges and the token is rotated:** a deploy is confirmed only when `https://studio.bistecglobal.com/api/health` returns the merged commit SHA. CI polls it for up to about 10 minutes and goes red if prod never serves the new commit. The scheduler is confirmed by its Coolify deployment status. That proves the container deployed, not that the worker loops (B4 / 006).
     - **Until then, a green `main` build is not evidence of a deploy.**
   - **New proposals:**
@@ -26,7 +47,6 @@ This repo contains planning documents for **bistec-studio**, an internal marketi
     - **011** app visual redesign: a **new direction**, opaque floating surfaces.
   - **004 re-planned to 24 tasks:** Phase 0 + T10 (design prompt says no emoji; monochrome symbols only) + T19 ("Use anyway" adopts a rejected refine). The verifier is pinned to Haiku.
   - **004 Phase 1 (Wave 2) built on `v2`:** commits `744f4b83`, `da54f2fc`, `7f880b07`, `404b0030`, `3a7dc4d0` plus the Wave 2 fix commit. **One new migration `20260927120000_draft_font_set`** — a redeploy applies it; locally run `npx prisma migrate deploy` after pulling `v2`. New `npm run test:render` real-render harness.
-  - **Gotcha:** specclaw `git.strategy` is now **`direct`**, so `/specclaw:build` commits to the checked-out branch. Switch to `fix/ci-deploy-pipeline` before building Phase 0.
 
 - **✅ 2026-08-03 — the model's chat preamble was being PAINTED onto exported posts.** Reported as "unnecessary text is printed on top" on a prod regenerate; the exported PNG carried a caption across its top edge reading _"The file write wasn't permitted, so here's the complete HTML document directly:"_ — the design model's own prose.
   - **Root cause — the reply was trusted to arrive clean.** CLI-mode design is a single-shot: every prompt says "Output ONLY … No markdown code fences, no commentary" (`prompts/shared.ts` `outputProtocol`, `prompts/refine.ts`). That run reached for a `Write` tool it was never granted (the design call passes **no** `allowedTools`), was denied, and narrated the fallback before printing the document. Nothing downstream removed it: **`stripCodeFences` is anchored** (`/^```[a-zA-Z]*\s*\n([\s\S]*?)\n```$/`) so it only strips when the _entire_ reply is one fenced block and returns the whole string otherwise, and the sanity check merely asked whether `<!doctype` appeared **anywhere** — a preamble sailed through both.

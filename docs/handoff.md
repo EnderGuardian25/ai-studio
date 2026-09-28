@@ -1,13 +1,93 @@
 # bistec-studio — Session Handoff
 
-**Date:** 2026-09-23 (latest, later the same day: proposal **012** per-channel captions + copy→caption rename, a floating **Create post** button folded into 011, and a launch-video legibility pass. Before that: planning session — proposals 008–011 + roadmap, 004 re-planned to 24 tasks incl. Phase 0, and the deploy pipeline found broken: Coolify 401 since 2026-09-15). Previous: 2026-07-28 (copy-edit status clobber fix).
+**Date:** 2026-09-28 (latest: build session — 004 Waves 1–3 built, MinIO → silo, PR #42 + draft PR #43). Previous: 2026-09-23 (later, later the same day: proposal **012** per-channel captions + copy→caption rename, a floating **Create post** button folded into 011, and a launch-video legibility pass. Before that: planning session — proposals 008–011 + roadmap, 004 re-planned to 24 tasks incl. Phase 0, and the deploy pipeline found broken: Coolify 401 since 2026-09-15). Previous: 2026-07-28 (copy-edit status clobber fix).
 **Repo:** https://github.com/bistec-oss/studio (formerly `bistec-oss/designer`)
-**Branch:** work continues on **`v2`** (integration branch, pushed; all 004–012 work lands here, merged to `main` in one go on go-ahead). `main` = `09a38b71` (PR #41, docs); prod runs `9ea4c045` because the #41 redeploy 401'd. Exception: 004 Phase 0 ships as its own PR to `main`.
+**Branch:** work continues on **`v2`** (pushed; all 004–012 work lands here, merged to `main` in one go on go-ahead). `main` = `09a38b71`; prod runs `9ea4c045` (deploys broken since 2026-09-15). Open: **PR #42** (004 Phase 0 + MinIO→silo, to `main`) and **draft PR #43** (`v2` CI only — never merge).
 **Production:** `https://studio.bistecglobal.com`
 
 ---
 
-## ⏸️ 2026-09-23 (later) — PICK UP HERE
+## ⏸️ 2026-09-28 — PICK UP HERE
+
+**Build session.** 004 Waves 1–3 are built, reviewed and pushed, and MinIO is replaced by the maintained fork **silo**. **15/24 of 004's tasks are done.** Next is **Wave 4** (Phase 2 wiring). Nothing is merged to `main`, and prod is unchanged.
+
+### Where things are
+
+| What                                         | Where                                                                                                                                                                                                                                                                                                                                      |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **PR #42** `fix/ci-deploy-pipeline` → `main` | Open, **not merged**. It holds 004 Phase 0 (T2–T5): readable Coolify redeploys, POST `/deploy`, `/api/health` → `{ ok, commit }`, CI verifying the deployed SHA, action majors, Node 22. Plus the **MinIO → silo** switch (`edb20b10`, `f52189e8`) and the admin runbook `docs/minio-silo-migration.md`. Local worktree: `../designer-ci`. |
+| **PR #43** `v2` → `main`                     | A **DRAFT that must never be merged.** It exists only so CI runs on `v2`, because `e2e.yml` never triggers on `v2` pushes. Its e2e job goes red at "Start MinIO" until #42 merges and `main` is merged into `v2`.                                                                                                                          |
+| **`v2`**                                     | Pushed. It holds 004 Waves 2–3 plus the tracking commits.                                                                                                                                                                                                                                                                                  |
+| `main` / prod                                | `main` = `09a38b71`; **prod runs `9ea4c045`**. Deploys have been broken since 2026-09-15 (Coolify 401).                                                                                                                                                                                                                                    |
+| 004 plan and progress                        | `.specclaw/changes/004-design-instruction-fidelity/tasks.md`: task IDs were **renumbered to T1–T24** (old→new table at the top). Each task has its verification report under `reports/`.                                                                                                                                                   |
+| Wave 4 rulings                               | **In `tasks.md` itself**, as "Carried in" notes on T17–T21. Read them before building.                                                                                                                                                                                                                                                     |
+| SDD ledger                                   | `.superpowers/sdd/tasks/progress.md`, which holds every ruling, deferred minor and fix round. **It is gitignored, so it exists on this machine only.** Its binding content was copied into the tasks.md carry notes.                                                                                                                       |
+
+### What was built (all reviewed by independent task and whole-wave reviews)
+
+- **Wave 1: Phase 0, deploy pipeline** (on PR #42). T2–T5 are done; T6's CLAUDE.md note is on `v2`. **T1 (token rotation) is deferred: the Coolify admin does it.** The final review caught two things:
+  - Coolify ≥4.2.0 **rejects GET `/deploy` with 405**, so the call is now POST.
+  - A token created by a team **Member** gets HTTP 200 but queues no deployment. The step now fails on that and prints Coolify's message.
+- **Wave 2: Phase 1** (on `v2`):
+  - T10: no emoji in designs; an explicit exception covers emoji in the caption. `PROMPT_VERSION` `2026-09-27.2`.
+  - T11: `reconcileInlineAssets`.
+  - T7: `font-noto-symbols` in the runner image.
+  - T9: real-render harness in `tests/render/` (`npm run test:render`), plus an in-image glyph check `scripts/glyph-check/check-glyphs.mjs` wired into CI.
+  - T8: `Draft.fontSet` stamp, migration `20260927120000_draft_font_set`.
+- **Wave 3: Phase 2 modules** (on `v2`, **not wired into the refine route yet**):
+  - T12: `instructionClasses.ts`, the one table: semantics plus pure post-conditions over `DomFacts`. It took 4 review rounds; 9 false-pass paths were closed.
+  - T13: `refineEnvelope.ts`. The envelope carries `classes`, `supersedes` and `constrains`.
+  - T15: migration `20260927130000_refine_not_applied`. Rejected rows have a NULL `revisionNumber` and `rejectedAt`, CHECK constraints enforce this, and the down path is documented in the migration header.
+  - T16: the `COMMITTED_REVISION` filter guards every chain consumer; E2E §U.
+  - T14: `refineVerify.ts` and `renderer/domFacts.ts`. Structural classes cost zero model calls; `add` makes one Haiku-pinned call through `pinModel`. It fails closed, and `isAccepted` is true only for `pass`.
+- **Gates at `v2` head:** unit 562/562, render 15/15, full mock E2E **183 passed / 4 skipped / 0 failed**, tsc and lint clean (the 7 known warnings).
+
+### 🔴 Urgent ops (Coolify administrator), not blocked on any merge
+
+1. **Swap prod MinIO to silo now.** MinIO's community edition is dead: Docker Hub deleted it on 2026-09-11, quay.io has refused anonymous pulls since 2026-09-24, and dl.min.io returns 410.
+   - Prod's version has **CVE-2026-40344**: anyone holding an access key can write any object. **Our presigned URLs expose the access key.**
+   - The runbook is `docs/minio-silo-migration.md` (PR #42 branch): record the image, tag a rollback copy, back up the volume, change only `image:`, verify, roll back if needed.
+   - Tested: data compatibility both ways, and full E2E 180/0 against silo.
+2. **Rotate `COOLIFY_API_TOKEN`** (`docs/coolify-token-rotation.md`). It needs the **`deploy` + `read`** abilities and must be created by a team **Admin/Owner**. Before PR #42 merges, prove the token with the doc's direct POST, **not** by re-running run 34988162569, which still sends GET and gets 405.
+
+### Next actions, in order
+
+1. **Check CI on #42 and #43.**
+   - #42: e2e should be green now with silo.
+   - #43: the build job carries the first **`ci-docker-build`** evidence for AC-01 (★ in the real image) and the first Linux run of `test:render`.
+   - Fix anything red.
+2. **Merge PR #42 on the user's go-ahead**, then **merge `main` into `v2`**. A reviewer checked this merge is conflict-free for the Dockerfile and `e2e.yml`. After the merge and the token rotation, trigger `gh workflow run docker-publish.yml --ref main`, then confirm `https://studio.bistecglobal.com/api/health` returns the SHA.
+3. **Build 004 Wave 4 on `v2`**: **T20 (test seam) first, then T17 → T18 → T19 → T21**.
+   - T17's file list was widened: runners, `revisions.ts`, `draftActions.ts`, `refineVerify.ts`.
+   - **T19's route is now `/api/drafts/[id]/rejected/[revisionId]/adopt`.**
+   - Stop at the phase boundary. Then Wave 5 (T22–T24).
+4. Then `/specclaw:verify` for 004. AC-01 is recorded as `ci-docker-build` once #43's build job is green.
+5. The earlier plan still stands after that: review/plan 005–012 in roadmap order.
+
+### Known limits, parked on purpose (tracked in the tasks.md carry notes)
+
+- **Headline replaced + logo removed.** "Change the headline to X and remove the logo" fails verification unless the new text is shorter, because `supersedes` is one flat list. T17 either makes it per-clause or adds the replace-only exemption.
+- **Re-tagged passages.** A passage moved to a new class (N5 family) can still pass `remove` when an additive clause is present. Carried to T21 as a known limit.
+- **constrain "smaller" can pass by truncating text** with the font unchanged. This is allowed by ruling and documented.
+
+### Gotchas learned this session
+
+- **Git Bash rewrites container paths.** `docker run -v vol:/data … server /data` silently becomes a Windows path. **`export MSYS_NO_PATHCONV=1`** before any docker command that has a container path. It invalidated a whole compatibility test before it was caught.
+- **Stale `.next` plus leftover servers.** A subagent's `node server.js` smoke test (ports 39xx) or a dead `next dev` on :3001 holds `.next` open, and `next dev` then 404s every route. Before a full E2E run:
+  - stop stray node processes (PowerShell `Get-CimInstance Win32_Process -Filter "Name='node.exe'"`);
+  - `rm -rf .next`;
+  - **drop and recreate the test DB** (`DROP DATABASE bistec_studio_test WITH (FORCE)`), because repeated runs hit the 200-campaign cap and fail `team-isolation`.
+- **Never run two implementers in one checkout.** lint-staged stashes unstaged changes on commit. Worktrees are the way to parallelise.
+- **specclaw quirks:**
+  - `specclaw-build-context` dumps about 457 KB, so briefs were hand-assembled from `tasks.md` + spec/design slices.
+  - Task IDs must be all-digit (`T<n>`).
+  - Report files need a `## Verification` footer with `Command:` / `Exit:` lines.
+- **Docker Desktop stopped once mid-session.** Relaunch it with `"C:\Program Files\Docker\Docker\Docker Desktop.exe"`.
+- **lint-staged commits everything already staged.** A staged `.gitignore` rode along into the task-renumber commit.
+
+---
+
+## 2026-09-23 (later) — planning: 012 + Create post button
 
 **Planning only, no product code changed.** Two additions to the roadmap, and a legibility pass on the launch video. Everything in the earlier 2026-09-23 section below still stands. **Next actions are unchanged except for step 4's order.**
 

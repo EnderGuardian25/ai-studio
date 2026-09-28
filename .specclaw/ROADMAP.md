@@ -1,7 +1,7 @@
 # bistec-studio roadmap — changes 004–012
 
 **Updated:** 2026-09-23 · **Branch:** all of this lands on `v2` (see Branching at the bottom); handoff in `docs/handoff.md` top section.
-**Status:** none of 004–012 is built. **004** is fully planned (spec, design, 24 tasks — 8 added 2026-09-23, incl. Phase 0 deploy-pipeline fix). **005–012** are proposals awaiting approval. **012** (per-channel captions) and **011**'s floating Create post button were added 2026-09-23 (later).
+**Status (2026-09-28):** **004** is in build: 15/24 tasks done. Waves 1–3 are built and reviewed (Phase 0 is on PR #42; Phases 1 and 2's modules are on `v2`), and Wave 4, the Phase 2 wiring, is next. **004 Phase 0's PR #42 also swaps MinIO for `pgsty/silo`** (community MinIO images withdrawn; prod CVE-2026-40344). **005–012** are proposals awaiting approval. **012** (per-channel captions) and **011**'s floating Create post button were added 2026-09-23 (later).
 
 This file sequences the open changes. Each change's own `proposal.md` is the source of truth for its scope. This file only records **order, dependencies, and the boundaries between changes that touch the same code**.
 
@@ -9,7 +9,7 @@ This file sequences the open changes. Each change's own `proposal.md` is the sou
 
 | #   | Change                                                                            | What it fixes / adds                                                                        | Size         | State             |
 | --- | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | ------------ | ----------------- |
-| 004 | [Design instruction fidelity](changes/004-design-instruction-fidelity/)           | Refine edits that don't stick; tofu glyphs; a real-render test harness                      | medium       | 📝 tasks ready    |
+| 004 | [Design instruction fidelity](changes/004-design-instruction-fidelity/)           | Refine edits that don't stick; tofu glyphs; a real-render test harness                      | medium       | 🔨 15/24 built    |
 | 005 | [Provider flexibility + onboarding](changes/005-provider-flexibility-onboarding/) | Guided Claude connect; COPY provider route; `isDefault` image bug; Gemini; CLI sandbox      | medium       | 📋 proposal       |
 | 006 | [Product observability](changes/006-product-observability/)                       | Self-hosted PostHog, generation traces, scheduler heartbeat, stale-export badge             | large        | 📋 proposal       |
 | 007 | [Brand-kit design system](changes/007-brandkit-design-system/)                    | Turn adjectival kit prose into measurable rules; typography dataset                         | medium-large | 📋 proposal       |
@@ -56,7 +56,8 @@ B4 scheduler fix (ops) ───────────────► 010 sche
 
 **Stage 0 — ops + the deploy pipeline (do now).** These unblock things that are already built.
 
-- **Rotate the Coolify API token.** Merges to `main` currently build but do not deploy (Coolify 401 since 2026-09-15). Handoff: `docs/coolify-token-rotation.md`. Then ship **004 Phase 0** as its own PR to `main`: readable deploy failures, post-deploy commit verification, current actions, Node 22. It is the one exception to the `v2` rule, because the deploy steps only run on `main`.
+- **Swap prod MinIO to `pgsty/silo`** (`docs/minio-silo-migration.md`, PR #42 branch). This is urgent because of CVE-2026-40344.
+- **Rotate the Coolify API token** (needs `deploy` + `read`, made by a team Admin/Owner). Merges to `main` currently build but do not deploy (Coolify 401 since 2026-09-15). Handoff: `docs/coolify-token-rotation.md`. Then ship **004 Phase 0** (built: **PR #42**) as its own PR to `main`: readable deploy failures, post-deploy commit verification, current actions, Node 22. It is the one exception to the `v2` rule, because the deploy steps only run on `main`.
 - Fix **B4**: the Coolify scheduler resource. Read `docs/scheduler-b4-diagnosis-2026-08-03.md`; one look at its logs picks the cause.
 - Set a **team Claude token** on both prod teams at `/team`.
 - Mark each team's IMAGE provider **isDefault** (data fix for today's silent no-background bug, ahead of 005's code fix).
