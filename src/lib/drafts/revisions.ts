@@ -255,13 +255,19 @@ export const NOT_APPLIED_CLEARED = { notAppliedReason: null, notAppliedRevisionI
 // Stamps the rejected render the draft's not-applied outcome references as
 // discarded — unless it was adopted or already discarded. The caller clears
 // (NOT_APPLIED_CLEARED) or replaces the draft's fields in the same
-// transaction. Only rejected rows may carry discardedAt (CHECK constraint), and
-// the filter says so too.
-export async function discardNotAppliedRender(tx: Prisma.TransactionClient, draftId: string): Promise<void> {
-  const draft = await tx.draft.findUnique({ where: { id: draftId }, select: { notAppliedRevisionId: true } })
-  if (!draft?.notAppliedRevisionId) return
-  await tx.draftRevision.updateMany({
-    where: { id: draft.notAppliedRevisionId, draftId, rejectedAt: { not: null }, adoptedAt: null, discardedAt: null },
+// transaction, AFTER this runs (the filter follows the draft's reference).
+// Only rejected rows may carry discardedAt (CHECK constraint), and the filter
+// says so too. One statement, no read, so it also fits a batch transaction —
+// it runs on every draft-action completion (draftActions.completeDraftAction).
+export function discardNotAppliedRender(client: Prisma.TransactionClient, draftId: string) {
+  return client.draftRevision.updateMany({
+    where: {
+      draftId,
+      rejectedAt: { not: null },
+      adoptedAt: null,
+      discardedAt: null,
+      notAppliedOn: { some: { id: draftId } },
+    },
     data: { discardedAt: new Date() },
   })
 }

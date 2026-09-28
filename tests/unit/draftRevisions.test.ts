@@ -40,6 +40,9 @@ const fake = vi.hoisted(() => {
       const value = (row as unknown as Record<string, unknown>)[key]
       if (key === 'draftId' || key === 'id') {
         if (value !== cond) return false
+      } else if (key === 'notAppliedOn') {
+        // The single fake draft's back-reference: { some: { id } }.
+        if (row.id !== db.notAppliedRevisionId) return false
       } else if (key === 'adoptedAt' || key === 'discardedAt') {
         if (cond !== null) throw new Error(`fake prisma: unsupported condition on ${key}`)
         if (value != null) return false
@@ -138,7 +141,6 @@ const fake = vi.hoisted(() => {
   const client = {
     draftRevision,
     draft: {
-      findUnique: async () => ({ notAppliedRevisionId: db.notAppliedRevisionId }),
       update: async (args: { where: unknown; data: Record<string, unknown> }) => {
         db.draftUpdates.push(args)
         if ('notAppliedRevisionId' in args.data) db.notAppliedRevisionId = args.data.notAppliedRevisionId as string | null

@@ -17,7 +17,8 @@ vi.mock('@/lib/prisma', () => {
   const client = {
     draft: { updateMany: h.updateMany, findUnique: h.findUnique },
     draftRevision: { updateMany: h.revisionUpdateMany },
-    $transaction: async <T>(fn: (tx: unknown) => Promise<T>) => fn(client),
+    // Batch form only: the statements were issued in order; await them all.
+    $transaction: async (ops: Array<Promise<unknown>>) => Promise.all(ops),
   }
   return { prisma: client }
 })
@@ -34,8 +35,10 @@ const { claimDraftAction, releaseDraftAction, startDraftAction } = await import(
 
 beforeEach(() => {
   h.updateMany.mockReset().mockResolvedValue({ count: 1 })
-  h.findUnique.mockReset().mockResolvedValue({ notAppliedRevisionId: null })
+  h.findUnique.mockReset()
   h.revisionUpdateMany.mockReset().mockResolvedValue({ count: 1 })
+  // A failed run is logged (startDraftAction) — keep the test output clean.
+  vi.spyOn(console, 'error').mockImplementation(() => {})
   h.resolveClaudeAuth.mockReset().mockResolvedValue(null)
   // Default: transparent pass-through, like the real fn with a null auth.
   h.runWithClaudeAuth.mockReset().mockImplementation((_auth, fn) => fn())
@@ -88,16 +91,21 @@ describe('startDraftAction', () => {
       where: { id: 'draft-1' },
       data: { pendingAction: null, pendingActionError: null, notAppliedReason: null, notAppliedRevisionId: null },
     })
-    // No outcome was pending, so no rejected row was touched.
-    expect(h.revisionUpdateMany).not.toHaveBeenCalled()
+    // One read-free batch: no findUnique on the completion path.
+    expect(h.findUnique).not.toHaveBeenCalled()
   })
 
   it('a success stamps the rejected render the cleared outcome referenced as discarded (never an adopted one)', async () => {
-    h.findUnique.mockResolvedValue({ notAppliedRevisionId: 'rej-1' })
     await startDraftAction('draft-1', 'user-1', 'team-1', async () => {})
     await waitForRelease(1)
     expect(h.revisionUpdateMany).toHaveBeenCalledWith({
-      where: { id: 'rej-1', draftId: 'draft-1', rejectedAt: { not: null }, adoptedAt: null, discardedAt: null },
+      where: {
+        draftId: 'draft-1',
+        rejectedAt: { not: null },
+        adoptedAt: null,
+        discardedAt: null,
+        notAppliedOn: { some: { id: 'draft-1' } },
+      },
       data: { discardedAt: expect.any(Date) },
     })
     // Stamped BEFORE the draft stops referencing it.
@@ -105,7 +113,6 @@ describe('startDraftAction', () => {
   })
 
   it("a 'not-applied' completion releases clean but KEEPS the outcome the refine just recorded", async () => {
-    h.findUnique.mockResolvedValue({ notAppliedRevisionId: 'rej-new' })
     await startDraftAction('draft-1', 'user-1', 'team-1', async () => 'not-applied' as const)
     await waitForRelease(1)
     expect(h.updateMany).toHaveBeenCalledWith({

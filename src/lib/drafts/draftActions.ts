@@ -36,14 +36,16 @@ export async function releaseDraftAction(draftId: string, error?: string): Promi
 // next successful action" — regenerate-design/copy included; a DB side effect
 // only, their request/response shapes are unchanged) and stamps the rejected
 // render it referenced as discarded, so a late "Use anyway" on it 409s.
+// A batch (not interactive) transaction: two statements in order, no read and
+// no held connection, since this runs on every action completion.
 export async function completeDraftAction(draftId: string): Promise<void> {
-  await prisma.$transaction(async (tx) => {
-    await discardNotAppliedRender(tx, draftId)
-    await tx.draft.updateMany({
+  await prisma.$transaction([
+    discardNotAppliedRender(prisma, draftId),
+    prisma.draft.updateMany({
       where: { id: draftId },
       data: { pendingAction: null, pendingActionError: null, ...NOT_APPLIED_CLEARED },
-    })
-  })
+    }),
+  ])
 }
 
 // What a work closure may return. 'not-applied' = the refine completed
@@ -73,9 +75,12 @@ export async function startDraftAction(
   const auth = await resolveClaudeAuth(userId, teamId)
   void runWithClaudeAuth(auth, work)
     .then((completion) => (completion === 'not-applied' ? releaseDraftAction(draftId) : completeDraftAction(draftId)))
-    .catch((err) =>
-      releaseDraftAction(draftId, err instanceof Error ? err.message : String(err))
-    )
+    .catch((err) => {
+      // Logged as well as recorded: the next claim clears pendingActionError,
+      // so without this a crashed run can vanish without trace.
+      console.error(`[draft-action] draft ${draftId} failed:`, err)
+      return releaseDraftAction(draftId, err instanceof Error ? err.message : String(err))
+    })
     // Belt-and-braces: a release failure (e.g. DB down) must not become an
     // unhandled rejection.
     .catch((e) => {
