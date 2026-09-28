@@ -466,3 +466,19 @@ describe('the retry is always told why', () => {
     expect(f.runs[1].retryReasons).toEqual(['the check found the instruction not applied'])
   })
 })
+
+// Fix round 1, Minor 1: the verifier-call count is recorded as spent, never
+// clamped — an over-spending verify is caught by the schema, not hidden.
+describe('verifierCalls is the true count', () => {
+  it('a verify that reports 2 model calls is recorded as 2, and the rejected-row schema refuses it', async () => {
+    const f = fakes([REPLIES.good], [MISS, MISS])
+    const inner = f.deps.verify
+    f.deps.verify = async (req) => ({ ...(await inner(req)), modelCalls: 2 })
+    const r = await runRefineAttempts(input({}), f.deps)
+    expect(r.kind).toBe('not-applied')
+    if (r.kind !== 'not-applied') return
+    expect(r.diagnostics.verifierCalls).toBe(4)
+    expect(r.diagnostics.attempts.map((a) => a.verifierCalls)).toEqual([2, 2])
+    expect(() => rejectionDiagnosticsSchema.parse({ ...r.diagnostics, export: 'none' })).toThrow()
+  })
+})

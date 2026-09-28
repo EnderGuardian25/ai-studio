@@ -298,9 +298,11 @@ export async function runRefineAttempts<C>(
         // verifyRefine never rejects; an injected verify that does fails closed (FR-10).
         outcome = { result: { kind: 'unavailable', reason: err instanceof Error ? err.message : String(err) }, modelCalls: 0 }
       }
-      const calls = Math.min(outcome.modelCalls, 1)
-      verifierCalls += calls
-      a.diag.verifierCalls = calls
+      // The TRUE count, never clamped: if verify ever spent more than one call,
+      // the diagnostics must say so and the schema (max 1 per attempt, 2 in
+      // total — AC-15) rejects the record rather than under-reporting it.
+      verifierCalls += outcome.modelCalls
+      a.diag.verifierCalls = outcome.modelCalls
       a.diag.verdict = outcome.result.kind
       a.diag.reasons = missReasons(outcome.result)
       if (isAccepted(outcome.result)) {

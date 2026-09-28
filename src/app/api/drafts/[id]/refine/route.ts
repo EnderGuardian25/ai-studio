@@ -14,7 +14,7 @@ import { modelFor, pathForDesignMode, pipelineMode } from '@/lib/agent/config'
 import { buildRefineSystemPrompt, buildRefineUserMessage } from '@/lib/agent/prompts/refine'
 import { generateBackgroundForRefine } from '@/lib/agent/background'
 import { commitDraftRevision, recordRejectedRender } from '@/lib/drafts/revisions'
-import { claimDraftAction, startDraftAction } from '@/lib/drafts/draftActions'
+import { claimDraftAction, startDraftAction, touchDraftAction } from '@/lib/drafts/draftActions'
 import { runRefineAttempts, settleRefine } from '@/lib/drafts/refineAttempt'
 import { verifyRefine } from '@/lib/drafts/refineVerify'
 import { extractDomFacts } from '@/lib/renderer/domFacts'
@@ -163,8 +163,29 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
       {
         // Neither runner renders in refine mode: only the document finally
         // kept is rendered (below), so a missed attempt leaves no export.
-        runRefine: ({ attempt, model, retryReasons }) =>
-          mode === 'cli'
+        //
+        // Stale-sweep heartbeat (T17 fix round 1). The lazy sweep in
+        // drafts/recovery.ts clears an action whose Draft.updatedAt is
+        // STUCK_GENERATION_MS (15 min = 900 s) old. A verified refine can now
+        // run two attempts, so each attempt start bumps updatedAt (only while
+        // this claim is held). Worst case between bumps, CLI mode (prod):
+        //   attempt 1 → attempt 2:  refine 300 s (runClaudeCli timeout)
+        //     + after-facts render 60 s (SET_CONTENT_TIMEOUT_MS; the
+        //       before-facts render overlaps the refine call)
+        //     + verifier 60 s (VERIFIER_TIMEOUT_MS)            ≈ 420 s
+        //   attempt 2 → settled:  the same 420 s + the final render 60 s
+        //     + upload + a commit/record transaction whose connection wait
+        //       is capped at 10 s (TX_MAX_WAIT_MS)             ≈ 490 s
+        // (a rejected personal token adds one fast failed CLI spawn before the
+        // team-token retry, not a second timeout; the ~410 s margin absorbs
+        // renderer queueing under PUPPETEER_MAX_CONCURRENCY). Both are well under 900 s,
+        // so the sweep cannot fire on a refine that is still verifying, and a
+        // run killed mid-way is still swept 15 min after its last bump.
+        // claim → attempt 1 (the background pre-step: ≤ 90 s decision + image
+        // generation) is unchanged by T17 and shared with regenerate-design.
+        runRefine: async ({ attempt, model, retryReasons }) => {
+          await touchDraftAction(draft.id, 'REFINE')
+          return mode === 'cli'
             ? runDesignAgentCliRefine({ systemPrompt, userMessage: userMessage(retryReasons), model })
             : runDesignAgentRefine({
                 systemPrompt,
@@ -176,7 +197,8 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
                 height,
                 actor,
                 refine: { attempt, instruction, slimHtml },
-              }),
+              })
+        },
         // The verifier model is pinned to Haiku inside verifyRefine (FR-14b).
         verify: async (req) => {
           let modelCalls = 0
