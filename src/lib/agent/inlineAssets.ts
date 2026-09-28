@@ -44,8 +44,9 @@ export function extractInlineAssets(html: string): ExtractedAssets {
 }
 
 // Splices the original `data:` URIs back in by token. A no-op when `assets` is
-// empty. Tolerant of the model dropping a token (the placeholder simply stays,
-// which would render as a broken image — surfaced via missingTokens()).
+// empty. It can only restore a token that is still in the HTML: when the model
+// DROPS a token, its location is gone with it, so that image is simply missing
+// from the result (nothing marks where it was — surfaced via missingTokens()).
 export function restoreInlineAssets(html: string, assets: Record<string, string> | undefined): string {
   if (!assets) return html
   let out = html
@@ -84,7 +85,12 @@ export type ReconcileResult =
 // multiset of tokens sent out against the multiset found in the model's reply.
 // - Every sent token present exactly once, nothing else → clean (commit as-is).
 // - A strict subset of sent tokens, each present exactly once, no unknown
-//   tokens → restored (the absent ones are spliced back in by the caller).
+//   tokens → restored, with `missing` listing the absent ones. The name is
+//   historical: an absent token CANNOT be spliced back in — its location in
+//   the document is gone. The refine caller (drafts/refineAttempt.ts, T17
+//   Ruling C) therefore commits the absence only when a replace/remove
+//   supersedes fragment names the token (the image was meant to go); any
+//   other absence is a preservation miss that takes the FR-11 retry path.
 // - Anything else — a token that was never sent (renamed/reindexed) or a sent
 //   token appearing more than once (duplicated) — is not applied: the caller
 //   takes the FR-11 fallback path rather than trusting a corrupted result.

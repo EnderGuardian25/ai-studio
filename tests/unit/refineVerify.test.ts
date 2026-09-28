@@ -615,3 +615,46 @@ describe('T20: mockVerifyOutcome override (MOCK_AI only)', () => {
     expect(h.extract).toHaveBeenCalled()
   })
 })
+
+// T17 — the retry reuses the before-facts extracted once (retry cost), and the
+// route counts the verifier MODEL calls through onVerifierCall (the rejected
+// row's refineCalls/verifierCalls diagnostics, AC-15).
+describe('T17 — precomputed before-facts and the verifier-call hook', () => {
+  it('extracts only the after document when beforeFacts is supplied, and checks against the supplied facts', async () => {
+    const after = facts([
+      el({ tag: 'div', classes: ['bg'], imageSources: [NEW_BG], box: { width: 1080, height: 1080 } }),
+      BEFORE.elements[1],
+      BEFORE.elements[2],
+    ])
+    h.extract.mockResolvedValue(after)
+    const r = await inAuth(() =>
+      verifyRefine(input({ classes: ['replace'], supersedes: [OLD_BG], instruction: 'swap the background', beforeFacts: BEFORE })),
+    )
+    expect(r).toEqual({ kind: 'pass' })
+    expect(h.extract).toHaveBeenCalledTimes(1)
+    expect(h.extract.mock.calls[0][0]).toContain('after')
+  })
+
+  it('onVerifierCall fires exactly once for add, and never for a structural class', async () => {
+    h.cli = false
+    useFacts(BEFORE, BEFORE)
+    const onVerifierCall = vi.fn()
+    await verifyRefine(input({ onVerifierCall }))
+    expect(onVerifierCall).toHaveBeenCalledTimes(1)
+    expect(h.anthropicCreate).toHaveBeenCalledTimes(1)
+
+    onVerifierCall.mockClear()
+    await verifyRefine(input({ classes: ['replace'], supersedes: [OLD_BG], onVerifierCall }))
+    expect(onVerifierCall).not.toHaveBeenCalled()
+  })
+
+  it('onVerifierCall still fires when the verifier call itself fails (it was issued)', async () => {
+    h.cli = false
+    useFacts(BEFORE, BEFORE)
+    h.anthropicCreate.mockRejectedValue(new Error('timeout'))
+    const onVerifierCall = vi.fn()
+    const r = await verifyRefine(input({ onVerifierCall }))
+    expect(r.kind).toBe('unavailable')
+    expect(onVerifierCall).toHaveBeenCalledTimes(1)
+  })
+})

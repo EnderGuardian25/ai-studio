@@ -103,6 +103,14 @@ export interface VerifyRefineInput {
   // on the retry). Only the MOCK_AI override below (T20) reads it — real
   // verification is attempt-agnostic. Defaults to 1.
   attempt?: 1 | 2
+  // Facts already extracted from beforeHtml (T17 retry cost): the before
+  // document is the same on both attempts, so the route extracts it once and
+  // passes it here; only afterHtml is rendered. Omitted → extracted as usual.
+  beforeFacts?: StyledDomFacts
+  // Called immediately before the one verifier MODEL call is issued (whatever
+  // its outcome), so the caller can count model calls (AC-15 diagnostics).
+  // Never called for structural-only verification or a MOCK_AI forced outcome.
+  onVerifierCall?: () => void
 }
 
 // ── Pinned model and limits ──────────────────────────────────────────────────
@@ -364,7 +372,10 @@ async function verifyOrThrow(input: VerifyRefineInput): Promise<VerifyResult> {
   let after: StyledDomFacts
   try {
     const opts = { width: input.width, height: input.height, inlineAssets: input.inlineAssets }
-    ;[before, after] = await Promise.all([extractDomFacts(input.beforeHtml, opts), extractDomFacts(input.afterHtml, opts)])
+    ;[before, after] = await Promise.all([
+      input.beforeFacts ?? extractDomFacts(input.beforeHtml, opts),
+      extractDomFacts(input.afterHtml, opts),
+    ])
   } catch (err) {
     log(`unavailable — fact extraction failed: ${errorText(err)}`)
     return { kind: 'unavailable', reason: `fact extraction failed: ${errorText(err)}` }
@@ -386,6 +397,7 @@ async function verifyOrThrow(input: VerifyRefineInput): Promise<VerifyResult> {
 
   let raw: string
   try {
+    input.onVerifierCall?.()
     raw = await callVerifierModel(buildVerifierPrompt({ instruction: input.instruction, classes, before, after }), input.instruction, input.teamId)
   } catch (err) {
     log(`unavailable — verifier call failed: ${errorText(err)}`)
