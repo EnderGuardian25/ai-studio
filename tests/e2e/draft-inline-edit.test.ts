@@ -99,6 +99,71 @@ test.describe('§T — draft inline edit', () => {
     expect(emptyRes.status()).toBe(400)
   })
 
+  // TC-INLINE-05 — element mode (change 004 T23 smoke): one element edit → 200
+  // with exactly one new revision; the SAME locator afterwards is stale → 409
+  // (its text fingerprint no longer matches the current HTML — AC-25).
+  test('element mode edits one node, then a stale fingerprint is 409', async () => {
+    if (!MOCKED()) {
+      test.skip()
+      return
+    }
+    const draft = await createExportedDraft(api, `Inline Element ${Date.now()}`)
+    // Pin a known document through the whole-document mode first (revision 2).
+    const base =
+      '<!doctype html><html><head></head><body style="width:1080px;height:1080px"><h1>Old headline</h1><p>Keep me</p></body></html>'
+    expect((await api.post(`/api/drafts/${draft.id}/inline-edit`, { html: base })).status()).toBe(200)
+
+    const locator = { path: [0], tag: 'H1', text: 'Old headline' }
+    const res = await api.post(`/api/drafts/${draft.id}/inline-edit`, {
+      mode: 'element',
+      locator,
+      edit: { kind: 'text', value: '<script>alert(1)</script>' },
+      selector: 'p', // AC-26: ignored — the server resolves the target itself
+    })
+    expect(res.status()).toBe(200)
+    expect((await res.json()).revisionId).toBeTruthy()
+
+    const after = await (await api.get(`/api/drafts/${draft.id}`)).json()
+    expect(after.currentRevisionNumber).toBe(3)
+    expect(after.htmlContent).toBe(
+      base.replace('<h1>Old headline</h1>', '<h1>&lt;script&gt;alert(1)&lt;/script&gt;</h1>'),
+    )
+    const revisions = await (await api.get(`/api/drafts/${draft.id}/revisions`)).json()
+    expect(revisions).toHaveLength(3)
+    expect(revisions[0].instruction).toBe('Element edit: text')
+
+    const stale = await api.post(`/api/drafts/${draft.id}/inline-edit`, {
+      mode: 'element',
+      locator,
+      edit: { kind: 'text', value: 'Second write' },
+    })
+    expect(stale.status()).toBe(409)
+    expect((await stale.json()).code).toBe('element-stale')
+    const unchanged = await (await api.get(`/api/drafts/${draft.id}`)).json()
+    expect(unchanged.currentRevisionNumber).toBe(3)
+  })
+
+  // TC-INLINE-06 — element mode grammar: a colour that tries to break out of
+  // its declaration is 400 and writes nothing (AC-22).
+  test('element mode rejects a colour outside the grammar with 400', async () => {
+    if (!MOCKED()) {
+      test.skip()
+      return
+    }
+    const draft = await createExportedDraft(api, `Inline Element Bad ${Date.now()}`)
+    const before = await (await api.get(`/api/drafts/${draft.id}`)).json()
+    const res = await api.post(`/api/drafts/${draft.id}/inline-edit`, {
+      mode: 'element',
+      locator: { path: [], tag: 'body', text: '' },
+      edit: { kind: 'color', value: 'red; background: url(http://evil.test/x)' },
+    })
+    expect(res.status()).toBe(400)
+    expect((await res.json()).code).toBe('invalid-color')
+    const after = await (await api.get(`/api/drafts/${draft.id}`)).json()
+    expect(after.currentRevisionNumber).toBe(before.currentRevisionNumber)
+    expect(after.htmlContent).toBe(before.htmlContent)
+  })
+
   // TC-INLINE-04 — a foreign draft id is a 404 (no existence leak).
   test('an unknown draft id is 404', async () => {
     if (!MOCKED()) {
