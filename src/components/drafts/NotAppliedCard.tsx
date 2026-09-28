@@ -1,11 +1,17 @@
 'use client'
 
-import { AlertTriangle } from 'lucide-react'
+import { AlertTriangle, Loader2, ImageDown } from 'lucide-react'
+import { Button } from '@/components/ui/Button'
 import type { DraftNotApplied } from '@/lib/api-types'
 import { formatDateTime } from '@/lib/format'
 
 export interface NotAppliedCardProps {
   notApplied: DraftNotApplied
+  /** T19 "Use anyway" — omitted (no button rendered) when the rejected
+   *  render has no preview/export to adopt (Ruling D: nothing to adopt). */
+  onAdopt?: () => void
+  /** True while an adopt POST is in flight — disables the button. */
+  adopting?: boolean
 }
 
 // FR-14/AC-18 hard failure: a refine that failed its fidelity check on both
@@ -20,10 +26,12 @@ export interface NotAppliedCardProps {
 // actually produced, kept for diagnosis only; it was never rendered onto the
 // draft. Extracted out of RefinementPanel so that panel doesn't keep growing.
 //
-// T19 slot: a "Use anyway" action (adopts this rejected render as a real,
-// committed revision via `POST /api/drafts/[id]/rejected/[revisionId]/adopt`)
-// belongs right below the preview, where the comment marks it. Not built here.
-export function NotAppliedCard({ notApplied }: NotAppliedCardProps) {
+// T19: "Use anyway" adopts this rejected render as a real, committed
+// revision via `POST /api/drafts/[id]/rejected/[revisionId]/adopt` — shown
+// only when there is a preview to adopt (a truncated reply left no export,
+// FR-14a "nothing enters the chain without that explicit action" still
+// holds — there is simply nothing offered to adopt in that case).
+export function NotAppliedCard({ notApplied, onAdopt, adopting }: NotAppliedCardProps) {
   return (
     <div
       role="alert"
@@ -52,7 +60,14 @@ export function NotAppliedCard({ notApplied }: NotAppliedCardProps) {
             Rejected {formatDateTime(notApplied.rejectedAt)} — your design was left unchanged.
           </p>
 
-          {/* T19 slot: "Use anyway" goes here, next to the preview above. */}
+          {notApplied.previewUrl && onAdopt && (
+            <div className="mt-2">
+              <Button size="sm" variant="secondary" onClick={onAdopt} disabled={adopting}>
+                {adopting ? <Loader2 size={13} className="animate-spin" /> : <ImageDown size={13} />}
+                Use anyway
+              </Button>
+            </div>
+          )}
         </div>
       </div>
     </div>

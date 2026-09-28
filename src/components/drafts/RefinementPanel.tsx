@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef, useState } from 'react'
 import { Send, Loader2, AlertTriangle, Check } from 'lucide-react'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/Button'
 import { GlassPanel } from '@/components/ui/GlassPanel'
 import { NotAppliedCard } from '@/components/drafts/NotAppliedCard'
@@ -81,6 +82,9 @@ export function RefinementPanel({
   // True only while a POST is in flight; the background refine itself is
   // tracked via the polled `pendingAction` prop.
   const [running, setRunning] = useState(false)
+  // T19 "Use anyway" — synchronous (no model call, no pendingAction poll):
+  // true only while its own POST is in flight.
+  const [adopting, setAdopting] = useState(false)
   const [conflictCard, setConflictCard] = useState<ConflictState | null>(null)
   const resolutionRef = useRef<PendingResolution | null>(null)
   const prevActionRef = useRef<DraftAction | null>(pendingAction)
@@ -171,6 +175,25 @@ export function RefinementPanel({
     }
   }
 
+  // T19 "Use anyway": adopts the retained rejected render as a normal,
+  // committed revision (POST .../rejected/[revisionId]/adopt — synchronous,
+  // { reply, revisionId, exportUrl }, mirroring inline-edit/Override). No
+  // undo-snapshot capture: adopt IS the recovery action here, not a change
+  // that itself needs undoing, and there is no separate "before" pointer to
+  // capture beyond what Revision History already offers via restore.
+  async function handleAdopt() {
+    if (!notApplied) return
+    setAdopting(true)
+    try {
+      await apiFetch(`/api/drafts/${draftId}/rejected/${notApplied.revisionId}/adopt`, { method: 'POST' })
+      onRefined()
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : 'Could not adopt this render')
+    } finally {
+      setAdopting(false)
+    }
+  }
+
   // Block sending while ANY background action is running (the server would 409
   // anyway) or while a refine is still awaiting resolution from the poll.
   const awaitingResolution = messages.some((m) => m.status === 'pending')
@@ -225,7 +248,7 @@ export function RefinementPanel({
       {/* FR-14/AC-18 hard failure — driven directly by the polled `notApplied`
           prop (not local message state), so it appears and clears exactly
           when the server says so, on the next poll either way. */}
-      {notApplied && <NotAppliedCard notApplied={notApplied} />}
+      {notApplied && <NotAppliedCard notApplied={notApplied} onAdopt={handleAdopt} adopting={adopting} />}
 
       {conflictCard && (
         <div className="mb-3 rounded-xl border border-amber-300 dark:border-amber-700/50 bg-amber-50 dark:bg-amber-900/20 p-3 animate-fade-in">

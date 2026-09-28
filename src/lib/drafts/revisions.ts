@@ -134,6 +134,31 @@ export interface CommitRevisionArgs {
   height: number
   exportKey?: string
   backgroundImageUrl?: string | null
+  // "Use anyway" (T19, FR-14a): the id of the rejected DraftRevision row being
+  // adopted. When set, it is stamped adoptedAt + adoptedRevisionNumber
+  // atomically INSIDE this same transaction, BEFORE the create/discard below
+  // run — the ordering hazard from T17's report (discardNotAppliedRender
+  // skips rows with adoptedAt already set, so stamping first is what keeps
+  // the just-adopted row from also being marked discardedAt a moment later).
+  // The guarded UPDATE (adoptedAt IS NULL AND discardedAt IS NULL) doubles as
+  // adopt's single-flight mechanism: a second concurrent adopt of the same
+  // row loses the race here and the whole commit aborts with
+  // AdoptConflictError. No Draft.pendingAction/DraftAction value describes
+  // "adopt a stored render" honestly, so adopt never claims that field —
+  // this conditional UPDATE is the guard instead, the same shape as the
+  // P2002 retry commitDraftRevision already uses for the revision-number race.
+  adoptRejectedRevisionId?: string
+}
+
+// Thrown (and never retried — only P2002 is) when adoptRejectedRevisionId's
+// guarded UPDATE touches 0 rows: the row was already adopted/discarded, or
+// was never a rejected row of this draft. The caller (the adopt route) maps
+// this to a 409.
+export class AdoptConflictError extends Error {
+  constructor() {
+    super('This render is no longer available to adopt')
+    this.name = 'AdoptConflictError'
+  }
 }
 
 // Shared commit path for refine + inline-edit. Renders the HTML to a PNG when
@@ -148,7 +173,7 @@ export interface CommitRevisionArgs {
 export async function commitDraftRevision(
   args: CommitRevisionArgs,
 ): Promise<{ revisionId: string; exportKey: string }> {
-  const { draftId, instruction, html, width, height, backgroundImageUrl } = args
+  const { draftId, instruction, html, width, height, backgroundImageUrl, adoptRejectedRevisionId } = args
 
   let finalExportKey = args.exportKey
   if (!finalExportKey) {
@@ -160,6 +185,37 @@ export async function commitDraftRevision(
   }
 
   const revision = await withNextRevisionNumber(draftId, async (tx, revisionNumber) => {
+    if (adoptRejectedRevisionId) {
+      // Re-read the draft's CURRENT not-applied pointer fresh, inside this
+      // transaction — never trust a value the caller read earlier (same
+      // "never trust the FK alone" principle T18's resolveNotAppliedOutcome
+      // documents). A mismatch means this row is not (or is no longer) the
+      // draft's live not-applied outcome.
+      const current = await tx.draft.findUnique({
+        where: { id: draftId },
+        select: { notAppliedRevisionId: true },
+      })
+      if (!current || current.notAppliedRevisionId !== adoptRejectedRevisionId) {
+        throw new AdoptConflictError()
+      }
+      // The guarded UPDATE: every remaining precondition (rejected, not yet
+      // adopted/discarded, has an export to adopt — Ruling D) checked and
+      // stamped atomically. 0 rows touched means a concurrent adopt/discard
+      // won the race, or the row never qualified — either way, 409.
+      const guard = await tx.draftRevision.updateMany({
+        where: {
+          id: adoptRejectedRevisionId,
+          draftId,
+          rejectedAt: { not: null },
+          adoptedAt: null,
+          discardedAt: null,
+          exportUrl: { not: null },
+        },
+        data: { adoptedAt: new Date(), adoptedRevisionNumber: revisionNumber },
+      })
+      if (guard.count !== 1) throw new AdoptConflictError()
+    }
+
     const created = await tx.draftRevision.create({
       data: {
         draftId,

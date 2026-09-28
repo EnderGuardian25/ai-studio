@@ -154,3 +154,128 @@ test.describe('T18 — refine not-applied poll field', () => {
     }
   })
 })
+
+// T19 (change 004 Phase 2, FR-14a) — POST
+// /api/drafts/[id]/rejected/[revisionId]/adopt: "Use anyway" commits a
+// twice-failed refine's retained rejected render as a normal chain revision,
+// through commitDraftRevision (adoptRejectedRevisionId), reusing the
+// rejected row's own stored export (nothing re-renders). Single-flight via
+// an atomic conditional UPDATE, not Draft.pendingAction (see the route's own
+// header comment for why). Additional seam used here:
+//   "__REFINE_REDUCE_NOOP__" — a `remove` whose reply echoes the current
+//     document unchanged → structural miss on both attempts → not-applied
+//     WITH a stored export (same "with export" shape as __VERIFY_FAIL_ALWAYS__,
+//     named here per the task brief).
+test.describe('T19 — "Use anyway" adopts a rejected render', () => {
+  let api: ApiClient
+  test.beforeEach(async ({ request }) => {
+    api = await loginAs(request, ADMIN_EMAIL, ADMIN_PASSWORD)
+  })
+  test.afterEach(async () => { await api.dispose() })
+
+  test('adopting commits exactly one new revision, advances the pointer, serves the rejected export, and clears notApplied', async () => {
+    if (!process.env.MOCK_AI || !process.env.MOCK_PUPPETEER) { test.skip(); return }
+    const draft = await createExportedDraft(api)
+    if (!draft) { test.skip(); return }
+    const baseline = draft.currentRevisionNumber as number
+
+    const settled = await refineAndWait(api, draft.id as string, 'reduce it __REFINE_REDUCE_NOOP__')
+    const notApplied = settled.notApplied as Record<string, unknown>
+    expect(notApplied).toBeTruthy()
+    expect(notApplied.previewUrl).toMatch(/^https?:\/\//)
+
+    const revisionsBefore = (await (await api.get(`/api/drafts/${draft.id}/revisions`)).json()) as Array<{
+      id: string
+    }>
+
+    const adoptRes = await api.post(`/api/drafts/${draft.id}/rejected/${notApplied.revisionId}/adopt`)
+    expect(adoptRes.status()).toBe(200)
+    const body = await adoptRes.json()
+    expect(typeof body.revisionId).toBe('string')
+    expect(body.reply).toBeTruthy()
+    expect(body.exportUrl).toMatch(/^https?:\/\//)
+
+    const after = await (await api.get(`/api/drafts/${draft.id}`)).json()
+    expect(after.notApplied).toBeNull()
+    expect(after.currentRevisionNumber).toBe(baseline + 1)
+    // The draft's live export now serves the rejected render's own object.
+    expect(after.exportUrl).toBe(body.exportUrl)
+
+    const revisionsAfter = (await (await api.get(`/api/drafts/${draft.id}/revisions`)).json()) as Array<{
+      id: string
+      revisionNumber: number
+      instruction: string
+    }>
+    expect(revisionsAfter.length).toBe(revisionsBefore.length + 1)
+    const created = revisionsAfter.find((r) => r.id === body.revisionId)
+    expect(created).toBeTruthy()
+    expect(created!.revisionNumber).toBe(baseline + 1)
+    expect(created!.instruction).toMatch(/^Use anyway: /)
+  })
+
+  test('a second adopt of the same render is 409 and creates no second revision', async () => {
+    if (!process.env.MOCK_AI || !process.env.MOCK_PUPPETEER) { test.skip(); return }
+    const draft = await createExportedDraft(api)
+    if (!draft) { test.skip(); return }
+
+    const settled = await refineAndWait(api, draft.id as string, 'reduce it __REFINE_REDUCE_NOOP__')
+    const notApplied = settled.notApplied as Record<string, unknown>
+    const adoptUrl = `/api/drafts/${draft.id}/rejected/${notApplied.revisionId}/adopt`
+
+    const first = await api.post(adoptUrl)
+    expect(first.status()).toBe(200)
+    const revisionsAfterFirst = await (await api.get(`/api/drafts/${draft.id}/revisions`)).json()
+
+    const second = await api.post(adoptUrl)
+    expect(second.status()).toBe(409)
+
+    const revisionsAfterSecond = await (await api.get(`/api/drafts/${draft.id}/revisions`)).json()
+    expect(revisionsAfterSecond.length).toBe(revisionsAfterFirst.length)
+  })
+
+  test('adopt of a truncated not-applied row (no export) is 409', async () => {
+    if (!process.env.MOCK_AI || !process.env.MOCK_PUPPETEER) { test.skip(); return }
+    const draft = await createExportedDraft(api)
+    if (!draft) { test.skip(); return }
+
+    const settled = await refineAndWait(api, draft.id as string, 'reduce it __REFINE_TRUNCATED__')
+    const notApplied = settled.notApplied as Record<string, unknown>
+    expect(notApplied.previewUrl).toBeNull()
+
+    const res = await api.post(`/api/drafts/${draft.id}/rejected/${notApplied.revisionId}/adopt`)
+    expect(res.status()).toBe(409)
+  })
+
+  test('adopt after a restore (the outcome was discarded) is 409', async () => {
+    if (!process.env.MOCK_AI || !process.env.MOCK_PUPPETEER) { test.skip(); return }
+    const draft = await createExportedDraft(api)
+    if (!draft) { test.skip(); return }
+    const baseline = draft.currentRevisionNumber as number
+
+    const settled = await refineAndWait(api, draft.id as string, 'reduce it __REFINE_REDUCE_NOOP__')
+    const notApplied = settled.notApplied as Record<string, unknown>
+
+    const restoreRes = await api.post(`/api/drafts/${draft.id}/revisions/${baseline}/restore`)
+    expect(restoreRes.status()).toBe(200)
+
+    const res = await api.post(`/api/drafts/${draft.id}/rejected/${notApplied.revisionId}/adopt`)
+    expect(res.status()).toBe(409)
+  })
+
+  test('a cross-team draft is a 404', async ({ request }) => {
+    if (!process.env.MOCK_AI || !process.env.MOCK_PUPPETEER) { test.skip(); return }
+    const draft = await createExportedDraft(api)
+    if (!draft) { test.skip(); return }
+
+    const settled = await refineAndWait(api, draft.id as string, 'reduce it __REFINE_REDUCE_NOOP__')
+    const notApplied = settled.notApplied as Record<string, unknown>
+
+    const clientx = await loginAs(request, CLIENTX_EMAIL, CLIENTX_PASSWORD, { team: 'ClientX' })
+    try {
+      const res = await clientx.post(`/api/drafts/${draft.id}/rejected/${notApplied.revisionId}/adopt`)
+      expect(res.status()).toBe(404)
+    } finally {
+      await clientx.dispose()
+    }
+  })
+})

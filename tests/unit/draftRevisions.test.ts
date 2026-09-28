@@ -22,6 +22,7 @@ interface Row {
   createdAt: Date
   rejection?: unknown
   adoptedAt?: Date | null
+  adoptedRevisionNumber?: number | null
   discardedAt?: Date | null
 }
 
@@ -47,7 +48,7 @@ const fake = vi.hoisted(() => {
       } else if (key === 'adoptedAt' || key === 'discardedAt') {
         if (cond !== null) throw new Error(`fake prisma: unsupported condition on ${key}`)
         if (value != null) return false
-      } else if (key === 'rejectedAt' || key === 'revisionNumber') {
+      } else if (key === 'rejectedAt' || key === 'revisionNumber' || key === 'exportUrl') {
         if (cond === null) {
           if (value !== null) return false
         } else if (typeof cond === 'number') {
@@ -147,6 +148,12 @@ const fake = vi.hoisted(() => {
         if ('notAppliedRevisionId' in args.data) db.notAppliedRevisionId = args.data.notAppliedRevisionId as string | null
         return {}
       },
+      // Single implicit fake draft (matches `update` above, which also
+      // ignores `where.id`) — T19's adoptRejectedRevisionId re-reads this
+      // fresh inside the transaction.
+      findUnique: async (_args: { where: unknown; select?: Record<string, boolean> }) => ({
+        notAppliedRevisionId: db.notAppliedRevisionId,
+      }),
     },
     $transaction: async <T>(fn: (tx: unknown) => Promise<T>, opts?: unknown) => {
       db.txOptions.push(opts)
@@ -183,6 +190,7 @@ import {
   nextRevisionNumber,
   withNextRevisionNumber,
   commitDraftRevision,
+  AdoptConflictError,
   recordRejectedRender,
   resolveNotAppliedOutcome,
   rejectionDiagnosticsSchema,
@@ -496,6 +504,154 @@ describe('commitDraftRevision clears the not-applied outcome', () => {
     row.adoptedAt = new Date()
     await commitDraftRevision({ draftId: 'd1', instruction: 'x', html: '<html/>', width: 1080, height: 1080, exportKey: 'k' })
     expect(row.discardedAt ?? null).toBeNull()
+  })
+})
+
+// ── T19: adoptRejectedRevisionId ("Use anyway") ─────────────────────────────
+
+describe('commitDraftRevision adoptRejectedRevisionId (T19 "Use anyway")', () => {
+  it('adopts the rejected row: stamps adoptedAt/adoptedRevisionNumber, creates exactly one chain row with its snapshot+export, clears notApplied', async () => {
+    db.rows = [committed('d1', 1)]
+    const { revisionId: rejectedId, exportKey: rejectedExport } = await recordRejectedRender(
+      rejectArgs({ instruction: 'make the logo bigger' }),
+    )
+    db.draftUpdates = []
+    db.render.calls = 0
+
+    const before = db.rows.length
+    const { revisionId, exportKey } = await commitDraftRevision({
+      draftId: 'd1',
+      instruction: 'Use anyway: make the logo bigger',
+      html: db.rows.find((r) => r.id === rejectedId)!.htmlSnapshot,
+      width: 1080,
+      height: 1080,
+      exportKey: rejectedExport!,
+      adoptRejectedRevisionId: rejectedId,
+    })
+
+    // Exactly one NEW chain row — the rejected row itself is never pointed at.
+    expect(db.rows.length).toBe(before + 1)
+    const created = db.rows.find((r) => r.id === revisionId)!
+    expect(created).toMatchObject({
+      revisionNumber: 2,
+      rejectedAt: null,
+      htmlSnapshot: '<!DOCTYPE html><html><body>still long</body></html>',
+      exportUrl: rejectedExport,
+    })
+    expect(exportKey).toBe(rejectedExport)
+    // The T17 ordering hazard: discardNotAppliedRender runs in this same
+    // commit and skips rows with adoptedAt set — proof it ran AFTER the
+    // guard stamp is that the adopted row carries adoptedAt but NOT
+    // discardedAt (the reverse order would have discarded it instead).
+    const rejectedRow = db.rows.find((r) => r.id === rejectedId)!
+    expect(rejectedRow.adoptedAt).toBeInstanceOf(Date)
+    expect(rejectedRow.adoptedRevisionNumber).toBe(2)
+    expect(rejectedRow.discardedAt ?? null).toBeNull()
+    // No render happened — the precomputed export key was reused as-is.
+    expect(db.render.calls).toBe(0)
+    // The draft's not-applied outcome is cleared and the pointer advanced.
+    expect(db.draftUpdates[0].data).toMatchObject({
+      notAppliedReason: null,
+      notAppliedRevisionId: null,
+      currentRevisionNumber: 2,
+    })
+  })
+
+  it('a row superseded by a NEWER not-applied outcome (already discarded) is refused, and the live row is left untouched', async () => {
+    // Simulates: the draft's CURRENT not-applied outcome now points at a
+    // DIFFERENT (newer) rejected row than the one being adopted — e.g. a
+    // race where a later refine already replaced the outcome before this
+    // adopt reached the transaction. The fresh re-read of
+    // Draft.notAppliedRevisionId inside the transaction must see that
+    // mismatch and refuse, never touching the newer (live) row.
+    const first = await recordRejectedRender(rejectArgs({ instruction: 'first' }))
+    const second = await recordRejectedRender(rejectArgs({ instruction: 'second' }))
+    // `second` is now the live outcome; `first` was already discarded by the
+    // replace. Adopting the (already-discarded) `first` row must 409, and
+    // the live `second` row must be untouched.
+    await expect(
+      commitDraftRevision({
+        draftId: 'd1',
+        instruction: 'Use anyway: first',
+        html: '<html/>',
+        width: 1080,
+        height: 1080,
+        exportKey: 'exports/whatever.png',
+        adoptRejectedRevisionId: first.revisionId,
+      }),
+    ).rejects.toThrow(AdoptConflictError)
+    expect(db.rows.find((r) => r.id === second.revisionId)!.adoptedAt ?? null).toBeNull()
+    expect(db.rows.find((r) => r.id === second.revisionId)!.discardedAt ?? null).toBeNull()
+  })
+
+  it('a second adopt of the same row is refused (single-flight) and creates no second chain row', async () => {
+    const { revisionId: rejectedId, exportKey: rejectedExport } = await recordRejectedRender(rejectArgs())
+    const rowsBeforeFirstAdopt = db.rows.length
+
+    await commitDraftRevision({
+      draftId: 'd1',
+      instruction: 'Use anyway: reduce the text',
+      html: '<html>REJECTED RENDER</html>',
+      width: 1080,
+      height: 1080,
+      exportKey: rejectedExport!,
+      adoptRejectedRevisionId: rejectedId,
+    })
+    const rowsAfterFirstAdopt = db.rows.length
+    expect(rowsAfterFirstAdopt).toBe(rowsBeforeFirstAdopt + 1)
+
+    await expect(
+      commitDraftRevision({
+        draftId: 'd1',
+        instruction: 'Use anyway: reduce the text',
+        html: '<html>REJECTED RENDER</html>',
+        width: 1080,
+        height: 1080,
+        exportKey: rejectedExport!,
+        adoptRejectedRevisionId: rejectedId,
+      }),
+    ).rejects.toThrow(AdoptConflictError)
+    // No second chain row was created by the refused second adopt.
+    expect(db.rows.length).toBe(rowsAfterFirstAdopt)
+  })
+
+  it('a row without an export is refused (Ruling D)', async () => {
+    const { revisionId } = await recordRejectedRender(
+      rejectArgs({ html: null, unusableHtml: '<!DOCTYPE html><html><body>cut off' }),
+    )
+    expect(db.rows.find((r) => r.id === revisionId)!.exportUrl).toBeNull()
+
+    await expect(
+      commitDraftRevision({
+        draftId: 'd1',
+        instruction: 'Use anyway: reduce the text',
+        html: '<html>whatever</html>',
+        width: 1080,
+        height: 1080,
+        exportKey: 'exports/would-be-fabricated.png',
+        adoptRejectedRevisionId: revisionId,
+      }),
+    ).rejects.toThrow(AdoptConflictError)
+    expect(db.rows.find((r) => r.id === revisionId)!.adoptedAt ?? null).toBeNull()
+  })
+
+  it('a mismatched notAppliedRevisionId (row is not the draft\'s live outcome) is refused', async () => {
+    db.rows = [committed('d1', 1)]
+    const stray = rejected('d1', 'some other refine')
+    db.rows.push(stray)
+    // db.notAppliedRevisionId is null — no live outcome at all.
+    await expect(
+      commitDraftRevision({
+        draftId: 'd1',
+        instruction: 'Use anyway: some other refine',
+        html: stray.htmlSnapshot,
+        width: 1080,
+        height: 1080,
+        exportKey: stray.exportUrl!,
+        adoptRejectedRevisionId: stray.id,
+      }),
+    ).rejects.toThrow(AdoptConflictError)
+    expect(db.rows.find((r) => r.id === stray.id)!.adoptedAt ?? null).toBeNull()
   })
 })
 
