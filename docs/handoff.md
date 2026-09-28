@@ -52,10 +52,7 @@
 
 ### Next actions, in order
 
-1. **Check CI on #42 and #43.**
-   - #42: e2e should be green now with silo.
-   - #43: the build job carries the first **`ci-docker-build`** evidence for AC-01 (★ in the real image) and the first Linux run of `test:render`.
-   - Fix anything red.
+1. ✅ **CI checked (2026-09-28).** #42 is all green (build, unit, and e2e against silo). #43: build + unit are green, including the first Linux `test:render` run and the AC-01 `ci-docker-build` evidence: PR #43 build job, [run 36361971755](https://github.com/bistec-oss/studio/actions/runs/36361971755) — PASS ★ ✓ ✦ → • inside the built runner image (2026-09-28). #43's e2e is red at "Start MinIO" as expected, until #42 merges into `v2`.
 2. **Merge PR #42 on the user's go-ahead**, then **merge `main` into `v2`**. A reviewer checked this merge is conflict-free for the Dockerfile and `e2e.yml`. After the merge and the token rotation, trigger `gh workflow run docker-publish.yml --ref main`, then confirm `https://studio.bistecglobal.com/api/health` returns the SHA.
 3. **Build 004 Wave 4 on `v2`**: **T20 (test seam) first, then T17 → T18 → T19 → T21**.
    - T17's file list was widened: runners, `revisions.ts`, `draftActions.ts`, `refineVerify.ts`.

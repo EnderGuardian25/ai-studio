@@ -12,7 +12,7 @@ This repo contains planning documents for **bistec-studio**, an internal marketi
     - **(1) Swap prod MinIO to `pgsty/silo`** following `docs/minio-silo-migration.md` (on the #42 branch). MinIO's community images are withdrawn everywhere. Prod's version has **CVE-2026-40344**, and our presigned URLs expose the access key.
     - **(2) Rotate `COOLIFY_API_TOKEN`.** It needs **`deploy` + `read`** and must be made by a team **Admin/Owner**. Prove it with a direct POST, **not** by re-running run 34988162569, which still sends GET → 405.
   - **Next:**
-    - check CI on #42/#43; #43's build job holds the first `ci-docker-build` proof of ★ inside the image;
+    - ✅ CI checked: #42 all green; #43's build is green (AC-01 `ci-docker-build` evidence: PR #43 build job, [run 36361971755](https://github.com/bistec-oss/studio/actions/runs/36361971755) — PASS ★ ✓ ✦ → • inside the built runner image (2026-09-28)); #43's e2e stays red until #42 merges into `v2`;
     - build 004 **Wave 4** on `v2`: **T20 → T17 → T18 → T19 → T21**. T19's route is `/api/drafts/[id]/rejected/[revisionId]/adopt`;
     - then Wave 5, then `/specclaw:verify`.
   - **Gates at `v2` head:** unit 562/562, `npm run test:render` 15/15, mock E2E 183/4/0.
