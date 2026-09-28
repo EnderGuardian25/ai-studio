@@ -810,3 +810,53 @@ describe('final fix — the phrase-gone word overlap counts DISTINCT words (R3)'
     if (!r.ok) expect(r.reason).toMatch(/gone/)
   })
 })
+
+// T17 — the flat supersedes list serves both clauses of a replace+remove
+// instruction. A text/token fragment whose passage was rewritten WHOLESALE
+// (under half its distinct words kept, phrase gone) is the replace clause's —
+// replace may reuse the same element, so the id fallback must not re-identify
+// the rewritten element as a passage that "failed to shrink".
+describe('T17 — replace+remove with one flat supersedes: a wholesale-replaced text fragment is the replace clause\'s', () => {
+  const NEW_HEADLINE = 'APPLY NOW FOR THE 2027 COHORT AND LAUNCH YOUR CAREER WITH US'
+  const both = (supersedes: string[], after: DomFacts) =>
+    checkPostConditions({ before: BEFORE, after, supersedes, constrains: [], classes: ['replace', 'remove'] })
+
+  it('"change the headline to X and remove the logo" passes when correctly applied (phrase fragment, element reused by id)', () => {
+    const after = facts([bgLayer(), headline(96, NEW_HEADLINE), body()])
+    const results = both(['INDUSTRY READINESS PROGRAMME', '.logo'], after)
+    expect(results.map((r) => [r.class, r.result])).toEqual([
+      ['replace', { ok: true }],
+      ['remove', { ok: true }],
+    ])
+  })
+
+  it('passes the same with a #id token fragment for the headline', () => {
+    const after = facts([bgLayer(), headline(96, NEW_HEADLINE), body()])
+    expect(both(['#headline', '.logo'], after).every((r) => r.result.ok)).toBe(true)
+  })
+
+  it('still fails when the logo is kept (the remove clause did nothing)', () => {
+    const after = facts([bgLayer(), headline(96, NEW_HEADLINE), body(), logo()])
+    const results = both(['INDUSTRY READINESS PROGRAMME', '.logo'], after)
+    expect(results.some((r) => !r.result.ok)).toBe(true)
+  })
+
+  it('still fails when the headline is kept (the replace clause did nothing)', () => {
+    const after = facts([bgLayer(), headline(), body()])
+    const results = both(['INDUSTRY READINESS PROGRAMME', '.logo'], after)
+    expect(results.find((r) => r.class === 'replace')?.result.ok).toBe(false)
+  })
+
+  it('a rewording that keeps most of the passage is not a replacement — remove still requires fewer words', () => {
+    const reworded = LONG_BODY.replace('an unforgettable evening', 'a truly memorable evening')
+    const after = facts([bgLayer(UPLOAD), headline(), body(reworded), logo()])
+    const results = both([OLD_BG, 'unforgettable evening'], after)
+    expect(results.find((r) => r.class === 'remove')?.result.ok).toBe(false)
+  })
+
+  it('the exemption is replace-only: remove+add still rejects a passage rewritten wholesale and longer', () => {
+    const after = facts([bgLayer(), headline(), body('Completely different words describing another thing entirely, at even greater length than before, so that this new passage runs well past the twenty words of the original body.'), logo()])
+    const r = check('remove', { after, supersedes: ['Join us for'], classes: ['remove', 'add'] })
+    expect(r.ok).toBe(false)
+  })
+})

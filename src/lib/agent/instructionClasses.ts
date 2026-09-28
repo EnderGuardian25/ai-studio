@@ -73,12 +73,23 @@
 //     element repeating the phrase, gives a shorter "counterpart". So the
 //     stood-down whole-document word count is replaced by the words summed
 //     over every element with each text passage's tag+classes, which must
-//     strictly decrease. Accepted consequences (fail-closed): a deliberately
-//     added paragraph of the passage's own shape counts against the reduction,
-//     and so does a replace+remove whose replacement TEXT, in the same shape,
-//     is longer than what it replaced. Nested same-shape elements (a class-less
-//     <div> inside another) are counted once per level, before and after
-//     alike.
+//     strictly decrease. Accepted consequence (fail-closed): a deliberately
+//     added paragraph of the passage's own shape counts against the reduction.
+//     Nested same-shape elements (a class-less <div> inside another) are
+//     counted once per level, before and after alike.
+//   - Flat supersedes (T17): replace+remove share one supersedes list, so a
+//     fragment cannot say which clause it serves. A text/token fragment whose
+//     passage was rewritten WHOLESALE (phrase gone, under half its distinct
+//     words kept by any same-shape element — the id is not followed, since
+//     replace may reuse the element) is attributed to replace and exempt from
+//     remove's checks. So "change the headline to X and remove the logo"
+//     passes when applied, however long X is. Accepted consequence (fail-
+//     open, narrow): in a replace+remove, a passage that the remove clause
+//     should have SHORTENED but that was instead rewritten wholesale — longer
+//     — passes remove; a rewording that keeps half the words still has to
+//     shrink. Per-clause supersedes ({fragment, clause}) is the upgrade path
+//     if that proves to matter. The exemption is replace-only: remove+add
+//     still requires the reduction.
 //
 // A text passage counts as reduced only when it no longer appears INTACT in the
 // document's text (re-wrapping a phrase in <strong>, or splitting a paragraph
@@ -343,6 +354,37 @@ function contentReduced(before: DomFacts, after: DomFacts, r: ResolvedFragment):
 
 const hasText = (r: ResolvedFragment) => r.passages.length > 0
 
+const distinctWords = (s: string) => new Set(fold(s).split(' ').filter(Boolean))
+// How many DISTINCT words of `text` are in `words`.
+const sharedWords = (words: Set<string>, text: string) => new Set(fold(text).split(' ').filter((w) => words.has(w))).size
+// `text` keeps at least half of the passage's distinct words (the counterpart threshold).
+const keepsMostOf = (passage: string, text: string) => {
+  const words = distinctWords(passage)
+  return words.size > 0 && sharedWords(words, text) * 2 >= words.size
+}
+
+// replace+remove share ONE flat supersedes list, so a text fragment cannot say
+// which clause it serves. A fragment whose text was rewritten WHOLESALE is the
+// replace clause's: its images are gone, its passage no longer appears intact,
+// the named phrase (text kind) is gone, and no element of the passage's
+// tag+classes — for a token, no element still carrying the token — keeps at
+// least half of the passage's distinct words. Unlike counterpart(), the id is
+// NOT followed: replace may reuse the same element (a new headline in the same
+// h1#headline), and following the id would read the new text as a passage that
+// failed to shrink. See Known limits (flat supersedes).
+function replacedWholesale(after: DomFacts, r: ResolvedFragment): boolean {
+  if (imagesPresent(after, r) || !hasText(r) || passageIntact(after, r)) return false
+  if (r.kind === 'text') {
+    if (fold(after.text).includes(r.phrase!)) return false
+    return r.elements.every((was) => !after.elements.some((e) => shapeKey(e) === shapeKey(was) && keepsMostOf(was.text, e.text)))
+  }
+  if (r.kind === 'token') {
+    const now = tokenElements(after, decodeHtmlEntities(r.raw))
+    return r.passages.every((p) => !now.some((e) => keepsMostOf(p, e.text)))
+  }
+  return false
+}
+
 const shapeKey = (e: DomElementFact) => [e.tag, ...e.classes].join('.')
 
 // For a TEXT fragment: each shape (tag+classes) of its passage elements whose
@@ -416,9 +458,9 @@ function counterpart(
       const same = holders.filter(sameShape).sort((a, b) => textLength(a.text) - textLength(b.text))[0]
       return same ?? (again?.kind === 'text' ? again.elements[0] : undefined) ?? holders[0]
     }
-    const passageWords = new Set(fold(el.text).split(' ').filter(Boolean))
+    const passageWords = distinctWords(el.text)
     // DISTINCT shared words — a newcomer repeating one passage word is not the passage.
-    const overlap = (e: DomElementFact) => new Set(fold(e.text).split(' ').filter((w) => passageWords.has(w))).size
+    const overlap = (e: DomElementFact) => sharedWords(passageWords, e.text)
     const best = after.elements.filter(sameShape).sort((a, b) => overlap(b) - overlap(a))[0]
     if (best && overlap(best) * 2 >= passageWords.size) return best
     if (el.id) return after.elements.find((e) => e.id === el.id) ?? null
@@ -463,14 +505,16 @@ function targetMiss(was: DomElementFact, now: DomElementFact, direction?: Constr
 // replace: every superseded fragment's content was present before and is
 // absent after. The element may be reused (same .bg, new image). When remove
 // is co-present the one flat supersedes list serves both clauses, so a text
-// fragment that was shortened (per contentReduced) also satisfies replace; an
-// image must still be gone.
+// fragment that was shortened (per contentReduced) or rewritten wholesale (per
+// replacedWholesale) satisfies replace; an image must still be gone.
 const supersededElementAbsent: PostCondition = (input) => {
   const resolved = resolveSupersedes('replace', input)
   if (!Array.isArray(resolved)) return resolved
   const withRemove = input.classes.includes('remove')
   const kept = resolved.filter((r) =>
-    withRemove ? !contentReduced(input.before, input.after, r) : !contentAbsent(input.after, r),
+    withRemove
+      ? !contentReduced(input.before, input.after, r) && !replacedWholesale(input.after, r)
+      : !contentAbsent(input.after, r),
   )
   return kept.length === 0
     ? { ok: true }
@@ -487,12 +531,16 @@ const supersededElementAbsent: PostCondition = (input) => {
 // grow, so that check is replaced by one scoped to each TEXT passage's shape:
 // the words across all elements with the passage's tag+classes must strictly
 // decrease. The per-fragment check (which requires the original passage to be
-// broken, not merely re-wrapped) always applies.
+// broken, not merely re-wrapped) always applies — except to a fragment the
+// co-present replace clause rewrote wholesale (replacedWholesale): one flat
+// supersedes list serves both clauses, and that fragment is replace's.
 const targetTextShorter: PostCondition = (input, table) => {
   const resolved = resolveSupersedes('remove', input)
   if (!Array.isArray(resolved)) return resolved
   const { before, after } = input
-  const unreduced = resolved.filter((r) => !contentReduced(before, after, r))
+  const withReplace = input.classes.includes('replace')
+  const ours = resolved.filter((r) => !(withReplace && replacedWholesale(after, r)))
+  const unreduced = ours.filter((r) => !contentReduced(before, after, r))
   if (unreduced.length > 0) {
     return {
       ok: false,
@@ -502,7 +550,7 @@ const targetTextShorter: PostCondition = (input, table) => {
   if (othersAdditive(input, table, 'remove')) {
     // The whole document may grow (the add/replace clause), so the count is
     // scoped to the elements shaped like each named passage.
-    const grown = resolved.flatMap((r) => shapesNotShrunk(before, after, r).map((d) => `${JSON.stringify(r.raw)} (${d})`))
+    const grown = ours.flatMap((r) => shapesNotShrunk(before, after, r).map((d) => `${JSON.stringify(r.raw)} (${d})`))
     return grown.length === 0
       ? { ok: true }
       : {
