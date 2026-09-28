@@ -59,6 +59,37 @@ describe('buildMockCopy', () => {
   })
 })
 
+// T21 follow-up — the mock verifier MODEL reply (raw string for the real parser).
+describe('buildMockVerifierReply', () => {
+  it('no sentinel → a well-formed "applied": true verdict', async () => {
+    const hooks = await loadHooks()
+    expect(JSON.parse(hooks.buildMockVerifierReply('include a human character'))).toMatchObject({ applied: true })
+  })
+
+  it('__VERIFIER_SAYS_NO__ → a well-formed "applied": false verdict with a reason', async () => {
+    const hooks = await loadHooks()
+    const v = JSON.parse(hooks.buildMockVerifierReply('include a human __VERIFIER_SAYS_NO__'))
+    expect(v.applied).toBe(false)
+    expect(typeof v.reason).toBe('string')
+  })
+
+  it('__VERIFIER_GARBAGE__ → prose with no JSON object; __VERIFIER_EMPTY__ → empty', async () => {
+    const hooks = await loadHooks()
+    const garbage = hooks.buildMockVerifierReply('x __VERIFIER_GARBAGE__')
+    expect(garbage.trim()).not.toBe('')
+    expect(garbage).not.toMatch(/[{}]/)
+    expect(hooks.buildMockVerifierReply('x __VERIFIER_EMPTY__')).toBe('')
+  })
+
+  it('never collides with the forced-outcome sentinels (mockVerifyOutcome stays null)', async () => {
+    const hooks = await loadHooks()
+    for (const s of ['__VERIFIER_SAYS_NO__', '__VERIFIER_GARBAGE__', '__VERIFIER_EMPTY__']) {
+      expect(hooks.mockVerifyOutcome(`include a human ${s}`, 1)).toBeNull()
+      expect(hooks.mockVerifyOutcome(`include a human ${s}`, 2)).toBeNull()
+    }
+  })
+})
+
 // T20 — the deterministic verification-outcome override (change 004 Phase 2).
 describe('mockVerifyOutcome', () => {
   it('no sentinel → null (real verification runs unchanged)', async () => {

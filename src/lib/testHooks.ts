@@ -233,13 +233,37 @@ export function buildMockConflict(): string {
 }
 
 /**
- * Deterministic reply of the refine add-verifier (MOCK_AI, change 004 T14).
- * A raw string, not a verdict object, so the mock still runs through the real
- * verdict parser. Always "applied" today; T20 extends this seam with sentinels
- * that force a miss or an unparseable (unavailable) reply.
+ * Deterministic reply of the refine add-verifier MODEL (MOCK_AI, change 004
+ * T14/T21). A raw string, not a verdict object, so the mock always runs through
+ * the real verdict parser (refineVerify.parseVerifierVerdict). It stands in for
+ * the model call only: verifyRefine has already counted the call
+ * (onVerifierCall) by the time this is consulted, so rejection.verifierCalls
+ * reports these calls truthfully — unlike mockVerifyOutcome's forced outcomes,
+ * which short-circuit before any call. Reached only for an `add` class whose
+ * structural checks (if any) passed.
+ *
+ * Sentinels in the instruction (first match wins; none → "applied"):
+ *   - "__VERIFIER_SAYS_NO__"  — a well-formed `{"applied": false, …}` verdict →
+ *     a miss (AC-13: an add absent after the retry is not applied, one call
+ *     per attempt).
+ *   - "__VERIFIER_GARBAGE__"  — prose with no JSON verdict → unparseable →
+ *     unavailable (AC-14, routed like a miss).
+ *   - "__VERIFIER_EMPTY__"    — an empty reply → unavailable (AC-14).
+ * Deliberately named __VERIFIER_…__, never __VERIFY_…__, so mockVerifyOutcome
+ * never matches them and the real verification path runs.
  */
 export function buildMockVerifierReply(instruction: string): string {
-  return JSON.stringify({ applied: true, reason: `Mock verifier: applied. [${instruction.slice(0, 80)}]` })
+  const tag = instruction.slice(0, 80)
+  if (instruction.includes('__VERIFIER_SAYS_NO__')) {
+    return JSON.stringify({ applied: false, reason: `Mock verifier: the requested element is absent. [${tag}]` })
+  }
+  if (instruction.includes('__VERIFIER_GARBAGE__')) {
+    return 'Mock verifier: looks great to me, no notes!'
+  }
+  if (instruction.includes('__VERIFIER_EMPTY__')) {
+    return ''
+  }
+  return JSON.stringify({ applied: true, reason: `Mock verifier: applied. [${tag}]` })
 }
 
 /**

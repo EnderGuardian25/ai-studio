@@ -552,6 +552,58 @@ describe('MOCK_AI seam', () => {
     expect(r).toEqual({ kind: 'pass' })
     expect(modelCalls()).toBe(0)
   })
+
+  // T21 follow-up: buildMockVerifierReply's sentinels drive the REAL add path —
+  // the call is counted (onVerifierCall) and the canned reply goes through the
+  // real verdict parser, unlike mockVerifyOutcome's forced outcomes.
+  const viaMockModel = async (instruction: string) => {
+    h.mockAi = true
+    h.extract.mockResolvedValue(BEFORE) // same facts before and after: nothing structural to check
+    let calls = 0
+    const r = await verifyRefine(input({ instruction, onVerifierCall: () => calls++ }))
+    expect(h.extract).toHaveBeenCalled() // real verification ran, not a forced outcome
+    expect(calls).toBe(1)
+    expect(modelCalls()).toBe(0) // no real SDK / CLI call
+    return r
+  }
+
+  it('__VERIFIER_SAYS_NO__: a well-formed "applied": false verdict is a miss carrying the reason (AC-13)', async () => {
+    const r = await viaMockModel('include a human character __VERIFIER_SAYS_NO__')
+    expect(r.kind).toBe('miss')
+    expect(r.kind === 'miss' && r.reasons[0]).toMatch(/^add: Mock verifier: the requested element is absent/)
+    expect(isAccepted(r)).toBe(false)
+  })
+
+  it('__VERIFIER_GARBAGE__: an unparseable reply is unavailable, never a pass (AC-14)', async () => {
+    const r = await viaMockModel('include a human character __VERIFIER_GARBAGE__')
+    expect(r).toEqual({ kind: 'unavailable', reason: 'verifier response was not a valid verdict' })
+  })
+
+  it('__VERIFIER_EMPTY__: an empty reply is unavailable, never a pass (AC-14)', async () => {
+    const r = await viaMockModel('include a human character __VERIFIER_EMPTY__')
+    expect(r).toEqual({ kind: 'unavailable', reason: 'verifier returned an empty response' })
+  })
+
+  it('the verifier-reply sentinels spend no call on a structural class (the reply is never reached)', async () => {
+    h.mockAi = true
+    const after = facts([
+      el({ tag: 'div', classes: ['bg'], imageSources: [NEW_BG], box: { width: 1080, height: 1080 } }),
+      BEFORE.elements[1],
+      BEFORE.elements[2],
+    ])
+    useFacts(BEFORE, after)
+    let calls = 0
+    const r = await verifyRefine(
+      input({
+        instruction: 'swap the background __VERIFIER_SAYS_NO__',
+        classes: ['replace'],
+        supersedes: [OLD_BG],
+        onVerifierCall: () => calls++,
+      }),
+    )
+    expect(r).toEqual({ kind: 'pass' })
+    expect(calls).toBe(0)
+  })
 })
 
 // T20 — the mockVerifyOutcome override sits at the very top of verifyRefine,

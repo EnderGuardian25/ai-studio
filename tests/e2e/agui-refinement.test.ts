@@ -643,11 +643,10 @@ test.describe('§V — refine fidelity contract', () => {
     expect(diag.verifierCalls).toBe(0)
   })
 
-  // TC-FID-09 — AC-13 (the E2E-reachable half): an add refine commits once the
-  // verifier passes it; an add the verifier misses on both attempts is not
-  // applied. The mock verifier always answers "applied", so the miss is forced
-  // (__VERIFY_FAIL_ALWAYS__, which short-circuits before the model hook — hence
-  // verifierCalls 0). "Exactly one Haiku call per attempt" is unit-covered.
+  // TC-FID-09 — an add refine commits once the verifier passes it; an add
+  // FORCED to miss (__VERIFY_FAIL_ALWAYS__, which short-circuits before the
+  // model hook — hence verifierCalls 0) is not applied. The real verifier-call
+  // path, with its per-attempt count, is TC-FID-16 (AC-13).
   test('an add refine commits on a verifier pass; an add missed twice is not applied', async () => {
     if (!FIDELITY_READY()) { test.skip(); return }
     const draft = await fidelityDraft(api, 'add')
@@ -831,4 +830,48 @@ test.describe('§V — refine fidelity contract', () => {
     expect(adopted?.adoptedAt).not.toBeNull()
     expect(adopted?.adoptedRevisionNumber).toBe(draft.pointer + 1)
   })
+
+  // TC-FID-16 — AC-13 over HTTP: an add whose element is absent after the
+  // retry is not applied, having spent exactly ONE real verifier call per
+  // attempt. __VERIFIER_SAYS_NO__ makes the mock verifier MODEL answer a
+  // well-formed {"applied": false} — not a forced outcome — so the calls are
+  // counted and the verdict goes through the real parser.
+  test('an add the verifier finds absent is retried once, then not applied — one verifier call per attempt', async () => {
+    if (!FIDELITY_READY()) { test.skip(); return }
+    const draft = await fidelityDraft(api, 'add-says-no')
+    const { diag } = await refineNotApplied(
+      api,
+      draft,
+      `Include a human character __VERIFIER_SAYS_NO__ ${uniq('V16')}`,
+    )
+    expect(diag.refineCalls).toBe(2)
+    expect(diag.verifierCalls).toBe(2)
+    for (const a of diag.attempts) {
+      expect(a.effectiveClasses).toEqual(['add'])
+      expect(a.verifierCalls).toBe(1)
+      expect(a.verdict).toBe('miss')
+      expect(a.reasons.some((r) => /^add: Mock verifier: the requested element is absent/.test(r))).toBe(true)
+    }
+  })
+
+  // TC-FID-17 — AC-14 over HTTP: an unparseable or an empty verifier reply is
+  // unavailable — treated as a miss, never a pass — after a real call on each
+  // attempt (the reply seam, not the forced-outcome seam).
+  for (const [sentinel, reason] of [
+    ['__VERIFIER_GARBAGE__', 'verifier response was not a valid verdict'],
+    ['__VERIFIER_EMPTY__', 'verifier returned an empty response'],
+  ] as const) {
+    test(`an ${sentinel === '__VERIFIER_EMPTY__' ? 'empty' : 'unparseable'} verifier reply is unavailable on both attempts, then not applied`, async () => {
+      if (!FIDELITY_READY()) { test.skip(); return }
+      const draft = await fidelityDraft(api, `add-${sentinel}`)
+      const { diag } = await refineNotApplied(api, draft, `Include a human character ${sentinel} ${uniq('V17')}`)
+      expect(diag.refineCalls).toBe(2)
+      expect(diag.verifierCalls).toBe(2)
+      for (const a of diag.attempts) {
+        expect(a.verifierCalls).toBe(1)
+        expect(a.verdict).toBe('unavailable')
+        expect(a.reasons).toEqual([`verification unavailable (treated as a miss): ${reason}`])
+      }
+    })
+  }
 })
