@@ -34,7 +34,7 @@
 // personal→team credential fallback still applies: it only fires when the
 // first credential is REJECTED (no model output, nothing billed), so it picks a
 // credential rather than re-asking for a verdict. The retry-once policy and the
-// hard caps belong to the refine route (T17).
+// hard caps belong to the refine attempt loop (drafts/refineAttempt.ts, T17).
 //
 // ── What the verifier sees (FR-09) ───────────────────────────────────────────
 // Never the document. It gets the instruction and the measured facts — element
