@@ -195,9 +195,12 @@ export function RefinementPanel({
   }
 
   // Block sending while ANY background action is running (the server would 409
-  // anyway) or while a refine is still awaiting resolution from the poll.
+  // anyway), while a refine is still awaiting resolution from the poll, or
+  // while an adopt POST is in flight (fix round 1, Minor 3 — adopting is a
+  // draft mutation too, so it belongs in the same busy gate as every other
+  // action, not a bespoke disabled state of its own).
   const awaitingResolution = messages.some((m) => m.status === 'pending')
-  const busy = running || pendingAction !== null || awaitingResolution
+  const busy = running || pendingAction !== null || awaitingResolution || adopting
 
   return (
     <GlassPanel className="p-4 flex flex-col">
@@ -248,7 +251,9 @@ export function RefinementPanel({
       {/* FR-14/AC-18 hard failure — driven directly by the polled `notApplied`
           prop (not local message state), so it appears and clears exactly
           when the server says so, on the next poll either way. */}
-      {notApplied && <NotAppliedCard notApplied={notApplied} onAdopt={handleAdopt} adopting={adopting} />}
+      {notApplied && (
+        <NotAppliedCard notApplied={notApplied} onAdopt={handleAdopt} adopting={adopting} disabled={busy} />
+      )}
 
       {conflictCard && (
         <div className="mb-3 rounded-xl border border-amber-300 dark:border-amber-700/50 bg-amber-50 dark:bg-amber-900/20 p-3 animate-fade-in">

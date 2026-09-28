@@ -5,6 +5,7 @@ import { canAccessContent } from '@/lib/authz/visibility'
 import { dimensionsFor } from '@/lib/aspectRatio'
 import { resolveExportUrl } from '@/lib/storage/minio'
 import { commitDraftRevision, AdoptConflictError } from '@/lib/drafts/revisions'
+import { inlineEditBlockReason } from '@/lib/drafts/inlineEdit'
 
 // "Use anyway" (change 004 Phase 2, T19, FR-14a): adopts a twice-failed
 // refine's retained rejected render as a normal, committed chain revision.
@@ -16,14 +17,19 @@ import { commitDraftRevision, AdoptConflictError } from '@/lib/drafts/revisions'
 // render" honestly (it is neither a regenerate nor a refine), and adding one
 // would need a new migration on top of T15's — which the task's ruling says
 // to avoid. Single-flight instead comes from two layers:
-//   1. a route-level pendingAction check (mirrors inline-edit's
-//      inlineEditBlockReason) — 409s while another action is genuinely
-//      running, same message as refine/regenerate use for the same case;
-//   2. the load-bearing guard: an atomic conditional UPDATE inside
-//      commitDraftRevision's own transaction (adoptRejectedRevisionId) that
-//      flips the rejected row's adoptedAt from NULL exactly once. Two
-//      concurrent adopts of the same row can never both win — the loser's
-//      commit aborts with AdoptConflictError, mapped to 409 below.
+//   1. a route-level `inlineEditBlockReason` check (fix round 1, Minor 2 —
+//      the same shared helper inline-edit uses, rather than a hand-rolled
+//      copy of half its logic) — 409s while another action is genuinely
+//      running OR the draft isn't ready, same messages inline-edit uses for
+//      the same cases;
+//   2. the load-bearing guard: atomic conditional UPDATEs inside
+//      commitDraftRevision's own transaction (adoptRejectedRevisionId) —
+//      one on the Draft row (re-checking pendingAction AND the not-applied
+//      pointer together, fix round 1 Minor 1) and one on the rejected row
+//      itself (adoptedAt flips from NULL exactly once). Two concurrent
+//      adopts of the same row can never both win, and a refine/regenerate
+//      claimed after this route's check still 409s — the loser's commit
+//      aborts with AdoptConflictError, mapped to 409 below.
 export const POST = withTeamAuth<{ id: string; revisionId: string }>(async (_req, { params }, user) => {
   const draft = await prisma.draft.findUnique({
     where: { id: params.id },
@@ -40,15 +46,22 @@ export const POST = withTeamAuth<{ id: string; revisionId: string }>(async (_req
     return NextResponse.json({ error: 'Draft not found' }, { status: 404 })
   }
 
-  if (draft.pendingAction !== null) {
-    return NextResponse.json({ error: 'Another action is already running on this draft' }, { status: 409 })
+  const blocked = inlineEditBlockReason(draft.status, draft.pendingAction)
+  if (blocked) {
+    return NextResponse.json({ error: blocked }, { status: 409 })
   }
 
-  const row = await prisma.draftRevision.findUnique({
-    where: { id: params.revisionId },
+  // Fix round 1, Important 1: scope the lookup to THIS draft in the query
+  // itself (findFirst, not findUnique-by-id-alone). A row that belongs to a
+  // different draft — or team entirely — now comes back null exactly like an
+  // unknown id: both are 404. The old findUnique-by-id-alone let a caller who
+  // can see any one draft learn "a DraftRevision with this id exists
+  // somewhere" from a 409 vs 404 split, which is exactly the existence leak
+  // the tenancy rule (cross-team is always 404) forbids.
+  const row = await prisma.draftRevision.findFirst({
+    where: { id: params.revisionId, draftId: draft.id },
     select: {
       id: true,
-      draftId: true,
       instruction: true,
       htmlSnapshot: true,
       exportUrl: true,
@@ -57,21 +70,17 @@ export const POST = withTeamAuth<{ id: string; revisionId: string }>(async (_req
       discardedAt: true,
     },
   })
-  // A genuinely unknown row id parallels the draft-not-found 404 above — a
-  // resource that simply does not exist.
+  // Unknown to this draft — whether the id doesn't exist at all, or exists
+  // on a different draft/team — is uniformly 404 (no existence leak).
   if (!row) {
     return NextResponse.json({ error: 'Rejected render not found' }, { status: 404 })
   }
-  // The row exists, but some precondition fails: it belongs to a different
-  // draft, it isn't (or is no longer) THIS draft's live not-applied outcome,
-  // it was already adopted or discarded, or it was never a usable rejected
-  // render at all (no export — Ruling D). All of these are 409, matching the
-  // task's own enumerated preconditions verbatim. A revisionId only ever
-  // reaches a client via ITS OWN draft's poll response, so there is no
-  // cross-tenant secret a 404 would additionally protect here — the draft
-  // visibility check above is what keeps this team-scoped.
+  // The row IS one of this draft's rows, but some other precondition fails:
+  // it isn't (or is no longer) the draft's live not-applied outcome, it was
+  // already adopted or discarded, or it was never a usable rejected render
+  // at all (no export — Ruling D). All 409, matching the task's own
+  // enumerated preconditions.
   const eligible =
-    row.draftId === draft.id &&
     row.id === draft.notAppliedRevisionId &&
     row.rejectedAt !== null &&
     row.adoptedAt === null &&

@@ -6,6 +6,14 @@ const ADMIN_PASSWORD = 'BistecStudio2026!'
 const CLIENTX_EMAIL = 'clientx.admin@users.bistec.internal'
 const CLIENTX_PASSWORD = 'BistecStudio2026!'
 
+// Fix round 1, Important 2: two presigned URLs for the SAME object are never
+// byte-identical (the signature covers a to-the-second X-Amz-Date), so
+// comparing them with `toBe` flakes. Compare the object path only — proves
+// "the same underlying object", which is what these tests actually mean.
+function urlPath(u: string): string {
+  return new URL(u).pathname
+}
+
 // T18 (change 004 Phase 2) — GET /api/drafts/[id]'s `notApplied` field
 // (Ruling E): a top-level, DISTINCT outcome channel from both success and the
 // existing `pendingActionError` crash channel —
@@ -159,9 +167,11 @@ test.describe('T18 — refine not-applied poll field', () => {
 // /api/drafts/[id]/rejected/[revisionId]/adopt: "Use anyway" commits a
 // twice-failed refine's retained rejected render as a normal chain revision,
 // through commitDraftRevision (adoptRejectedRevisionId), reusing the
-// rejected row's own stored export (nothing re-renders). Single-flight via
-// an atomic conditional UPDATE, not Draft.pendingAction (see the route's own
-// header comment for why). Additional seam used here:
+// rejected row's own stored export (nothing re-renders). Adopt never CLAIMS
+// Draft.pendingAction (no DraftAction value fits), but fix round 1 (Minor 1)
+// does re-check it atomically inside the same guarded UPDATE that re-checks
+// the not-applied pointer — see the route's own header comment. Additional
+// seam used here:
 //   "__REFINE_REDUCE_NOOP__" — a `remove` whose reply echoes the current
 //     document unchanged → structural miss on both attempts → not-applied
 //     WITH a stored export (same "with export" shape as __VERIFY_FAIL_ALWAYS__,
@@ -198,8 +208,11 @@ test.describe('T19 — "Use anyway" adopts a rejected render', () => {
     const after = await (await api.get(`/api/drafts/${draft.id}`)).json()
     expect(after.notApplied).toBeNull()
     expect(after.currentRevisionNumber).toBe(baseline + 1)
-    // The draft's live export now serves the rejected render's own object.
-    expect(after.exportUrl).toBe(body.exportUrl)
+    // The draft's live export now serves the rejected render's own object —
+    // compare the signed URL's PATH, not the whole string (Important 2: two
+    // presigned URLs for the same object are never byte-identical).
+    expect(urlPath(after.exportUrl)).toBe(urlPath(notApplied.previewUrl as string))
+    expect(urlPath(after.exportUrl)).toBe(urlPath(body.exportUrl))
 
     const revisionsAfter = (await (await api.get(`/api/drafts/${draft.id}/revisions`)).json()) as Array<{
       id: string
@@ -277,5 +290,65 @@ test.describe('T19 — "Use anyway" adopts a rejected render', () => {
     } finally {
       await clientx.dispose()
     }
+  })
+
+  // Fix round 1, Important 1: a revisionId that IS real, but belongs to
+  // ANOTHER draft (here, on ANOTHER TEAM entirely) must answer exactly like
+  // an id that never existed — 404 both times. Before the fix, the row
+  // lookup was unscoped (findUnique by id alone) and a mismatched draftId
+  // fell through to the 409 "can no longer be adopted" branch instead — a
+  // caller who can see any one draft could tell "this id exists elsewhere"
+  // (409) apart from "no such id" (404), an existence leak the tenancy rule
+  // (cross-team is always 404) forbids.
+  test('a real rejected-row id belonging to a DIFFERENT team\'s draft is 404, exactly like an unknown id', async ({
+    request,
+  }) => {
+    if (!process.env.MOCK_AI || !process.env.MOCK_PUPPETEER) { test.skip(); return }
+    const draft = await createExportedDraft(api)
+    if (!draft) { test.skip(); return }
+
+    const clientx = await loginAs(request, CLIENTX_EMAIL, CLIENTX_PASSWORD, { team: 'ClientX' })
+    try {
+      const clientxDraft = await createExportedDraft(clientx)
+      if (!clientxDraft) { test.skip(); return }
+      const clientxSettled = await refineAndWait(clientx, clientxDraft.id as string, 'reduce it __REFINE_REDUCE_NOOP__')
+      const clientxNotApplied = clientxSettled.notApplied as Record<string, unknown>
+      expect(clientxNotApplied).toBeTruthy()
+
+      // A real, currently-live, adoptable rejected row — but on ClientX's
+      // draft, requested against the admin's (Bistec) draft.
+      const crossTeamRes = await api.post(
+        `/api/drafts/${draft.id}/rejected/${clientxNotApplied.revisionId}/adopt`,
+      )
+      expect(crossTeamRes.status()).toBe(404)
+
+      // An id that never existed at all answers the exact same way.
+      const unknownRes = await api.post(`/api/drafts/${draft.id}/rejected/does-not-exist-at-all/adopt`)
+      expect(unknownRes.status()).toBe(404)
+    } finally {
+      await clientx.dispose()
+    }
+  })
+
+  // Fix round 1, Minor 5: two adopts of the SAME rejected row fired at once.
+  // The atomic guard inside commitDraftRevision (not any request-ordering)
+  // must be what decides the winner — exactly one 200, one 409, and exactly
+  // one new chain revision, never two and never zero.
+  test('two concurrent adopts of the same render: exactly one 200, one 409, exactly one new revision', async () => {
+    if (!process.env.MOCK_AI || !process.env.MOCK_PUPPETEER) { test.skip(); return }
+    const draft = await createExportedDraft(api)
+    if (!draft) { test.skip(); return }
+
+    const settled = await refineAndWait(api, draft.id as string, 'reduce it __REFINE_REDUCE_NOOP__')
+    const notApplied = settled.notApplied as Record<string, unknown>
+    const adoptUrl = `/api/drafts/${draft.id}/rejected/${notApplied.revisionId}/adopt`
+
+    const revisionsBefore = await (await api.get(`/api/drafts/${draft.id}/revisions`)).json()
+
+    const [a, b] = await Promise.all([api.post(adoptUrl), api.post(adoptUrl)])
+    expect([a.status(), b.status()].sort()).toEqual([200, 409])
+
+    const revisionsAfter = await (await api.get(`/api/drafts/${draft.id}/revisions`)).json()
+    expect(revisionsAfter.length).toBe(revisionsBefore.length + 1)
   })
 })

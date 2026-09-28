@@ -30,8 +30,11 @@ const fake = vi.hoisted(() => {
   const db = {
     rows: [] as Row[],
     draftUpdates: [] as Array<{ where: unknown; data: Record<string, unknown> }>,
-    // The draft's current not-applied pointer (draft.findUnique).
+    // The draft's current not-applied pointer.
     notAppliedRevisionId: null as string | null,
+    // The draft's in-flight action marker — T19's adoptRejectedRevisionId
+    // guard re-checks this (fix round 1, Minor 1).
+    pendingAction: null as string | null,
     render: { calls: 0, fail: false },
     uploads: [] as string[],
     txOptions: [] as unknown[],
@@ -146,14 +149,29 @@ const fake = vi.hoisted(() => {
       update: async (args: { where: unknown; data: Record<string, unknown> }) => {
         db.draftUpdates.push(args)
         if ('notAppliedRevisionId' in args.data) db.notAppliedRevisionId = args.data.notAppliedRevisionId as string | null
+        if ('pendingAction' in args.data) db.pendingAction = args.data.pendingAction as string | null
         return {}
       },
       // Single implicit fake draft (matches `update` above, which also
-      // ignores `where.id`) — T19's adoptRejectedRevisionId re-reads this
-      // fresh inside the transaction.
-      findUnique: async (_args: { where: unknown; select?: Record<string, boolean> }) => ({
-        notAppliedRevisionId: db.notAppliedRevisionId,
-      }),
+      // ignores `where.id`) — T19's adoptRejectedRevisionId guards on this
+      // atomically (fix round 1, Minor 1: pendingAction IS NULL AND
+      // notAppliedRevisionId matches, in one conditional UPDATE).
+      // Deliberately does NOT push onto db.draftUpdates: that array tracks
+      // the meaningful commit-shaped `draft.update` writes existing tests
+      // assert on by index; this guard is a heartbeat-style touch (mirrors
+      // touchDraftAction), not one of those.
+      updateMany: async ({
+        where,
+      }: {
+        where: { id?: string; pendingAction?: string | null; notAppliedRevisionId?: string | null }
+        data: Record<string, unknown>
+      }) => {
+        if ('pendingAction' in where && where.pendingAction !== db.pendingAction) return { count: 0 }
+        if ('notAppliedRevisionId' in where && where.notAppliedRevisionId !== db.notAppliedRevisionId) {
+          return { count: 0 }
+        }
+        return { count: 1 }
+      },
     },
     $transaction: async <T>(fn: (tx: unknown) => Promise<T>, opts?: unknown) => {
       db.txOptions.push(opts)
@@ -233,6 +251,7 @@ beforeEach(() => {
   db.rows = []
   db.draftUpdates = []
   db.notAppliedRevisionId = null
+  db.pendingAction = null
   db.render = { calls: 0, fail: false }
   db.uploads = []
   db.txOptions = []
@@ -652,6 +671,32 @@ describe('commitDraftRevision adoptRejectedRevisionId (T19 "Use anyway")', () =>
       }),
     ).rejects.toThrow(AdoptConflictError)
     expect(db.rows.find((r) => r.id === stray.id)!.adoptedAt ?? null).toBeNull()
+  })
+
+  // Fix round 1, Minor 1 (FR-14a: adopt is single-flight "like every other
+  // draft action" — a concurrent action 409s). A refine/regenerate that
+  // claimed Draft.pendingAction after the route's own pre-check must still
+  // make the in-transaction guard refuse — proof the guard re-checks
+  // pendingAction itself, not just the not-applied pointer.
+  it('a draft with a pendingAction already claimed (a refine/regenerate in flight) refuses the adopt, touching nothing', async () => {
+    const { revisionId: rejectedId, exportKey: rejectedExport } = await recordRejectedRender(rejectArgs())
+    db.pendingAction = 'REFINE'
+
+    await expect(
+      commitDraftRevision({
+        draftId: 'd1',
+        instruction: 'Use anyway: reduce the text',
+        html: '<html>REJECTED RENDER</html>',
+        width: 1080,
+        height: 1080,
+        exportKey: rejectedExport!,
+        adoptRejectedRevisionId: rejectedId,
+      }),
+    ).rejects.toThrow(AdoptConflictError)
+    // The rejected row's own guard never even ran — pendingAction is checked
+    // first — so it is untouched, and no chain row was created.
+    expect(db.rows.find((r) => r.id === rejectedId)!.adoptedAt ?? null).toBeNull()
+    expect(db.rows.some((r) => r.revisionNumber === 2)).toBe(false)
   })
 })
 

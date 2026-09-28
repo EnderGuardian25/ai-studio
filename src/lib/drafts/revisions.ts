@@ -146,7 +146,9 @@ export interface CommitRevisionArgs {
   // AdoptConflictError. No Draft.pendingAction/DraftAction value describes
   // "adopt a stored render" honestly, so adopt never claims that field —
   // this conditional UPDATE is the guard instead, the same shape as the
-  // P2002 retry commitDraftRevision already uses for the revision-number race.
+  // P2002 retry commitDraftRevision already uses for the revision-number
+  // race. A SECOND guarded UPDATE, on the Draft row itself, re-checks
+  // pendingAction IS NULL in the same atomic step (fix round 1, Minor 1).
   adoptRejectedRevisionId?: string
 }
 
@@ -186,22 +188,34 @@ export async function commitDraftRevision(
 
   const revision = await withNextRevisionNumber(draftId, async (tx, revisionNumber) => {
     if (adoptRejectedRevisionId) {
-      // Re-read the draft's CURRENT not-applied pointer fresh, inside this
-      // transaction — never trust a value the caller read earlier (same
-      // "never trust the FK alone" principle T18's resolveNotAppliedOutcome
-      // documents). A mismatch means this row is not (or is no longer) the
-      // draft's live not-applied outcome.
-      const current = await tx.draft.findUnique({
-        where: { id: draftId },
-        select: { notAppliedRevisionId: true },
+      // Fix round 1, Minor 1 (FR-14a: adopt is single-flight "like every
+      // other draft action" — a concurrent action 409s). A guarded UPDATE on
+      // the DRAFT row itself, not a read followed by a separate write:
+      // matches only when pendingAction is STILL null (nothing claimed the
+      // draft between the route's own pre-check and here) AND this row is
+      // STILL the draft's live not-applied pointer (never trust a value the
+      // caller read earlier — same "never trust the FK alone" principle
+      // T18's resolveNotAppliedOutcome documents). Both facts are checked and
+      // "touched" (a heartbeat-style updatedAt bump, the same idiom
+      // touchDraftAction uses) atomically in ONE conditional UPDATE, so
+      // nothing can change either fact in the gap between checking and
+      // acting — under Postgres, a concurrent claimDraftAction competing for
+      // the same row blocks on this transaction's row lock and then
+      // re-evaluates its own WHERE against whatever we leave committed.
+      // 0 rows touched: a refine/regenerate claimed pendingAction, or a
+      // newer not-applied outcome already superseded this row — either way,
+      // 409.
+      const draftGuard = await tx.draft.updateMany({
+        where: { id: draftId, pendingAction: null, notAppliedRevisionId: adoptRejectedRevisionId },
+        data: { updatedAt: new Date() },
       })
-      if (!current || current.notAppliedRevisionId !== adoptRejectedRevisionId) {
-        throw new AdoptConflictError()
-      }
-      // The guarded UPDATE: every remaining precondition (rejected, not yet
-      // adopted/discarded, has an export to adopt — Ruling D) checked and
-      // stamped atomically. 0 rows touched means a concurrent adopt/discard
-      // won the race, or the row never qualified — either way, 409.
+      if (draftGuard.count !== 1) throw new AdoptConflictError()
+
+      // The guarded UPDATE on the rejected row itself: every remaining
+      // precondition (rejected, not yet adopted/discarded, has an export to
+      // adopt — Ruling D) checked and stamped atomically. 0 rows touched
+      // means a concurrent adopt/discard won the race, or the row never
+      // qualified — either way, 409.
       const guard = await tx.draftRevision.updateMany({
         where: {
           id: adoptRejectedRevisionId,

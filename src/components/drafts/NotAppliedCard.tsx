@@ -10,8 +10,12 @@ export interface NotAppliedCardProps {
   /** T19 "Use anyway" — omitted (no button rendered) when the rejected
    *  render has no preview/export to adopt (Ruling D: nothing to adopt). */
   onAdopt?: () => void
-  /** True while an adopt POST is in flight — disables the button. */
+  /** True while an adopt POST is in flight — shows the spinner icon. */
   adopting?: boolean
+  /** Fix round 1, Minor 3: the panel's own `busy` (adopting folded in, plus
+   *  any other in-flight action) — disables the button whenever the server
+   *  would 409 the click anyway, not just during this action's own POST. */
+  disabled?: boolean
 }
 
 // FR-14/AC-18 hard failure: a refine that failed its fidelity check on both
@@ -31,7 +35,7 @@ export interface NotAppliedCardProps {
 // only when there is a preview to adopt (a truncated reply left no export,
 // FR-14a "nothing enters the chain without that explicit action" still
 // holds — there is simply nothing offered to adopt in that case).
-export function NotAppliedCard({ notApplied, onAdopt, adopting }: NotAppliedCardProps) {
+export function NotAppliedCard({ notApplied, onAdopt, adopting, disabled }: NotAppliedCardProps) {
   return (
     <div
       role="alert"
@@ -62,7 +66,7 @@ export function NotAppliedCard({ notApplied, onAdopt, adopting }: NotAppliedCard
 
           {notApplied.previewUrl && onAdopt && (
             <div className="mt-2">
-              <Button size="sm" variant="secondary" onClick={onAdopt} disabled={adopting}>
+              <Button size="sm" variant="secondary" onClick={onAdopt} disabled={disabled}>
                 {adopting ? <Loader2 size={13} className="animate-spin" /> : <ImageDown size={13} />}
                 Use anyway
               </Button>
