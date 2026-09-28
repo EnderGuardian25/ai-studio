@@ -20,19 +20,29 @@ interface Row {
   htmlSnapshot: string
   exportUrl: string | null
   createdAt: Date
+  rejection?: unknown
+  adoptedAt?: Date | null
+  discardedAt?: Date | null
 }
 
 const fake = vi.hoisted(() => {
   const db = {
     rows: [] as Row[],
     draftUpdates: [] as Array<{ where: unknown; data: Record<string, unknown> }>,
+    // The draft's current not-applied pointer (draft.findUnique).
+    notAppliedRevisionId: null as string | null,
+    render: { calls: 0, fail: false },
+    uploads: [] as string[],
   }
 
   function matches(row: Row, where: Record<string, unknown>): boolean {
     for (const [key, cond] of Object.entries(where)) {
       const value = (row as unknown as Record<string, unknown>)[key]
-      if (key === 'draftId') {
+      if (key === 'draftId' || key === 'id') {
         if (value !== cond) return false
+      } else if (key === 'adoptedAt' || key === 'discardedAt') {
+        if (cond !== null) throw new Error(`fake prisma: unsupported condition on ${key}`)
+        if (value != null) return false
       } else if (key === 'rejectedAt' || key === 'revisionNumber') {
         if (cond === null) {
           if (value !== null) return false
@@ -97,14 +107,19 @@ const fake = vi.hoisted(() => {
         db.rows.filter((r) => matches(r, args.where ?? {})),
         args.orderBy,
       ).map((r) => project(r, args.select)),
+    updateMany: async ({ where, data }: { where: Record<string, unknown>; data: Partial<Row> }) => {
+      const hit = db.rows.filter((r) => matches(r, where))
+      for (const r of hit) Object.assign(r, data)
+      return { count: hit.length }
+    },
     create: async ({
       data,
     }: {
-      data: Partial<Row> & { draftId: string; revisionNumber: number }
+      data: Partial<Row> & { draftId: string; revisionNumber: number | null }
     }) => {
-      const clash = db.rows.some(
-        (r) => r.draftId === data.draftId && r.revisionNumber === data.revisionNumber,
-      )
+      const clash =
+        data.revisionNumber !== null &&
+        db.rows.some((r) => r.draftId === data.draftId && r.revisionNumber === data.revisionNumber)
       if (clash) throw new Error('unexpected unique violation in fake')
       const row: Row = {
         id: `rev-${db.rows.length + 1}`,
@@ -123,8 +138,10 @@ const fake = vi.hoisted(() => {
   const client = {
     draftRevision,
     draft: {
+      findUnique: async () => ({ notAppliedRevisionId: db.notAppliedRevisionId }),
       update: async (args: { where: unknown; data: Record<string, unknown> }) => {
         db.draftUpdates.push(args)
+        if ('notAppliedRevisionId' in args.data) db.notAppliedRevisionId = args.data.notAppliedRevisionId as string | null
         return {}
       },
     },
@@ -135,6 +152,20 @@ const fake = vi.hoisted(() => {
 const db = fake.db
 vi.mock('@/lib/prisma', () => ({ prisma: fake.client }))
 vi.mock('@/lib/renderer/fontSet', () => ({ getFontSetId: () => 'fonts-test' }))
+vi.mock('@/lib/renderer/puppeteer', () => ({
+  renderHtmlToPng: async () => {
+    fake.db.render.calls++
+    if (fake.db.render.fail) throw new Error('Chromium crashed')
+    return Buffer.from('png')
+  },
+}))
+vi.mock('@/lib/storage/minio', () => ({
+  BUCKET_EXPORTS: 'exports',
+  exportKey: (kind: string, id: string) => `exports/${kind}-${id}-test.png`,
+  uploadObject: async (_b: Buffer, _bucket: string, key: string) => {
+    fake.db.uploads.push(key)
+  },
+}))
 
 import { prisma } from '@/lib/prisma'
 import {
@@ -145,6 +176,10 @@ import {
   nextRevisionNumber,
   withNextRevisionNumber,
   commitDraftRevision,
+  recordRejectedRender,
+  rejectionDiagnosticsSchema,
+  MAX_NOT_APPLIED_REASON,
+  type RejectionDiagnostics,
 } from '@/lib/drafts/revisions'
 
 let seq = 0
@@ -180,6 +215,9 @@ function rejected(draftId: string, instruction = 'make the logo bigger'): Row {
 beforeEach(() => {
   db.rows = []
   db.draftUpdates = []
+  db.notAppliedRevisionId = null
+  db.render = { calls: 0, fail: false }
+  db.uploads = []
 })
 
 describe('COMMITTED_REVISION / committedRevisionWhere', () => {
@@ -300,5 +338,131 @@ describe('commitDraftRevision (refine + inline-edit writer)', () => {
     expect(db.draftUpdates).toHaveLength(1)
     expect(db.draftUpdates[0].data.currentRevisionNumber).toBe(2)
     expect(db.draftUpdates[0].data.htmlContent).toBe('<html>new</html>')
+  })
+})
+
+// ── T17: the not-applied outcome and its rejected render ─────────────────────
+
+function diagnostics(over: Partial<Omit<RejectionDiagnostics, 'export'>> = {}): Omit<RejectionDiagnostics, 'export'> {
+  const attempt = (n: 1 | 2) => ({
+    attempt: n,
+    document: 'complete' as const,
+    classes: ['remove' as const],
+    classificationDefaulted: false,
+    effectiveClasses: ['remove' as const],
+    downgraded: [],
+    supersedes: ['Join us for'],
+    constrains: [],
+    reconcile: { kind: 'clean' as const, missing: [] },
+    verdict: 'miss' as const,
+    reasons: ['remove: "Join us for" was neither removed nor shortened'],
+    verifierCalls: 0,
+  })
+  return {
+    version: 1,
+    refineCalls: 2,
+    verifierCalls: 0,
+    attempts: [attempt(1), attempt(2)],
+    reasons: ['remove: "Join us for" was neither removed nor shortened'],
+    ...over,
+  }
+}
+
+const rejectArgs = (over: Partial<Parameters<typeof recordRejectedRender>[0]> = {}) => ({
+  draftId: 'd1',
+  instruction: 'reduce the text',
+  html: '<!DOCTYPE html><html><body>still long</body></html>',
+  width: 1080,
+  height: 1350,
+  reason: 'The edit could not be applied: remove missed.',
+  diagnostics: diagnostics(),
+  ...over,
+})
+
+describe('recordRejectedRender (FR-12/13, Ruling D/E)', () => {
+  it('writes ONE unnumbered rejected row with the render, diagnostics and export; the chain and pointer are untouched', async () => {
+    db.rows = [committed('d1', 1), committed('d1', 2)]
+    const { revisionId, exportKey } = await recordRejectedRender(rejectArgs())
+    const row = db.rows.find((r) => r.id === revisionId)!
+    expect(row).toMatchObject({
+      revisionNumber: null,
+      instruction: 'reduce the text',
+      htmlSnapshot: '<!DOCTYPE html><html><body>still long</body></html>',
+      exportUrl: exportKey,
+    })
+    expect(row.rejectedAt).toBeInstanceOf(Date)
+    expect(exportKey).toBe('exports/refine-d1-test.png')
+    expect(db.uploads).toEqual([exportKey])
+    // Retrievable with its instruction, classes and the verifier's miss (AC-17).
+    const rejection = rejectionDiagnosticsSchema.parse(row.rejection)
+    expect(rejection.attempts[1].classes).toEqual(['remove'])
+    expect(rejection.reasons[0]).toMatch(/neither removed nor shortened/)
+    expect(rejection.export).toBe('stored')
+    // The draft carries the outcome; nothing about the chain moved (AC-16).
+    expect(db.draftUpdates).toHaveLength(1)
+    expect(db.draftUpdates[0].data).toEqual({ notAppliedReason: 'The edit could not be applied: remove missed.', notAppliedRevisionId: revisionId })
+    expect(db.rows.filter((r) => r.revisionNumber !== null)).toHaveLength(2)
+    expect(await nextRevisionNumber(prisma, 'd1')).toBe(3)
+  })
+
+  it('with no usable document: records the row for diagnosis, no render, no export', async () => {
+    const { revisionId, exportKey } = await recordRejectedRender(
+      rejectArgs({ html: null, unusableHtml: '<!DOCTYPE html><html><body>cut off' }),
+    )
+    expect(exportKey).toBeNull()
+    expect(db.render.calls).toBe(0)
+    const row = db.rows.find((r) => r.id === revisionId)!
+    expect(row.exportUrl).toBeNull()
+    expect(row.htmlSnapshot).toBe('<!DOCTYPE html><html><body>cut off')
+    expect(rejectionDiagnosticsSchema.parse(row.rejection).export).toBe('none')
+  })
+
+  it('a render failure does not mask the outcome: the row is recorded without an export', async () => {
+    db.render.fail = true
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const { revisionId, exportKey } = await recordRejectedRender(rejectArgs())
+    expect(exportKey).toBeNull()
+    expect(errors).toHaveBeenCalled()
+    errors.mockRestore()
+    const row = db.rows.find((r) => r.id === revisionId)!
+    expect(rejectionDiagnosticsSchema.parse(row.rejection).export).toBe('render-failed')
+    expect(db.notAppliedRevisionId).toBe(revisionId)
+  })
+
+  it('REPLACING an outcome stamps the previous rejected row discarded', async () => {
+    const first = await recordRejectedRender(rejectArgs())
+    const second = await recordRejectedRender(rejectArgs({ instruction: 'reduce it again' }))
+    expect(db.rows.find((r) => r.id === first.revisionId)!.discardedAt).toBeInstanceOf(Date)
+    expect(db.rows.find((r) => r.id === second.revisionId)!.discardedAt ?? null).toBeNull()
+    expect(db.notAppliedRevisionId).toBe(second.revisionId)
+  })
+
+  it('caps the human-readable reason', async () => {
+    await recordRejectedRender(rejectArgs({ reason: 'x'.repeat(5000) }))
+    expect((db.draftUpdates[0].data.notAppliedReason as string).length).toBe(MAX_NOT_APPLIED_REASON)
+  })
+
+  it('refuses diagnostics beyond the hard caps (AC-15 is part of the schema)', async () => {
+    await expect(recordRejectedRender(rejectArgs({ diagnostics: diagnostics({ refineCalls: 3 }) }))).rejects.toThrow()
+    await expect(recordRejectedRender(rejectArgs({ diagnostics: diagnostics({ verifierCalls: 3 }) }))).rejects.toThrow()
+  })
+})
+
+describe('commitDraftRevision clears the not-applied outcome', () => {
+  it('nulls notApplied* and stamps the referenced rejected row discarded', async () => {
+    db.rows = [committed('d1', 1)]
+    const { revisionId: rejectedId } = await recordRejectedRender(rejectArgs())
+    db.draftUpdates = []
+    await commitDraftRevision({ draftId: 'd1', instruction: 'x', html: '<html/>', width: 1080, height: 1080, exportKey: 'k' })
+    expect(db.draftUpdates[0].data).toMatchObject({ notAppliedReason: null, notAppliedRevisionId: null, currentRevisionNumber: 2 })
+    expect(db.rows.find((r) => r.id === rejectedId)!.discardedAt).toBeInstanceOf(Date)
+  })
+
+  it('never stamps an adopted rejected row', async () => {
+    const { revisionId: rejectedId } = await recordRejectedRender(rejectArgs())
+    const row = db.rows.find((r) => r.id === rejectedId)!
+    row.adoptedAt = new Date()
+    await commitDraftRevision({ draftId: 'd1', instruction: 'x', html: '<html/>', width: 1080, height: 1080, exportKey: 'k' })
+    expect(row.discardedAt ?? null).toBeNull()
   })
 })
