@@ -141,7 +141,7 @@ Two migrations, one per phase, deliberately not merged — a single migration wo
 
 ### Wave 4 — Phase 2: wiring, UI, and test seams
 
-- [ ] `T17` — Wire classification, verification, retry-once and the not-applied outcome into the refine route
+- [x] `T17` — Wire classification, verification, retry-once and the not-applied outcome into the refine route
   - Files: `src/app/api/drafts/[id]/refine/route.ts`, `src/lib/agent/prompts/refine.ts`, `src/lib/agent/designAgentCli.ts`, `src/lib/agent/designAgent.ts`, `src/lib/drafts/revisions.ts`, `src/lib/drafts/draftActions.ts`, `src/lib/drafts/refineVerify.ts`, `src/lib/agent/inlineAssets.ts` (comment only) _(widened 2026-09-28 by the Wave 3 final review)_
   - Estimate: large
   - Kind: impl
@@ -159,7 +159,7 @@ Two migrations, one per phase, deliberately not merged — a single migration wo
     - **Baseline:** full mock E2E was 183/4/0 at the Wave 3 final fix; re-run first.
     - **Flat supersedes:** replace-text + remove currently fails closed unless the new text is strictly shorter (e.g. "change the headline to X and remove the logo"). Make supersedes per-clause (`{ fragment, clause: "replace" | "remove" }`) or add the replace-only exemption (phrase absent AND no counterpart), and correct the `instructionClasses.ts` known-limits header wording.
 
-- [ ] `T18` — Surface not-applied as a failure in the UI
+- [x] `T18` — Surface not-applied as a failure in the UI
   - Files: `src/components/drafts/RefinementPanel.tsx`, `src/app/api/drafts/[id]/route.ts` (poll response)
   - Estimate: medium
   - Kind: impl
@@ -167,7 +167,7 @@ Two migrations, one per phase, deliberately not merged — a single migration wo
   - Notes: FR-14, AC-18. Name the poll field explicitly — party-architect's point is that client and server halves of one merge disagree without it. Hard failure, not a dismissible warning on a committed revision.
   - Carried in: dereference `notAppliedRevisionId` as `{ id, draftId, rejectedAt: { not: null } }` — never trust the FK alone.
 
-- [ ] `T19` — "Use anyway": adopt a rejected render _(added 2026-09-23)_
+- [x] `T19` — "Use anyway": adopt a rejected render _(added 2026-09-23)_
   - Files: `src/app/api/drafts/[id]/rejected/[revisionId]/adopt/route.ts` (new — rejected rows have no revision number, so they are addressed by row id; path changed 2026-09-28), `src/lib/drafts/revisions.ts`, `src/components/drafts/RefinementPanel.tsx` — schema already landed in T15's migration (`adoptedAt`, `adoptedRevisionNumber`, `discardedAt`)
   - Estimate: medium
   - Kind: impl
@@ -175,7 +175,7 @@ Two migrations, one per phase, deliberately not merged — a single migration wo
   - Notes: FR-14a, AC-20a. The not-applied failure shows the rejected render's preview + **Use anyway**. The route claims `pendingAction` (single-flight, 409 on contention), then commits the rejected row's snapshot + export as a **fresh** normal revision via `commitDraftRevision`, marked user-accepted, and advances the pointer. The rejected row is never itself pointed at — T16's filter invariant holds. Record the adoption on the rejected row so a second adopt is a 409. Team-scoped like every draft route (cross-team → 404).
   - Carried in: adopt only when `row.id === draft.notAppliedRevisionId`, `adoptedAt` is null and `discardedAt` is null; otherwise 409.
 
-- [ ] `T20` — Deterministic verification-miss seam
+- [x] `T20` — Deterministic verification-miss seam
   - Files: `src/lib/testHooks.ts`
   - Estimate: small
   - Kind: test
@@ -183,7 +183,7 @@ Two migrations, one per phase, deliberately not merged — a single migration wo
   - Notes: FR-24. Follows the existing sentinel pattern (`shouldMockGenerateFail`, `__FAIL_*__` in the brief topic). Without this the retry and twice-failed branches are unreachable in tests — exactly the structural blindness this change exists to fix.
   - Carried in: must land **before or with T17** — under `MOCK_PUPPETEER`, `#id`/`.class` fragments and constrain targets never resolve, so any mock E2E refine would otherwise always miss once T17 wires verification. The seam must be able to force pass / miss / unavailable.
 
-- [ ] `T21` — E2E coverage for the refine fidelity contract
+- [x] `T21` — E2E coverage for the refine fidelity contract
   - Files: `tests/e2e/agui-refinement.test.ts`, new cases
   - Estimate: large
   - Kind: test
