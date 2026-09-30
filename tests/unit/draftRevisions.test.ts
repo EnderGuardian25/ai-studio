@@ -35,8 +35,12 @@ const fake = vi.hoisted(() => {
     // The draft's in-flight action marker — T19's adoptRejectedRevisionId
     // guard re-checks this (fix round 1, Minor 1).
     pendingAction: null as string | null,
+    // The draft's revision pointer — the element-edit CAS (expectedRevisionNumber,
+    // change 004 T23 fix round 1) guards on it.
+    currentRevisionNumber: null as number | null,
     render: { calls: 0, fail: false },
     uploads: [] as string[],
+    deletes: [] as string[],
     txOptions: [] as unknown[],
   }
 
@@ -150,6 +154,9 @@ const fake = vi.hoisted(() => {
         db.draftUpdates.push(args)
         if ('notAppliedRevisionId' in args.data) db.notAppliedRevisionId = args.data.notAppliedRevisionId as string | null
         if ('pendingAction' in args.data) db.pendingAction = args.data.pendingAction as string | null
+        if ('currentRevisionNumber' in args.data) {
+          db.currentRevisionNumber = args.data.currentRevisionNumber as number | null
+        }
         return {}
       },
       // Single implicit fake draft (matches `update` above, which also
@@ -163,11 +170,19 @@ const fake = vi.hoisted(() => {
       updateMany: async ({
         where,
       }: {
-        where: { id?: string; pendingAction?: string | null; notAppliedRevisionId?: string | null }
+        where: {
+          id?: string
+          pendingAction?: string | null
+          notAppliedRevisionId?: string | null
+          currentRevisionNumber?: number | null
+        }
         data: Record<string, unknown>
       }) => {
         if ('pendingAction' in where && where.pendingAction !== db.pendingAction) return { count: 0 }
         if ('notAppliedRevisionId' in where && where.notAppliedRevisionId !== db.notAppliedRevisionId) {
+          return { count: 0 }
+        }
+        if ('currentRevisionNumber' in where && where.currentRevisionNumber !== db.currentRevisionNumber) {
           return { count: 0 }
         }
         return { count: 1 }
@@ -196,6 +211,9 @@ vi.mock('@/lib/storage/minio', () => ({
   uploadObject: async (_b: Buffer, _bucket: string, key: string) => {
     fake.db.uploads.push(key)
   },
+  deleteObject: async (_bucket: string, key: string) => {
+    fake.db.deletes.push(key)
+  },
   resolveExportUrl: async (key: string | null) => (key ? `https://signed.test/${key}` : null),
 }))
 
@@ -209,6 +227,7 @@ import {
   withNextRevisionNumber,
   commitDraftRevision,
   AdoptConflictError,
+  RevisionConflictError,
   recordRejectedRender,
   resolveNotAppliedOutcome,
   rejectionDiagnosticsSchema,
@@ -254,6 +273,8 @@ beforeEach(() => {
   db.pendingAction = null
   db.render = { calls: 0, fail: false }
   db.uploads = []
+  db.deletes = []
+  db.currentRevisionNumber = null
   db.txOptions = []
 })
 
@@ -375,6 +396,108 @@ describe('commitDraftRevision (refine + inline-edit writer)', () => {
     expect(db.draftUpdates).toHaveLength(1)
     expect(db.draftUpdates[0].data.currentRevisionNumber).toBe(2)
     expect(db.draftUpdates[0].data.htmlContent).toBe('<html>new</html>')
+  })
+
+  it('returns the new revision number (the pointer the draft now carries)', async () => {
+    db.rows = [committed('d1', 1), committed('d1', 2)]
+    const out = await commitDraftRevision({
+      draftId: 'd1', instruction: 'x', html: '<html/>', width: 1080, height: 1080, exportKey: 'k',
+    })
+    expect(out.revisionNumber).toBe(3)
+  })
+})
+
+// Change 004 T23 fix round 1 (amended Ruling W5-B): the element-edit
+// compare-and-swap. The route checks the client's baseRevisionNumber first;
+// this is the in-transaction half that closes the render window between that
+// check and the write (review Important 1, lost update).
+describe('commitDraftRevision expectedRevisionNumber (element-edit CAS)', () => {
+  const args = (over: Partial<Parameters<typeof commitDraftRevision>[0]> = {}) => ({
+    draftId: 'd1',
+    instruction: 'Element edit: text',
+    html: '<html>edited</html>',
+    width: 1080,
+    height: 1080,
+    ...over,
+  })
+
+  it('commits when the draft still points at the expected revision', async () => {
+    db.rows = [committed('d1', 1), committed('d1', 2)]
+    db.currentRevisionNumber = 2
+    const out = await commitDraftRevision(args({ expectedRevisionNumber: 2 }))
+    expect(out.revisionNumber).toBe(3)
+    expect(db.currentRevisionNumber).toBe(3)
+    expect(db.rows.filter((r) => r.revisionNumber !== null)).toHaveLength(3)
+  })
+
+  it('a moved pointer aborts WITHOUT writing: no revision row, no draft update, typed error', async () => {
+    db.rows = [committed('d1', 1), committed('d1', 2), committed('d1', 3)]
+    db.currentRevisionNumber = 3 // another edit committed after the caller read 2
+    await expect(commitDraftRevision(args({ expectedRevisionNumber: 2 }))).rejects.toBeInstanceOf(
+      RevisionConflictError,
+    )
+    expect(db.rows).toHaveLength(3)
+    expect(db.draftUpdates).toEqual([])
+    expect(db.currentRevisionNumber).toBe(3)
+  })
+
+  it('on a CAS miss the export it rendered + uploaded itself is removed (no orphan)', async () => {
+    db.rows = [committed('d1', 1)]
+    db.currentRevisionNumber = 1
+    await expect(commitDraftRevision(args({ expectedRevisionNumber: 0 }))).rejects.toBeInstanceOf(
+      RevisionConflictError,
+    )
+    expect(db.uploads).toHaveLength(1)
+    expect(db.deletes).toEqual(db.uploads)
+  })
+
+  it('on a CAS miss a CALLER-supplied export key is never deleted (not ours to remove)', async () => {
+    db.currentRevisionNumber = 5
+    await expect(
+      commitDraftRevision(args({ expectedRevisionNumber: 4, exportKey: 'exports/caller.png' })),
+    ).rejects.toBeInstanceOf(RevisionConflictError)
+    expect(db.deletes).toEqual([])
+  })
+
+  it('a failed cleanup does not mask the conflict', async () => {
+    db.currentRevisionNumber = 2
+    const errors = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const original = db.deletes.push
+    db.deletes.push = () => {
+      throw new Error('minio down')
+    }
+    try {
+      await expect(commitDraftRevision(args({ expectedRevisionNumber: 1 }))).rejects.toBeInstanceOf(
+        RevisionConflictError,
+      )
+      expect(errors).toHaveBeenCalled()
+    } finally {
+      db.deletes.push = original
+      errors.mockRestore()
+    }
+  })
+
+  it('null matches a legacy draft that has no revision pointer yet', async () => {
+    db.rows = []
+    db.currentRevisionNumber = null
+    const out = await commitDraftRevision(args({ expectedRevisionNumber: null }))
+    expect(out.revisionNumber).toBe(1)
+  })
+
+  it('null does NOT match a draft that has a pointer', async () => {
+    db.rows = [committed('d1', 1)]
+    db.currentRevisionNumber = 1
+    await expect(commitDraftRevision(args({ expectedRevisionNumber: null }))).rejects.toBeInstanceOf(
+      RevisionConflictError,
+    )
+  })
+
+  it('omitted → unchanged behaviour: commits whatever the pointer is (whole-document mode, refine, adopt)', async () => {
+    db.rows = [committed('d1', 1), committed('d1', 2)]
+    db.currentRevisionNumber = 1 // e.g. after a restore
+    const out = await commitDraftRevision(args())
+    expect(out.revisionNumber).toBe(3)
+    expect(db.deletes).toEqual([])
   })
 })
 

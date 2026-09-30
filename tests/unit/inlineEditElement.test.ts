@@ -5,6 +5,7 @@ import {
   escapeHtmlText,
   elementEditRequestSchema,
   applyElementEdit,
+  checkElementBaseRevision,
   editorElementPath,
   editorFingerprintText,
   type ElementEditRequest,
@@ -153,7 +154,7 @@ describe('escapeHtmlText (re-exported grammar text handling)', () => {
 describe('elementEditRequestSchema (Ruling W5-B payload)', () => {
   const base = {
     mode: 'element',
-    locator: { path: [0, 1], tag: 'h1', text: 'Hello' },
+    locator: { path: [0, 1], tag: 'h1', text: 'Hello', baseRevisionNumber: 3 },
     edit: { kind: 'text', value: 'Hi' },
   }
 
@@ -200,6 +201,22 @@ describe('elementEditRequestSchema (Ruling W5-B payload)', () => {
     )
   })
 
+  it('baseRevisionNumber is REQUIRED; null (legacy draft) is accepted, a non-integer is not', () => {
+    const { baseRevisionNumber: _omit, ...noBase } = base.locator
+    expect(elementEditRequestSchema.safeParse({ ...base, locator: noBase }).success).toBe(false)
+    expect(
+      elementEditRequestSchema.safeParse({ ...base, locator: { ...base.locator, baseRevisionNumber: null } })
+        .success,
+    ).toBe(true)
+    for (const bad of [-1, 1.5, '3']) {
+      expect(
+        elementEditRequestSchema.safeParse({ ...base, locator: { ...base.locator, baseRevisionNumber: bad } })
+          .success,
+      ).toBe(false)
+    }
+    expect(elementEditRequestSchema.parse(base).locator.baseRevisionNumber).toBe(3)
+  })
+
   it('rejects a non-string value and a missing mode', () => {
     expect(
       elementEditRequestSchema.safeParse({ ...base, edit: { kind: 'text', value: 5 } }).success,
@@ -230,7 +247,7 @@ function req(
   kind: ElementEditRequest['edit']['kind'],
   value: string,
 ): ElementEditRequest {
-  return { mode: 'element', locator: { path, tag, text }, edit: { kind, value } }
+  return { mode: 'element', locator: { path, tag, text, baseRevisionNumber: 1 }, edit: { kind, value } }
 }
 
 function el(html: string, path: number[]): HtmlElement {
@@ -385,7 +402,7 @@ describe('applyElementEdit — stale / unsupported (FR-17/18, AC-25)', () => {
 
   it('AC-25: a refine that rewrites the markup between sessions cannot redirect an old address', () => {
     // Session 1 addressed the headline at [0, 0].
-    const locator = { path: [0, 0], tag: 'h1', text: 'Launch day' }
+    const locator = { path: [0, 0], tag: 'h1', text: 'Launch day', baseRevisionNumber: 1 }
     // A refine then restructured the document: a new h1 now sits at [0, 0].
     const refined = HTML.replace(
       '<section class="hero">',
@@ -487,15 +504,118 @@ describe('editorElementPath / editorFingerprintText (editor-chrome aware)', () =
       '<!doctype html><html><body><div><img src="a.png"> caption <h1>Hello</h1></div><p>World</p></body></html>'
     const r = applyElementEdit(stored, {
       mode: 'element',
-      locator: { path: editorElementPath(h1, body)!, tag: h1.tagName, text: editorFingerprintText(h1) },
+      locator: { path: editorElementPath(h1, body)!, tag: h1.tagName, text: editorFingerprintText(h1), baseRevisionNumber: 1 },
       edit: { kind: 'text', value: 'Hi' },
     })
     expect(r.ok && r.html).toContain('<h1>Hi</h1>')
     const r2 = applyElementEdit(stored, {
       mode: 'element',
-      locator: { path: editorElementPath(card, body)!, tag: card.tagName, text: editorFingerprintText(card) },
+      locator: { path: editorElementPath(card, body)!, tag: card.tagName, text: editorFingerprintText(card), baseRevisionNumber: 1 },
       edit: { kind: 'color', value: '#fff' },
     })
     expect(r2.ok).toBe(true)
+  })
+})
+
+// ── Fix round 1 (review wave5-O) ────────────────────────────────────────────
+
+describe('checkElementBaseRevision — the revision check the route runs before applyElementEdit (Critical 1)', () => {
+  it('passes when the draft still points at the revision the editor loaded', () => {
+    expect(checkElementBaseRevision(4, 4)).toBeNull()
+    expect(checkElementBaseRevision(null, null)).toBeNull()
+  })
+
+  it('any difference is 409 element-stale', () => {
+    for (const [b, c] of [[2, 3], [3, 2], [null, 1], [1, null]] as const) {
+      expect(checkElementBaseRevision(b, c)).toMatchObject({ ok: false, status: 409, code: 'element-stale' })
+    }
+  })
+
+  // The review's exact reproduction. The editor loaded revision 2; a refine
+  // (revision 3) then removed shapeA. The stale locator's fingerprint
+  // (tag div, empty text) ALSO matches shapeB, so the pure core cannot tell
+  // the two apart — the revision check is what refuses it.
+  const loaded =
+    '<!doctype html><html><head></head><body><div class="shapeA"></div><div class="shapeB"></div><div class="content">Hi</div></body></html>'
+  const refined = loaded.replace('<div class="shapeA"></div>', '')
+  const staleReq: ElementEditRequest = {
+    mode: 'element',
+    locator: { path: [0], tag: 'DIV', text: '', baseRevisionNumber: 2 },
+    edit: { kind: 'color', value: '#ff0000' },
+  }
+
+  it('Critical repro: applyElementEdit ALONE would land the colour on shapeB (why the fingerprint is not enough)', () => {
+    const r = applyElementEdit(refined, staleReq)
+    expect(r.ok && r.html).toContain('<div style="color: #ff0000" class="shapeB">')
+  })
+
+  it('Critical repro: the revision check refuses it (base 2, draft now at 3)', () => {
+    expect(checkElementBaseRevision(staleReq.locator.baseRevisionNumber, 3)).toMatchObject({
+      status: 409,
+      code: 'element-stale',
+    })
+  })
+
+  it('identical siblings: a refine that drops the first "•" makes the stale path name the second — refused', () => {
+    const before = '<!doctype html><html><body><p><span>•</span><span>•</span></p></body></html>'
+    const after = before.replace('<span>•</span>', '')
+    const r = applyElementEdit(after, {
+      mode: 'element',
+      locator: { path: [0, 0], tag: 'SPAN', text: '•', baseRevisionNumber: 5 },
+      edit: { kind: 'text', value: '→' },
+    })
+    expect(r.ok).toBe(true) // indistinguishable by tag + text…
+    expect(checkElementBaseRevision(5, 6)).toMatchObject({ code: 'element-stale' }) // …so the pointer decides
+  })
+})
+
+describe('applyElementEdit — silent text differences (Minor 5)', () => {
+  const pre = (tag: string) =>
+    `<!doctype html><html><body><${tag}>code</${tag}><p>para</p></body></html>`
+
+  it('a <pre>/<listing> text edit starting with a line break is 400 invalid-text (the browser would drop it)', () => {
+    for (const tag of ['pre', 'listing']) {
+      for (const v of ['\nline', '\r\nline', '\rline']) {
+        const r = applyElementEdit(pre(tag), req([0], tag, 'code', 'text', v))
+        expect(r, `${tag} ${JSON.stringify(v)}`).toMatchObject({ ok: false, status: 400, code: 'invalid-text' })
+      }
+    }
+  })
+
+  it('a <pre> edit with an inner line break, and a <p> edit with a leading one, are fine', () => {
+    expect(applyElementEdit(pre('pre'), req([0], 'pre', 'code', 'text', 'a\nb')).ok).toBe(true)
+    expect(applyElementEdit(pre('pre'), req([1], 'p', 'para', 'text', '\nx')).ok).toBe(true)
+  })
+})
+
+describe('applyElementEdit — tag comparison is ASCII-only (Minor 4)', () => {
+  const html = '<!doctype html><html><body><tracK>x</tracK></body></html>'
+
+  it('the browser tagName (ASCII-uppercased, Kelvin sign kept) matches', () => {
+    const r = applyElementEdit(html, req([0], 'TRACK', 'x', 'text', 'y'))
+    expect(r.ok && r.html).toContain('<tracK>y</tracK>')
+  })
+
+  it('"TRACK" does not match it (toLowerCase would fold the Kelvin sign to k)', () => {
+    const r = applyElementEdit(html, req([0], 'TRACK', 'x', 'text', 'y'))
+    expect(r).toMatchObject({ ok: false, code: 'element-stale' })
+  })
+})
+
+describe('applyElementEdit — deep nesting fails closed, never throws (Minor 2)', () => {
+  for (const depth of [600, 20_000]) {
+    it(`${depth} deep → 409 element-unsupported, quickly`, () => {
+      const html = `<!doctype html><html><body>${'<div>'.repeat(depth)}x${'</div>'.repeat(depth)}</body></html>`
+      const t0 = Date.now()
+      const r = applyElementEdit(html, req([0], 'div', 'x', 'color', '#000'))
+      expect(r).toMatchObject({ ok: false, status: 409, code: 'element-unsupported' })
+      expect(Date.now() - t0).toBeLessThan(500)
+    })
+  }
+
+  it('an unbalanced existing style is 409 element-unsupported through the core too (Minor 1)', () => {
+    const html = '<!doctype html><html><body><p style="color: red; foo: {">x</p></body></html>'
+    const r = applyElementEdit(html, req([0], 'p', 'x', 'color', '#000'))
+    expect(r).toMatchObject({ ok: false, status: 409, code: 'element-unsupported' })
   })
 })

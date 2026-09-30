@@ -19,7 +19,16 @@
 //          declaration; nothing containing `url(` (FR-16);
 //        - the write target is resolved server-side from the CURRENT stored
 //          HTML (htmlLocator.ts), never from a client selector, and only that
-//          element's content / style attribute bytes change (FR-17/18).
+//          element's content / style attribute bytes change (FR-17/18);
+//        - the edit applies only to the revision the editor loaded (Ruling
+//          W5-B as amended in fix round 1): the locator carries
+//          baseRevisionNumber, the route refuses it when the draft's pointer
+//          has moved (checkElementBaseRevision), and commitDraftRevision
+//          re-checks it inside its transaction (expectedRevisionNumber — a
+//          compare-and-swap), so neither a stale address nor a concurrent
+//          commit can land an edit on the wrong document. The tag + text
+//          fingerprint stays as defence in depth: on its own it cannot tell
+//          identical siblings (or two empty same-tag elements) apart.
 //      The renderer egress allowlist (src/lib/renderer/puppeteer.ts,
 //      isAllowedRenderRequest — MinIO + Google Fonts only) already blocks
 //      off-host fetches, so the `url(` refusal is NOT the SSRF control: it
@@ -35,6 +44,7 @@ import {
   replaceElementText,
   setStyleDeclaration,
   escapeHtmlText,
+  asciiLower,
   VOID_ELEMENTS,
   type HtmlElement,
   type StyleProperty,
@@ -156,11 +166,21 @@ export { escapeHtmlText }
 // C0 controls other than tab / LF / CR (NUL included), and DEL, are refused.
 const TEXT_CONTROL = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/
 
-// ── The request (Ruling W5-B) ───────────────────────────────────────────────
+// ── The request (Ruling W5-B, amended in fix round 1) ───────────────────────
 // Selected on the route by `mode: 'element'`. z.object strips unknown keys, so
 // a client-supplied `selector` / `target` (at any level) never survives
 // parsing — the write target is always the element the SERVER resolves from
 // `locator` against the current stored HTML (AC-26).
+//
+//   { mode: 'element',
+//     locator: { path: number[], tag: string, text: string,
+//                baseRevisionNumber: number | null },
+//     edit: { kind: 'text' | 'color' | 'backgroundColor' | 'fontSize', value: string } }
+//
+// baseRevisionNumber (required) is the draft's currentRevisionNumber when the
+// editor loaded the HTML `path` was computed against — null only for a legacy
+// draft with no revision pointer. A successful edit answers with the new
+// `revisionNumber`, which the client sends as the next edit's base.
 
 export const ELEMENT_EDIT_KINDS = ['text', 'color', 'backgroundColor', 'fontSize'] as const
 export type ElementEditKind = (typeof ELEMENT_EDIT_KINDS)[number]
@@ -179,6 +199,9 @@ export const elementEditRequestSchema = z.object({
     // The element's textContent when it was selected — the staleness
     // fingerprint. Compared whitespace-normalized (normalizeFingerprintText).
     text: z.string().max(MAX_FINGERPRINT_TEXT),
+    // The revision the path was computed against (see above). Required —
+    // nullable, not optional, so a client can't skip the check by omission.
+    baseRevisionNumber: z.number().int().min(0).nullable(),
   }),
   edit: z.object({
     kind: z.enum(ELEMENT_EDIT_KINDS),
@@ -191,10 +214,11 @@ export type ElementEditRequest = z.infer<typeof elementEditRequestSchema>
 export type ElementEditErrorCode =
   | 'invalid-color' // 400 — colour outside the closed grammar
   | 'invalid-size' // 400 — size outside the closed grammar
-  | 'invalid-text' // 400 — text holds a control character
+  | 'invalid-text' // 400 — text holds a control character, or starts a <pre>/<listing> with a line break
   | 'element-not-text-leaf' // 400 — text edit on an element that has child elements
   | 'element-not-editable' // 400 — this element kind can't take this edit (script/style/void…)
-  | 'element-stale' // 409 — path miss, or tag / text fingerprint mismatch
+  | 'element-stale' // 409 — the draft moved past baseRevisionNumber (route check or the
+  //                            commit's CAS), a path miss, or a tag / text fingerprint mismatch
   | 'element-unsupported' // 409 — the stored HTML / element can't be edited reliably in element mode
 
 export type ElementEditResult =
@@ -207,19 +231,51 @@ const fail = (
   error: string,
 ): Extract<ElementEditResult, { ok: false }> => ({ ok: false, status, code, error })
 
-const STALE_MESSAGE =
+export const ELEMENT_STALE_MESSAGE =
   'This element changed since it was selected. Reopen the editor and select it again.'
+const STALE_MESSAGE = ELEMENT_STALE_MESSAGE
 const UNSUPPORTED_MESSAGE =
   "This part of the design can't be edited element-by-element. Use the whole-document editor instead."
 
-// Text edits: only a leaf (no child elements) whose content is ordinary text.
-// Raw-text / RCDATA elements are refused — text written into <style> would be
-// CSS, and into <script> would be code. Void elements have no content.
+// The revision half of the staleness check (amended Ruling W5-B — review
+// wave5-O Critical 1). The route runs it after the busy check and BEFORE
+// applyElementEdit: an edit is only ever applied to the revision the editor
+// loaded. This is what the fingerprint alone cannot guarantee — a refine that
+// removes an element can leave a same-tag, same-text sibling (two empty
+// <div>s, repeated "•" spans) at the old path, and the fingerprint matches it.
+// null = the draft still points at the base; otherwise the 409 to answer.
+// (commitDraftRevision's expectedRevisionNumber re-checks the same fact inside
+// its transaction, for a commit that lands between this check and the write.)
+export function checkElementBaseRevision(
+  baseRevisionNumber: number | null,
+  currentRevisionNumber: number | null,
+): Extract<ElementEditResult, { ok: false }> | null {
+  return baseRevisionNumber === currentRevisionNumber ? null : fail(409, 'element-stale', STALE_MESSAGE)
+}
+
+// Text edits (the leaf rule): only an element with no child ELEMENTS, whose
+// content is ordinary text. The whole content range [openEnd, closeStart) is
+// replaced, so any comment children the leaf held are deleted with the old
+// text — deliberately: a comment is invisible, never part of the fingerprint,
+// and keeping it would mean splicing around it. Raw-text / RCDATA elements are
+// refused — text written into <style> would be CSS, and into <script> would be
+// code. Void elements have no content.
 const TEXT_FORBIDDEN = new Set([
   'script', 'style', 'template', 'textarea', 'title', 'iframe', 'noembed', 'noframes', 'xmp',
 ])
 // Style edits: any element except those that hold code/CSS or aren't rendered.
 const STYLE_FORBIDDEN = new Set(['script', 'style', 'template', 'title'])
+
+// The browser drops ONE line feed that immediately follows a <pre> / <listing>
+// start tag (HTML "in body": "if the next token is a LF, ignore it"; CR and
+// CRLF are LF by then). Text starting with a line break would therefore render
+// without it while our own re-parse (the post-write check) kept it — a silent
+// difference. Refused rather than modelled (review wave5-O Minor 5): modelling
+// means an extra serializer-style leading LF on write AND dropping that LF in
+// elementTextContent everywhere, a second tree-building rule to keep exact for
+// a whitespace-only edge case. The fingerprint is unaffected either way — it
+// is compared trimmed.
+const LEADING_LF_DROPPED = new Set(['pre', 'listing'])
 
 const STYLE_PROPERTY: Record<Exclude<ElementEditKind, 'text'>, StyleProperty> = {
   color: 'color',
@@ -270,7 +326,10 @@ export function applyElementEdit(html: string, req: ElementEditRequest): Element
   if (!el) return fail(409, 'element-stale', STALE_MESSAGE)
 
   // 3. Fingerprint: same tag, same normalized text — else the address is stale.
-  if (el.tag !== locator.tag.toLowerCase()) return fail(409, 'element-stale', STALE_MESSAGE)
+  // (Defence in depth since fix round 1: the route has already matched
+  // locator.baseRevisionNumber against the draft — checkElementBaseRevision.)
+  // The tag is ASCII-folded like the tokenizer's, never toLowerCase().
+  if (el.tag !== asciiLower(locator.tag)) return fail(409, 'element-stale', STALE_MESSAGE)
   const current = elementTextContent(el)
   if (current === null) return fail(409, 'element-unsupported', UNSUPPORTED_MESSAGE)
   if (normalizeFingerprintText(current) !== normalizeFingerprintText(locator.text)) {
@@ -288,6 +347,13 @@ export function applyElementEdit(html: string, req: ElementEditRequest): Element
         400,
         'element-not-text-leaf',
         'Only an element that holds text alone can have its text replaced. Select the innermost text, or use the whole-document editor.',
+      )
+    }
+    if (el.ns === 'html' && LEADING_LF_DROPPED.has(el.tag) && /^[\n\r]/.test(edit.value)) {
+      return fail(
+        400,
+        'invalid-text',
+        `Text in <${el.tag}> can't start with a line break (the browser would drop it). Remove the leading line break.`,
       )
     }
     next = replaceElementText(html, el, edit.value)

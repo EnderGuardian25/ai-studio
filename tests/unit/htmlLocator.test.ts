@@ -353,3 +353,137 @@ describe('setStyleDeclaration', () => {
     expect(() => setStyleDeclaration(html, p, 'background', '#000000')).toThrow()
   })
 })
+
+// ── Fix round 1 (review wave5-O, Minors 1–4) ────────────────────────────────
+
+describe('setStyleDeclaration — the splitter tracks every bracket kind and refuses what CSS would read differently (Minor 1)', () => {
+  const refuse = (style: string) => {
+    const html = doc(`<p style="${style}">x</p>`)
+    return setStyleDeclaration(html, at(html, [0]), 'color', '#aabbcc')
+  }
+
+  it('an unbalanced { (review repro 1) is refused — the new declaration would land inside the open block', () => {
+    expect(refuse('color: red; foo: {').ok).toBe(false)
+  })
+
+  it('unbalanced or mismatched [ ] { } ( ) are refused', () => {
+    for (const s of ['a: [x', 'a: x]', 'a: x}', 'a: (x]', 'a: [x)', 'a: {x]']) {
+      expect(refuse(s).ok, s).toBe(false)
+    }
+  })
+
+  it('a ; inside a balanced {} or [] block does not split (matches CSS)', () => {
+    const html = doc('<p style="--x: {a;b}; --y: [c;d]; color: red">x</p>')
+    const r = setStyleDeclaration(html, at(html, [0]), 'color', '#aabbcc')
+    expect(r.ok && r.html).toBe(doc('<p style="--x: {a;b}; --y: [c;d]; color: #aabbcc">x</p>'))
+  })
+
+  it('a trailing backslash (review repro 2) is refused — it would escape the ; we append', () => {
+    expect(refuse('font-weight: bold\\').ok).toBe(false)
+  })
+
+  it('a raw newline inside a string (review repro 3) is refused — CSS ends a bad-string there', () => {
+    expect(refuse("content: 'a\nb'; color: red").ok).toBe(false)
+    expect(refuse('content: &quot;a&#10;b&quot;').ok).toBe(false)
+    expect(refuse("content: 'a\rb'").ok).toBe(false)
+  })
+
+  it('an ESCAPED newline in a string is a valid continuation and is kept', () => {
+    const html = doc("<p style=\"content: 'a\\\nb'\">x</p>")
+    const r = setStyleDeclaration(html, at(html, [0]), 'color', '#aabbcc')
+    expect(r.ok && r.html).toBe(doc("<p style=\"content: 'a\\\nb'; color: #aabbcc\">x</p>"))
+  })
+
+  it('trimming never strips an escaped trailing ; or space (the kept escape stays an escape)', () => {
+    const a = doc('<p style="font-weight: bold\\;">x</p>')
+    expect(setStyleDeclaration(a, at(a, [0]), 'color', '#aabbcc')).toEqual({
+      ok: true,
+      html: doc('<p style="font-weight: bold\\;; color: #aabbcc">x</p>'),
+    })
+    const b = doc('<p style="font-weight: bold\\ ">x</p>')
+    expect(setStyleDeclaration(b, at(b, [0]), 'color', '#aabbcc')).toEqual({
+      ok: true,
+      html: doc('<p style="font-weight: bold\\ ; color: #aabbcc">x</p>'),
+    })
+  })
+
+  it('trims CSS whitespace only — a trailing no-break space is an ident character and is kept', () => {
+    const html = doc('<p style="font-family: x ">x</p>')
+    const r = setStyleDeclaration(html, at(html, [0]), 'color', '#aabbcc')
+    expect(r.ok && r.html).toBe(doc('<p style="font-family: x ; color: #aabbcc">x</p>'))
+  })
+
+  it('an escaped property name (c\\olor is color to CSS) is refused rather than silently kept', () => {
+    expect(refuse('c\\olor: red !important').ok).toBe(false)
+  })
+})
+
+describe('parseHtmlDocument — nesting depth cap (Minor 2)', () => {
+  const nested = (depth: number) => doc('<div>'.repeat(depth) + 'x' + '</div>'.repeat(depth))
+
+  it('rejects nesting deeper than the 512-element parser cap — 600 deep', () => {
+    const r = parseHtmlDocument(nested(600))
+    expect(r.ok).toBe(false)
+  })
+
+  it('rejects 20 000-deep input quickly and without a RangeError', () => {
+    const html = nested(20_000)
+    const t0 = Date.now()
+    const r = parseHtmlDocument(html)
+    expect(r.ok).toBe(false)
+    expect(Date.now() - t0).toBeLessThan(500)
+  })
+
+  it('still parses (and walks) a document just under the cap', () => {
+    const html = nested(500)
+    const b = body(html)
+    expect(elementTextContent(b)).toBe('x')
+    let el = b
+    for (let d = 0; d < 500; d++) el = elementChildren(el)[0]
+    expect(el.tag).toBe('div')
+  })
+
+  it('is linear in the number of tags (no per-tag rescans of the open stack)', () => {
+    // 450 deep × many siblings at the bottom: every <p> sits under a deep stack.
+    const html = doc('<div>'.repeat(450) + '<p>a</p>'.repeat(40_000) + '</div>'.repeat(450))
+    const t0 = Date.now()
+    expect(parseHtmlDocument(html).ok).toBe(true)
+    expect(Date.now() - t0).toBeLessThan(1500)
+  })
+})
+
+describe('resolveElementPath — never descends into <template> content (Minor 3)', () => {
+  it('a path that steps into a template resolves to null (stale)', () => {
+    const html = doc('<template><p>x</p></template><p>y</p>')
+    expect(resolveElementPath(body(html), [0, 0])).toBeNull()
+    // The template element itself, and its siblings, still resolve.
+    expect(at(html, [0]).tag).toBe('template')
+    expect(at(html, [1]).tag).toBe('p')
+  })
+
+  it('also below the template', () => {
+    const html = doc('<div><template><div><span>x</span></div></template></div>')
+    expect(resolveElementPath(body(html), [0, 0, 0, 0])).toBeNull()
+  })
+})
+
+describe('tag and attribute names are ASCII-lowercased, as the HTML tokenizer does (Minor 4)', () => {
+  it('<tracK> (U+212A KELVIN SIGN) is NOT the void element track', () => {
+    const html = doc('<div><tracK>x</tracK></div>')
+    const el = at(html, [0, 0])
+    expect(el.tag).toBe('tracK')
+    expect(el.closeStart).not.toBeNull()
+    expect(elementTextContent(el)).toBe('x')
+  })
+
+  it('ASCII upper case still lowercases (tags and attributes)', () => {
+    const html = doc('<DIV STYLE="color:red" Data-X="1"><P>x</P></DIV>')
+    expect(at(html, [0]).attrs.map((a) => a.name)).toEqual(['style', 'data-x'])
+    expect(at(html, [0, 0]).tag).toBe('p')
+  })
+
+  it('a Kelvin-sign attribute name is not folded onto an ASCII one', () => {
+    const html = doc('<p data-K="1">x</p>')
+    expect(at(html, [0]).attrs.map((a) => a.name)).toEqual(['data-K'])
+  })
+})

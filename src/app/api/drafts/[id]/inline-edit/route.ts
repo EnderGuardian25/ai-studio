@@ -5,12 +5,14 @@ import { withTeamAuth, parseBody, type TeamAuthedUser } from '@/lib/api/handler'
 import { canAccessContent } from '@/lib/authz/visibility'
 import { dimensionsFor } from '@/lib/aspectRatio'
 import { resolveExportUrl } from '@/lib/storage/minio'
-import { commitDraftRevision } from '@/lib/drafts/revisions'
+import { commitDraftRevision, RevisionConflictError } from '@/lib/drafts/revisions'
 import {
   sanitizeInlineHtml,
   inlineEditBlockReason,
   elementEditRequestSchema,
   applyElementEdit,
+  checkElementBaseRevision,
+  ELEMENT_STALE_MESSAGE,
 } from '@/lib/drafts/inlineEdit'
 
 // Permissive schema + manual check so the error message stays stable.
@@ -85,16 +87,25 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
   })
 })
 
-// Element mode. Body (Ruling W5-B):
+// Element mode. Body (Ruling W5-B, amended in fix round 1):
 //   { mode: 'element',
-//     locator: { path: number[], tag: string, text: string },
+//     locator: { path: number[], tag: string, text: string,
+//                baseRevisionNumber: number | null },
 //     edit: { kind: 'text' | 'color' | 'backgroundColor' | 'fontSize', value: string } }
 //
+// - baseRevisionNumber is the draft's currentRevisionNumber when the editor
+//   loaded the HTML the path was computed against (null only for a legacy
+//   draft with no pointer). The edit applies to THAT revision only: a moved
+//   pointer is 409 element-stale here, before anything is resolved, and again
+//   inside commitDraftRevision's transaction (expectedRevisionNumber, a
+//   compare-and-swap) for a commit that lands while this one renders. This is
+//   what makes a refine that removed or reordered elements unable to redirect
+//   an old address — the fingerprint alone cannot tell identical siblings
+//   apart (review wave5-O Critical 1 / Important 1).
 // - The write target is resolved HERE, against the draft's CURRENT stored
 //   htmlContent, from `locator.path`; it is written only when the resolved
-//   element's tag and normalized text match the locator's fingerprint. Nothing
-//   about the address is persisted (FR-18) — a refine that rewrote the markup
-//   since the client selected the element makes the fingerprint miss → 409.
+//   element's tag and normalized text match the locator's fingerprint
+//   (defence in depth). Nothing about the address is persisted (FR-18).
 // - Any `selector` / `target` field in the body is stripped by the schema and
 //   never consulted (AC-26).
 // - The value goes through the closed grammar (inlineEdit.ts); a rejection is
@@ -105,14 +116,20 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
 //   escaped text node or one grammar-serialized declaration.
 //
 // Responses (every error carries a stable `code` for the client — T24):
-//   200 { reply, revisionId, exportUrl }                    (same as mode 1)
-//   400 invalid-element-edit  — payload fails the schema (incl. unknown edit.kind)
+//   200 { reply, revisionId, revisionNumber, exportUrl }   (mode 1's shape plus
+//       revisionNumber — the draft's new pointer, the next edit's base)
+//   400 invalid-element-edit  — payload fails the schema (incl. unknown edit.kind,
+//                               a missing baseRevisionNumber)
 //   400 invalid-color | invalid-size | invalid-text — value outside the grammar
+//                               (invalid-text also: a <pre>/<listing> text that
+//                               starts with a line break)
 //   400 element-not-text-leaf — text edit on an element with child elements
 //   400 element-not-editable  — the element can't take this edit (script, style, void…)
 //   404 (no code)             — draft missing or not visible (same as mode 1)
 //   409 draft-busy            — inlineEditBlockReason (action running / not exported)
-//   409 element-stale         — path miss, or tag / text fingerprint mismatch
+//   409 element-stale         — the draft moved past baseRevisionNumber (checked
+//                               before resolution and again at commit), a path
+//                               miss, or a tag / text fingerprint mismatch
 //   409 element-unsupported   — the stored HTML can't be edited reliably
 //                               element-by-element (use the whole-document mode)
 async function handleElementEdit(raw: unknown, draftId: string, user: TeamAuthedUser) {
@@ -133,6 +150,11 @@ async function handleElementEdit(raw: unknown, draftId: string, user: TeamAuthed
   const blocked = inlineEditBlockReason(draft.status, draft.pendingAction)
   if (blocked) return NextResponse.json({ error: blocked, code: 'draft-busy' }, { status: 409 })
 
+  // The edit applies to the revision the editor loaded, or not at all.
+  const { baseRevisionNumber } = parsed.data.locator
+  const moved = checkElementBaseRevision(baseRevisionNumber, draft.currentRevisionNumber)
+  if (moved) return NextResponse.json({ error: moved.error, code: moved.code }, { status: moved.status })
+
   if (!draft.htmlContent) {
     return NextResponse.json(
       { error: 'This draft has no design to edit', code: 'element-unsupported' },
@@ -146,17 +168,30 @@ async function handleElementEdit(raw: unknown, draftId: string, user: TeamAuthed
   }
 
   const { width, height } = dimensionsFor(draft.brief.aspectRatio)
-  const { revisionId, exportKey } = await commitDraftRevision({
-    draftId: draft.id,
-    instruction: result.instruction,
-    html: result.html,
-    width,
-    height,
-  })
+  let committed: Awaited<ReturnType<typeof commitDraftRevision>>
+  try {
+    committed = await commitDraftRevision({
+      draftId: draft.id,
+      instruction: result.instruction,
+      html: result.html,
+      width,
+      height,
+      // The compare-and-swap: commit only if the pointer is still the base
+      // (a commit that landed while this one rendered would otherwise be
+      // silently overwritten). A miss writes nothing.
+      expectedRevisionNumber: baseRevisionNumber,
+    })
+  } catch (err) {
+    if (err instanceof RevisionConflictError) {
+      return NextResponse.json({ error: ELEMENT_STALE_MESSAGE, code: 'element-stale' }, { status: 409 })
+    }
+    throw err
+  }
 
   return NextResponse.json({
     reply: 'Design updated',
-    revisionId,
-    exportUrl: await resolveExportUrl(exportKey),
+    revisionId: committed.revisionId,
+    revisionNumber: committed.revisionNumber,
+    exportUrl: await resolveExportUrl(committed.exportKey),
   })
 }

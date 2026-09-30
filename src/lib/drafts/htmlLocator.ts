@@ -153,6 +153,23 @@ const isAsciiAlnum = (c: string | undefined) =>
   c !== undefined && (isAsciiAlpha(c) || (c >= '0' && c <= '9'))
 const isWhitespaceOnly = (s: string) => /^[ \t\n\f\r]*$/.test(s)
 
+// ASCII-only lowercasing, exactly as the HTML tokenizer folds tag and attribute
+// names: A–Z only. String.prototype.toLowerCase is NOT equivalent — it folds
+// U+212A KELVIN SIGN to "k" (so `<tracK>` would become the void `track`)
+// and turns U+0130 into two code units. Exported so the route-side tag
+// comparison (inlineEdit.ts) folds the client's tagName the same way.
+export function asciiLower(s: string): string {
+  return s.replace(/[A-Z]/g, (c) => String.fromCharCode(c.charCodeAt(0) + 32))
+}
+
+// Deepest element nesting accepted (review wave5-O Minor 2). Chromium's parser
+// stops nesting at 512 open elements (kMaximumHTMLParserDOMTreeDepth) and
+// attaches anything deeper to an ancestor instead, so beyond it the browser's
+// tree differs from the markup — and the recursive tree walks here would
+// eventually overflow the stack. An element whose depth (counting <html> as 1)
+// would reach this is refused, one below Chromium's cap: stricter is safe.
+export const MAX_ELEMENT_DEPTH = 512
+
 // ── Character references ───────────────────────────────────────────────────
 // Only the references this module can decode with certainty. Everything the
 // full HTML table might decode differently makes the text UNVERIFIABLE (null)
@@ -292,7 +309,7 @@ function readTag(html: string, nameStart: number): TagToken {
   let i = nameStart
   while (i < n && !isWs(html[i]) && html[i] !== '/' && html[i] !== '>') i++
   if (i >= n) throw new Reject('end of document inside a tag')
-  const name = html.slice(nameStart, i).toLowerCase()
+  const name = asciiLower(html.slice(nameStart, i))
   const nameEnd = i
   const attrs: HtmlAttr[] = []
   let selfClosing = false
@@ -313,7 +330,7 @@ function readTag(html: string, nameStart: number): TagToken {
     const aStart = i
     i++
     while (i < n && !isWs(html[i]) && html[i] !== '/' && html[i] !== '>' && html[i] !== '=') i++
-    const aName = html.slice(aStart, i).toLowerCase()
+    const aName = asciiLower(html.slice(aStart, i))
     let aEnd = i
     let j = i
     while (j < n && isWs(html[j])) j++
@@ -357,7 +374,7 @@ function findRawTextEnd(html: string, from: number, name: string): number {
   for (;;) {
     const lt = html.indexOf('</', i)
     if (lt === -1) throw new Reject(`<${name}> is never closed`)
-    const candidate = html.slice(lt + 2, lt + 2 + name.length).toLowerCase()
+    const candidate = asciiLower(html.slice(lt + 2, lt + 2 + name.length))
     const term = html[lt + 2 + name.length]
     if (candidate === name && (isWs(term) || term === '/' || term === '>')) return lt
     i = lt + 2
@@ -399,7 +416,35 @@ function build(html: string): HtmlElement {
   const pushComment = (start: number, end: number) => {
     top().children.push({ type: 'comment', start, end })
   }
-  const htmlStack = () => stack.filter((e) => e.ns === 'html' && e !== root)
+  // How many HTML-namespace elements of each tag are open right now, kept
+  // incrementally (review wave5-O Minor 2: the old per-tag filter of the whole
+  // open stack was quadratic in depth). The two scoped walks below (li, dd/dt)
+  // still look down the stack, but never further than MAX_ELEMENT_DEPTH.
+  const openCount = new Map<string, number>()
+  let openHeadings = 0
+  const isOpen = (tag: string) => (openCount.get(tag) ?? 0) > 0
+  const pushOpen = (el: HtmlElement) => {
+    stack.push(el)
+    if (el.ns !== 'html') return
+    openCount.set(el.tag, (openCount.get(el.tag) ?? 0) + 1)
+    if (HEADINGS.has(el.tag)) openHeadings++
+  }
+  const popOpen = () => {
+    const el = stack.pop()!
+    if (el.ns !== 'html') return
+    openCount.set(el.tag, openCount.get(el.tag)! - 1)
+    if (HEADINGS.has(el.tag)) openHeadings--
+  }
+  // Nearest-first walk over the open HTML elements (the synthetic root excluded).
+  const scopedOpen = (stopAt: (tag: string) => boolean, hit: (tag: string) => boolean): string | null => {
+    for (let k = stack.length - 1; k >= 1; k--) {
+      const e = stack[k]
+      if (e.ns !== 'html') continue
+      if (stopAt(e.tag)) return null
+      if (hit(e.tag)) return e.tag
+    }
+    return null
+  }
   const inForeign = () => {
     const t = top()
     return t.ns === 'svg' && !SVG_HTML_INTEGRATION.has(t.tag)
@@ -408,6 +453,11 @@ function build(html: string): HtmlElement {
   const openStart = (lt: number, tok: TagToken) => {
     const parent = top()
     const { name } = tok
+    // stack holds the synthetic root plus every open element, so the new
+    // element's depth (counting <html> as 1) is stack.length.
+    if (stack.length >= MAX_ELEMENT_DEPTH) {
+      throw new Reject(`nesting deeper than ${MAX_ELEMENT_DEPTH - 1} elements`)
+    }
     let ns: HtmlNamespace
     if (inForeign()) {
       if (SVG_BREAKOUT.has(name)) throw new Reject(`<${name}> breaks out of <svg>`)
@@ -430,28 +480,23 @@ function build(html: string): HtmlElement {
         if (seenBody || (parent.tag !== 'html' && parent !== root)) throw new Reject('unexpected <body>')
         seenBody = true
       }
-      const open = htmlStack()
-      if (CLOSES_P.has(name) && open.some((e) => e.tag === 'p')) {
+      if (CLOSES_P.has(name) && isOpen('p')) {
         throw new Reject(`<${name}> inside <p> (the browser would close the <p>)`)
       }
-      if (name === 'li') {
-        for (let k = open.length - 1; k >= 0; k--) {
-          const t = open[k].tag
-          if (t === 'ul' || t === 'ol' || t === 'menu') break
-          if (t === 'li') throw new Reject('<li> inside <li> without a list between them')
-        }
+      if (
+        name === 'li' &&
+        scopedOpen((t) => t === 'ul' || t === 'ol' || t === 'menu', (t) => t === 'li')
+      ) {
+        throw new Reject('<li> inside <li> without a list between them')
       }
       if (name === 'dd' || name === 'dt') {
-        for (let k = open.length - 1; k >= 0; k--) {
-          const t = open[k].tag
-          if (t === 'dl') break
-          if (t === 'dd' || t === 'dt') throw new Reject(`<${name}> inside <${t}>`)
-        }
+        const t = scopedOpen((x) => x === 'dl', (x) => x === 'dd' || x === 'dt')
+        if (t) throw new Reject(`<${name}> inside <${t}>`)
       }
-      if (HEADINGS.has(name) && open.some((e) => HEADINGS.has(e.tag))) {
+      if (HEADINGS.has(name) && openHeadings > 0) {
         throw new Reject('a heading inside a heading')
       }
-      if (NO_SELF_NESTING.has(name) && open.some((e) => e.tag === name)) {
+      if (NO_SELF_NESTING.has(name) && isOpen(name)) {
         throw new Reject(`<${name}> inside <${name}>`)
       }
       const allowedKids = parent.ns === 'html' ? TABLE_CHILDREN[parent.tag] : undefined
@@ -476,7 +521,7 @@ function build(html: string): HtmlElement {
       el.end = tok.end
       return tok.end
     }
-    stack.push(el)
+    pushOpen(el)
 
     if (ns === 'html' && (RAW_TEXT.has(name) || RCDATA.has(name))) {
       const closeAt = findRawTextEnd(html, tok.end, name)
@@ -486,7 +531,7 @@ function build(html: string): HtmlElement {
       }
       pushText(tok.end, closeAt, RCDATA.has(name) ? decodeHtmlEntities(raw, 'text') : raw)
       const endTok = readTag(html, closeAt + 2)
-      stack.pop()
+      popOpen()
       el.closeStart = closeAt
       el.end = endTok.end
       return endTok.end
@@ -515,7 +560,7 @@ function build(html: string): HtmlElement {
         if (cur === root || cur.tag !== tok.name) {
           throw new Reject(`</${tok.name}> does not close the open <${cur === root ? '(none)' : cur.tag}>`)
         }
-        stack.pop()
+        popOpen()
         cur.closeStart = lt
         cur.end = tok.end
         i = textStart = tok.end
@@ -637,9 +682,14 @@ export function elementChildren(el: HtmlElement): HtmlElement[] {
 }
 
 // Element-child indices from <body>. [] is <body> itself. null = no such element.
+// Never descends into an HTML <template>: a browser keeps its content in a
+// separate fragment (template.children is empty), so no path the editor could
+// build steps into it — only a crafted request would (review wave5-O Minor 3).
+// The template element itself still resolves.
 export function resolveElementPath(body: HtmlElement, path: readonly number[]): HtmlElement | null {
   let cur = body
   for (const idx of path) {
+    if (cur.ns === 'html' && cur.tag === 'template') return null
     if (!Number.isInteger(idx) || idx < 0) return null
     const next = elementChildren(cur)[idx]
     if (!next) return null
@@ -696,22 +746,38 @@ const STYLE_PROPERTIES: ReadonlySet<string> = new Set<StyleProperty>(['color', '
 // emits. A value that does not match is a programming error, never written.
 const SERIALIZED_VALUE = /^(?:#[0-9a-f]{6}|rgba?\((?:\d{1,3}, ){2}\d{1,3}(?:, (?:0|1|0\.\d+))?\)|\d+(?:\.\d+)?(?:px|pt|em|rem|%))$/
 
+// The bracket pairs CSS tracks as blocks: a ';' inside any of them does not end
+// a declaration (CSS Syntax §5.4.7 "consume a simple block").
+const BLOCK_CLOSER: Record<string, string> = { '(': ')', '[': ']', '{': '}' }
+const CSS_NEWLINE = new Set(['\n', '\r', '\f'])
+
 // Splits a (decoded) style attribute value into declarations on top-level ';'
-// — outside strings, comments and parentheses. null when a string, comment or
-// parenthesis is left open (the value is ambiguous — refuse it).
+// — outside strings, comments and ( ) [ ] { } blocks. null (refuse — the
+// caller answers element-unsupported) wherever CSS could read the value
+// differently from this splitter (review wave5-O Minor 1):
+//   - a string, comment or block left open, or a closer that doesn't match the
+//     innermost opener (`foo: {` would swallow the declaration we append);
+//   - a backslash as the very last character (it would escape the ';' we
+//     append: `bold\` + `; color: …` is one declaration to CSS);
+//   - an unescaped newline inside a string (CSS ends a bad-string there, this
+//     splitter would keep reading it as a string).
+// An escaped newline inside a string is a valid CSS line continuation and is
+// accepted.
 function splitDeclarations(style: string): string[] | null {
   const out: string[] = []
-  let depth = 0
+  const closers: string[] = []
   let quote: string | null = null
   let segStart = 0
   for (let i = 0; i < style.length; i++) {
     const c = style[i]
     if (c === '\\') {
+      if (i + 1 >= style.length) return null
       i++
       continue
     }
     if (quote) {
       if (c === quote) quote = null
+      else if (CSS_NEWLINE.has(c)) return null
       continue
     }
     if (c === '/' && style[i + 1] === '*') {
@@ -721,23 +787,50 @@ function splitDeclarations(style: string): string[] | null {
       continue
     }
     if (c === '"' || c === "'") quote = c
-    else if (c === '(') depth++
-    else if (c === ')') {
-      if (depth === 0) return null
-      depth--
-    } else if (c === ';' && depth === 0) {
+    else if (c === '(' || c === '[' || c === '{') closers.push(BLOCK_CLOSER[c])
+    else if (c === ')' || c === ']' || c === '}') {
+      if (closers.pop() !== c) return null
+    } else if (c === ';' && closers.length === 0) {
       out.push(style.slice(segStart, i))
       segStart = i + 1
     }
   }
-  if (quote || depth !== 0) return null
+  if (quote || closers.length !== 0) return null
   out.push(style.slice(segStart))
   return out
 }
 
-function declarationProperty(decl: string): string | null {
-  const m = /^\s*([-A-Za-z0-9_]+)\s*:/.exec(decl.replace(/\/\*[\s\S]*?\*\//g, ''))
-  return m ? m[1].toLowerCase() : null
+// CSS whitespace only. JS \s also matches U+00A0 and friends, which are ident
+// characters to CSS — trimming them would silently change a kept declaration.
+const CSS_WS = /[ \t\n\r\f]/
+const CSS_WS_RUN_START = /^[ \t\n\r\f]+/
+
+// True when the character at `i` is escaped (an odd run of backslashes before it).
+function isEscapedAt(s: string, i: number): boolean {
+  let n = 0
+  for (let k = i - 1; k >= 0 && s[k] === '\\'; k--) n++
+  return n % 2 === 1
+}
+
+// Strips trailing CSS whitespace and ';' — but never an ESCAPED one, which
+// belongs to the declaration's value (`bold\;` and `bold\ ` must stay escapes).
+function trimDeclarationsEnd(s: string): string {
+  let end = s.length
+  while (end > 0 && (CSS_WS.test(s[end - 1]) || s[end - 1] === ';') && !isEscapedAt(s, end - 1)) end--
+  return s.slice(0, end)
+}
+
+// The declaration's property name, ASCII-lowercased; null when it has none
+// (kept as written); AMBIGUOUS when the name holds an escape — `c\olor` IS
+// `color` to CSS, and an escape-aware comparison isn't worth modelling, so the
+// whole edit is refused instead.
+const AMBIGUOUS = Symbol('ambiguous')
+function declarationProperty(decl: string): string | null | typeof AMBIGUOUS {
+  const bare = decl.replace(/\/\*[\s\S]*?\*\//g, '')
+  const colon = bare.indexOf(':')
+  if (colon !== -1 && bare.slice(0, colon).includes('\\')) return AMBIGUOUS
+  const m = /^[ \t\n\r\f]*([-A-Za-z0-9_]+)[ \t\n\r\f]*:/.exec(bare)
+  return m ? asciiLower(m[1]) : null
 }
 
 const encodeAttributeValue = (s: string) => s.replace(/&/g, '&amp;').replace(/"/g, '&quot;')
@@ -770,12 +863,28 @@ export function setStyleDeclaration(
   const current = decodeHtmlEntities(raw, 'attribute')
   if (current === null) return { ok: false, reason: 'the style attribute holds an undecodable character reference' }
   const segments = splitDeclarations(current)
-  if (!segments) return { ok: false, reason: 'the style attribute has an unterminated string, comment or parenthesis' }
-  const kept = segments
-    .filter((s) => declarationProperty(s) !== property)
-    .join(';')
-    .replace(/^\s+/, '')
-    .replace(/[\s;]+$/, '')
+  if (!segments) {
+    return {
+      ok: false,
+      reason: 'the style attribute has an unterminated string, comment or block, a trailing backslash, or a newline inside a string',
+    }
+  }
+  const properties = segments.map(declarationProperty)
+  if (properties.includes(AMBIGUOUS)) {
+    return { ok: false, reason: 'a declaration name in the style attribute holds an escape' }
+  }
+  const kept = trimDeclarationsEnd(
+    segments
+      .filter((_, k) => properties[k] !== property)
+      .join(';')
+      .replace(CSS_WS_RUN_START, ''),
+  )
+  // Defence in depth: the trim never leaves a dangling escape (the splitter
+  // refused a trailing backslash, and an escaped ';' / space is never
+  // trimmed), but if it ever did, the ';' appended below would be swallowed.
+  if (isEscapedAt(kept + ';', kept.length)) {
+    return { ok: false, reason: 'the kept declarations end in an escape' }
+  }
   const next = kept ? `${kept}; ${decl}` : decl
   return {
     ok: true,

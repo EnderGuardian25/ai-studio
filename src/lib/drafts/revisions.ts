@@ -150,6 +150,32 @@ export interface CommitRevisionArgs {
   // race. A SECOND guarded UPDATE, on the Draft row itself, re-checks
   // pendingAction IS NULL in the same atomic step (fix round 1, Minor 1).
   adoptRejectedRevisionId?: string
+  // Compare-and-swap on the revision pointer (change 004 T23 fix round 1,
+  // amended Ruling W5-B — element-mode inline edits only). When set, the
+  // commit happens only if Draft.currentRevisionNumber is STILL this value
+  // inside the same transaction that writes; otherwise nothing is written (no
+  // revision row, no htmlContent change) and RevisionConflictError is thrown.
+  // null means "the draft has no pointer yet" (a legacy draft). Omitted (the
+  // default — whole-document inline edit, refine, override, adopt): no check,
+  // behaviour unchanged.
+  //
+  // Why it is needed: the caller computed `html` from the draft it read
+  // BEFORE this function rendered the PNG (1–2 s in real Chromium). Another
+  // commit landing in that window would otherwise be silently overwritten —
+  // with element mode's many small edits per session, a real lost update.
+  expectedRevisionNumber?: number | null
+}
+
+// Thrown (and never retried — only P2002 is) when expectedRevisionNumber no
+// longer matches the draft's pointer: another commit (or a restore) moved it
+// after the caller read the document. The transaction is rolled back before
+// anything is written. The element-mode inline-edit route maps it to 409
+// element-stale.
+export class RevisionConflictError extends Error {
+  constructor() {
+    super('The draft changed since this edit was prepared')
+    this.name = 'RevisionConflictError'
+  }
 }
 
 // Thrown (and never retried — only P2002 is) when adoptRejectedRevisionId's
@@ -174,19 +200,67 @@ export class AdoptConflictError extends Error {
 // the rejected render it referenced as discarded (discardNotAppliedRender).
 export async function commitDraftRevision(
   args: CommitRevisionArgs,
-): Promise<{ revisionId: string; exportKey: string }> {
+): Promise<{ revisionId: string; exportKey: string; revisionNumber: number }> {
   const { draftId, instruction, html, width, height, backgroundImageUrl, adoptRejectedRevisionId } = args
+  const casExpected = args.expectedRevisionNumber
+  const cas = casExpected !== undefined
 
   let finalExportKey = args.exportKey
+  // Set only when THIS call rendered + uploaded the export — the only object
+  // it may remove again (a caller-supplied key belongs to someone else, e.g.
+  // the rejected render an adopt reuses).
+  let uploadedKey: string | null = null
   if (!finalExportKey) {
     const { renderHtmlToPng } = await import('@/lib/renderer/puppeteer')
     const { uploadObject, exportKey, BUCKET_EXPORTS } = await import('@/lib/storage/minio')
     const buffer = await renderHtmlToPng(html, width, height)
     finalExportKey = exportKey('refine', draftId)
     await uploadObject(buffer, BUCKET_EXPORTS, finalExportKey, 'image/png')
+    uploadedKey = finalExportKey
+  }
+  const committedExportKey: string = finalExportKey
+
+  let revision: { id: string; revisionNumber: number }
+  try {
+    revision = await withNextRevisionNumber(draftId, (tx, revisionNumber) =>
+      writeRevision(tx, revisionNumber),
+    )
+  } catch (err) {
+    // A CAS miss is the one failure after the upload that is KNOWN to have
+    // written nothing (the throw rolled the transaction back), so the export
+    // it rendered can be removed without risking a committed row that points
+    // at it. Every other failure keeps the pre-existing behaviour (the object
+    // is left in place): after e.g. a dropped connection the commit may in
+    // fact have landed. Best-effort — a failed removal is logged and never
+    // masks the conflict.
+    if (err instanceof RevisionConflictError && uploadedKey) {
+      try {
+        const { deleteObject, BUCKET_EXPORTS } = await import('@/lib/storage/minio')
+        await deleteObject(BUCKET_EXPORTS, uploadedKey)
+      } catch (cleanupErr) {
+        console.error(`[revisions] could not remove the unused export ${uploadedKey} after a revision conflict:`, cleanupErr)
+      }
+    }
+    throw err
   }
 
-  const revision = await withNextRevisionNumber(draftId, async (tx, revisionNumber) => {
+  return { revisionId: revision.id, exportKey: committedExportKey, revisionNumber: revision.revisionNumber }
+
+  async function writeRevision(tx: Prisma.TransactionClient, revisionNumber: number) {
+    if (cas) {
+      // The compare-and-swap: a guarded UPDATE on the draft row, not a read
+      // followed by a separate write — the same idiom as the adopt guard
+      // below. It matches only while the pointer is STILL the caller's base,
+      // and it takes the row lock, so a concurrent commit or restore either
+      // finished first (0 rows → conflict) or waits for this transaction and
+      // then re-evaluates its own write. Runs before anything is written.
+      const pointer = await tx.draft.updateMany({
+        where: { id: draftId, currentRevisionNumber: casExpected },
+        data: { updatedAt: new Date() },
+      })
+      if (pointer.count !== 1) throw new RevisionConflictError()
+    }
+
     if (adoptRejectedRevisionId) {
       // Fix round 1, Minor 1 (FR-14a: adopt is single-flight "like every
       // other draft action" — a concurrent action 409s). A guarded UPDATE on
@@ -236,7 +310,7 @@ export async function commitDraftRevision(
         revisionNumber,
         instruction,
         htmlSnapshot: html,
-        exportUrl: finalExportKey,
+        exportUrl: committedExportKey,
       },
       select: { id: true },
     })
@@ -247,7 +321,7 @@ export async function commitDraftRevision(
       data: {
         ...NOT_APPLIED_CLEARED,
         htmlContent: html,
-        exportUrl: finalExportKey,
+        exportUrl: committedExportKey,
         currentRevisionNumber: revisionNumber,
         pendingConflict: Prisma.JsonNull,
         promptVersion: PROMPT_VERSION,
@@ -256,10 +330,8 @@ export async function commitDraftRevision(
       },
     })
 
-    return created
-  })
-
-  return { revisionId: revision.id, exportKey: finalExportKey }
+    return { id: created.id, revisionNumber }
+  }
 }
 
 // ── Not-applied outcome + rejected renders (change 004 Phase 2, T17) ─────────
