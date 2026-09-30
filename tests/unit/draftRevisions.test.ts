@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { Prisma } from '@prisma/client'
 
 // T16 (change 004 Phase 2) — the revision-chain query helpers in
 // src/lib/drafts/revisions.ts are the single filter that keeps rejected refine
@@ -42,6 +43,17 @@ const fake = vi.hoisted(() => {
     uploads: [] as string[],
     deletes: [] as string[],
     txOptions: [] as unknown[],
+    // Every write/read the code under test issues, in order (fix round 2:
+    // the lock-order assertions — every writer must insert the revision row
+    // BEFORE it writes the draft row). A rolled-back transaction appends
+    // 'rollback'.
+    ops: [] as string[],
+    // Runs at the start of draftRevision.create — lets a test simulate a
+    // concurrent writer committing first (it may throw a P2002).
+    onCreate: null as null | ((data: { revisionNumber: number | null }) => void),
+    // Writes a CONCURRENT transaction commits while ours is open: applied
+    // after our rollback, so they survive it (they were never ours).
+    external: [] as Array<() => void>,
   }
 
   function matches(row: Row, where: Record<string, unknown>): boolean {
@@ -120,6 +132,7 @@ const fake = vi.hoisted(() => {
         args.orderBy,
       ).map((r) => project(r, args.select)),
     updateMany: async ({ where, data }: { where: Record<string, unknown>; data: Partial<Row> }) => {
+      db.ops.push('revision.updateMany')
       const hit = db.rows.filter((r) => matches(r, where))
       for (const r of hit) Object.assign(r, data)
       return { count: hit.length }
@@ -129,6 +142,8 @@ const fake = vi.hoisted(() => {
     }: {
       data: Partial<Row> & { draftId: string; revisionNumber: number | null }
     }) => {
+      db.ops.push('revision.create')
+      db.onCreate?.(data)
       const clash =
         data.revisionNumber !== null &&
         db.rows.some((r) => r.draftId === data.draftId && r.revisionNumber === data.revisionNumber)
@@ -147,29 +162,29 @@ const fake = vi.hoisted(() => {
     },
   }
 
+  // A commit-shaped write to the single implicit fake draft.
+  function applyDraft(args: { where: unknown; data: Record<string, unknown> }) {
+    db.draftUpdates.push(args)
+    if ('notAppliedRevisionId' in args.data) db.notAppliedRevisionId = args.data.notAppliedRevisionId as string | null
+    if ('pendingAction' in args.data) db.pendingAction = args.data.pendingAction as string | null
+    if ('currentRevisionNumber' in args.data) {
+      db.currentRevisionNumber = args.data.currentRevisionNumber as number | null
+    }
+  }
+
   const client = {
     draftRevision,
     draft: {
       update: async (args: { where: unknown; data: Record<string, unknown> }) => {
-        db.draftUpdates.push(args)
-        if ('notAppliedRevisionId' in args.data) db.notAppliedRevisionId = args.data.notAppliedRevisionId as string | null
-        if ('pendingAction' in args.data) db.pendingAction = args.data.pendingAction as string | null
-        if ('currentRevisionNumber' in args.data) {
-          db.currentRevisionNumber = args.data.currentRevisionNumber as number | null
-        }
+        db.ops.push('draft.update')
+        applyDraft(args)
         return {}
       },
       // Single implicit fake draft (matches `update` above, which also
-      // ignores `where.id`) — T19's adoptRejectedRevisionId guards on this
-      // atomically (fix round 1, Minor 1: pendingAction IS NULL AND
-      // notAppliedRevisionId matches, in one conditional UPDATE).
-      // Deliberately does NOT push onto db.draftUpdates: that array tracks
-      // the meaningful commit-shaped `draft.update` writes existing tests
-      // assert on by index; this guard is a heartbeat-style touch (mirrors
-      // touchDraftAction), not one of those.
-      updateMany: async ({
-        where,
-      }: {
+      // ignores `where.id`). The guarded final draft write of the CAS and
+      // adopt paths (fix round 2): the WHERE is evaluated against the current
+      // fake draft, and a match applies + records the data like `update`.
+      updateMany: async (args: {
         where: {
           id?: string
           pendingAction?: string | null
@@ -178,6 +193,8 @@ const fake = vi.hoisted(() => {
         }
         data: Record<string, unknown>
       }) => {
+        db.ops.push('draft.updateMany')
+        const { where } = args
         if ('pendingAction' in where && where.pendingAction !== db.pendingAction) return { count: 0 }
         if ('notAppliedRevisionId' in where && where.notAppliedRevisionId !== db.notAppliedRevisionId) {
           return { count: 0 }
@@ -185,12 +202,46 @@ const fake = vi.hoisted(() => {
         if ('currentRevisionNumber' in where && where.currentRevisionNumber !== db.currentRevisionNumber) {
           return { count: 0 }
         }
+        applyDraft(args)
         return { count: 1 }
       },
+      findUnique: async () => {
+        db.ops.push('draft.findUnique')
+        return {
+          pendingAction: db.pendingAction,
+          currentRevisionNumber: db.currentRevisionNumber,
+          notAppliedRevisionId: db.notAppliedRevisionId,
+        }
+      },
     },
+    // Interactive transactions ROLL BACK on a throw, like Postgres: every
+    // row's fields, row membership and the draft's fields are restored (row
+    // object identities are kept, so references a test holds stay valid).
     $transaction: async <T>(fn: (tx: unknown) => Promise<T>, opts?: unknown) => {
       db.txOptions.push(opts)
-      return fn(client)
+      const rows = [...db.rows]
+      const rowState = rows.map((r) => ({ ...r }))
+      const draftState = {
+        draftUpdates: [...db.draftUpdates],
+        notAppliedRevisionId: db.notAppliedRevisionId,
+        pendingAction: db.pendingAction,
+        currentRevisionNumber: db.currentRevisionNumber,
+      }
+      try {
+        return await fn(client)
+      } catch (err) {
+        rows.forEach((r, k) => {
+          for (const key of Object.keys(r)) delete (r as unknown as Record<string, unknown>)[key]
+          Object.assign(r, rowState[k])
+        })
+        db.rows = rows
+        Object.assign(db, draftState)
+        db.ops.push('rollback')
+        const external = db.external
+        db.external = []
+        external.forEach((apply) => apply())
+        throw err
+      }
     },
   }
   return { db, client }
@@ -276,6 +327,9 @@ beforeEach(() => {
   db.deletes = []
   db.currentRevisionNumber = null
   db.txOptions = []
+  db.ops = []
+  db.onCreate = null
+  db.external = []
 })
 
 describe('COMMITTED_REVISION / committedRevisionWhere', () => {
@@ -498,6 +552,138 @@ describe('commitDraftRevision expectedRevisionNumber (element-edit CAS)', () => 
     const out = await commitDraftRevision(args())
     expect(out.revisionNumber).toBe(3)
     expect(db.deletes).toEqual([])
+  })
+})
+
+// Fix round 2 (review of 88b6b35b, Important): lock order. Every writer must
+// take the revision-number unique-index slot (the insert) BEFORE the draft
+// row lock (the draft write); a guard that locked the draft row first could
+// deadlock (40P01 → 500) against a concurrent non-CAS commit or
+// regenerate-design, which insert first. So the CAS and the adopt guard are
+// the FINAL draft write, not a leading touch.
+describe('commitDraftRevision lock order: the revision insert precedes every draft-row write', () => {
+  const draftWrites = (ops: string[]) => ops.filter((o) => o.startsWith('draft.update'))
+  const beforeCreate = (ops: string[]) => ops.slice(0, ops.indexOf('revision.create'))
+
+  it('CAS path: insert first, then ONE guarded draft write (the CAS), nothing on the draft before', async () => {
+    db.rows = [committed('d1', 1)]
+    db.currentRevisionNumber = 1
+    await commitDraftRevision({
+      draftId: 'd1', instruction: 'Element edit: text', html: '<html/>', width: 1080, height: 1080,
+      exportKey: 'k', expectedRevisionNumber: 1,
+    })
+    expect(draftWrites(beforeCreate(db.ops))).toEqual([])
+    expect(draftWrites(db.ops)).toEqual(['draft.updateMany'])
+    expect(db.ops.indexOf('draft.updateMany')).toBeGreaterThan(db.ops.indexOf('revision.create'))
+    // The CAS write IS the commit write: it carries the new pointer + document.
+    expect(db.draftUpdates).toHaveLength(1)
+    expect(db.draftUpdates[0].where).toMatchObject({ currentRevisionNumber: 1, pendingAction: null })
+    expect(db.draftUpdates[0].data).toMatchObject({ currentRevisionNumber: 2, htmlContent: '<html/>' })
+  })
+
+  it('adopt path: insert, then the rejected-row stamp, then ONE guarded draft write', async () => {
+    db.rows = [committed('d1', 1)]
+    const { revisionId: rejectedId, exportKey } = await recordRejectedRender(rejectArgs())
+    db.ops = []
+    db.draftUpdates = []
+    await commitDraftRevision({
+      draftId: 'd1', instruction: 'Use anyway: reduce the text', html: '<html/>', width: 1080, height: 1080,
+      exportKey: exportKey!, adoptRejectedRevisionId: rejectedId,
+    })
+    expect(draftWrites(beforeCreate(db.ops))).toEqual([])
+    expect(draftWrites(db.ops)).toEqual(['draft.updateMany'])
+    const create = db.ops.indexOf('revision.create')
+    const stamp = db.ops.indexOf('revision.updateMany') // the adopt stamp (before discard's)
+    expect(stamp).toBeGreaterThan(create)
+    expect(db.ops.indexOf('draft.updateMany')).toBeGreaterThan(db.ops.lastIndexOf('revision.updateMany'))
+    // Exact guard semantics kept: single-flight + still the live outcome.
+    expect(db.draftUpdates[0].where).toMatchObject({ pendingAction: null, notAppliedRevisionId: rejectedId })
+    expect(db.draftUpdates[0].data).toMatchObject({ notAppliedRevisionId: null, currentRevisionNumber: 2 })
+  })
+
+  it('non-CAS path is unchanged: insert, then a plain draft.update (no guard)', async () => {
+    db.rows = [committed('d1', 1)]
+    await commitDraftRevision({ draftId: 'd1', instruction: 'x', html: '<html/>', width: 1080, height: 1080, exportKey: 'k' })
+    expect(draftWrites(db.ops)).toEqual(['draft.update'])
+    expect(db.ops.indexOf('draft.update')).toBeGreaterThan(db.ops.indexOf('revision.create'))
+  })
+
+  it('a CAS miss rolls back the insert it already made', async () => {
+    db.rows = [committed('d1', 1), committed('d1', 2)]
+    db.currentRevisionNumber = 2
+    await expect(
+      commitDraftRevision({
+        draftId: 'd1', instruction: 'Element edit: color', html: '<html/>', width: 1080, height: 1080,
+        exportKey: 'k', expectedRevisionNumber: 1,
+      }),
+    ).rejects.toBeInstanceOf(RevisionConflictError)
+    expect(db.ops).toContain('revision.create')
+    expect(db.ops.at(-1)).toBe('rollback')
+    expect(db.rows.map((r) => r.revisionNumber)).toEqual([1, 2])
+    expect(db.currentRevisionNumber).toBe(2)
+  })
+
+  it('a concurrent insert of the same number surfaces as P2002; the retry re-reads and then misses the CAS', async () => {
+    db.rows = [committed('d1', 1)]
+    db.currentRevisionNumber = 1
+    let first = true
+    db.onCreate = ({ revisionNumber }) => {
+      if (!first) return
+      first = false
+      // Another writer committed #2 while we were computing ours: our
+      // insert collides with it (P2002) and our attempt rolls back.
+      db.external.push(() => {
+        db.rows.push(committed('d1', revisionNumber!, 'other writer'))
+        db.currentRevisionNumber = revisionNumber
+      })
+      throw new Prisma.PrismaClientKnownRequestError('Unique constraint failed', { code: 'P2002', clientVersion: 'test' })
+    }
+    await expect(
+      commitDraftRevision({
+        draftId: 'd1', instruction: 'Element edit: text', html: '<html/>', width: 1080, height: 1080,
+        exportKey: 'k', expectedRevisionNumber: 1,
+      }),
+    ).rejects.toBeInstanceOf(RevisionConflictError)
+    expect(db.ops.filter((o) => o === 'revision.create')).toHaveLength(2) // it retried, at #3
+    expect(db.rows.map((r) => r.instruction)).toEqual(['v1', 'other writer'])
+    expect(db.currentRevisionNumber).toBe(2)
+  })
+})
+
+// Fix round 2, Minor 3: the element CAS is also single-flight — it can't
+// commit while a refine/regenerate claimed the draft during its render (the
+// same pendingAction IS NULL condition adopt's guard has). A miss says which.
+describe('commitDraftRevision CAS single-flight (pendingAction)', () => {
+  const casArgs = (expectedRevisionNumber: number) => ({
+    draftId: 'd1', instruction: 'Element edit: text', html: '<html/>', width: 1080, height: 1080,
+    exportKey: 'k', expectedRevisionNumber,
+  })
+
+  it('a claimed pendingAction refuses the commit, writes nothing, and reports the action', async () => {
+    db.rows = [committed('d1', 1)]
+    db.currentRevisionNumber = 1
+    db.pendingAction = 'REFINE'
+    const err = await commitDraftRevision(casArgs(1)).catch((e: unknown) => e)
+    expect(err).toBeInstanceOf(RevisionConflictError)
+    expect((err as InstanceType<typeof RevisionConflictError>).pendingAction).toBe('REFINE')
+    expect(db.rows).toHaveLength(1)
+    expect(db.currentRevisionNumber).toBe(1)
+    expect(db.draftUpdates).toEqual([])
+  })
+
+  it('a moved pointer with no action running reports pendingAction null (stale)', async () => {
+    db.rows = [committed('d1', 1), committed('d1', 2)]
+    db.currentRevisionNumber = 2
+    const err = await commitDraftRevision(casArgs(1)).catch((e: unknown) => e)
+    expect(err).toBeInstanceOf(RevisionConflictError)
+    expect((err as InstanceType<typeof RevisionConflictError>).pendingAction).toBeNull()
+  })
+
+  it('the non-CAS path still commits while an action is claimed (refine commits under its own claim)', async () => {
+    db.rows = [committed('d1', 1)]
+    db.pendingAction = 'REFINE'
+    const out = await commitDraftRevision({ draftId: 'd1', instruction: 'x', html: '<html/>', width: 1080, height: 1080, exportKey: 'k' })
+    expect(out.revisionNumber).toBe(2)
   })
 })
 
@@ -816,8 +1002,9 @@ describe('commitDraftRevision adoptRejectedRevisionId (T19 "Use anyway")', () =>
         adoptRejectedRevisionId: rejectedId,
       }),
     ).rejects.toThrow(AdoptConflictError)
-    // The rejected row's own guard never even ran — pendingAction is checked
-    // first — so it is untouched, and no chain row was created.
+    // The guarded final draft write refused it, so the transaction rolled
+    // back: the rejected row's stamp and the chain insert made before it are
+    // gone (fix round 2 — the draft row is locked last).
     expect(db.rows.find((r) => r.id === rejectedId)!.adoptedAt ?? null).toBeNull()
     expect(db.rows.some((r) => r.revisionNumber === 2)).toBe(false)
   })

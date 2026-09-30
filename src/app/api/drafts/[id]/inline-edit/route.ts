@@ -12,7 +12,7 @@ import {
   elementEditRequestSchema,
   applyElementEdit,
   checkElementBaseRevision,
-  ELEMENT_STALE_MESSAGE,
+  elementCommitConflict,
 } from '@/lib/drafts/inlineEdit'
 
 // Permissive schema + manual check so the error message stays stable.
@@ -126,7 +126,9 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
 //   400 element-not-text-leaf — text edit on an element with child elements
 //   400 element-not-editable  — the element can't take this edit (script, style, void…)
 //   404 (no code)             — draft missing or not visible (same as mode 1)
-//   409 draft-busy            — inlineEditBlockReason (action running / not exported)
+//   409 draft-busy            — inlineEditBlockReason (action running / not exported),
+//                               or an action claimed the draft while this edit
+//                               rendered (the commit's single-flight check)
 //   409 element-stale         — the draft moved past baseRevisionNumber (checked
 //                               before resolution and again at commit), a path
 //                               miss, or a tag / text fingerprint mismatch
@@ -178,12 +180,14 @@ async function handleElementEdit(raw: unknown, draftId: string, user: TeamAuthed
       height,
       // The compare-and-swap: commit only if the pointer is still the base
       // (a commit that landed while this one rendered would otherwise be
-      // silently overwritten). A miss writes nothing.
+      // silently overwritten) and no refine/regenerate claimed the draft
+      // meanwhile (single-flight). A miss writes nothing.
       expectedRevisionNumber: baseRevisionNumber,
     })
   } catch (err) {
     if (err instanceof RevisionConflictError) {
-      return NextResponse.json({ error: ELEMENT_STALE_MESSAGE, code: 'element-stale' }, { status: 409 })
+      const conflict = elementCommitConflict(err.pendingAction)
+      return NextResponse.json({ error: conflict.error, code: conflict.code }, { status: conflict.status })
     }
     throw err
   }

@@ -220,6 +220,7 @@ export type ElementEditErrorCode =
   | 'element-stale' // 409 — the draft moved past baseRevisionNumber (route check or the
   //                            commit's CAS), a path miss, or a tag / text fingerprint mismatch
   | 'element-unsupported' // 409 — the stored HTML / element can't be edited reliably in element mode
+  | 'draft-busy' // 409 — an action is running (the route's own guard, or claimed during the commit)
 
 export type ElementEditResult =
   | { ok: true; html: string; instruction: string }
@@ -231,9 +232,8 @@ const fail = (
   error: string,
 ): Extract<ElementEditResult, { ok: false }> => ({ ok: false, status, code, error })
 
-export const ELEMENT_STALE_MESSAGE =
+const STALE_MESSAGE =
   'This element changed since it was selected. Reopen the editor and select it again.'
-const STALE_MESSAGE = ELEMENT_STALE_MESSAGE
 const UNSUPPORTED_MESSAGE =
   "This part of the design can't be edited element-by-element. Use the whole-document editor instead."
 
@@ -251,6 +251,18 @@ export function checkElementBaseRevision(
   currentRevisionNumber: number | null,
 ): Extract<ElementEditResult, { ok: false }> | null {
   return baseRevisionNumber === currentRevisionNumber ? null : fail(409, 'element-stale', STALE_MESSAGE)
+}
+
+// The 409 for a commit-time refusal (commitDraftRevision's guarded final
+// write missed — RevisionConflictError; fix round 2). `pendingAction` is the
+// action that claimed the draft while this edit rendered, or null when the
+// pointer moved instead. A claimed action reuses inlineEditBlockReason's
+// message verbatim, so both busy paths read the same.
+export function elementCommitConflict(pendingAction: string | null): Extract<ElementEditResult, { ok: false }> {
+  if (pendingAction !== null) {
+    return fail(409, 'draft-busy', inlineEditBlockReason('EXPORTED', pendingAction)!)
+  }
+  return fail(409, 'element-stale', STALE_MESSAGE)
 }
 
 // Text edits (the leaf rule): only an element with no child ELEMENTS, whose

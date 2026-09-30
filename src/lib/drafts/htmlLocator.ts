@@ -787,7 +787,18 @@ function splitDeclarations(style: string): string[] | null {
       continue
     }
     if (c === '"' || c === "'") quote = c
-    else if (c === '(' || c === '[' || c === '{') closers.push(BLOCK_CLOSER[c])
+    else if (c === '(') {
+      const fn = functionNameBefore(style, i)
+      if (fn === null) return null
+      if (fn === 'url' && !isQuotedUrl(style, i + 1)) {
+        // An unquoted url( is ONE url token to CSS, not a block.
+        const close = unquotedUrlEnd(style, i + 1)
+        if (close === -1) return null
+        i = close
+        continue
+      }
+      closers.push(')')
+    } else if (c === '[' || c === '{') closers.push(BLOCK_CLOSER[c])
     else if (c === ')' || c === ']' || c === '}') {
       if (closers.pop() !== c) return null
     } else if (c === ';' && closers.length === 0) {
@@ -798,6 +809,72 @@ function splitDeclarations(style: string): string[] | null {
   if (quote || closers.length !== 0) return null
   out.push(style.slice(segStart))
   return out
+}
+
+// ── url( handling (fix round 2, Minor 2) ──
+// CSS tokenizes `url(` followed by anything but a quote as a single url
+// token — NOT as a function block. Inside it, a quote, "(" or a backslash
+// that isn't a valid escape makes a bad-url that runs to the first ")", and
+// a quote there does NOT open a string. The splitter would read those as a
+// string / nested block and put its declaration boundaries elsewhere
+// (verified in Chrome: `background: url(a"b); color: blue; x: ")` applies
+// color blue, and `url(a(b); color: blue !important; y: )` hides an
+// !important), so such a body is refused. A quoted url("…") is an ordinary
+// function holding a string and is handled like any other block.
+
+const isCssIdentChar = (c: string | undefined) =>
+  c !== undefined && (/[-_a-zA-Z0-9\\]/.test(c) || c.charCodeAt(0) >= 0x80)
+
+// The ASCII-lowercased name of the function whose "(" is at `paren` ('' when
+// the "(" opens a plain block), or null when the name can't be read with
+// certainty: it holds an escape (u\72 l( IS url( to CSS), or it continues an
+// ident whose previous character was escaped (a\;url( is one ident, "a;url").
+function functionNameBefore(style: string, paren: number): string | null {
+  let k = paren
+  while (k > 0 && isCssIdentChar(style[k - 1])) k--
+  const name = style.slice(k, paren)
+  if (name.includes('\\')) return null
+  if (k > 0 && isEscapedAt(style, k - 1)) return null
+  // A hex escape swallows ONE whitespace character after it (`u\72 l(` is
+  // "url("), so a name right after "\<hex> " continues that escape's ident.
+  if (k > 0 && CSS_WS.test(style[k - 1]) && endsHexEscape(style, k - 1)) return null
+  return asciiLower(name)
+}
+
+// True when the whitespace at `ws` is the terminator of a hex escape (\1-6 hex digits).
+function endsHexEscape(style: string, ws: number): boolean {
+  let h = ws
+  let digits = 0
+  while (h > 0 && digits < 6 && /[0-9a-fA-F]/.test(style[h - 1])) {
+    h--
+    digits++
+  }
+  return digits > 0 && h > 0 && style[h - 1] === '\\' && !isEscapedAt(style, h - 1)
+}
+
+// After `url(`: is the first non-whitespace character a quote?
+function isQuotedUrl(style: string, from: number): boolean {
+  let j = from
+  while (j < style.length && CSS_WS.test(style[j])) j++
+  return style[j] === '"' || style[j] === "'"
+}
+
+// Index of the ")" that ends an unquoted url( body starting at `from`, or -1
+// (refuse) for anything that would make CSS read it as a bad-url: a quote,
+// "(", a non-printable character, a backslash before a newline or at the end,
+// or no ")" at all. A valid escape (\" \) \\ …) is skipped over.
+function unquotedUrlEnd(style: string, from: number): number {
+  for (let m = from; m < style.length; m++) {
+    const c = style[m]
+    if (c === ')') return m
+    if (c === '"' || c === "'" || c === '(') return -1
+    if (/[\u0000-\u0008\u000b\u000e-\u001f\u007f]/.test(c)) return -1
+    if (c === '\\') {
+      if (m + 1 >= style.length || CSS_NEWLINE.has(style[m + 1])) return -1
+      m++
+    }
+  }
+  return -1
 }
 
 // CSS whitespace only. JS \s also matches U+00A0 and friends, which are ident

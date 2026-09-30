@@ -136,10 +136,11 @@ export interface CommitRevisionArgs {
   backgroundImageUrl?: string | null
   // "Use anyway" (T19, FR-14a): the id of the rejected DraftRevision row being
   // adopted. When set, it is stamped adoptedAt + adoptedRevisionNumber
-  // atomically INSIDE this same transaction, BEFORE the create/discard below
-  // run — the ordering hazard from T17's report (discardNotAppliedRender
-  // skips rows with adoptedAt already set, so stamping first is what keeps
-  // the just-adopted row from also being marked discardedAt a moment later).
+  // atomically INSIDE this same transaction, after the chain insert and
+  // BEFORE discardNotAppliedRender runs — the ordering hazard from T17's
+  // report (discardNotAppliedRender skips rows with adoptedAt already set, so
+  // stamping first is what keeps the just-adopted row from also being marked
+  // discardedAt a moment later). See writeRevision's LOCK ORDER note.
   // The guarded UPDATE (adoptedAt IS NULL AND discardedAt IS NULL) doubles as
   // adopt's single-flight mechanism: a second concurrent adopt of the same
   // row loses the race here and the whole commit aborts with
@@ -147,17 +148,22 @@ export interface CommitRevisionArgs {
   // "adopt a stored render" honestly, so adopt never claims that field —
   // this conditional UPDATE is the guard instead, the same shape as the
   // P2002 retry commitDraftRevision already uses for the revision-number
-  // race. A SECOND guarded UPDATE, on the Draft row itself, re-checks
-  // pendingAction IS NULL in the same atomic step (fix round 1, Minor 1).
+  // race. The final Draft write is itself guarded: it re-checks
+  // pendingAction IS NULL and that this row is still the live not-applied
+  // pointer in the same atomic step (fix round 1, Minor 1; folded into the
+  // final write in fix round 2).
   adoptRejectedRevisionId?: string
   // Compare-and-swap on the revision pointer (change 004 T23 fix round 1,
   // amended Ruling W5-B — element-mode inline edits only). When set, the
   // commit happens only if Draft.currentRevisionNumber is STILL this value
-  // inside the same transaction that writes; otherwise nothing is written (no
-  // revision row, no htmlContent change) and RevisionConflictError is thrown.
-  // null means "the draft has no pointer yet" (a legacy draft). Omitted (the
-  // default — whole-document inline edit, refine, override, adopt): no check,
-  // behaviour unchanged.
+  // AND no action has claimed the draft (pendingAction IS NULL — fix round 2),
+  // checked by the transaction's final, guarded draft write; otherwise the
+  // transaction rolls back (no revision row, no htmlContent change) and
+  // RevisionConflictError is thrown, carrying the claimed action if that was
+  // the cause. null means "the draft has no pointer yet" (a legacy draft).
+  // Omitted (the default — whole-document inline edit, refine, override,
+  // adopt): no check, behaviour unchanged. (Refine commits while it holds its
+  // OWN pendingAction claim, which is why only this path adds that condition.)
   //
   // Why it is needed: the caller computed `html` from the draft it read
   // BEFORE this function rendered the PNG (1–2 s in real Chromium). Another
@@ -166,14 +172,20 @@ export interface CommitRevisionArgs {
   expectedRevisionNumber?: number | null
 }
 
-// Thrown (and never retried — only P2002 is) when expectedRevisionNumber no
-// longer matches the draft's pointer: another commit (or a restore) moved it
-// after the caller read the document. The transaction is rolled back before
-// anything is written. The element-mode inline-edit route maps it to 409
-// element-stale.
+// Thrown (and never retried — only P2002 is) when the expectedRevisionNumber
+// commit is refused: another commit (or a restore) moved the pointer after
+// the caller read the document, or a refine/regenerate claimed the draft
+// (pendingAction) meanwhile. The transaction is rolled back, so nothing it
+// wrote survives. `pendingAction` says which: the claimed action (the
+// element-mode route answers 409 draft-busy), or null (the pointer moved —
+// 409 element-stale).
 export class RevisionConflictError extends Error {
-  constructor() {
-    super('The draft changed since this edit was prepared')
+  constructor(readonly pendingAction: string | null = null) {
+    super(
+      pendingAction
+        ? 'Another action claimed the draft while this edit was being prepared'
+        : 'The draft changed since this edit was prepared',
+    )
     this.name = 'RevisionConflictError'
   }
 }
@@ -246,50 +258,40 @@ export async function commitDraftRevision(
 
   return { revisionId: revision.id, exportKey: committedExportKey, revisionNumber: revision.revisionNumber }
 
+  // LOCK ORDER (fix round 2 — a draft-row-first guard deadlocked, 40P01 →
+  // 500, against a concurrent writer). Every writer of the chain takes its
+  // locks in ONE order:
+  //   1. the revision insert (the (draftId, revisionNumber) unique-index slot;
+  //      a concurrent insert of the same number waits here and then fails
+  //      P2002, which withNextRevisionNumber retries with a fresh read);
+  //   2. rejected-render rows (adopt's stamp, then discardNotAppliedRender);
+  //   3. the draft row — ALWAYS the last write.
+  // regenerate-design, recordRejectedRender and restore follow the same
+  // order (index/rejected rows before the draft). So every guard on the draft
+  // row — the element CAS and adopt's single-flight/superseded check — is
+  // folded INTO that final write as its WHERE, never run as a leading touch:
+  // a miss throws, and the throw rolls back the insert and stamps before it.
   async function writeRevision(tx: Prisma.TransactionClient, revisionNumber: number) {
-    if (cas) {
-      // The compare-and-swap: a guarded UPDATE on the draft row, not a read
-      // followed by a separate write — the same idiom as the adopt guard
-      // below. It matches only while the pointer is STILL the caller's base,
-      // and it takes the row lock, so a concurrent commit or restore either
-      // finished first (0 rows → conflict) or waits for this transaction and
-      // then re-evaluates its own write. Runs before anything is written.
-      const pointer = await tx.draft.updateMany({
-        where: { id: draftId, currentRevisionNumber: casExpected },
-        data: { updatedAt: new Date() },
-      })
-      if (pointer.count !== 1) throw new RevisionConflictError()
-    }
+    const created = await tx.draftRevision.create({
+      data: {
+        draftId,
+        revisionNumber,
+        instruction,
+        htmlSnapshot: html,
+        exportUrl: committedExportKey,
+      },
+      select: { id: true },
+    })
 
     if (adoptRejectedRevisionId) {
-      // Fix round 1, Minor 1 (FR-14a: adopt is single-flight "like every
-      // other draft action" — a concurrent action 409s). A guarded UPDATE on
-      // the DRAFT row itself, not a read followed by a separate write:
-      // matches only when pendingAction is STILL null (nothing claimed the
-      // draft between the route's own pre-check and here) AND this row is
-      // STILL the draft's live not-applied pointer (never trust a value the
-      // caller read earlier — same "never trust the FK alone" principle
-      // T18's resolveNotAppliedOutcome documents). Both facts are checked and
-      // "touched" (a heartbeat-style updatedAt bump, the same idiom
-      // touchDraftAction uses) atomically in ONE conditional UPDATE, so
-      // nothing can change either fact in the gap between checking and
-      // acting — under Postgres, a concurrent claimDraftAction competing for
-      // the same row blocks on this transaction's row lock and then
-      // re-evaluates its own WHERE against whatever we leave committed.
-      // 0 rows touched: a refine/regenerate claimed pendingAction, or a
-      // newer not-applied outcome already superseded this row — either way,
-      // 409.
-      const draftGuard = await tx.draft.updateMany({
-        where: { id: draftId, pendingAction: null, notAppliedRevisionId: adoptRejectedRevisionId },
-        data: { updatedAt: new Date() },
-      })
-      if (draftGuard.count !== 1) throw new AdoptConflictError()
-
       // The guarded UPDATE on the rejected row itself: every remaining
       // precondition (rejected, not yet adopted/discarded, has an export to
       // adopt — Ruling D) checked and stamped atomically. 0 rows touched
       // means a concurrent adopt/discard won the race, or the row never
-      // qualified — either way, 409.
+      // qualified — either way, 409. It still runs BEFORE
+      // discardNotAppliedRender (the T17 ordering hazard: discard skips rows
+      // with adoptedAt set, so stamping first keeps the adopted row from also
+      // being marked discarded).
       const guard = await tx.draftRevision.updateMany({
         where: {
           id: adoptRejectedRevisionId,
@@ -304,32 +306,57 @@ export async function commitDraftRevision(
       if (guard.count !== 1) throw new AdoptConflictError()
     }
 
-    const created = await tx.draftRevision.create({
-      data: {
-        draftId,
-        revisionNumber,
-        instruction,
-        htmlSnapshot: html,
-        exportUrl: committedExportKey,
-      },
-      select: { id: true },
-    })
-
     await discardNotAppliedRender(tx, draftId)
-    await tx.draft.update({
-      where: { id: draftId },
-      data: {
-        ...NOT_APPLIED_CLEARED,
-        htmlContent: html,
-        exportUrl: committedExportKey,
-        currentRevisionNumber: revisionNumber,
-        pendingConflict: Prisma.JsonNull,
-        promptVersion: PROMPT_VERSION,
-        fontSet: getFontSetId(),
-        ...(backgroundImageUrl ? { imageUrl: backgroundImageUrl } : {}),
-      },
-    })
 
+    const data = {
+      ...NOT_APPLIED_CLEARED,
+      htmlContent: html,
+      exportUrl: committedExportKey,
+      currentRevisionNumber: revisionNumber,
+      pendingConflict: Prisma.JsonNull,
+      promptVersion: PROMPT_VERSION,
+      fontSet: getFontSetId(),
+      ...(backgroundImageUrl ? { imageUrl: backgroundImageUrl } : {}),
+    }
+
+    if (!cas && !adoptRejectedRevisionId) {
+      // The plain commit (whole-document inline edit, refine, override):
+      // unchanged — no guard.
+      await tx.draft.update({ where: { id: draftId }, data })
+      return { id: created.id, revisionNumber }
+    }
+
+    // The guarded final write. Its WHERE is evaluated by Postgres under the
+    // row lock (a concurrent claimDraftAction / restore / commit on this row
+    // either committed first — and is what the WHERE now sees — or waits for
+    // this transaction), so each fact is checked and acted on atomically:
+    //   - adopt (T19, FR-14a): pendingAction is STILL null (single-flight
+    //     "like every other draft action") AND this row is STILL the draft's
+    //     live not-applied pointer (never trust a value read earlier — T18's
+    //     "never trust the FK alone"). Superseded or claimed → 409.
+    //   - element CAS (T23, amended W5-B): the pointer is STILL the caller's
+    //     base AND pendingAction is null — an element edit must not commit
+    //     while a refine/regenerate claimed the draft during its render
+    //     (fix round 2, Minor 3; the same condition adopt has).
+    const written = await tx.draft.updateMany({
+      where: {
+        id: draftId,
+        pendingAction: null,
+        ...(adoptRejectedRevisionId ? { notAppliedRevisionId: adoptRejectedRevisionId } : {}),
+        ...(cas ? { currentRevisionNumber: casExpected } : {}),
+      },
+      data,
+    })
+    if (written.count !== 1) {
+      if (adoptRejectedRevisionId) throw new AdoptConflictError()
+      // Which condition missed? One read in the same transaction, after the
+      // UPDATE's own evaluation (READ COMMITTED sees the same committed
+      // state): an action is claimed → the caller answers draft-busy;
+      // otherwise the pointer moved → element-stale. If both, busy wins — it
+      // tells the user why, and the edit is refused either way.
+      const now = await tx.draft.findUnique({ where: { id: draftId }, select: { pendingAction: true } })
+      throw new RevisionConflictError(now?.pendingAction ?? null)
+    }
     return { id: created.id, revisionNumber }
   }
 }

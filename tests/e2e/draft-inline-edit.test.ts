@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { loginAs, waitForDraft, type ApiClient } from '../helpers/api'
+import { loginAs, waitForDraft, waitForAction, type ApiClient } from '../helpers/api'
 
 const ADMIN_EMAIL = 'admin@bisteccare.lk'
 const ADMIN_PASSWORD = 'BistecStudio2026!'
@@ -296,6 +296,79 @@ test.describe('§T — draft inline edit', () => {
     const winner = statuses.indexOf(200)
     expect(after.htmlContent).toContain(edits[winner].landed)
     expect(after.htmlContent).not.toContain(edits[1 - winner].landed)
+  })
+
+  // TC-INLINE-10 — fix round 2 (lock order): an element edit racing a
+  // whole-document save. The element CAS used to lock the draft row BEFORE
+  // its revision insert while every other writer inserts first — an
+  // inversion Postgres resolves by killing one side (40P01 → 500). Now every
+  // response is 200 or 409, never 500, and the chain holds exactly one
+  // revision per 200.
+  test('an element edit racing a whole-document save never 500s; revisions == 200s', async () => {
+    if (!MOCKED()) {
+      test.skip()
+      return
+    }
+    const draft = await createExportedDraft(api, `Inline Race ${Date.now()}`)
+    const id = String(draft.id)
+    const start = (await pin(api, id, TWO)).currentRevisionNumber
+    let landed = 0
+    for (let round = 0; round < 15; round++) {
+      const { currentRevisionNumber: base } = await (await api.get(`/api/drafts/${id}`)).json()
+      const [element, whole] = await Promise.all([
+        api.post(`/api/drafts/${id}/inline-edit`, {
+          mode: 'element',
+          locator: { path: [1], tag: 'P', text: 'Keep me', baseRevisionNumber: base },
+          edit: { kind: 'color', value: round % 2 ? '#111111' : '#222222' },
+        }),
+        api.post(`/api/drafts/${id}/inline-edit`, {
+          html: TWO.replace('Old headline', `Round ${round}`),
+        }),
+      ])
+      expect([200, 409], `element round ${round}`).toContain(element.status())
+      expect(whole.status(), `whole-document round ${round}`).toBe(200)
+      if (element.status() === 409) {
+        expect((await element.json()).code).toBe('element-stale')
+      } else {
+        landed++
+      }
+      landed++ // the whole-document save
+    }
+    const after = await (await api.get(`/api/drafts/${id}`)).json()
+    const revisions = await (await api.get(`/api/drafts/${id}/revisions`)).json()
+    expect(revisions).toHaveLength(start + landed)
+    expect(after.currentRevisionNumber).toBe(start + landed)
+  })
+
+  // TC-INLINE-11 — fix round 2 (lock order, the adopt half): T19's "Use
+  // anyway" had the same draft-row-first guard. An adopt racing a
+  // whole-document save is 200 or 409 (the save superseded the outcome),
+  // never 500, and revisions == 200s. The rejected render comes from the
+  // mock seam "__REFINE_REDUCE_NOOP__" (see refine-not-applied.test.ts).
+  test('a "Use anyway" adopt racing a whole-document save never 500s; revisions == 200s', async () => {
+    if (!MOCKED() || !process.env.MOCK_AI) {
+      test.skip()
+      return
+    }
+    const draft = await createExportedDraft(api, `Inline Adopt Race ${Date.now()}`)
+    const id = String(draft.id)
+    const start = (await pin(api, id, TWO)).currentRevisionNumber
+    let landed = 0
+    for (let round = 0; round < 10; round++) {
+      expect((await api.post(`/api/drafts/${id}/refine`, { instruction: 'reduce it __REFINE_REDUCE_NOOP__' })).status()).toBe(202)
+      const settled = await waitForAction(api, id)
+      const notApplied = settled.notApplied as { revisionId: string } | null
+      expect(notApplied, `round ${round} produced a rejected render`).toBeTruthy()
+      const [adopt, whole] = await Promise.all([
+        api.post(`/api/drafts/${id}/rejected/${notApplied!.revisionId}/adopt`),
+        api.post(`/api/drafts/${id}/inline-edit`, { html: TWO.replace('Old headline', `Adopt round ${round}`) }),
+      ])
+      expect([200, 409], `adopt round ${round}`).toContain(adopt.status())
+      expect(whole.status(), `whole-document round ${round}`).toBe(200)
+      landed += adopt.status() === 200 ? 2 : 1
+    }
+    const revisions = await (await api.get(`/api/drafts/${id}/revisions`)).json()
+    expect(revisions).toHaveLength(start + landed)
   })
 
   // TC-INLINE-04 — a foreign draft id is a 404 (no existence leak).

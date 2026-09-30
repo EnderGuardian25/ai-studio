@@ -200,7 +200,7 @@ describe('parseHtmlDocument — malformed or ambiguous markup fails closed', () 
 describe('elementTextContent + normalizeFingerprintText', () => {
   it('decodes entities (named, numeric, hex) in the fingerprint text', () => {
     const html = doc('<p>Fish &amp; Chips&nbsp;&#169; &#x2014; &lt;b&gt; &quot;q&quot; &hellip;</p>')
-    expect(elementTextContent(at(html, [0]))).toBe('Fish & Chips © — <b> "q" …')
+    expect(elementTextContent(at(html, [0]))).toBe('Fish & Chips\u00a0© — <b> "q" …')
   })
 
   it('concatenates descendant text and ignores comments', () => {
@@ -230,7 +230,7 @@ describe('elementTextContent + normalizeFingerprintText', () => {
   })
 
   it('normalizes whitespace runs (incl. nbsp and newlines) to one space and trims', () => {
-    expect(normalizeFingerprintText('  Fish\n\t &  Chips  ')).toBe('Fish & Chips')
+    expect(normalizeFingerprintText('  Fish\n\t &\u00a0 Chips  ')).toBe('Fish & Chips')
   })
 })
 
@@ -408,9 +408,9 @@ describe('setStyleDeclaration — the splitter tracks every bracket kind and ref
   })
 
   it('trims CSS whitespace only — a trailing no-break space is an ident character and is kept', () => {
-    const html = doc('<p style="font-family: x ">x</p>')
+    const html = doc('<p style="font-family: x\u00a0">x</p>')
     const r = setStyleDeclaration(html, at(html, [0]), 'color', '#aabbcc')
-    expect(r.ok && r.html).toBe(doc('<p style="font-family: x ; color: #aabbcc">x</p>'))
+    expect(r.ok && r.html).toBe(doc('<p style="font-family: x\u00a0; color: #aabbcc">x</p>'))
   })
 
   it('an escaped property name (c\\olor is color to CSS) is refused rather than silently kept', () => {
@@ -469,9 +469,9 @@ describe('resolveElementPath — never descends into <template> content (Minor 3
 
 describe('tag and attribute names are ASCII-lowercased, as the HTML tokenizer does (Minor 4)', () => {
   it('<tracK> (U+212A KELVIN SIGN) is NOT the void element track', () => {
-    const html = doc('<div><tracK>x</tracK></div>')
+    const html = doc('<div><trac\u212A>x</trac\u212A></div>')
     const el = at(html, [0, 0])
-    expect(el.tag).toBe('tracK')
+    expect(el.tag).toBe('trac\u212A')
     expect(el.closeStart).not.toBeNull()
     expect(elementTextContent(el)).toBe('x')
   })
@@ -482,8 +482,77 @@ describe('tag and attribute names are ASCII-lowercased, as the HTML tokenizer do
     expect(at(html, [0, 0]).tag).toBe('p')
   })
 
-  it('a Kelvin-sign attribute name is not folded onto an ASCII one', () => {
-    const html = doc('<p data-K="1">x</p>')
-    expect(at(html, [0]).attrs.map((a) => a.name)).toEqual(['data-K'])
+  it('a Kelvin-sign attribute name is not folded onto an ASCII one (see below for url)', () => {
+    const html = doc('<p data-\u212A="1">x</p>')
+    expect(at(html, [0]).attrs.map((a) => a.name)).toEqual(['data-\u212A'])
+  })
+})
+
+// ── Fix round 2 (review of 88b6b35b, Minor 2) ────────────────────────────────
+// An UNQUOTED url( is one url token to CSS; a quote, "(" or non-escape
+// backslash inside it makes a bad-url that ends at the first ")". The splitter
+// would read those as a string / block instead, so the edit is refused.
+
+describe('setStyleDeclaration: an unquoted url( body the splitter would misread is refused', () => {
+  const style = (s: string) => {
+    const html = doc(`<p style='${s}'>x</p>`)
+    return setStyleDeclaration(html, at(html, [0]), 'color', '#aabbcc')
+  }
+
+  it('review repro A: a quote inside an unquoted url( (Chrome: color blue applies)', () => {
+    expect(style('background: url(a"b); color: blue; x: ")').ok).toBe(false)
+  })
+
+  it('review repro B: a "(" inside an unquoted url( hides an !important', () => {
+    expect(style('background: url(a(b); color: blue !important; y: )').ok).toBe(false)
+  })
+
+  it("an apostrophe, and a backslash-newline (not a valid escape), are refused too", () => {
+    const html = doc('<p style="background: url(a\'b); color: blue">x</p>')
+    expect(setStyleDeclaration(html, at(html, [0]), 'color', '#aabbcc').ok).toBe(false)
+    const bs = doc('<p style="background: url(a\\\nb); color: blue">x</p>')
+    expect(setStyleDeclaration(bs, at(bs, [0]), 'color', '#aabbcc').ok).toBe(false)
+  })
+
+  it('an unclosed unquoted url( is refused', () => {
+    const html = doc('<p style="background: url(a.png">x</p>')
+    expect(setStyleDeclaration(html, at(html, [0]), 'color', '#aabbcc').ok).toBe(false)
+  })
+
+  it('URL( is matched case-insensitively', () => {
+    expect(style('background: URL(a"b); color: blue; x: ")').ok).toBe(false)
+  })
+
+  it('a function whose name holds an escape (u\\72 l( IS url() is refused', () => {
+    const html = doc('<p style="background: u\\72 l(a); color: blue">x</p>')
+    expect(setStyleDeclaration(html, at(html, [0]), 'color', '#aabbcc').ok).toBe(false)
+  })
+
+  it('a plain unquoted url(, one with ; inside, and an escaped quote are kept', () => {
+    const a = doc('<p style="background: url(a.png); color: red">x</p>')
+    expect(setStyleDeclaration(a, at(a, [0]), 'color', '#aabbcc')).toEqual({
+      ok: true,
+      html: doc('<p style="background: url(a.png); color: #aabbcc">x</p>'),
+    })
+    const b = doc('<p style="background: url(a;b.png)">x</p>')
+    expect(setStyleDeclaration(b, at(b, [0]), 'color', '#aabbcc')).toEqual({
+      ok: true,
+      html: doc('<p style="background: url(a;b.png); color: #aabbcc">x</p>'),
+    })
+    const c = doc(`<p style='background: url(a\\"b.png)'>x</p>`)
+    expect(setStyleDeclaration(c, at(c, [0]), 'color', '#aabbcc').ok).toBe(true)
+  })
+
+  it('a QUOTED url("...") stays accepted, whatever it holds', () => {
+    const html = doc(`<p style='background: url( "a(b;c.png" ); color: red'>x</p>`)
+    const r = setStyleDeclaration(html, at(html, [0]), 'color', '#aabbcc')
+    expect(r.ok && r.html).toBe(
+      doc('<p style="background: url( &quot;a(b;c.png&quot; ); color: #aabbcc">x</p>'),
+    )
+  })
+
+  it('a function that merely ends in "url" (myurl() is an ordinary function', () => {
+    const html = doc('<p style="--x: myurl(a(b)); color: red">x</p>')
+    expect(setStyleDeclaration(html, at(html, [0]), 'color', '#aabbcc').ok).toBe(true)
   })
 })

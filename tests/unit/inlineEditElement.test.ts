@@ -6,6 +6,7 @@ import {
   elementEditRequestSchema,
   applyElementEdit,
   checkElementBaseRevision,
+  elementCommitConflict,
   editorElementPath,
   editorFingerprintText,
   type ElementEditRequest,
@@ -295,7 +296,7 @@ describe('applyElementEdit — text (FR-15)', () => {
   })
 
   it('the fingerprint is whitespace-normalized on both sides', () => {
-    const r = applyElementEdit(HTML, req([0, 0], 'h1', '\n  Launch day ', 'text', 'x'))
+    const r = applyElementEdit(HTML, req([0, 0], 'h1', '\n  Launch\u00a0day ', 'text', 'x'))
     expect(r.ok).toBe(true)
   })
 
@@ -589,11 +590,11 @@ describe('applyElementEdit — silent text differences (Minor 5)', () => {
 })
 
 describe('applyElementEdit — tag comparison is ASCII-only (Minor 4)', () => {
-  const html = '<!doctype html><html><body><tracK>x</tracK></body></html>'
+  const html = '<!doctype html><html><body><trac\u212A>x</trac\u212A></body></html>'
 
   it('the browser tagName (ASCII-uppercased, Kelvin sign kept) matches', () => {
-    const r = applyElementEdit(html, req([0], 'TRACK', 'x', 'text', 'y'))
-    expect(r.ok && r.html).toContain('<tracK>y</tracK>')
+    const r = applyElementEdit(html, req([0], 'TRAC\u212A', 'x', 'text', 'y'))
+    expect(r.ok && r.html).toContain('<trac\u212A>y</trac\u212A>')
   })
 
   it('"TRACK" does not match it (toLowerCase would fold the Kelvin sign to k)', () => {
@@ -617,5 +618,22 @@ describe('applyElementEdit — deep nesting fails closed, never throws (Minor 2)
     const html = '<!doctype html><html><body><p style="color: red; foo: {">x</p></body></html>'
     const r = applyElementEdit(html, req([0], 'p', 'x', 'color', '#000'))
     expect(r).toMatchObject({ ok: false, status: 409, code: 'element-unsupported' })
+  })
+})
+
+// ── Fix round 2 (review of 88b6b35b, Minor 3) ────────────────────────────────
+
+describe('elementCommitConflict: the 409 for a commit-time CAS miss', () => {
+  it('an action claimed during the render is draft-busy, with the existing busy message', () => {
+    expect(elementCommitConflict('REFINE')).toEqual({
+      ok: false,
+      status: 409,
+      code: 'draft-busy',
+      error: 'Another action is already running on this draft',
+    })
+  })
+
+  it('otherwise the pointer moved: element-stale', () => {
+    expect(elementCommitConflict(null)).toMatchObject({ ok: false, status: 409, code: 'element-stale' })
   })
 })
