@@ -5,6 +5,8 @@ import {
   SUPERSEDES_RULE,
   CONSTRAINS_RULE,
   checkPostConditions,
+  asksForTextReduction,
+  TEXT_REDUCTION_CHECK,
   decodeHtmlEntities,
   renderClassSemantics,
   type DomElementFact,
@@ -858,5 +860,206 @@ describe('T17 — replace+remove with one flat supersedes: a wholesale-replaced 
     const after = facts([bgLayer(), headline(), body('Completely different words describing another thing entirely, at even greater length than before, so that this new passage runs well past the twenty words of the original body.'), logo()])
     const r = check('remove', { after, supersedes: ['Join us for'], classes: ['remove', 'add'] })
     expect(r.ok).toBe(false)
+  })
+})
+
+// ── Final fix wave F1 (change 004 final review, slice 1) ─────────────────────
+
+// C-1: the reported duplicate shape is "the uploaded image applied as the
+// background AND kept as a separate inset" (proposal.md:18). Refine has no
+// upload, so "the uploaded image" is an <img> already in the design. The check
+// used to certify that duplicate (supersedes = the old background URL, which is
+// gone) and miss the correct move whenever supersedes named the moved image.
+describe('final F1 / C-1 — replace: no existing image may appear more often, and a moved image must leave its old place', () => {
+  const inset = (src = UPLOAD, cls: string[] = ['inset']) => el({ tag: 'img', classes: cls, imageSources: [src], box: { width: 300, height: 300 } })
+  const before = facts([bgLayer(OLD_BG), headline(), body(), inset()])
+  // The duplicate: the upload is the background AND still the inset.
+  const dup = facts([bgLayer(UPLOAD), headline(), body(), inset()])
+  // The correct move: the upload is the background, the inset is gone.
+  const moved = facts([bgLayer(UPLOAD), headline(), body()])
+  const replace = (after: DomFacts, supersedes: string[], classes: InstructionClass[] = ['replace'], b: DomFacts = before) =>
+    check('replace', { before: b, after, supersedes, classes })
+
+  // Every supersedes form the replace semantics allow for this instruction.
+  const FORMS: string[][] = [[OLD_BG], [UPLOAD], ['.inset'], [OLD_BG, '.inset'], [OLD_BG, UPLOAD], ['upload.jpg'], [`url('${OLD_BG}')`, '.inset']]
+
+  for (const supersedes of FORMS) {
+    it(`probe1 duplicate MISSES — supersedes ${JSON.stringify(supersedes)}`, () => {
+      const r = replace(dup, supersedes)
+      expect(r.ok).toBe(false)
+      if (!r.ok) expect(r.reason).toMatch(/^replace: /)
+    })
+    it(`probe1 correct move PASSES — supersedes ${JSON.stringify(supersedes)}`, () => {
+      expect(replace(moved, supersedes)).toEqual({ ok: true })
+    })
+  }
+
+  it('the duplicate reason names the image whose count grew, and the counts', () => {
+    const r = replace(dup, [OLD_BG])
+    expect(r.ok).toBe(false)
+    if (!r.ok) {
+      expect(r.reason).toContain(UPLOAD)
+      expect(r.reason).toMatch(/1 → 2/)
+    }
+  })
+
+  it('a moved inset with no class of its own passes when it leaves (another <img> of a different shape stays)', () => {
+    const b = facts([bgLayer(OLD_BG), headline(), inset(UPLOAD, []), logo()])
+    const a = facts([bgLayer(UPLOAD), headline(), logo()])
+    expect(replace(a, [UPLOAD], ['replace'], b)).toEqual({ ok: true })
+    expect(replace(a, [OLD_BG, UPLOAD], ['replace'], b)).toEqual({ ok: true })
+  })
+
+  it('a SWAP (upload to the background, old background into the inset) misses in every form — the old image moved to another element', () => {
+    const swapped = facts([bgLayer(UPLOAD), headline(), body(), inset(OLD_BG)])
+    for (const supersedes of [[OLD_BG], [UPLOAD], ['.inset'], [OLD_BG, '.inset']]) {
+      expect(replace(swapped, supersedes).ok).toBe(false)
+    }
+  })
+
+  it('the old background layered underneath on a NEW element still misses by URL (the element it identified survives)', () => {
+    const layered = facts([bgLayer(UPLOAD), bgLayer(OLD_BG, 'underlay'), headline(), body()])
+    expect(replace(layered, [OLD_BG], ['replace'], facts([bgLayer(OLD_BG), headline(), body()])).ok).toBe(false)
+  })
+
+  it('a moved image kept on an element with the same id misses (the identified element survives)', () => {
+    const b = facts([bgLayer(OLD_BG), el({ tag: 'img', id: 'photo', imageSources: [UPLOAD] })])
+    const a = facts([bgLayer(UPLOAD), el({ tag: 'img', id: 'photo', imageSources: [UPLOAD] })])
+    expect(replace(a, [UPLOAD], ['replace'], b).ok).toBe(false)
+    const gone = facts([bgLayer(UPLOAD)])
+    expect(replace(gone, [UPLOAD], ['replace'], b)).toEqual({ ok: true })
+  })
+
+  it('an unrelated existing image duplicated by a replace misses (multiplicity holds for every BEFORE image)', () => {
+    const a = facts([bgLayer(UPLOAD), headline(), body(), logo(), logo()])
+    const r = check('replace', { after: a, supersedes: [OLD_BG] })
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.reason).toContain(LOGO)
+  })
+
+  it('a NEW image may appear any number of times; an image kept at its count is fine', () => {
+    const a = facts([bgLayer(UPLOAD), bgLayer(UPLOAD, 'echo'), headline(), body(), logo()])
+    expect(check('replace', { after: a, supersedes: [OLD_BG] })).toEqual({ ok: true })
+  })
+
+  it('holds with remove co-present (replace+remove): the duplicate misses, the move passes', () => {
+    const shorter = (f: DomFacts) => facts(f.elements.map((e) => (e.tag === 'p' ? body(SHORT_BODY) : e)))
+    expect(replace(shorter(dup), [OLD_BG, 'Join us for'], ['replace', 'remove']).ok).toBe(false)
+    expect(replace(shorter(moved), [OLD_BG, 'Join us for'], ['replace', 'remove'])).toEqual({ ok: true })
+    expect(replace(shorter(moved), ['.inset', 'Join us for'], ['replace', 'remove'])).toEqual({ ok: true })
+  })
+
+  it('the replace example steers to the unambiguous form: name the old background AND the moved image\'s old place, and say an image may not appear more often', () => {
+    const s = INSTRUCTION_CLASSES.replace.semantics
+    expect(s).toMatch(/uploaded image as the background/)
+    expect(s).toMatch(/more often/i)
+    // The example lists both the old background and the image's previous element.
+    expect(s).toMatch(/supersedes \["<the current background image URL[^\]]*", "<[^\]]*(old|previous|current) (element|place)/i)
+  })
+})
+
+// I-2: a self-classified "reduce the text" could pass with a LONGER rewrite —
+// as replace (contentAbsent only needs the phrase gone) or replace+remove (the
+// wholesale exemption). A narrow lexicon on the instruction adds a
+// deterministic word-count decrease, whatever the classes.
+describe('final F1 / I-2 — the text-reduction lexicon adds a visible-word-count decrease', () => {
+  const H = 'Join the Industry Readiness Programme'
+  const P = 'Our twelve week programme gives undergraduates hands on experience with real client projects and mentors'
+  const mk = (h: string, p: string) =>
+    nested(`${h} ${p}`, [el({ tag: 'body', text: `${h} ${p}` }), el({ tag: 'h1', text: h }), el({ tag: 'p', classes: ['body-copy'], text: p })])
+  const B = mk(H, P)
+  // probe2: a 20→28-word rewrite.
+  const LONGER = mk(H, 'This intensive and immersive twelve week journey equips every ambitious undergraduate with practical, hands on exposure to genuine client engagements alongside seasoned industry mentors and peers')
+  // probe4: a wholesale rewrite, longer.
+  const WHOLESALE = mk(H, 'Discover an immersive curriculum where ambitious students build genuine portfolios through practical engagements supervised by seasoned professionals across many sectors every single day')
+  const SHORTER = mk(H, 'Twelve weeks of real client projects and mentors')
+  const run = (after: DomFacts, classes: InstructionClass[], instruction = 'reduce the text') =>
+    checkPostConditions({ before: B, after, supersedes: ['twelve week programme gives'], constrains: [], classes, instruction })
+  const allOk = (rs: ReturnType<typeof run>) => rs.every((r) => r.result.ok)
+
+  for (const [name, after] of [['probe2 longer rewrite', LONGER], ['probe4 wholesale rewrite', WHOLESALE]] as const) {
+    for (const classes of [['replace'], ['replace', 'remove'], ['remove'], ['add'], ['replace', 'add']] as InstructionClass[][]) {
+      it(`${name} under ${JSON.stringify(classes)} MISSES`, () => {
+        const rs = run(after, classes)
+        expect(allOk(rs)).toBe(false)
+        const tr = rs.find((r) => r.class === TEXT_REDUCTION_CHECK)
+        expect(tr?.result.ok).toBe(false)
+        if (tr && !tr.result.ok) expect(tr.result.reason).toMatch(/^text reduction: .*\d+ → \d+/)
+      })
+    }
+  }
+
+  it('a real reduction passes the lexicon check under every class set', () => {
+    for (const classes of [['replace'], ['replace', 'remove'], ['remove'], ['add']] as InstructionClass[][]) {
+      expect(run(SHORTER, classes).find((r) => r.class === TEXT_REDUCTION_CHECK)?.result).toEqual({ ok: true })
+    }
+  })
+
+  it('without the instruction (or outside the lexicon) no lexicon check runs — the known limit', () => {
+    const rs = checkPostConditions({ before: B, after: LONGER, supersedes: ['twelve week programme gives'], constrains: [], classes: ['replace'] })
+    expect(rs.find((r) => r.class === TEXT_REDUCTION_CHECK)).toBeUndefined()
+    expect(run(LONGER, ['replace'], 'rewrite the paragraph').find((r) => r.class === TEXT_REDUCTION_CHECK)).toBeUndefined()
+  })
+
+  const TRIGGERS = [
+    'reduce the text',
+    'Reduce the text',
+    'please reduce the body text a bit',
+    'shorten the description',
+    'shorten the caption',
+    'trim the copy',
+    'cut down the wording',
+    'cut the words "Limited seats" from the badge',
+    'condense the paragraph',
+    'reduce the amount of text',
+    'reduce the number of words',
+    'reduce the word count',
+    'use less text',
+    'fewer words please',
+    'less copy on the poster',
+    'make the text shorter',
+    'make the copy more concise',
+    'keep the caption shorter',
+    'shorter text',
+    'more concise copy',
+    'make the body text a bit shorter',
+    'shorten the paragraphs and add a logo',
+  ]
+  const NON_TRIGGERS = [
+    'reduce the logo size',
+    'make the image smaller',
+    'reduce the padding',
+    'reduce the text size',
+    'reduce the font size of the body text',
+    'make the headline smaller',
+    'reduce the size of the text',
+    'cut the image in half',
+    'trim the photo',
+    'less padding',
+    'fewer images',
+    'shorten the logo bar',
+    'reduce the body padding',
+    'make the text smaller',
+    'reduce the text spacing',
+    'reduce the text opacity',
+    'include a human character',
+    'reduce it',
+    'make the caption navy',
+    'reduce the line height of the text',
+  ]
+  for (const t of TRIGGERS) it(`lexicon matches: ${JSON.stringify(t)}`, () => expect(asksForTextReduction(t)).toBe(true))
+  for (const t of NON_TRIGGERS) it(`lexicon does NOT match: ${JSON.stringify(t)}`, () => expect(asksForTextReduction(t)).toBe(false))
+
+  it('size words never trigger the word-count check (a smaller headline with the same words passes structurally)', () => {
+    const smaller = nested(`${H} ${P}`, [el({ tag: 'body', text: `${H} ${P}` }), el({ tag: 'h1', text: H, fontSizePx: 40 }), el({ tag: 'p', classes: ['body-copy'], text: P })])
+    const rs = checkPostConditions({ before: B, after: smaller, supersedes: [], constrains: [], classes: ['add'], instruction: 'reduce the text size' })
+    expect(rs).toEqual([])
+  })
+})
+
+// M-1: the verifier's scope wording lives in the table (AC-19).
+describe('final F1 / M-1 — every class carries its verifier scope in the table', () => {
+  it('has a non-empty verifierScope per class', () => {
+    for (const k of INSTRUCTION_CLASS_KEYS) expect(INSTRUCTION_CLASSES[k].verifierScope.trim().length).toBeGreaterThan(10)
   })
 })

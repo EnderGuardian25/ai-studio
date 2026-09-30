@@ -89,7 +89,10 @@
 //     — passes remove; a rewording that keeps half the words still has to
 //     shrink. Per-clause supersedes ({fragment, clause}) is the upgrade path
 //     if that proves to matter. The exemption is replace-only: remove+add
-//     still requires the reduction.
+//     still requires the reduction. Final F1 / I-2 narrows the fail-open
+//     case: when the instruction is in TEXT_REDUCTION_LEXICON ("reduce the
+//     text"), the visible word count must fall whatever the classes, and the
+//     exemption does not apply to that check.
 //
 // A text passage counts as reduced only when it no longer appears INTACT in the
 // document's text (re-wrapping a phrase in <strong>, or splitting a paragraph
@@ -176,6 +179,10 @@ export interface PostConditionInput {
   // Every class the instruction carried (after effectiveClasses), including the
   // one being checked.
   classes: InstructionClass[]
+  // The user's instruction. Only the text-reduction lexicon reads it (see
+  // TEXT_REDUCTION_LEXICON); the class post-conditions never do. Omitted → no
+  // lexicon check.
+  instruction?: string
 }
 
 export type PostConditionResult = { ok: true } | { ok: false; reason: string }
@@ -185,6 +192,12 @@ export type PostCondition = (input: PostConditionInput, table: InstructionClassT
 
 export interface InstructionClassDefinition {
   semantics: string
+  // What this class covers, as one clause, for the add-verifier prompt. The
+  // prompt names the classes whose post-conditions already ran and tells the
+  // verifier to judge every OTHER class's scope (refineVerify.ts
+  // buildVerifierPrompt) — this field is the only definition of that scope
+  // (AC-19).
+  verifierScope: string
   postCondition: PostCondition | null
   // Deletes content; permitted only with a non-empty supersedes (FR-04 —
   // enforced by the route via effectiveClasses).
@@ -502,26 +515,101 @@ function targetMiss(was: DomElementFact, now: DomElementFact, direction?: Constr
 
 // ── Post-conditions ──────────────────────────────────────────────────────────
 
+// ── Image multiplicity and moves (replace, final F1 / C-1) ───────────────────
+//
+// The reported duplicate is "the uploaded image applied as the background AND
+// kept as a separate inset" (proposal.md:18). Refine carries no upload, so that
+// image is already in the design, and checking only that the NAMED source is
+// gone got the shape backwards: supersedes = the old background URL passed the
+// duplicate (the old URL is gone), and supersedes = the moved image missed the
+// correct move (it is, rightly, still present). Two rules close it:
+//   1. Multiplicity: in a replace, no image source present in BEFORE may appear
+//      more often in AFTER. The duplicate raises the moved image 1 → 2.
+//   2. A superseded image may still be present only as a MOVE: its count did
+//      not grow, and every element that carried it in BEFORE is GONE (an id'd
+//      element: no element keeps that id; otherwise fewer elements of its
+//      tag+classes remain) and no remaining element of that shape carries it.
+//      "Gone", not merely "no longer carries it": otherwise the old background
+//      moved onto a new layer under a re-imaged .bg — the "layered underneath"
+//      failure — would pass.
+// Known limits (fail closed — a false miss offers "Use anyway"):
+//   - a replace that legitimately reuses an image already in the design in a
+//     second place ("replace the second photo with the first") misses;
+//   - a moved image whose old element survives with another image (a swap)
+//     misses whichever fragment is named;
+//   - a moved image whose old element was the body/html misses (never gone).
+
+const countOf = (sources: string[], s: string) => sources.reduce((n, x) => (x === s ? n + 1 : n), 0)
+
+// BEFORE image sources that appear more often in AFTER, described with counts.
+function multipliedImages(before: DomFacts, after: DomFacts): string[] {
+  return unique(before.imageSources).flatMap((s) => {
+    const n0 = countOf(before.imageSources, s)
+    const n1 = countOf(after.imageSources, s)
+    return n1 > n0 ? [`${JSON.stringify(s)} (${n0} → ${n1})`] : []
+  })
+}
+
+// The BEFORE sources a resolved fragment identifies.
+function identifiedSources(before: DomFacts, r: ResolvedFragment): string[] {
+  return unique(
+    before.imageSources.filter((s) => (r.imageSubstring ? r.images.some((u) => s.includes(u)) : r.images.includes(s))),
+  )
+}
+
+// Rule 2 above: the fragment's images are still present, but only because they
+// moved away from every element that carried them.
+function movedAway(before: DomFacts, after: DomFacts, r: ResolvedFragment): boolean {
+  const sources = identifiedSources(before, r)
+  if (sources.length === 0) return false
+  if (sources.some((s) => countOf(after.imageSources, s) > countOf(before.imageSources, s))) return false
+  const carries = (e: DomElementFact) => e.imageSources.some((s) => sources.includes(s))
+  const carriers = before.elements.filter(carries)
+  if (carriers.length === 0) return false
+  const shapeCount = (facts: DomFacts, key: string) => facts.elements.filter((e) => shapeKey(e) === key).length
+  return carriers.every((was) => {
+    const key = shapeKey(was)
+    const gone = was.id
+      ? !after.elements.some((e) => e.id === was.id)
+      : shapeCount(after, key) < shapeCount(before, key)
+    return gone && !after.elements.some((e) => shapeKey(e) === key && carries(e))
+  })
+}
+
+// The fragment with its image content set aside (already judged by the caller).
+const textPart = (r: ResolvedFragment): ResolvedFragment => ({ ...r, images: [] })
+
 // replace: every superseded fragment's content was present before and is
-// absent after. The element may be reused (same .bg, new image). When remove
-// is co-present the one flat supersedes list serves both clauses, so a text
-// fragment that was shortened (per contentReduced) or rewritten wholesale (per
-// replacedWholesale) satisfies replace; an image must still be gone.
+// absent after. The element may be reused (same .bg, new image). A superseded
+// image may survive only as a move (movedAway), and no BEFORE image may appear
+// more often (multipliedImages). When remove is co-present the one flat
+// supersedes list serves both clauses, so a text fragment that was shortened
+// (per contentReduced) or rewritten wholesale (per replacedWholesale)
+// satisfies replace; an image must still be gone or moved.
 const supersededElementAbsent: PostCondition = (input) => {
   const resolved = resolveSupersedes('replace', input)
   if (!Array.isArray(resolved)) return resolved
+  const { before, after } = input
   const withRemove = input.classes.includes('remove')
-  const kept = resolved.filter((r) =>
-    withRemove
-      ? !contentReduced(input.before, input.after, r) && !replacedWholesale(input.after, r)
-      : !contentAbsent(input.after, r),
-  )
-  return kept.length === 0
-    ? { ok: true }
-    : {
-        ok: false,
-        reason: `replace: the content of ${quoted(kept.map((r) => r.raw))} is still present after the edit — the superseded content must be gone, not kept alongside the new one`,
-      }
+  const kept = resolved.filter((r) => {
+    if (imagesPresent(after, r) && !movedAway(before, after, r)) return true
+    const t = textPart(r)
+    return withRemove ? !contentReduced(before, after, t) && !replacedWholesale(after, t) : !contentAbsent(after, t)
+  })
+  const grown = multipliedImages(before, after)
+  const problems = [
+    ...(kept.length > 0
+      ? [
+          `the content of ${quoted(kept.map((r) => r.raw))} is still present after the edit — the superseded content must be gone, not kept alongside the new one`,
+        ]
+      : []),
+    ...(grown.length > 0
+      ? [
+          `image ${grown.join(', ')} now appears more often than before — an image already in the design must not be duplicated; one that moves (for example an inset that becomes the background) must leave its old place`,
+        ]
+      : []),
+  ]
+  return problems.length === 0 ? { ok: true } : { ok: false, reason: `replace: ${problems.join('; and ')}` }
 }
 
 // remove: every named fragment's content is reduced, AND the document shrank:
@@ -620,13 +708,15 @@ export const INSTRUCTION_CLASSES: InstructionClassTable = {
   add: {
     semantics:
       'Add what the instruction asks for and preserve everything else — every existing element, image and line of text stays where it is. Also use add for changes to colour, weight, style or spacing. Example: "include a human character" → add a figure; the headline, copy, logo and background all remain.',
+    verifierScope: 'anything the instruction adds, or any change to colour, weight, style or spacing',
     postCondition: null,
     destructive: false,
     additive: true,
   },
   replace: {
     semantics:
-      'Put new content in place of existing content. The superseded content — the old image, the old text — must be GONE from the result: not hidden, not layered underneath, not moved to another element, not kept alongside the new one. You may reuse the same element (for example, swap the image on the same background element). List what is replaced in supersedes. Example: "use the uploaded image as the background" → supersedes ["<the current background image URL, copied exactly from its url(...) or src>"].',
+      'Put new content in place of existing content. The superseded content — the old image, the old text — must be GONE from the result: not hidden, not layered underneath, not moved to another element, not kept alongside the new one. You may reuse the same element (for example, swap the image on the same background element). No image already in the design may appear more often afterwards: an image that moves (for example a photo in the design that becomes the background) must leave its old place. List what is replaced in supersedes. Example: "use the uploaded image as the background" → supersedes ["<the current background image URL, copied exactly from its url(...) or src>", "<the uploaded image\'s old element, as its #id or .class, when it moves from there>"]; the old background is gone and the uploaded image appears once, as the background.',
+    verifierScope: 'content the instruction replaces (the superseded content is gone, and no existing image appears more often)',
     postCondition: supersededElementAbsent,
     destructive: true,
     additive: true,
@@ -634,6 +724,7 @@ export const INSTRUCTION_CLASSES: InstructionClassTable = {
   remove: {
     semantics:
       'Delete or shorten the named content. The result must contain measurably less: removed content is gone, shortened text loses whole words, and nothing new is added elsewhere to compensate. List each thing you remove or shorten in supersedes. For a text reduction, name a TEXT phrase from each passage you shorten — text reductions are checked by word count, and only when a text phrase is named. Example: "reduce the text" → supersedes ["<a phrase unique to each passage you shorten>"]; each of those passages must come out shorter.',
+    verifierScope: 'content the instruction removes or shortens (it is gone, or its text has fewer words)',
     postCondition: targetTextShorter,
     destructive: true,
     additive: false,
@@ -641,6 +732,7 @@ export const INSTRUCTION_CLASSES: InstructionClassTable = {
   constrain: {
     semantics:
       'Bound a measurable size or length of existing content — font size, element size, text length or word count — without adding anything: no new elements, images or text. Name the target in constrains with the direction of the change; a text phrase used as the target must still be present after your edit. Examples: "make the headline smaller" → constrains [{"fragment": "<the headline\'s #id, .class or a phrase of its text>", "direction": "decrease"}] and reduce its font-size; "keep the body text under 12 words" → constrains [{"fragment": "<a phrase of the body text>", "direction": "decrease"}]. supersedes stays empty — a constrain deletes nothing.',
+    verifierScope: 'a size or length the instruction bounds (font size, element size, text length or word count moved the way it asks)',
     postCondition: boundedAttributeHolds,
     destructive: false,
     additive: false,
@@ -673,14 +765,84 @@ ${SUPERSEDES_RULE}
 ${CONSTRAINS_RULE}`
 }
 
+// ── Text-reduction lexicon (final F1 / I-2) ──────────────────────────────────
+//
+// The model classifies its own instruction, so "reduce the text" answered as
+// replace (the phrase is gone — contentAbsent is satisfied by a LONGER
+// rewrite), as replace+remove (the wholesale exemption, Known limits: flat
+// supersedes), or defaulted to add (FR-05) could pass without the text getting
+// shorter. When the INSTRUCTION itself asks for less text, one extra
+// deterministic post-condition runs, whatever the classes and with no
+// wholesale exemption: the document's visible word count must strictly
+// decrease. It is structural — zero model calls (AC-12).
+//
+// The lexicon is deliberately NARROW. It matches:
+//   - a reducing verb — reduce, shorten, trim, cut (optionally "down"/"back"/
+//     "out"), condense, or less / fewer — followed (after optional
+//     determiners/modifiers such as "the", "all of the", "the amount of",
+//     "the body") by a text object: text, copy, word(s), wording,
+//     paragraph(s), caption(s), body, description(s);
+//   - "shorter" / "briefer" / "more concise" said of a text object, before it
+//     ("shorter text") or after it ("make the copy more concise", "the caption
+//     should be shorter").
+// A text object followed by a visual property ("the text size", "the body
+// padding", "the text spacing") is NOT a match, and size or visual words
+// alone ("reduce the logo size", "make the image smaller", "make the text
+// smaller", "reduce the padding") never are.
+//
+// Known limit (the boundary): phrasings outside the lexicon — "tighten the
+// copy", "shorten the headline", "too wordy", other languages — remain
+// classifier-dependent: they are checked only by the classes the model
+// declared. A match inside it can false-miss (fail closed): "shorten the
+// caption and add a tagline" must still lower the whole document's word count.
+export const TEXT_REDUCTION_CHECK = 'text-reduction' as const
+
+const REDUCING_VERB = String.raw`(?:reduce|reducing|shorten|shortening|trim|trimming|cut|cutting|condense|condensing)(?:\s+(?:down|back|out))?`
+const FEWER = String.raw`(?:less|fewer)`
+const SHORTER = String.raw`(?:shorter|briefer|more\s+concise)`
+const TEXT_MODIFIERS = String.raw`(?:(?:the|this|that|these|those|all|some|of|a|bit|little|lot|amount|number|length|main|body|intro|headline|sub-?heading|subtitle|post|poster)\s+)*`
+const TEXT_OBJECT = String.raw`(?:text|copy|words?|wording|paragraphs?|captions?|body|descriptions?)`
+const VISUAL_PROPERTY = String.raw`(?!\s+(?:sizes?|fonts?|font-size|heights?|widths?|spacing|padding|margins?|gaps?|colou?rs?|weights?|opacity|contrast|shadows?|box(?:es)?|areas?|scale|lines?|line-height|leading|tracking|styles?|blocks?|bars?|alignment|position|layers?)\b)`
+const COPULA = String.raw`(?:(?:should|must|could|can)\s+be\s+|needs?\s+to\s+be\s+|is\s+|are\s+)?`
+const DEGREE = String.raw`(?:(?:a\s+)?(?:bit|little|lot|much|far)\s+)?`
+
+export const TEXT_REDUCTION_LEXICON: readonly RegExp[] = [
+  new RegExp(String.raw`\b${REDUCING_VERB}\s+${TEXT_MODIFIERS}${TEXT_OBJECT}\b${VISUAL_PROPERTY}`, 'i'),
+  new RegExp(String.raw`\b${FEWER}\s+${TEXT_MODIFIERS}${TEXT_OBJECT}\b${VISUAL_PROPERTY}`, 'i'),
+  new RegExp(String.raw`\b${TEXT_OBJECT}\s+${COPULA}${DEGREE}${SHORTER}\b`, 'i'),
+  new RegExp(String.raw`\b${SHORTER}\s+${TEXT_MODIFIERS}${TEXT_OBJECT}\b${VISUAL_PROPERTY}`, 'i'),
+]
+
+export function asksForTextReduction(instruction: string): boolean {
+  return TEXT_REDUCTION_LEXICON.some((re) => re.test(instruction))
+}
+
+function visibleWordCountDecreased(before: DomFacts, after: DomFacts): PostConditionResult {
+  const w0 = wordCount(before.text)
+  const w1 = wordCount(after.text)
+  return w1 < w0
+    ? { ok: true }
+    : {
+        ok: false,
+        reason: `text reduction: the instruction asks for less text, but the visible word count did not go down (${w0} → ${w1}) — the result must have fewer words, not a rewrite of the same length or longer`,
+      }
+}
+
 // Runs every class's post-condition from the table (the verifier consumer;
-// classes with a null post-condition — add — are skipped for the model verifier).
+// classes with a null post-condition — add — are skipped for the model
+// verifier), plus the text-reduction check when the instruction is in the
+// lexicon — whatever the classes.
 export function checkPostConditions(
   input: PostConditionInput,
   table: InstructionClassTable = INSTRUCTION_CLASSES,
-): Array<{ class: InstructionClass; result: PostConditionResult }> {
-  return input.classes.flatMap((c) => {
-    const pc = table[c].postCondition
-    return pc ? [{ class: c, result: pc(input, table) }] : []
-  })
+): Array<{ class: InstructionClass | typeof TEXT_REDUCTION_CHECK; result: PostConditionResult }> {
+  const results: Array<{ class: InstructionClass | typeof TEXT_REDUCTION_CHECK; result: PostConditionResult }> =
+    input.classes.flatMap((c) => {
+      const pc = table[c].postCondition
+      return pc ? [{ class: c, result: pc(input, table) }] : []
+    })
+  if (input.instruction && asksForTextReduction(input.instruction)) {
+    results.push({ class: TEXT_REDUCTION_CHECK, result: visibleWordCountDecreased(input.before, input.after) })
+  }
+  return results
 }

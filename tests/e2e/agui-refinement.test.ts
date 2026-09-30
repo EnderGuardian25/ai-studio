@@ -252,7 +252,8 @@ test.describe('AGUI design refinement', () => {
 // not-applied outcome. These cases drive that contract end to end with the
 // T20 seams (src/lib/testHooks.ts):
 //   mock refine replies  __REFINE_REDUCE_NOOP__ / _REAL__, __REFINE_IMAGE_DUP__ /
-//                        _REPLACE__, __REFINE_EMPTY_SUPERSEDES__,
+//                        _REPLACE__, __REFINE_IMAGE_MOVE_DUP__,
+//                        __REFINE_EMPTY_SUPERSEDES__,
 //                        __REFINE_MULTI_CLASS__, __REFINE_TOKEN_RENAME__,
 //                        __REFINE_TRUNCATED__, modifier __REFINE_FIX_ON_RETRY__
 //   forced verify        __VERIFY_PASS__ / _FAIL_ALWAYS__ / _FAIL_ONCE__ /
@@ -287,6 +288,11 @@ const textDoc = () => doc(`<p>${PARAGRAPH}</p>`)
 // An "uploaded" image on the public MinIO host (the IMAGES bucket is public-read).
 const imageUrlFor = (tag: string) => `http://localhost:9000/images/t21-${tag}-uploaded.png`
 const imageDoc = (tag: string) => doc(`<img src="${imageUrlFor(tag)}" alt="Uploaded photo"><p>Autumn open day</p>`)
+// Final F1 / C-1: an old background plus an "uploaded" inset — the before-
+// document of the reported duplicate (background first, inset second: the
+// order __REFINE_IMAGE_MOVE_DUP__ reads them in).
+const moveDoc = (oldBg: string, upload: string) =>
+  doc(`<div class="bg" style="background-image:url('${oldBg}')"></div><img class="inset" src="${upload}" alt="Uploaded photo"><p>Autumn open day</p>`)
 const dataUri = `data:image/png;base64,${MOCK_PNG_B64}`
 const dataDoc = () => doc(`<img src="${dataUri}" alt="Inline logo"><p>Inline asset poster</p>`)
 
@@ -580,6 +586,54 @@ test.describe('§V — refine fidelity contract', () => {
     )
     expect(settled.htmlContent).not.toContain(imageUrlFor(tag))
     expect(settled.htmlContent).toContain(MOCK_NEW_IMAGE)
+  })
+
+  // TC-FID-05b — REGRESSION, the REPORTED duplicate shape (AC-09, final F1 /
+  // C-1). "The uploaded image" is an image already in the design (an inset);
+  // the reply applies it as the background AND keeps the inset, with
+  // supersedes naming the old background — which IS gone. The old check
+  // certified this; the image-multiplicity rule (upload 1 → 2) misses it.
+  test('regression: the inset image applied as the background AND kept as the inset is not applied', async () => {
+    if (!FIDELITY_READY()) { test.skip(); return }
+    const tag = `img-move-dup-${Date.now()}`
+    const oldBg = `http://localhost:9000/images/t21-${tag}-old-bg.png`
+    const upload = imageUrlFor(tag)
+    const draft = await fidelityDraft(api, tag, moveDoc(oldBg, upload))
+    const instruction = `Use the uploaded image as the background __REFINE_IMAGE_MOVE_DUP__ ${uniq('V05b')}`
+
+    const { row, diag } = await refineNotApplied(api, draft, instruction)
+
+    for (const a of diag.attempts) {
+      expect(a.classes).toEqual(['replace'])
+      expect(a.effectiveClasses).toEqual(['replace'])
+      expect(a.supersedes).toEqual([oldBg])
+      expect(a.verdict).toBe('miss')
+      expect(a.reasons.some((r) => /^replace: .*appears more often/.test(r))).toBe(true)
+    }
+    expect(diag.verifierCalls).toBe(0)
+    // The rejected render IS the reported duplicate: the old background gone,
+    // the upload twice (background + inset).
+    expect(row.htmlSnapshot).not.toContain(oldBg)
+    expect(row.htmlSnapshot.split(upload).length - 1).toBe(2)
+    const live = await (await api.get(`/api/drafts/${draft.id}`)).json()
+    expect(live.htmlContent).toBe(draft.html)
+  })
+
+  // TC-FID-05c — the correct move commits (AC-09): upload as the background,
+  // inset gone — reached on the retry.
+  test('the inset image moved to the background (inset gone) commits on the retry', async () => {
+    if (!FIDELITY_READY()) { test.skip(); return }
+    const tag = `img-move-${Date.now()}`
+    const oldBg = `http://localhost:9000/images/t21-${tag}-old-bg.png`
+    const upload = imageUrlFor(tag)
+    const draft = await fidelityDraft(api, tag, moveDoc(oldBg, upload))
+    const settled = await refineCommitted(
+      api,
+      draft,
+      `Use the uploaded image as the background __REFINE_IMAGE_MOVE_DUP__ __REFINE_FIX_ON_RETRY__ ${uniq('V05c')}`,
+    )
+    expect(settled.htmlContent).not.toContain(oldBg)
+    expect(settled.htmlContent.split(upload).length - 1).toBe(1)
   })
 
   // TC-FID-06 — AC-10: a destructive class with empty supersedes deletes

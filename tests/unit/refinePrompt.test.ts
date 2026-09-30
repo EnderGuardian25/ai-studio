@@ -3,6 +3,7 @@ import type { ResolvedBrandKit } from '@/lib/brandkit/resolve'
 import { buildRefineSystemPrompt, buildRefineUserMessage, buildRefineRetryNote } from '@/lib/agent/prompts/refine'
 import { INSTRUCTION_CLASSES, renderClassSemantics } from '@/lib/agent/instructionClasses'
 import { renderEnvelopeProtocol } from '@/lib/agent/refineEnvelope'
+import { SCRIPT_SUPPORT_NOTE } from '@/lib/agent/prompts/shared'
 
 // T17 (change 004 Phase 2): the refine prompt renders the class semantics from
 // the one table (FR-03/FR-06) and the envelope reply protocol (FR-01) in BOTH
@@ -28,6 +29,16 @@ describe('buildRefineSystemPrompt', () => {
       expect(p).toContain(renderClassSemantics())
       expect(p).toContain(renderEnvelopeProtocol())
       for (const def of Object.values(INSTRUCTION_CLASSES)) expect(p).toContain(def.semantics)
+    })
+
+    // Final F1 / I-3: the CLI branch (prod) restated Sinhala preservation inline
+    // but never carried SCRIPT_SUPPORT_NOTE, so the no-emoji rule never reached
+    // a production refine.
+    it(`${mode}: carries SCRIPT_SUPPORT_NOTE (the no-emoji rule) exactly once`, () => {
+      const p = buildRefineSystemPrompt({ ...base, mode })
+      expect(p).toContain(SCRIPT_SUPPORT_NOTE)
+      expect(p.split(SCRIPT_SUPPORT_NOTE)).toHaveLength(2)
+      expect(p).toContain('never emoji')
     })
 
     it(`${mode}: no longer carries the blanket "preserve everything" rule`, () => {

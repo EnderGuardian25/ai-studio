@@ -320,6 +320,18 @@ function findImageRef(html: string): string | null {
   return m ? (m[1] ?? m[2] ?? null) : null
 }
 
+/** Every `src="…"` / `url(…)` reference in `html`, in document order, minus `@import url(…)`. */
+function findImageRefs(html: string): string[] {
+  const re = /(@import\s+)?(?:\bsrc\s*=\s*"([^"]+)"|url\(\s*['"]?([^'")]+)['"]?\s*\))/gi
+  const refs: string[] = []
+  for (const m of html.matchAll(re)) {
+    if (m[1]) continue
+    const ref = m[2] ?? m[3]
+    if (ref) refs.push(ref)
+  }
+  return refs
+}
+
 /** A short leading phrase of `html`'s visible text (tags/script/style/comments stripped). */
 function findTextPhrase(html: string): string | null {
   const text = html
@@ -375,6 +387,13 @@ function refineHeader(classes: InstructionClass[], supersedes: string[] = [], co
  *     background bug, AC-09 regression).
  *   - "__REFINE_IMAGE_REPLACE__"    — a `replace` whose reply drops the
  *     superseded image and adds a new one → pass.
+ *   - "__REFINE_IMAGE_MOVE_DUP__"   — the REPORTED duplicate shape (final F1
+ *     / C-1): the document's SECOND image (the "uploaded" inset) is applied
+ *     as the background AND kept as the inset, with supersedes = the FIRST
+ *     image (the old background, which is gone) → miss on image
+ *     multiplicity. Checked before the two above (distinct substring). With
+ *     "__REFINE_FIX_ON_RETRY__", attempt 2 is the correct move (inset gone).
+ *     Fewer than two images → a non-resolving supersedes (always a miss).
  *   - "__REFINE_EMPTY_SUPERSEDES__" — a `replace` with `supersedes: []`
  *     (AC-10 — `effectiveClasses` downgrades this to `add` before
  *     verification).
@@ -425,6 +444,20 @@ export function buildMockRefineReply(args: {
       return `${refineHeader(['remove'], supersedes)}\n${slimHtml}`
     }
     return `${refineHeader(['remove'], supersedes)}\n${refineDoc(width, height, 'Shortened.')}`
+  }
+
+  if (instruction.includes('__REFINE_IMAGE_MOVE_DUP__')) {
+    // The REPORTED shape (final F1 / C-1): the design's second image (the
+    // "uploaded" inset) becomes the background AND stays as the inset;
+    // supersedes names the old background, which is gone.
+    const [bgRef, insetRef] = findImageRefs(slimHtml)
+    if (!bgRef || !insetRef) {
+      // degrade: a supersedes entry that never resolves → always a miss
+      return `${refineHeader(['replace'], [MOCK_NEW_IMAGE])}\n${refineDoc(width, height, 'Mock move-dup refine reply.')}`
+    }
+    const background = `<div style="background-image:url('${insetRef}')"></div>`
+    const body = fixOnRetry ? background : `${background}<img src="${insetRef}" alt="Uploaded photo">`
+    return `${refineHeader(['replace'], [bgRef])}\n${refineDoc(width, height, body)}`
   }
 
   if (instruction.includes('__REFINE_IMAGE_DUP__') || instruction.includes('__REFINE_IMAGE_REPLACE__')) {

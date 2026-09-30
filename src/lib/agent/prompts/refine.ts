@@ -10,6 +10,11 @@
 // preserve, replace/remove delete what they name in supersedes. The route
 // verifies the reply (drafts/refineAttempt.ts) and, on a miss, retries ONCE
 // with buildRefineRetryNote appended to the same user message.
+//
+// Both modes carry SCRIPT_SUPPORT_NOTE (script fidelity + the no-emoji rule).
+// The CLI branch — the production path — used to restate only the Sinhala half
+// inline, so the no-emoji rule never reached a production refine (final F1 /
+// I-3).
 
 import type { ResolvedBrandKit } from '@/lib/brandkit/resolve'
 import { buildBrandKitSystemContext } from '@/lib/brandkit/systemContext'
@@ -53,6 +58,7 @@ export function buildRefineSystemPrompt(opts: RefinePromptOptions): string {
     return `You are a design refinement agent. Apply the user's instruction as a targeted edit to the HTML, staying on-brand. Classify the instruction first (classes below): content the instruction does not name stays exactly as it is, and content a replace or remove names must be gone.
 
 ${buildBrandKitSystemContext(kit)}${refinePlaceholderNote(hasInlineAssets)}${backgroundNote(backgroundImageUrl)}
+${SCRIPT_SUPPORT_NOTE}
 
 ${renderClassSemantics()}
 
@@ -60,7 +66,6 @@ Output protocol (single-shot — you have NO tools):
 - Apply the user's instruction to the HTML above as its classes require. Keep all structure, layout, and CSS the instruction does not name.
 - Keep the ${width}×${height} px canvas size unless the instruction explicitly asks to resize it.
 - Do NOT add external image/CDN references other than any URL explicitly named in the instruction or this system prompt. Brand font @import URLs are allowed.
-- Preserve any non-Latin text (e.g. Sinhala සිංහල) exactly — never transliterate or drop glyphs. "Noto Sans Sinhala" is available and the renderer also falls back to it automatically.
 - No commentary.
 
 ${renderEnvelopeProtocol()}`

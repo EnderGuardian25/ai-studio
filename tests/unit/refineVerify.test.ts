@@ -89,8 +89,9 @@ vi.mock('@/lib/testHooks', async (importOriginal) => {
 process.env.CLAUDE_CLI_MODEL = 'opus'
 process.env.CLAUDE_CLI_DEBUG = '0'
 
-const { verifyRefine, isAccepted, parseVerifierVerdict, buildVerifierPrompt, VERIFIER_MODEL, MAX_FACTS_CHARS } =
+const { verifyRefine, isAccepted, parseVerifierVerdict, buildVerifierPrompt, VERIFIER_MODEL, VERIFIER_SYSTEM, MAX_FACTS_CHARS } =
   await import('@/lib/drafts/refineVerify')
+const { INSTRUCTION_CLASSES } = await import('@/lib/agent/instructionClasses')
 const { runWithClaudeAuth } = await import('@/lib/agent/claudeAuth')
 type VerifyRefineInput = import('@/lib/drafts/refineVerify').VerifyRefineInput
 type StyledDomFacts = import('@/lib/renderer/domFacts').StyledDomFacts
@@ -708,5 +709,95 @@ describe('T17 — precomputed before-facts and the verifier-call hook', () => {
     const r = await verifyRefine(input({ onVerifierCall }))
     expect(r.kind).toBe('unavailable')
     expect(onVerifierCall).toHaveBeenCalledTimes(1)
+  })
+})
+
+// ── Final fix wave F1 (change 004 final review, slice 1) ─────────────────────
+
+// I-1 + M-1: the add verifier used to be told that replacing, removing and
+// resizing are "checked separately. Ignore them." — true only when those
+// classes are effective. A defaulted `add` (no header, FR-05) or a downgraded
+// constrain left the destructive or resize intent unchecked by anyone. The
+// prompt now names what the structural checks covered (from the table) and
+// tells Haiku to judge every OTHER part.
+describe('final F1 / I-1 + M-1 — the verifier judges every part no structural check covered', () => {
+  const judgeLine = (user: string) => user.split('\n').find((l) => /^Judge /.test(l)) ?? ''
+  const checkedLine = (user: string) => user.split('\n').find((l) => /^Already checked/.test(l)) ?? ''
+
+  it('probe5: "make the headline smaller" as add is NOT told to ignore resizing', () => {
+    const p = buildVerifierPrompt({ instruction: 'make the headline smaller', classes: ['add'], before: BEFORE, after: BEFORE })
+    const all = `${p.system}\n${p.user}`
+    expect(all).not.toMatch(/Ignore them/i)
+    expect(all).not.toMatch(/checked separately/i)
+    expect(judgeLine(p.user)).toContain(INSTRUCTION_CLASSES.constrain.verifierScope)
+    expect(p.user).toMatch(/No part of it was checked by measurement/)
+  })
+
+  it('a defaulted add for "reduce the text" is told to judge the removal', () => {
+    const p = buildVerifierPrompt({ instruction: 'reduce the text', classes: ['add'], before: BEFORE, after: BEFORE })
+    expect(judgeLine(p.user)).toContain(INSTRUCTION_CLASSES.remove.verifierScope)
+    expect(judgeLine(p.user)).toContain(INSTRUCTION_CLASSES.add.verifierScope)
+    expect(p.user).toMatch(/not listed as already checked/)
+  })
+
+  it('replace+add: replace is listed as already checked and not judged; remove/constrain/add are judged', () => {
+    const p = buildVerifierPrompt({ instruction: 'use the upload as the background and add a tagline', classes: ['replace', 'add'], before: BEFORE, after: BEFORE })
+    expect(checkedLine(p.user)).toContain(INSTRUCTION_CLASSES.replace.verifierScope)
+    const judge = judgeLine(p.user)
+    expect(judge).not.toContain(INSTRUCTION_CLASSES.replace.verifierScope)
+    for (const k of ['add', 'remove', 'constrain'] as const) expect(judge).toContain(INSTRUCTION_CLASSES[k].verifierScope)
+  })
+
+  it('the system prompt restates no class scope (M-1: one definition, in the table)', () => {
+    expect(VERIFIER_SYSTEM).not.toMatch(/colour, weight, style or spacing/)
+    expect(VERIFIER_SYSTEM).not.toMatch(/ADDS something/)
+    for (const def of Object.values(INSTRUCTION_CLASSES)) expect(VERIFIER_SYSTEM).not.toContain(def.verifierScope)
+  })
+
+  it('AC-19: editing a verifierScope in the table changes the verifier prompt', () => {
+    const edited = { ...INSTRUCTION_CLASSES, remove: { ...INSTRUCTION_CLASSES.remove, verifierScope: 'EDITED REMOVE SCOPE' } }
+    const p = buildVerifierPrompt({ instruction: 'x', classes: ['add'], before: BEFORE, after: BEFORE }, edited)
+    expect(judgeLine(p.user)).toContain('EDITED REMOVE SCOPE')
+    expect(p.user).not.toContain(INSTRUCTION_CLASSES.remove.verifierScope)
+  })
+
+  it('withinBudget keeps the "gone" (−) rows even when many elements were added', () => {
+    const goneRow = el({ tag: 'p', classes: ['vanished-passage'], text: 'Limited seats available this weekend only' })
+    const before = facts([...BEFORE.elements, goneRow])
+    const added = Array.from({ length: 40 }, (_, i) =>
+      el({ tag: 'p', classes: [`added-${i}`], text: `A long new paragraph number ${i} `.repeat(8) }),
+    )
+    const after = facts([...BEFORE.elements, ...added])
+    const p = buildVerifierPrompt({ instruction: 'reduce the text', classes: ['add'], before, after })
+    expect(p.user).toMatch(/\n {2}- p\.vanished-passage/)
+    expect(p.user).toMatch(/\n {2}\+ p\.added-0/)
+  })
+})
+
+// I-2 through the real verifyRefine: the lexicon check is structural (AC-12).
+describe('final F1 / I-2 — a text-reduction instruction must lower the visible word count, zero model calls', () => {
+  const P = 'Limited seats available this weekend only'
+  const longer = facts([BEFORE.elements[0], BEFORE.elements[1], el({ tag: 'p', text: 'A brand new and considerably longer sentence replaces the seats line entirely here' })])
+
+  it('"reduce the text" classified replace with a longer rewrite → miss, no model call', async () => {
+    useFacts(BEFORE, longer)
+    const r = await inAuth(() => verifyRefine(input({ instruction: 'reduce the text', classes: ['replace'], supersedes: [P] })))
+    expect(r.kind).toBe('miss')
+    expect(r.kind === 'miss' && r.reasons.some((x) => /^text reduction: /.test(x))).toBe(true)
+    expect(modelCalls()).toBe(0)
+  })
+
+  it('"reduce the text" defaulted to add, document unchanged → structural miss, the add call is never spent', async () => {
+    useFacts(BEFORE, BEFORE)
+    const r = await inAuth(() => verifyRefine(input({ instruction: 'reduce the text', classes: ['add'] })))
+    expect(r.kind).toBe('miss')
+    expect(modelCalls()).toBe(0)
+  })
+
+  it('a size instruction ("reduce the logo size") adds no word-count check', async () => {
+    useFacts(BEFORE, BEFORE)
+    const r = await inAuth(() => verifyRefine(input({ instruction: 'reduce the logo size', classes: ['add'] })))
+    expect(r).toEqual({ kind: 'pass' }) // the (scripted) add verifier said applied
+    expect(modelCalls()).toBe(1)
   })
 })

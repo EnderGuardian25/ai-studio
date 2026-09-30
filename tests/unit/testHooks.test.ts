@@ -255,6 +255,46 @@ describe('buildMockRefineReply', () => {
     })
   })
 
+  // Final F1 / C-1: the REPORTED duplicate shape — the design's own inset image
+  // applied as the background AND kept as the inset, supersedes naming the old
+  // background (which is gone).
+  describe('__REFINE_IMAGE_MOVE_DUP__ (AC-09, final F1 C-1)', () => {
+    const OLD = 'https://minio.example.com/images/old-bg.png'
+    const UP = 'https://minio.example.com/images/uploaded.png'
+    const TWO_IMAGE_DOC = `<!DOCTYPE html>
+<html><head><style>@import url('https://fonts.googleapis.com/css2?family=Inter');body{margin:0}</style></head>
+<body><div style="background-image:url('${OLD}')"></div><img src="${UP}" alt="Uploaded photo"><p>Autumn open day</p></body>
+</html>`
+
+    it('broken: the inset image is the background AND still the inset; supersedes = the old background', () => {
+      const parsed = parseRefineEnvelope(buildMockRefineReply(args({ slimHtml: TWO_IMAGE_DOC, instruction: 'bg __REFINE_IMAGE_MOVE_DUP__' })))
+      expect(parsed?.classes).toEqual(['replace'])
+      expect(parsed?.supersedes).toEqual([OLD])
+      expect(parsed?.html).not.toContain(OLD)
+      expect(parsed!.html.split(UP).length - 1).toBe(2)
+    })
+
+    it('+ __REFINE_FIX_ON_RETRY__: attempt 2 is the correct move (the inset is gone)', () => {
+      const instruction = 'bg __REFINE_IMAGE_MOVE_DUP__ __REFINE_FIX_ON_RETRY__'
+      const broken = parseRefineEnvelope(buildMockRefineReply(args({ slimHtml: TWO_IMAGE_DOC, instruction, attempt: 1 })))
+      const fixed = parseRefineEnvelope(buildMockRefineReply(args({ slimHtml: TWO_IMAGE_DOC, instruction, attempt: 2 })))
+      expect(broken!.html.split(UP).length - 1).toBe(2)
+      expect(fixed!.html.split(UP).length - 1).toBe(1)
+      expect(fixed?.html).not.toContain(OLD)
+      expect(fixed?.supersedes).toEqual([OLD])
+    })
+
+    it('does not trigger the plain __REFINE_IMAGE_DUP__ branch', () => {
+      const parsed = parseRefineEnvelope(buildMockRefineReply(args({ slimHtml: TWO_IMAGE_DOC, instruction: 'bg __REFINE_IMAGE_MOVE_DUP__' })))
+      expect(parsed?.html).not.toContain('refine-new-image.png')
+    })
+
+    it('degrades to a non-resolving supersedes when the document has fewer than two images', () => {
+      const parsed = parseRefineEnvelope(buildMockRefineReply(args({ instruction: 'bg __REFINE_IMAGE_MOVE_DUP__' })))
+      expect(CURRENT_DOC).not.toContain(parsed!.supersedes[0])
+    })
+  })
+
   it('__REFINE_EMPTY_SUPERSEDES__: downgrades to add via effectiveClasses (AC-10)', () => {
     const reply = buildMockRefineReply(args({ instruction: 'delete something __REFINE_EMPTY_SUPERSEDES__' }))
     const parsed = parseRefineEnvelope(reply)
