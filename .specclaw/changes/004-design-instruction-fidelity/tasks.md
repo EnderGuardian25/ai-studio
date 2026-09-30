@@ -193,20 +193,20 @@ Two migrations, one per phase, deliberately not merged — a single migration wo
 
 ### Wave 5 — Phase 3: element-targeted editing
 
-- [ ] `T22` — Closed input grammar for element edits
+- [x] `T22` — Closed input grammar for element edits
   - Files: `src/lib/drafts/inlineEdit.ts`, unit tests
   - Estimate: medium
   - Kind: impl
   - Notes: FR-15/16, AC-21/22/23. Text written as text content, never parsed as markup. Colour parsed and re-serialized to hex/`rgb()`; size to number + unit from an allowed set. Reject on any parse failure — never pass through. No free-form CSS declarations, no value containing `url(`. Note in comments that the renderer egress allowlist already blocks off-host fetches (`puppeteer.ts:75`), so this guards declaration break-out and defence in depth, not SSRF.
 
-- [ ] `T23` — Element-scoped write path on the existing inline-edit route
+- [x] `T23` — Element-scoped write path on the existing inline-edit route
   - Files: `src/app/api/drafts/[id]/inline-edit/route.ts`
   - Estimate: medium
   - Kind: impl
   - Depends: T22
   - Notes: FR-17/18/19, AC-24/25/26. Node resolved **server-side** from the click payload; a client-supplied selector is never the write target. Addresses resolved fresh, never persisted. Commits through the existing `commitDraftRevision` — no second writer of `Draft.htmlContent`. This mode must be **narrower** than the existing whole-document contenteditable surface, never wider; that surface is unchanged.
 
-- [ ] `T24` — Click-to-select element mode in the editor, with E2E
+- [~] `T24` — Click-to-select element mode in the editor, with E2E
   - Files: `src/components/drafts/InlineEditModal.tsx`, `tests/e2e/draft-inline-edit.test.ts`
   - Estimate: large
   - Kind: impl
