@@ -410,6 +410,46 @@ Every not-applied case (helper `refineNotApplied`) asserts: clean completion (`p
 - **Re-tagged passages (N5 family: SPLIT / R1 variants).** A passage re-tagged with its phrase reworded out has no counterpart and reads as gone, so it can pass remove — including when an additive clause is co-present.
 - **Flat supersedes, replace-only exemption (fail-open, narrow).** In a replace+remove, a passage the remove clause should have shortened but that was rewritten wholesale — longer — is attributed to replace and passes. Per-clause supersedes is the upgrade path.
 
+### T. Manual inline edit, whole-document and single-element (`draft-inline-edit.test.ts`, element mode is change 004 T22–T24)
+
+`POST /api/drafts/[id]/inline-edit` has two modes, and both use one writer, `commitDraftRevision`.
+
+- **Whole-document mode** (the default): the editor sends the edited HTML.
+- **Element mode** (`mode: 'element'`): the editor sends one structural locator `{path, tag, text, baseRevisionNumber}` and one closed-grammar value.
+  - The server resolves the node against the **current** stored HTML, and only when the draft's pointer still equals `baseRevisionNumber` (a route check, and again as a compare-and-swap inside the commit).
+  - Text is written as a text node. Colour and size are parsed and re-serialized.
+
+Most cases pin a known document through whole-document mode first, then address elements by path. Every case needs `MOCK_PUPPETEER`; TC-INLINE-11 and -13 also need `MOCK_AI`.
+
+- **TC-INLINE-01..04:** whole-document save → new revision with the pointer advanced; restore still works; a missing or empty `html` is 400; an unknown draft is 404.
+- **TC-INLINE-05:** an element text edit with a `<script>` value and a decoy top-level `selector`. It is 200 with exactly one new revision, and the stored HTML equals the base with only the `<h1>` content changed, now escaped. Re-sending the same locator is 409 `element-stale`.
+- **TC-INLINE-06:** the colour `red; background: url(http://evil.test/x)` is 400 `invalid-color`; the pointer and `htmlContent` are unchanged.
+- **TC-INLINE-07:** two element edits chained on the returned `revisionNumber` both land, and the exact final document is asserted.
+- **TC-INLINE-08:** a stale `baseRevisionNumber` whose path now names an identical-fingerprint sibling is 409 and writes nothing.
+- **TC-INLINE-09:** two element edits in parallel on one base: exactly one 200 and one 409 `element-stale`, never a 500.
+- **TC-INLINE-10:** an element edit racing a whole-document save, 15 rounds. It is never a 500, and revisions == pointer == the number of 200s.
+- **TC-INLINE-11:** a "Use anyway" adopt racing a whole-document save, 10 rounds. It is never a 500.
+- **TC-INLINE-12 (T24):** the sizes `24vh`, `big`, `12 px`, `-5px` and `calc(1px + 2px)` are each 400 `invalid-size`, with no revision and `htmlContent` unchanged.
+- **TC-INLINE-13 (T24):** a **real refine** between two edit sessions (default mock reply). The before-document has `<div>MOCK DESIGN</div>` at `[0]`. The refine rewrites the whole document, but a `<div>MOCK DESIGN</div>` is still at `[0]`, so the old tag + text fingerprint still matches. The old session's edit is 409 `element-stale` and the refined HTML is byte-identical. A fresh session, with the base taken from a new GET, then lands on the refined node.
+- **TC-INLINE-14 (T24):** decoy `selector` / `target` fields naming the `<p>` at the top level, in `locator` and in `edit`. Only the path-resolved `<h1>` gets the declaration, and the document is asserted exactly.
+- **TC-INLINE-15 (T24, browser):** the editor UI, driven with Playwright `page`.
+  1. Open the draft, choose "Edit inline" → "Single element", and click the `<h1>` inside the iframe.
+  2. Apply the text `<script>alert(1)</script>`. The stored HTML is escaped, there is exactly one new revision, the reloaded iframe shows the literal text with no `<script>` element in `<body>`, and the `<h1>` is re-selected.
+  3. Apply the AC-22 colour as a background. The server's grammar message is shown inline, and nothing is written.
+  4. Another writer rewrites the design, then apply a font size. It reports that the design changed, reloads the latest version, and writes nothing.
+  5. A fresh click on the right `<p>` in the reloaded document then lands.
+
+**AC → case map (change 004 Phase 3).** The unit files are `tests/unit/inlineEditElement.test.ts`, `htmlLocator.test.ts`, `draftRevisions.test.ts` and `inlineElementEditClient.test.ts`.
+
+| AC                                                                     | E2E                                                                                                                     | Unit                                              |
+| ---------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| AC-21 `<script>` text renders as literal text                          | TC-INLINE-05 (stored escaped, exact document), TC-INLINE-15 (visible literal text in the editor, no `<script>` element) | `applyElementEdit` AC-21; `replaceElementText`    |
+| AC-22 break-out colour rejected, nothing written                       | TC-INLINE-06, TC-INLINE-15 (message shown in the UI)                                                                    | `parseColor` (the exact string plus every `url(`) |
+| AC-23 bad unit / non-numeric size rejected                             | TC-INLINE-12                                                                                                            | `parseSize`                                       |
+| AC-24 one revision through `commitDraftRevision`                       | TC-INLINE-05, -07, -09, -10, -15                                                                                        | `draftRevisions.test.ts` (CAS, lock order)        |
+| AC-25 no persisted address; a rewrite between sessions can't misdirect | TC-INLINE-05, -08 (whole-document rewrite), **-13 (real refine)**, -15 (UI reload)                                      | `checkElementBaseRevision`, stale path/tag/text   |
+| AC-26 client selector never chooses the target                         | TC-INLINE-05 (top-level decoy), **-14 (decoys at every level, naming a different element)**                             | schema strips `selector`/`target` at every level  |
+
 ---
 
 ## 7. Fixes required to the existing specs (before/while implementing)

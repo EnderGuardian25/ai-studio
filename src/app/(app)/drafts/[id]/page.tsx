@@ -530,13 +530,16 @@ export default function DraftDetailPage() {
         />
       )}
 
-      {/* Manual inline edit — sandboxed iframe, text + image edits, synchronous save. */}
-      {draft.htmlContent && (
+      {/* Manual inline edit — sandboxed iframe; whole-document text + image
+          edits, or single-element edits (change 004 T24). Mounted per open so
+          the modal reads html + revision pointer from THIS draft read, once. */}
+      {draft.htmlContent && showInlineEdit && (
         <InlineEditModal
           open={showInlineEdit}
           onClose={() => setShowInlineEdit(false)}
           draftId={draftId}
           html={draft.htmlContent}
+          baseRevisionNumber={draft.currentRevisionNumber}
           aspectRatio={draft.brief.aspectRatio}
           onSaved={refreshAfterChange}
         />

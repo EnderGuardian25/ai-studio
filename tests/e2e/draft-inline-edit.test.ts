@@ -1,9 +1,25 @@
-import { test, expect } from '@playwright/test'
+import { test, expect, type Page } from '@playwright/test'
 import { loginAs, waitForDraft, waitForAction, type ApiClient } from '../helpers/api'
 
 const ADMIN_EMAIL = 'admin@bisteccare.lk'
 const ADMIN_PASSWORD = 'BistecStudio2026!'
 const MOCKED = () => process.env.MOCK_PUPPETEER === 'true'
+
+// Browser sign-in for the UI case (TC-INLINE-15). This is the same flow as
+// ui.test.ts pageLogin. A super admin with more than one team lands on
+// /choose-team.
+async function pageLogin(page: Page) {
+  await page.goto('/login')
+  await page.getByPlaceholder('Username').fill(ADMIN_EMAIL)
+  await page.getByPlaceholder('Password').fill(ADMIN_PASSWORD)
+  await page.getByRole('button', { name: 'Sign in' }).click()
+  await page.waitForURL((url) => url.pathname === '/' || url.pathname === '/choose-team')
+  await page.goto('/')
+  if (page.url().includes('/choose-team')) {
+    await page.getByRole('button', { name: 'Bistec' }).click()
+    await page.waitForURL((url) => url.pathname === '/')
+  }
+}
 
 async function createExportedDraft(api: ApiClient, topic: string) {
   const kit = await (
@@ -369,6 +385,198 @@ test.describe('§T — draft inline edit', () => {
     }
     const revisions = await (await api.get(`/api/drafts/${id}/revisions`)).json()
     expect(revisions).toHaveLength(start + landed)
+  })
+
+  // ── T24 (change 004 Phase 3): the AC-21..26 cases TC-INLINE-05..11 don't
+  // already cover, plus the editor UI. AC→TC map: docs/e2e-test-plan.md §T.
+
+  // TC-INLINE-12 — AC-23 over HTTP: a size with a disallowed unit, and a
+  // non-numeric size, are each 400 invalid-size, and nothing is written.
+  test('element mode rejects a disallowed size unit and a non-numeric size with 400', async () => {
+    if (!MOCKED()) {
+      test.skip()
+      return
+    }
+    const draft = await createExportedDraft(api, `Inline Size ${Date.now()}`)
+    const pinned = await pin(api, String(draft.id), TWO)
+    for (const value of ['24vh', 'big', '12 px', '-5px', 'calc(1px + 2px)']) {
+      const res = await api.post(`/api/drafts/${draft.id}/inline-edit`, {
+        mode: 'element',
+        locator: { path: [0], tag: 'H1', text: 'Old headline', baseRevisionNumber: pinned.currentRevisionNumber },
+        edit: { kind: 'fontSize', value },
+      })
+      expect(res.status(), value).toBe(400)
+      expect((await res.json()).code, value).toBe('invalid-size')
+    }
+    const after = await (await api.get(`/api/drafts/${draft.id}`)).json()
+    expect(after.currentRevisionNumber).toBe(pinned.currentRevisionNumber)
+    expect(after.htmlContent).toBe(pinned.htmlContent)
+    const revisions = await (await api.get(`/api/drafts/${draft.id}/revisions`)).json()
+    expect(revisions).toHaveLength(pinned.currentRevisionNumber)
+  })
+
+  // TC-INLINE-13 — AC-25 through a REAL refine (default mock reply). The
+  // before-document puts <div>MOCK DESIGN</div> at path [0]. The mock refine
+  // rewrites the whole document into <div class="card">MOCK DESIGN</div>, so
+  // the old locator's tag AND text fingerprint still match a node at [0].
+  // Only the address's revision tells the old session apart. The old session
+  // is 409 and writes nothing. A fresh session (new GET) edits the new node.
+  test('a refine between two edit sessions: the old locator is 409, a fresh one lands', async () => {
+    if (!MOCKED() || !process.env.MOCK_AI) {
+      test.skip()
+      return
+    }
+    const draft = await createExportedDraft(api, `Inline Refine ${Date.now()}`)
+    const id = String(draft.id)
+    const before = await pin(
+      api,
+      id,
+      '<!doctype html><html><head></head><body style="width:1080px;height:1080px"><div class="old">MOCK DESIGN</div><p>Keep me</p></body></html>',
+    )
+    const oldLocator = { path: [0], tag: 'DIV', text: 'MOCK DESIGN', baseRevisionNumber: before.currentRevisionNumber }
+
+    expect((await api.post(`/api/drafts/${id}/refine`, { instruction: 'Make it bolder' })).status()).toBe(202)
+    const refined = await waitForAction(api, id)
+    expect(refined.pendingActionError).toBeNull()
+    expect(refined.currentRevisionNumber).toBe(before.currentRevisionNumber + 1)
+    const refinedHtml = refined.htmlContent as string
+    expect(refinedHtml).not.toBe(before.htmlContent)
+    expect(refinedHtml).toContain('<div class="card" data-mock="true">MOCK DESIGN</div>')
+
+    const stale = await api.post(`/api/drafts/${id}/inline-edit`, {
+      mode: 'element',
+      locator: oldLocator,
+      edit: { kind: 'color', value: '#ff0000' },
+    })
+    expect(stale.status()).toBe(409)
+    expect((await stale.json()).code).toBe('element-stale')
+    const untouched = await (await api.get(`/api/drafts/${id}`)).json()
+    expect(untouched.currentRevisionNumber).toBe(refined.currentRevisionNumber)
+    expect(untouched.htmlContent).toBe(refinedHtml)
+
+    // A fresh session resolves against the refined document.
+    const fresh = await api.post(`/api/drafts/${id}/inline-edit`, {
+      mode: 'element',
+      locator: { ...oldLocator, baseRevisionNumber: untouched.currentRevisionNumber },
+      edit: { kind: 'color', value: '#ff0000' },
+    })
+    expect(fresh.status()).toBe(200)
+    const after = await (await api.get(`/api/drafts/${id}`)).json()
+    expect(after.htmlContent).toBe(
+      refinedHtml.replace(
+        '<div class="card" data-mock="true">',
+        '<div style="color: #ff0000" class="card" data-mock="true">', // inserted right after the tag name
+      ),
+    )
+  })
+
+  // TC-INLINE-14 — AC-26: decoy selectors naming a DIFFERENT element (the <p>)
+  // at every level of the body. The write still lands only on the
+  // path-resolved <h1>, and the <p> is byte-identical.
+  test('decoy selector / target fields naming another element are ignored at every level', async () => {
+    if (!MOCKED()) {
+      test.skip()
+      return
+    }
+    const draft = await createExportedDraft(api, `Inline Decoy ${Date.now()}`)
+    const pinned = await pin(api, String(draft.id), TWO)
+    const res = await api.post(`/api/drafts/${draft.id}/inline-edit`, {
+      mode: 'element',
+      selector: 'body > p',
+      target: { path: [1], tag: 'P' },
+      locator: {
+        path: [0],
+        tag: 'H1',
+        text: 'Old headline',
+        baseRevisionNumber: pinned.currentRevisionNumber,
+        selector: 'p',
+        target: 'p',
+      },
+      edit: { kind: 'backgroundColor', value: '#00ff00', selector: 'p', target: [1] },
+    })
+    expect(res.status()).toBe(200)
+    const after = await (await api.get(`/api/drafts/${draft.id}`)).json()
+    expect(after.htmlContent).toBe(
+      TWO.replace('<h1>Old headline</h1>', '<h1 style="background-color: #00ff00">Old headline</h1>'),
+    )
+    expect(after.htmlContent).toContain('<p>Keep me</p>')
+  })
+
+  // TC-INLINE-15 — the editor UI (T24). The test opens a draft, switches the
+  // inline editor to "Single element", clicks the <h1> in the iframe and sets
+  // its text to a <script> string. The text is stored escaped and shown as
+  // literal visible text in the reloaded editor (AC-21), with exactly one new
+  // revision (AC-24). A colour that breaks out of its declaration shows the
+  // server's message and writes nothing (AC-22). Another writer then rewrites
+  // the design behind the editor: the next apply reports the change, reloads
+  // the latest version and writes nothing (AC-25). A fresh selection in the
+  // reloaded document lands on the right node.
+  test('the element editor edits through the UI: text as text, grammar errors inline, stale reload', async ({
+    page,
+  }) => {
+    if (!MOCKED()) {
+      test.skip()
+      return
+    }
+    const draft = await createExportedDraft(api, `Inline UI ${Date.now()}`)
+    const id = String(draft.id)
+    const pinned = await pin(api, id, TWO)
+    const current = async () => (await (await api.get(`/api/drafts/${id}`)).json()) as {
+      currentRevisionNumber: number
+      htmlContent: string
+    }
+
+    await pageLogin(page)
+    await page.goto(`/drafts/${id}`)
+    await page.getByRole('button', { name: 'Edit inline' }).click()
+    const dialog = page.getByRole('dialog')
+    await dialog.getByRole('tab', { name: 'Single element' }).click()
+    const frame = page.frameLocator('iframe[title="Inline editor"]')
+
+    // AC-21 + AC-24.
+    await frame.locator('h1').click()
+    await expect(dialog.getByTestId('element-tag')).toHaveText('<h1>')
+    await dialog.getByLabel('Text', { exact: true }).fill('<script>alert(1)</script>')
+    await dialog.getByRole('button', { name: 'Apply text', exact: true }).click()
+    await expect.poll(async () => (await current()).currentRevisionNumber, { timeout: 15_000 }).toBe(
+      pinned.currentRevisionNumber + 1,
+    )
+    const saved = await current()
+    expect(saved.htmlContent).toBe(
+      TWO.replace('<h1>Old headline</h1>', '<h1>&lt;script&gt;alert(1)&lt;/script&gt;</h1>'),
+    )
+    await expect(frame.locator('h1')).toHaveText('<script>alert(1)</script>')
+    await expect(frame.locator('body script')).toHaveCount(0)
+    // The same element is re-selected in the reloaded document.
+    await expect(dialog.getByTestId('element-tag')).toHaveText('<h1>')
+
+    // AC-22: the server's grammar message, shown inline; nothing written.
+    await dialog.getByLabel('Background', { exact: true }).fill('red; background: url(http://evil.test/x)')
+    await dialog.getByRole('button', { name: 'Apply background', exact: true }).click()
+    await expect(dialog.getByRole('alert').filter({ hasText: 'Colour must be a hex value' })).toBeVisible()
+    const rejected = await current()
+    expect(rejected.currentRevisionNumber).toBe(saved.currentRevisionNumber)
+    expect(rejected.htmlContent).toBe(saved.htmlContent)
+
+    // AC-25: another writer ("another tab") rewrites the design behind the editor.
+    const moved = await pin(api, id, TWO.replace('<p>Keep me</p>', '<p>Moved in</p><p>Keep me</p>'))
+    await dialog.getByLabel('Font size').fill('64px')
+    await dialog.getByRole('button', { name: 'Apply font size', exact: true }).click()
+    await expect(dialog.getByRole('alert').filter({ hasText: 'The design changed' })).toBeVisible()
+    const refused = await current()
+    expect(refused.currentRevisionNumber).toBe(moved.currentRevisionNumber)
+    expect(refused.htmlContent).toBe(moved.htmlContent)
+    // The editor reloaded the latest version; a fresh selection lands on the right node.
+    await expect(frame.locator('p').first()).toHaveText('Moved in')
+    await frame.locator('p', { hasText: 'Keep me' }).click()
+    await dialog.getByLabel('Text colour', { exact: true }).fill('#00ff00')
+    await dialog.getByRole('button', { name: 'Apply text colour', exact: true }).click()
+    await expect.poll(async () => (await current()).currentRevisionNumber, { timeout: 15_000 }).toBe(
+      moved.currentRevisionNumber + 1,
+    )
+    expect((await current()).htmlContent).toBe(
+      moved.htmlContent.replace('<p>Keep me</p>', '<p style="color: #00ff00">Keep me</p>'),
+    )
   })
 
   // TC-INLINE-04 — a foreign draft id is a 404 (no existence leak).
