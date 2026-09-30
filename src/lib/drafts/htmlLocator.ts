@@ -835,6 +835,10 @@ function functionNameBefore(style: string, paren: number): string | null {
   const name = style.slice(k, paren)
   if (name.includes('\\')) return null
   if (k > 0 && isEscapedAt(style, k - 1)) return null
+  // `#url` is a hash token and `@url` an at-keyword to CSS — the "(" after
+  // them opens a plain block, not a url token (fix round 3). Reported with
+  // the sigil so it never equals "url". (An escaped sigil was refused above.)
+  if (k > 0 && (style[k - 1] === '#' || style[k - 1] === '@')) return asciiLower(style[k - 1] + name)
   // A hex escape swallows ONE whitespace character after it (`u\72 l(` is
   // "url("), so a name right after "\<hex> " continues that escape's ident.
   if (k > 0 && CSS_WS.test(style[k - 1]) && endsHexEscape(style, k - 1)) return null
@@ -863,11 +867,18 @@ function isQuotedUrl(style: string, from: number): boolean {
 // (refuse) for anything that would make CSS read it as a bad-url: a quote,
 // "(", a non-printable character, a backslash before a newline or at the end,
 // or no ")" at all. A valid escape (\" \) \\ …) is skipped over.
+// Also refused (fix round 3): { } [ ] and "/*". They are literal inside a
+// real url token but nest (or open a comment) if the "(" is in fact a block —
+// e.g. after a sigil or an escaped name this reader failed to recognise.
+// Refusing them makes every ACCEPTED body end at the same ")" under either
+// reading, so a misidentified url( can never move a declaration boundary.
 function unquotedUrlEnd(style: string, from: number): number {
   for (let m = from; m < style.length; m++) {
     const c = style[m]
     if (c === ')') return m
     if (c === '"' || c === "'" || c === '(') return -1
+    if (c === '{' || c === '}' || c === '[' || c === ']') return -1
+    if (c === '/' && style[m + 1] === '*') return -1
     if (/[\u0000-\u0008\u000b\u000e-\u001f\u007f]/.test(c)) return -1
     if (c === '\\') {
       if (m + 1 >= style.length || CSS_NEWLINE.has(style[m + 1])) return -1
@@ -939,6 +950,13 @@ export function setStyleDeclaration(
   const raw = attr.valueStart === null ? '' : html.slice(attr.valueStart, attr.valueEnd!)
   const current = decodeHtmlEntities(raw, 'attribute')
   if (current === null) return { ok: false, reason: 'the style attribute holds an undecodable character reference' }
+  // No carriage returns (fix round 3). CSS preprocessing folds CRLF into ONE
+  // LF — which a hex escape then consumes as its terminator (`u\72` CRLF `l(`
+  // IS `url(`) — and the HTML parser itself turns raw CRs into LFs, so a CR
+  // here means character positions this reader can't mirror. Generated
+  // styles never need one; refuse. A lone form feed IS modelled: it maps 1:1
+  // to one LF, and CSS_WS / CSS_NEWLINE both treat it as that.
+  if (current.includes('\r')) return { ok: false, reason: 'the style attribute holds a carriage return' }
   const segments = splitDeclarations(current)
   if (!segments) {
     return {

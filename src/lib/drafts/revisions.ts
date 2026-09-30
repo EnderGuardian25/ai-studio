@@ -350,10 +350,12 @@ export async function commitDraftRevision(
     if (written.count !== 1) {
       if (adoptRejectedRevisionId) throw new AdoptConflictError()
       // Which condition missed? One read in the same transaction, after the
-      // UPDATE's own evaluation (READ COMMITTED sees the same committed
-      // state): an action is claimed → the caller answers draft-busy;
-      // otherwise the pointer moved → element-stale. If both, busy wins — it
-      // tells the user why, and the edit is refused either way.
+      // UPDATE's own evaluation. Under READ COMMITTED it sees the same OR
+      // NEWER committed state: a claim or release landing in between can flip
+      // the answer (draft-busy ↔ element-stale), which is harmless — both are
+      // 409 and nothing was written. An action is claimed → the caller
+      // answers draft-busy; otherwise the pointer moved → element-stale. If
+      // both, busy wins — it tells the user why.
       const now = await tx.draft.findUnique({ where: { id: draftId }, select: { pendingAction: true } })
       throw new RevisionConflictError(now?.pendingAction ?? null)
     }

@@ -556,3 +556,64 @@ describe('setStyleDeclaration: an unquoted url( body the splitter would misread 
     expect(setStyleDeclaration(html, at(html, [0]), 'color', '#aabbcc').ok).toBe(true)
   })
 })
+
+// ── Fix round 3 (review of 43dc354d) ─────────────────────────────────────────
+
+describe('setStyleDeclaration: #url( / @url( and block characters in an unquoted url( body (round 3, item 1)', () => {
+  const refuse = (s: string) => {
+    const html = doc(`<p style='${s}'>x</p>`)
+    return setStyleDeclaration(html, at(html, [0]), 'color', '#aabbcc').ok
+  }
+
+  // The reviewer's Chrome-confirmed repros: to CSS "#url" is a hash token and
+  // "@url" an at-keyword, so the "(" opens a BLOCK where { [ /* nest.
+  it('x: #url(a{b); color: red', () => {
+    expect(refuse('x: #url(a{b); color: red')).toBe(false)
+  })
+  it('x: @url(a{b)', () => {
+    expect(refuse('x: @url(a{b)')).toBe(false)
+  })
+  it('#url(a[b)', () => {
+    expect(refuse('#url(a[b)')).toBe(false)
+  })
+  it('x: #url(a/*b); y: 1 */', () => {
+    expect(refuse('x: #url(a/*b); y: 1 */')).toBe(false)
+  })
+
+  it('{ } [ ] and /* are refused in ANY unquoted url( body, so both readings end at the same )', () => {
+    for (const s of ['background: url(a{b)', 'background: url(a}b)', 'background: url(a[b)', 'background: url(a]b)', 'background: url(a/*b)']) {
+      expect(refuse(s), s).toBe(false)
+    }
+  })
+
+  it('a balanced #url(...) block is still an ordinary block and is kept', () => {
+    const html = doc('<p style="x: #url(a); color: red">x</p>')
+    const r = setStyleDeclaration(html, at(html, [0]), 'color', '#aabbcc')
+    expect(r.ok && r.html).toBe(doc('<p style="x: #url(a); color: #aabbcc">x</p>'))
+  })
+})
+
+describe('setStyleDeclaration: carriage returns are refused (round 3, item 2)', () => {
+  it('reviewer repro: u\\72 + CRLF + l( IS url( (CSS folds CRLF to one LF, which the hex escape consumes)', () => {
+    const html = doc('<p style="background: u\\72&#13;&#10;l(a(b); color: blue !important; y: )">x</p>')
+    expect(setStyleDeclaration(html, at(html, [0]), 'color', '#aabbcc').ok).toBe(false)
+  })
+
+  it('any CR after decoding is refused — as a reference or as a raw byte', () => {
+    const ref = doc('<p style="color: red;&#13;font-size: 12px">x</p>')
+    expect(setStyleDeclaration(ref, at(ref, [0]), 'color', '#aabbcc').ok).toBe(false)
+    const raw = doc('<p style="color: red;\rfont-size: 12px">x</p>')
+    expect(setStyleDeclaration(raw, at(raw, [0]), 'color', '#aabbcc').ok).toBe(false)
+  })
+
+  it('a lone form feed is modelled (one whitespace, which a hex escape consumes) — u\\72 + FF + l( is refused as url(', () => {
+    const html = doc('<p style="background: u\\72&#12;l(a(b); color: blue !important; y: )">x</p>')
+    expect(setStyleDeclaration(html, at(html, [0]), 'color', '#aabbcc').ok).toBe(false)
+  })
+
+  it('an LF alone is still fine between declarations', () => {
+    const html = doc('<p style="color: red;&#10;font-size: 12px">x</p>')
+    const r = setStyleDeclaration(html, at(html, [0]), 'color', '#aabbcc')
+    expect(r.ok).toBe(true)
+  })
+})
