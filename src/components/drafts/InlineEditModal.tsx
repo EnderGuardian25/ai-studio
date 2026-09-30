@@ -17,10 +17,12 @@ import {
   buildElementEditBody,
   canEditElementStyle,
   canEditElementText,
-  cssColorToHex,
   postElementEdit,
+  relativeElementPath,
   resolveEditorPath,
+  seedColorValue,
   snapshotElementLocator,
+  type ElementNavDirection,
 } from '@/components/drafts/inlineElementEdit'
 import { ElementEditPanel, type ElementNotice, type ElementSelection } from '@/components/drafts/ElementEditPanel'
 
@@ -29,10 +31,12 @@ interface InlineEditModalProps {
   onClose: () => void
   draftId: string
   // `html` and `baseRevisionNumber` must come from the SAME draft read
-  // (htmlContent and currentRevisionNumber of one GET /api/drafts/[id]). Element
-  // edits are pinned to that revision. The modal reads both once, when it
-  // mounts, and afterwards only from its own re-reads. The caller mounts it
-  // per open.
+  // (htmlContent and currentRevisionNumber of one GET /api/drafts/[id]). They
+  // are the FIRST PAINT only: on mount the modal re-reads the draft itself
+  // (fix round 1), and nothing can be saved or applied until that read lands.
+  // The caller's copy can be older than the stored draft (a reopen inside the
+  // page's post-save refetch), and a whole-document save from it would revert
+  // the save made just before. The caller mounts the modal per open.
   html: string
   baseRevisionNumber: number | null
   aspectRatio: AspectRatio
@@ -108,11 +112,27 @@ export function InlineEditModal({
   const inFlightRef = useRef(false)
   const [fieldError, setFieldError] = useState<{ kind: ElementEditKind; message: string } | null>(null)
   const [notice, setNotice] = useState<ElementNotice | null>(null)
-  const [reloading, setReloading] = useState(false)
+  // True from mount until the first own read of the draft lands (fix round 1).
+  const [reloading, setReloading] = useState(true)
+  // The first own read landed, so {html, pointer} are the stored draft's, not
+  // the caller's possibly stale copy. Save and Apply stay disabled until then.
+  const [synced, setSynced] = useState(false)
+  const [syncFailed, setSyncFailed] = useState(false)
+  // The iframe key whose document has been wired (parsed, with listeners and
+  // chrome attached). Save, selection and Apply wait for it, so nothing ever
+  // acts on a remounting frame's blank document.
+  const [wiredKey, setWiredKey] = useState<string | null>(null)
+  // Focus "Select the whole design" after a stale reload cleared the selection.
+  const [focusStart, setFocusStart] = useState(false)
   const selectionSeq = useRef(0)
   // After a save, the same element is re-selected in the reloaded document,
   // but only if that document IS the revision the save produced.
-  const pendingReselectRef = useRef<{ path: number[]; tag: string; revisionNumber: number | null } | null>(null)
+  const pendingReselectRef = useRef<{
+    path: number[]
+    tag: string
+    revisionNumber: number | null
+    focusId: string
+  } | null>(null)
   const wiredDocs = useRef(new WeakSet<Document>())
 
   // The true-size canvas is scaled down to fit the stage on BOTH axes (the old
@@ -228,30 +248,41 @@ export function InlineEditModal({
 
   // Single-element mode: select `el`, snapshotting its locator NOW, against
   // the document it lives in and the revision that document was loaded at.
-  const selectElement = useCallback((el: Element, revisionNumber: number | null) => {
-    const doc = el.ownerDocument
-    if (!doc.body) return
-    const locator = snapshotElementLocator(el, doc.body, revisionNumber)
-    if (!locator) return // editor chrome, or outside <body>
-    const cs = doc.defaultView?.getComputedStyle(el)
-    selectionSeq.current += 1
-    setSelection({
-      id: selectionSeq.current,
-      el,
-      locator,
-      tag: asciiLower(el.tagName),
-      isBody: el === doc.body,
-      canText: canEditElementText(el),
-      canStyle: canEditElementStyle(el),
-      initial: {
-        text: locator.text,
-        color: cssColorToHex(cs?.color ?? '') ?? '',
-        background: cssColorToHex(cs?.backgroundColor ?? '') ?? '',
-        fontSize: cs?.fontSize ?? '',
-      },
-    })
-    setFieldError(null)
-  }, [])
+  // `focusId` is the panel control to focus once it is enabled (keyboard use).
+  // It is null for a mouse selection, which must not pull focus off the canvas.
+  const selectElement = useCallback(
+    (el: Element, revisionNumber: number | null, focusId: string | null = null) => {
+      const doc = el.ownerDocument
+      if (!doc.body) return
+      const locator = snapshotElementLocator(el, doc.body, revisionNumber)
+      if (!locator) return // editor chrome, or outside <body>
+      const cs = doc.defaultView?.getComputedStyle(el)
+      const has = (dir: ElementNavDirection) => relativeElementPath(doc.body, locator.path, dir) !== null
+      selectionSeq.current += 1
+      setSelection({
+        id: selectionSeq.current,
+        el,
+        locator,
+        tag: asciiLower(el.tagName),
+        canText: canEditElementText(el),
+        canStyle: canEditElementStyle(el),
+        nav: { parent: has('parent'), firstChild: has('firstChild'), previous: has('previous'), next: has('next') },
+        initial: {
+          text: locator.text,
+          color: seedColorValue(cs?.color ?? '').text,
+          background: seedColorValue(cs?.backgroundColor ?? '').text,
+          fontSize: cs?.fontSize ?? '',
+        },
+        focusId,
+      })
+      setFieldError(null)
+      setFocusStart(false)
+      // A fresh selection supersedes a stale, superseded or unsupported
+      // notice. A busy one stays until "Check again" clears it.
+      setNotice((prev) => (prev?.kind === 'busy' ? prev : null))
+    },
+    [],
+  )
 
   const wireSelector = useCallback(
     (doc: Document, revisionNumber: number | null) => {
@@ -259,6 +290,7 @@ export function InlineEditModal({
       wiredDocs.current.add(doc)
 
       const style = doc.createElement('style')
+      style.id = 'inline-edit-select-style'
       style.textContent = SELECT_STYLE
       doc.head?.appendChild(style)
 
@@ -289,16 +321,20 @@ export function InlineEditModal({
       if (pending && pending.revisionNumber === revisionNumber) {
         pendingReselectRef.current = null
         const again = resolveEditorPath(doc.body, pending.path) as Element | null
-        if (again && asciiLower(again.tagName) === pending.tag) selectElement(again, revisionNumber)
+        if (again && asciiLower(again.tagName) === pending.tag) {
+          selectElement(again, revisionNumber, pending.focusId)
+        }
       }
     },
     [selectElement],
   )
 
+  const frameKey = `${mode}-${loaded.seq}`
   const wire = useCallback(
     (doc: Document) => {
       if (mode === 'element') wireSelector(doc, loaded.revisionNumber)
       else wireEditor(doc)
+      setWiredKey(`${mode}-${loaded.seq}`)
     },
     [mode, loaded, wireEditor, wireSelector],
   )
@@ -337,7 +373,7 @@ export function InlineEditModal({
   // Re-read the draft, then load its htmlContent and currentRevisionNumber
   // TOGETHER. Both come from one response, so the next locator is always
   // computed against the revision it names.
-  async function reloadFromServer(): Promise<Omit<LoadedDoc, 'seq'> | null> {
+  const reloadFromServer = useCallback(async (): Promise<Omit<LoadedDoc, 'seq'> | null> => {
     setReloading(true)
     try {
       const d = await apiFetch<DraftDetail>(`/api/drafts/${draftId}`)
@@ -360,7 +396,24 @@ export function InlineEditModal({
     } finally {
       setReloading(false)
     }
-  }
+  }, [draftId])
+
+  // The first own read (fix round 1; see the props comment). Until it lands,
+  // the stage is covered and Save and Apply are disabled. A failed read keeps
+  // them disabled and offers a retry; it never falls back to the caller's copy.
+  const syncWithServer = useCallback(async () => {
+    setSyncFailed(false)
+    const next = await reloadFromServer()
+    if (next) setSynced(true)
+    else setSyncFailed(true)
+  }, [reloadFromServer])
+
+  const syncStarted = useRef(false)
+  useEffect(() => {
+    if (syncStarted.current) return
+    syncStarted.current = true
+    void syncWithServer()
+  }, [syncWithServer])
 
   // One element edit: one request, never two at once.
   async function applyElementEdit(kind: ElementEditKind, value: string) {
@@ -379,6 +432,7 @@ export function InlineEditModal({
             path: selection.locator.path,
             tag: selection.tag,
             revisionNumber: out.revisionNumber,
+            focusId: `apply-${kind}`,
           }
           const reloaded = await reloadFromServer()
           if (reloaded && reloaded.revisionNumber !== out.revisionNumber) {
@@ -389,6 +443,7 @@ export function InlineEditModal({
         }
         case 'stale':
           setNotice({ kind: 'stale', message: STALE_MESSAGE })
+          setFocusStart(true)
           await reloadFromServer()
           break
         case 'busy':
@@ -417,10 +472,21 @@ export function InlineEditModal({
     }
   }
 
-  function selectParent() {
-    if (!selection || selection.isBody) return
-    const parent = selection.el.parentElement
-    if (parent) selectElement(parent, selection.locator.baseRevisionNumber)
+  // Keyboard navigation moves one step through the same tree the locator
+  // uses, so it never reaches editor chrome. The target is selected like a
+  // click.
+  function navigate(dir: ElementNavDirection) {
+    if (!selection || inFlightRef.current) return
+    const body = selection.el.ownerDocument.body
+    const next = relativeElementPath(body, selection.locator.path, dir)
+    const el = next && (resolveEditorPath(body, next) as Element | null)
+    if (el) selectElement(el, selection.locator.baseRevisionNumber, `nav-${dir}`)
+  }
+
+  function selectBody() {
+    const doc = iframeRef.current?.contentDocument
+    if (!doc?.body || inFlightRef.current || wiredKey !== frameKey) return
+    selectElement(doc.body, loaded.revisionNumber, 'heading')
   }
 
   async function switchMode(next: string) {
@@ -477,7 +543,10 @@ export function InlineEditModal({
   const elementMode = mode === 'element'
   const selectedBox = elementMode ? boxFor(selection?.el ?? null) : null
   const hoverBox = elementMode && hoverEl !== selection?.el ? boxFor(hoverEl) : null
-  const editorDisabled = inFlight !== null || reloading || notice?.kind === 'busy'
+  // Everything that acts on the document waits for the first own read, and for
+  // the current frame to be wired.
+  const editorReady = synced && !reloading && wiredKey === frameKey
+  const editorDisabled = inFlight !== null || !editorReady || notice?.kind === 'busy'
 
   return (
     <Modal
@@ -495,7 +564,7 @@ export function InlineEditModal({
             <Button variant="ghost" size="sm" onClick={onClose} disabled={saving}>
               Cancel
             </Button>
-            <Button size="sm" onClick={handleSave} disabled={saving}>
+            <Button size="sm" onClick={handleSave} disabled={saving || !editorReady}>
               {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
               Save &amp; re-export
             </Button>
@@ -533,9 +602,10 @@ export function InlineEditModal({
             <div
               className="relative overflow-hidden rounded-lg bg-white shadow-xl"
               style={{ width: width * scale, height: height * scale }}
+              data-editor-ready={editorReady ? 'true' : 'false'}
             >
               <iframe
-                key={`${mode}-${loaded.seq}`}
+                key={frameKey}
                 ref={iframeRef}
                 onLoad={onIframeLoad}
                 title="Inline editor"
@@ -564,9 +634,29 @@ export function InlineEditModal({
                   style={selectedBox}
                 />
               )}
-              {elementMode && reloading && (
-                <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-white/40 dark:bg-black/30">
-                  <Loader2 size={20} className="animate-spin text-primary dark:text-primary-light" />
+              {/* It covers the canvas, and takes its clicks and typing, until
+                  the document on it is the stored one and is wired. */}
+              {(!editorReady || syncFailed) && (
+                <div
+                  className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-white/60 dark:bg-black/50"
+                  role="status"
+                  aria-live="polite"
+                >
+                  {syncFailed ? (
+                    <>
+                      <p className="text-sm font-medium text-light-text dark:text-dark-text">
+                        Couldn&apos;t load the latest version of this design.
+                      </p>
+                      <Button variant="secondary" size="sm" onClick={() => void syncWithServer()}>
+                        Try again
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <Loader2 size={20} className="animate-spin text-primary dark:text-primary-light" aria-hidden />
+                      <span className="sr-only">Loading the latest version</span>
+                    </>
+                  )}
                 </div>
               )}
             </div>
@@ -579,8 +669,10 @@ export function InlineEditModal({
                 inFlight={inFlight}
                 fieldError={fieldError}
                 notice={notice}
+                focusStart={focusStart}
                 onApply={applyElementEdit}
-                onSelectParent={selectParent}
+                onSelectBody={selectBody}
+                onNavigate={navigate}
                 onClearSelection={() => {
                   setSelection(null)
                   setFieldError(null)

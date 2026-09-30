@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test'
+import { test, expect, type Locator, type Page } from '@playwright/test'
 import { loginAs, waitForDraft, waitForAction, type ApiClient } from '../helpers/api'
 
 const ADMIN_EMAIL = 'admin@bisteccare.lk'
@@ -532,8 +532,11 @@ test.describe('§T — draft inline edit', () => {
     const dialog = page.getByRole('dialog')
     await dialog.getByRole('tab', { name: 'Single element' }).click()
     const frame = page.frameLocator('iframe[title="Inline editor"]')
+    const ready = () => expect(dialog.locator('[data-editor-ready="true"]')).toBeAttached()
 
     // AC-21 + AC-24.
+    await ready()
+    await expect(frame.locator('#inline-edit-select-style')).toBeAttached()
     await frame.locator('h1').click()
     await expect(dialog.getByTestId('element-tag')).toHaveText('<h1>')
     await dialog.getByLabel('Text', { exact: true }).fill('<script>alert(1)</script>')
@@ -546,6 +549,7 @@ test.describe('§T — draft inline edit', () => {
       TWO.replace('<h1>Old headline</h1>', '<h1>&lt;script&gt;alert(1)&lt;/script&gt;</h1>'),
     )
     await expect(frame.locator('h1')).toHaveText('<script>alert(1)</script>')
+    await ready()
     await expect(frame.locator('body script')).toHaveCount(0)
     // The same element is re-selected in the reloaded document.
     await expect(dialog.getByTestId('element-tag')).toHaveText('<h1>')
@@ -568,6 +572,8 @@ test.describe('§T — draft inline edit', () => {
     expect(refused.htmlContent).toBe(moved.htmlContent)
     // The editor reloaded the latest version; a fresh selection lands on the right node.
     await expect(frame.locator('p').first()).toHaveText('Moved in')
+    await ready()
+    await expect(frame.locator('#inline-edit-select-style')).toBeAttached()
     await frame.locator('p', { hasText: 'Keep me' }).click()
     await dialog.getByLabel('Text colour', { exact: true }).fill('#00ff00')
     await dialog.getByRole('button', { name: 'Apply text colour', exact: true }).click()
@@ -576,6 +582,134 @@ test.describe('§T — draft inline edit', () => {
     )
     expect((await current()).htmlContent).toBe(
       moved.htmlContent.replace('<p>Keep me</p>', '<p style="color: #00ff00">Keep me</p>'),
+    )
+  })
+
+  // TC-INLINE-16 — fix round 1 (Critical). The editor never saves from the
+  // caller's stale copy. The page read the draft at revision 2; a newer save
+  // then landed (revision 3) and the page does not poll, so it still holds
+  // revision 2. That is exactly the state of a reopen inside the page's
+  // post-save refetch. Opening the editor re-reads the draft, and a
+  // whole-document "Save & re-export" keeps the newer save instead of
+  // reverting it.
+  test('the editor re-reads the draft on open; a whole-document save never reverts a newer save', async ({
+    page,
+  }) => {
+    if (!MOCKED()) {
+      test.skip()
+      return
+    }
+    const draft = await createExportedDraft(api, `Inline Reopen ${Date.now()}`)
+    const id = String(draft.id)
+    await pin(api, id, TWO)
+    const current = async () => (await (await api.get(`/api/drafts/${id}`)).json()) as {
+      currentRevisionNumber: number
+      htmlContent: string
+    }
+
+    await pageLogin(page)
+    await page.goto(`/drafts/${id}`)
+    const edit = page.getByRole('button', { name: 'Edit inline' })
+    await expect(edit).toBeEnabled()
+    const newer = await pin(api, id, TWO.replace('Old headline', 'Newer headline'))
+
+    await edit.click()
+    const dialog = page.getByRole('dialog')
+    // The click waits until Save is enabled, which is only after the editor's own read.
+    await dialog.getByRole('button', { name: 'Save & re-export' }).click()
+    await expect.poll(async () => (await current()).currentRevisionNumber, { timeout: 15_000 }).toBe(
+      newer.currentRevisionNumber + 1,
+    )
+    const after = await current()
+    expect(after.htmlContent).toContain('Newer headline')
+    expect(after.htmlContent).not.toContain('Old headline')
+  })
+
+  // TC-INLINE-17 — fix round 1 (Important). Element mode works with the
+  // keyboard alone: every control is focused and activated with Enter, and
+  // there is no pointer input on the canvas. Focus returns to the control
+  // that was used after a navigation, and after an Apply once the element
+  // is re-selected in the reloaded document. When that control is now
+  // disabled (an unchanged text disables Apply text) focus goes to its field
+  // instead.
+  test('element mode works with the keyboard alone, and focus returns to the control used', async ({
+    page,
+  }) => {
+    if (!MOCKED()) {
+      test.skip()
+      return
+    }
+    const NESTED =
+      '<!doctype html><html><head></head><body style="margin:0;width:1080px;height:1080px"><section><h1>Old headline</h1><p>Keep me</p></section><footer>Foot</footer></body></html>'
+    const draft = await createExportedDraft(api, `Inline Keyboard ${Date.now()}`)
+    const id = String(draft.id)
+    const pinned = await pin(api, id, NESTED)
+    const current = async () => (await (await api.get(`/api/drafts/${id}`)).json()) as {
+      currentRevisionNumber: number
+      htmlContent: string
+    }
+    const press = async (locator: Locator) => {
+      await locator.focus()
+      await page.keyboard.press('Enter')
+    }
+
+    await pageLogin(page)
+    await page.goto(`/drafts/${id}`)
+    const edit = page.getByRole('button', { name: 'Edit inline' })
+    await expect(edit).toBeEnabled()
+    await press(edit)
+    const dialog = page.getByRole('dialog')
+    await press(dialog.getByRole('tab', { name: 'Single element' }))
+    await expect(dialog.locator('[data-editor-ready="true"]')).toBeAttached()
+
+    const tag = dialog.getByTestId('element-tag')
+    const heading = dialog.locator('[data-focus-id="heading"]')
+    const child = dialog.getByRole('button', { name: 'Select first child element' })
+    const next = dialog.getByRole('button', { name: 'Select next sibling element' })
+    const previous = dialog.getByRole('button', { name: 'Select previous sibling element' })
+    const parent = dialog.getByRole('button', { name: 'Select parent element' })
+
+    await press(dialog.getByRole('button', { name: 'Select the whole design' }))
+    await expect(tag).toHaveText('<body>')
+    await expect(heading).toBeFocused()
+    await expect(parent).toBeDisabled()
+
+    await press(child)
+    await expect(tag).toHaveText('<section>')
+    await expect(child).toBeFocused() // section has children, so Child stays enabled
+    await press(next)
+    await expect(tag).toHaveText('<footer>')
+    await expect(heading).toBeFocused() // footer is last, so Next is disabled; focus falls back
+    await press(previous)
+    await expect(tag).toHaveText('<section>')
+    await press(child)
+    await expect(tag).toHaveText('<h1>')
+
+    const text = dialog.getByLabel('Text', { exact: true })
+    await text.focus()
+    await page.keyboard.press('Control+A')
+    await page.keyboard.type('Keyboard headline')
+    await press(dialog.getByRole('button', { name: 'Apply text', exact: true }))
+    await expect.poll(async () => (await current()).currentRevisionNumber, { timeout: 15_000 }).toBe(
+      pinned.currentRevisionNumber + 1,
+    )
+    // Re-selected in the reloaded document. Apply text is disabled for the
+    // unchanged text, so focus is on the Text field.
+    await expect(tag).toHaveText('<h1>')
+    await expect(text).toBeFocused()
+
+    const size = dialog.getByLabel('Font size')
+    await size.focus()
+    await page.keyboard.press('Control+A')
+    await page.keyboard.type('40px')
+    const applySize = dialog.getByRole('button', { name: 'Apply font size', exact: true })
+    await press(applySize)
+    await expect.poll(async () => (await current()).currentRevisionNumber, { timeout: 15_000 }).toBe(
+      pinned.currentRevisionNumber + 2,
+    )
+    await expect(applySize).toBeFocused()
+    expect((await current()).htmlContent).toBe(
+      NESTED.replace('<h1>Old headline</h1>', '<h1 style="font-size: 40px">Keyboard headline</h1>'),
     )
   })
 

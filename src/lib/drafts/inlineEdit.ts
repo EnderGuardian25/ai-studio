@@ -272,11 +272,13 @@ export function elementCommitConflict(pendingAction: string | null): Extract<Ele
 // and keeping it would mean splicing around it. Raw-text / RCDATA elements are
 // refused — text written into <style> would be CSS, and into <script> would be
 // code. Void elements have no content.
-const TEXT_FORBIDDEN = new Set([
+// Exported so the editor mirrors the rule from this one definition
+// (src/components/drafts/inlineElementEdit.ts).
+export const TEXT_FORBIDDEN: ReadonlySet<string> = new Set([
   'script', 'style', 'template', 'textarea', 'title', 'iframe', 'noembed', 'noframes', 'xmp',
 ])
 // Style edits: any element except those that hold code/CSS or aren't rendered.
-const STYLE_FORBIDDEN = new Set(['script', 'style', 'template', 'title'])
+export const STYLE_FORBIDDEN: ReadonlySet<string> = new Set(['script', 'style', 'template', 'title'])
 
 // The browser drops ONE line feed that immediately follows a <pre> / <listing>
 // start tag (HTML "in body": "if the next token is a LF, ignore it"; CR and

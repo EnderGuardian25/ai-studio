@@ -439,6 +439,19 @@ Most cases pin a known document through whole-document mode first, then address 
   4. Another writer rewrites the design, then apply a font size. It reports that the design changed, reloads the latest version, and writes nothing.
   5. A fresh click on the right `<p>` in the reloaded document then lands.
 
+  Clicks in a freshly remounted frame first wait for `[data-editor-ready="true"]` and the frame's `#inline-edit-select-style`.
+
+- **TC-INLINE-16 (T24 fix round 1, browser):** a whole-document save never reverts a newer save.
+  - The page reads the draft at revision 2. A newer save then lands (revision 3), and the page, which does not poll, still holds revision 2. That is the state of a reopen inside the page's post-save refetch.
+  - Opening the editor re-reads the draft, and "Save & re-export" stays disabled until that read lands.
+  - The save keeps the newer save's text.
+- **TC-INLINE-17 (T24 fix round 1, browser):** keyboard only. Every control is focused and activated with Enter.
+  1. "Select the whole design" selects `<body>`, with focus on the heading.
+  2. Child selects `<section>`, and focus stays on Child. Next selects `<footer>`; Next is then disabled, so focus falls back to the heading. Previous and Child reach the `<h1>`.
+  3. Type the text and Apply. After the re-select, focus is on the Text field, because Apply text is disabled for the unchanged text.
+  4. Apply a font size. Focus is back on "Apply font size".
+  5. The exact document is asserted.
+
 **AC → case map (change 004 Phase 3).** The unit files are `tests/unit/inlineEditElement.test.ts`, `htmlLocator.test.ts`, `draftRevisions.test.ts` and `inlineElementEditClient.test.ts`.
 
 | AC                                                                     | E2E                                                                                                                     | Unit                                              |

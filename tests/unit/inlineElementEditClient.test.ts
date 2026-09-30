@@ -8,9 +8,11 @@ import {
   postElementEdit,
   cssColorToHex,
   resolveEditorPath,
+  relativeElementPath,
+  seedColorValue,
   type SelectableElement,
 } from '@/components/drafts/inlineElementEdit'
-import { applyElementEdit } from '@/lib/drafts/inlineEdit'
+import { applyElementEdit, parseColor } from '@/lib/drafts/inlineEdit'
 
 // Structural stand-ins for iframe DOM elements (vitest runs in `node`, no DOM).
 // Same shape as the fakes in inlineEditElement.test.ts.
@@ -353,5 +355,77 @@ describe('resolveEditorPath — re-selects the same element in a reloaded docume
   it('a path that no longer resolves is null', () => {
     expect(resolveEditorPath(body, [5])).toBeNull()
     expect(resolveEditorPath(body, [1, 0])).toBeNull()
+  })
+})
+
+// Fix round 1 (review of 783c3d56): keyboard navigation and alpha-preserving seeds.
+
+describe('relativeElementPath — keyboard navigation over the stored-HTML tree', () => {
+  const img = E('img', {}, [])
+  const btn = E('button', { 'data-inline-edit-chrome': 'img-btn' }, ['Replace photo'])
+  const wrap = E('span', { 'data-inline-edit-chrome': 'img-wrap' }, [img, btn])
+  const h1 = E('h1', {}, ['Hi'])
+  const card = E('div', {}, [wrap, h1])
+  const p = E('p', {}, ['World'])
+  const banner = E('div', { 'data-inline-edit-chrome': 'banner' }, ['x'])
+  const body = E('body', {}, [banner, card, p])
+  const at = (el: Fake) => snapshotElementLocator(el, body, 1)!.path
+  const go = (el: Fake, dir: Parameters<typeof relativeElementPath>[2]) => {
+    const next = relativeElementPath(body, at(el), dir)
+    return next === null ? null : resolveEditorPath(body, next)
+  }
+
+  it('parent, first child, previous and next follow the stored-HTML tree', () => {
+    expect(go(body, 'firstChild')).toBe(card)
+    expect(go(card, 'next')).toBe(p)
+    expect(go(p, 'previous')).toBe(card)
+    expect(go(card, 'firstChild')).toBe(img)
+    expect(go(img, 'next')).toBe(h1)
+    expect(go(img, 'parent')).toBe(card)
+    expect(go(card, 'parent')).toBe(body)
+  })
+
+  it('never reaches editor chrome: img-wrap is transparent, the button and banner are skipped', () => {
+    for (const el of [body, card, img, h1, p]) {
+      for (const dir of ['parent', 'firstChild', 'previous', 'next'] as const) {
+        const hit = go(el, dir)
+        if (hit) expect(hit.getAttribute('data-inline-edit-chrome')).toBeNull()
+      }
+    }
+    expect(go(h1, 'next')).toBeNull() // the Replace-photo button is not a sibling
+    expect(go(body, 'firstChild')).not.toBe(banner)
+  })
+
+  it('is null at the edges', () => {
+    expect(relativeElementPath(body, [], 'parent')).toBeNull()
+    expect(relativeElementPath(body, [], 'next')).toBeNull()
+    expect(relativeElementPath(body, [], 'previous')).toBeNull()
+    expect(go(card, 'previous')).toBeNull()
+    expect(go(p, 'next')).toBeNull()
+    expect(go(h1, 'firstChild')).toBeNull()
+  })
+})
+
+describe('seedColorValue — the field and swatch seeds for a computed colour', () => {
+  it('an opaque colour seeds hex', () => {
+    expect(seedColorValue('rgb(2, 132, 199)')).toEqual({ text: '#0284c7', swatch: '#0284c7' })
+  })
+
+  it('a translucent colour keeps its alpha, so an unchanged Apply does not make it opaque', () => {
+    const seed = seedColorValue('rgba(255, 0, 0, 0.5)')
+    expect(seed).toEqual({ text: 'rgba(255, 0, 0, 0.5)', swatch: '#ff0000' })
+    expect(parseColor(seed.text)).toBe('rgba(255, 0, 0, 0.5)')
+  })
+
+  it('a long computed alpha is rounded into the server grammar (at most 4 decimals)', () => {
+    const seed = seedColorValue('rgba(10, 20, 30, 0.498039)')
+    expect(seed.text).toBe('rgba(10, 20, 30, 0.498)')
+    expect(parseColor(seed.text)).not.toBeNull()
+  })
+
+  it('a transparent or unreadable colour seeds nothing (no fake black swatch)', () => {
+    expect(seedColorValue('rgba(0, 0, 0, 0)')).toEqual({ text: '', swatch: null })
+    expect(seedColorValue('transparent')).toEqual({ text: '', swatch: null })
+    expect(seedColorValue('color(srgb 1 0 0)')).toEqual({ text: '', swatch: null })
   })
 })

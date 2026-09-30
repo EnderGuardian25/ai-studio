@@ -18,6 +18,8 @@
 import {
   editorElementPath,
   editorFingerprintText,
+  TEXT_FORBIDDEN,
+  STYLE_FORBIDDEN,
   type EditorDomElement,
   type ElementEditKind,
   type ElementEditRequest,
@@ -32,13 +34,9 @@ export type ElementLocator = ElementEditRequest['locator']
 const SVG_NS = 'http://www.w3.org/2000/svg'
 const CHROME_ATTR = 'data-inline-edit-chrome'
 
-// Mirrors inlineEdit.ts TEXT_FORBIDDEN / STYLE_FORBIDDEN. The contract test in
-// tests/unit/inlineElementEditClient.test.ts checks the mirror against
-// applyElementEdit.
-const TEXT_FORBIDDEN = new Set([
-  'script', 'style', 'template', 'textarea', 'title', 'iframe', 'noembed', 'noframes', 'xmp',
-])
-const STYLE_FORBIDDEN = new Set(['script', 'style', 'template', 'title'])
+// TEXT_FORBIDDEN / STYLE_FORBIDDEN are the server's own sets (inlineEdit.ts). The
+// contract test in tests/unit/inlineElementEditClient.test.ts also checks the
+// rest of the leaf rule against applyElementEdit.
 
 function tagOf(el: SelectableElement): string {
   return asciiLower(el.tagName)
@@ -123,6 +121,31 @@ export function resolveEditorPath(body: SelectableElement, path: number[]): Sele
     cur = next
   }
   return cur
+}
+
+export type ElementNavDirection = 'parent' | 'firstChild' | 'previous' | 'next'
+
+// Keyboard navigation (fix round 1). The path of the element one step from
+// `path` in direction `dir`, or null when there is none. It walks the same
+// chrome-transparent tree as the locator (resolveEditorPath), so it can never
+// land on editor chrome, and the element it names is then selected like any
+// click: its locator is snapshotted fresh.
+export function relativeElementPath(
+  body: SelectableElement,
+  path: number[],
+  dir: ElementNavDirection,
+): number[] | null {
+  let next: number[]
+  if (dir === 'firstChild') {
+    next = [...path, 0]
+  } else {
+    if (path.length === 0) return null // <body> has no parent or siblings
+    const last = path[path.length - 1]
+    if (dir === 'parent') return path.slice(0, -1)
+    if (dir === 'previous' && last === 0) return null
+    next = [...path.slice(0, -1), dir === 'previous' ? last - 1 : last + 1]
+  }
+  return resolveEditorPath(body, next) ? next : null
 }
 
 // Exactly the Ruling W5-B body. No selector or target is ever sent; the
@@ -238,4 +261,22 @@ export function cssColorToHex(value: string): string | null {
   const channels = [m[1], m[2], m[3]].map(Number)
   if (channels.some((c) => c > 255)) return null
   return `#${channels.map((c) => c.toString(16).padStart(2, '0')).join('')}`
+}
+
+// The seeds for a colour field (fix round 1).
+// - `text` is what the text field starts with.
+// - `swatch` is what the picker shows. It is null when there is no colour to
+//   show, and the panel then draws a "none" state rather than a fake black.
+// A translucent computed colour keeps its alpha as `rgba(...)`, which the server
+// grammar accepts, so applying the field unchanged never makes it opaque.
+// Alpha is rounded to the grammar's 4 decimals.
+export function seedColorValue(css: string): { text: string; swatch: string | null } {
+  const swatch = cssColorToHex(css)
+  if (swatch === null) return { text: '', swatch: null }
+  const m = /^rgba\(\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*(\d{1,3})\s*,\s*([\d.]+)\s*\)$/.exec(css.trim().toLowerCase())
+  if (m) {
+    const a = Number(Number(m[4]).toFixed(4))
+    if (a > 0 && a < 1) return { text: `rgba(${m[1]}, ${m[2]}, ${m[3]}, ${String(a)})`, swatch }
+  }
+  return { text: swatch, swatch }
 }
