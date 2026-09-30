@@ -451,6 +451,10 @@ Most cases pin a known document through whole-document mode first, then address 
   3. Type the text and Apply. After the re-select, focus is on the Text field, because Apply text is disabled for the unchanged text.
   4. Apply a font size. Focus is back on "Apply font size".
   5. The exact document is asserted.
+- **TC-INLINE-18 (T24 fix round 2, browser):** a failed re-read fails closed, and whole-document mode always starts from a fresh read. A Playwright `page.route` fails exactly one of the **editor's** draft GETs; the page's own refetch is left alone, because if it failed the page would show its error screen.
+  - **Phase 1:** an element Apply succeeds, then the editor's re-read fails. Switching to Whole document re-reads, and Save stays disabled until a read lands. The save keeps the element edit. On `4f9477fe` this reverted it.
+  - **Phase 2:** the switch's own re-read fails. The "Try again" overlay shows and Save is disabled, and only a successful retry re-enables it.
+  - A mutation check confirmed that phase 2 fails when only the fail-closed half of the fix is removed.
 
 **AC → case map (change 004 Phase 3).** The unit files are `tests/unit/inlineEditElement.test.ts`, `htmlLocator.test.ts`, `draftRevisions.test.ts` and `inlineElementEditClient.test.ts`.
 
@@ -459,7 +463,7 @@ Most cases pin a known document through whole-document mode first, then address 
 | AC-21 `<script>` text renders as literal text                          | TC-INLINE-05 (stored escaped, exact document), TC-INLINE-15 (visible literal text in the editor, no `<script>` element) | `applyElementEdit` AC-21; `replaceElementText`    |
 | AC-22 break-out colour rejected, nothing written                       | TC-INLINE-06, TC-INLINE-15 (message shown in the UI)                                                                    | `parseColor` (the exact string plus every `url(`) |
 | AC-23 bad unit / non-numeric size rejected                             | TC-INLINE-12                                                                                                            | `parseSize`                                       |
-| AC-24 one revision through `commitDraftRevision`                       | TC-INLINE-05, -07, -09, -10, -15                                                                                        | `draftRevisions.test.ts` (CAS, lock order)        |
+| AC-24 one revision through `commitDraftRevision`                       | TC-INLINE-05, -07, -09, -10, -15, -17, -18                                                                              | `draftRevisions.test.ts` (CAS, lock order)        |
 | AC-25 no persisted address; a rewrite between sessions can't misdirect | TC-INLINE-05, -08 (whole-document rewrite), **-13 (real refine)**, -15 (UI reload)                                      | `checkElementBaseRevision`, stale path/tag/text   |
 | AC-26 client selector never chooses the target                         | TC-INLINE-05 (top-level decoy), **-14 (decoys at every level, naming a different element)**                             | schema strips `selector`/`target` at every level  |
 

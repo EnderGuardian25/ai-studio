@@ -1,4 +1,4 @@
-import { test, expect, type Locator, type Page } from '@playwright/test'
+import { test, expect, type Locator, type Page, type Route } from '@playwright/test'
 import { loginAs, waitForDraft, waitForAction, type ApiClient } from '../helpers/api'
 
 const ADMIN_EMAIL = 'admin@bisteccare.lk'
@@ -711,6 +711,109 @@ test.describe('§T — draft inline edit', () => {
     expect((await current()).htmlContent).toBe(
       NESTED.replace('<h1>Old headline</h1>', '<h1 style="font-size: 40px">Keyboard headline</h1>'),
     )
+  })
+
+  // TC-INLINE-18 — fix round 2. A failed re-read fails closed, and whole-document
+  // mode always starts from a fresh read.
+  //
+  // Phase 1: an element Apply succeeds, then the editor's re-read of the draft
+  // fails. The user switches to Whole document and saves. The element edit
+  // must survive. The switch re-reads, and until a read lands nothing can be
+  // saved. (On 4f9477fe the failed read left the pre-edit document writable,
+  // and this save reverted the element edit.)
+  //
+  // Phase 2: the switch's own re-read fails. Save stays disabled behind "Try
+  // again", and becomes available only once a retry succeeds.
+  //
+  // Only the EDITOR's GET may fail. If the page's own refetch failed, the page
+  // would swap to its error screen. After an Apply the page refetch is issued
+  // first (onSaved) and the editor's re-read second, so phase 1 fails the 2nd
+  // draft GET. The draft page issues no other GET of that URL here (it polls
+  // only while an action runs). If that order ever changes, the page errors
+  // and this test fails loudly; it cannot pass by accident.
+  test('a failed re-read fails closed; switching to whole-document re-reads, so a save never reverts an element edit', async ({
+    page,
+  }) => {
+    if (!MOCKED()) {
+      test.skip()
+      return
+    }
+    const draft = await createExportedDraft(api, `Inline Reread ${Date.now()}`)
+    const id = String(draft.id)
+    const pinned = await pin(api, id, TWO)
+    const current = async () => (await (await api.get(`/api/drafts/${id}`)).json()) as {
+      currentRevisionNumber: number
+      htmlContent: string
+    }
+    // Fail the nth browser GET of exactly /api/drafts/<id> (not /inline-edit or
+    // /revisions) from now on, once. `failed` resolves when it has failed. It is
+    // wrapped in an object because an async function would unwrap a bare promise.
+    const failDraftGet = async (nth: number) => {
+      const url = new RegExp(`/api/drafts/${id}$`)
+      let seen = 0
+      let failed!: () => void
+      const done = new Promise<void>((r) => (failed = r))
+      let spent = false
+      const handler = async (route: Route) => {
+        if (spent || route.request().method() !== 'GET') return route.continue()
+        seen += 1
+        if (seen !== nth) return route.continue()
+        spent = true
+        await route.fulfill({
+          status: 500,
+          contentType: 'application/json',
+          body: JSON.stringify({ error: 'Simulated read failure' }),
+        })
+        failed()
+      }
+      await page.route(url, handler)
+      return { failed: done }
+    }
+
+    await pageLogin(page)
+    await page.goto(`/drafts/${id}`)
+    await page.getByRole('button', { name: 'Edit inline' }).click()
+    const dialog = page.getByRole('dialog')
+    const frame = page.frameLocator('iframe[title="Inline editor"]')
+    const save = dialog.getByRole('button', { name: 'Save & re-export' })
+    await dialog.getByRole('tab', { name: 'Single element' }).click()
+    await expect(dialog.locator('[data-editor-ready="true"]')).toBeAttached()
+    await expect(frame.locator('#inline-edit-select-style')).toBeAttached()
+
+    // Phase 1.
+    await frame.locator('h1').click()
+    await dialog.getByLabel('Text', { exact: true }).fill('Element edit survives')
+    const reread = (await failDraftGet(2)).failed // 1st = the page's refetch, 2nd = the editor's re-read
+    await dialog.getByRole('button', { name: 'Apply text', exact: true }).click()
+    await expect.poll(async () => (await current()).currentRevisionNumber, { timeout: 15_000 }).toBe(
+      pinned.currentRevisionNumber + 1,
+    )
+    await reread
+    await dialog.getByRole('tab', { name: 'Whole document' }).click()
+    await save.click() // it waits until Save is enabled, i.e. a read has landed
+    await expect.poll(async () => (await current()).currentRevisionNumber, { timeout: 15_000 }).toBe(
+      pinned.currentRevisionNumber + 2,
+    )
+    const afterSave = await current()
+    expect(afterSave.htmlContent).toContain('Element edit survives')
+    expect(afterSave.htmlContent).not.toContain('Old headline')
+
+    // Phase 2. The whole-document save closed the modal; reopen it (the page
+    // has refetched), then fail the read that the switch back to Whole
+    // document makes.
+    await expect(dialog).toBeHidden()
+    await page.getByRole('button', { name: 'Edit inline' }).click()
+    await dialog.getByRole('tab', { name: 'Single element' }).click()
+    await expect(dialog.locator('[data-editor-ready="true"]')).toBeAttached()
+    const switchRead = (await failDraftGet(1)).failed
+    await dialog.getByRole('tab', { name: 'Whole document' }).click()
+    await switchRead
+    const retry = dialog.getByRole('button', { name: 'Try again' })
+    await expect(retry).toBeVisible()
+    await expect(save).toBeDisabled()
+    await retry.click()
+    await expect(save).toBeEnabled()
+    await expect(frame.locator('h1')).toHaveText('Element edit survives')
   })
 
   // TC-INLINE-04 — a foreign draft id is a 404 (no existence leak).

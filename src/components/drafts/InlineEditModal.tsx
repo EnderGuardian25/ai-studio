@@ -373,13 +373,26 @@ export function InlineEditModal({
   // Re-read the draft, then load its htmlContent and currentRevisionNumber
   // TOGETHER. Both come from one response, so the next locator is always
   // computed against the revision it names.
+  //
+  // It FAILS CLOSED (fix round 2). Every caller re-reads because the document
+  // on the canvas may no longer be the stored one: after a save, after a stale
+  // reply, on "Check again", on the switch into whole-document mode. So a
+  // failed read clears `synced`, and every write (Save, Apply, selection)
+  // stays blocked behind the "Try again" overlay until a read succeeds. The
+  // old document is never left writable, and a whole-document save from it
+  // would silently revert what was just committed.
   const reloadFromServer = useCallback(async (): Promise<Omit<LoadedDoc, 'seq'> | null> => {
     setReloading(true)
+    const failClosed = () => {
+      setSynced(false)
+      setSyncFailed(true)
+      return null
+    }
     try {
       const d = await apiFetch<DraftDetail>(`/api/drafts/${draftId}`)
       if (!d.htmlContent) {
         toast.error('This draft has no design to edit')
-        return null
+        return failClosed()
       }
       const next = { html: d.htmlContent, revisionNumber: d.currentRevisionNumber }
       setSelection(null)
@@ -389,23 +402,24 @@ export function InlineEditModal({
       setNotice((prev) =>
         blocked ? { kind: 'busy', message: blocked } : prev?.kind === 'busy' ? null : prev,
       )
+      setSynced(true)
+      setSyncFailed(false)
       return next
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : 'Could not reload the draft')
-      return null
+      return failClosed()
     } finally {
       setReloading(false)
     }
   }, [draftId])
 
-  // The first own read (fix round 1; see the props comment). Until it lands,
-  // the stage is covered and Save and Apply are disabled. A failed read keeps
-  // them disabled and offers a retry; it never falls back to the caller's copy.
+  // The first own read (fix round 1; see the props comment), and "Try again".
+  // Until a read lands, the stage is covered and Save and Apply are disabled.
+  // A failed read keeps them disabled (reloadFromServer fails closed) and offers
+  // a retry. It never falls back to the caller's copy.
   const syncWithServer = useCallback(async () => {
     setSyncFailed(false)
-    const next = await reloadFromServer()
-    if (next) setSynced(true)
-    else setSyncFailed(true)
+    await reloadFromServer()
   }, [reloadFromServer])
 
   const syncStarted = useRef(false)
@@ -485,7 +499,7 @@ export function InlineEditModal({
 
   function selectBody() {
     const doc = iframeRef.current?.contentDocument
-    if (!doc?.body || inFlightRef.current || wiredKey !== frameKey) return
+    if (!doc?.body || inFlightRef.current || !synced || wiredKey !== frameKey) return
     selectElement(doc.body, loaded.revisionNumber, 'heading')
   }
 
@@ -507,6 +521,11 @@ export function InlineEditModal({
     setFieldError(null)
     setNotice(null)
     setMode(target)
+    // Whole-document mode serializes the canvas as the new revision, with no
+    // base revision to check it against. So it always starts from a fresh
+    // {html, pointer} read (fix round 2), through the same gated path: Save
+    // stays disabled until the read lands, and blocked if it fails.
+    if (target === 'document') await reloadFromServer()
   }
 
   async function handleSave() {
