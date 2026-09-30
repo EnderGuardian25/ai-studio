@@ -206,7 +206,7 @@ Two migrations, one per phase, deliberately not merged — a single migration wo
   - Depends: T22
   - Notes: FR-17/18/19, AC-24/25/26. Node resolved **server-side** from the click payload; a client-supplied selector is never the write target. Addresses resolved fresh, never persisted. Commits through the existing `commitDraftRevision` — no second writer of `Draft.htmlContent`. This mode must be **narrower** than the existing whole-document contenteditable surface, never wider; that surface is unchanged.
 
-- [~] `T24` — Click-to-select element mode in the editor, with E2E
+- [x] `T24` — Click-to-select element mode in the editor, with E2E
   - Files: `src/components/drafts/InlineEditModal.tsx`, `tests/e2e/draft-inline-edit.test.ts`
   - Estimate: large
   - Kind: impl
