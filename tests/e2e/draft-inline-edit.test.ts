@@ -816,6 +816,58 @@ test.describe('§T — draft inline edit', () => {
     await expect(frame.locator('h1')).toHaveText('Element edit survives')
   })
 
+  // TC-INLINE-19 — F2 (final-3 Important). The editor's plain-text paste and
+  // unsaved-typing listeners used to be guarded by a marker attribute on <body>,
+  // which was saved into the stored HTML; a document carrying it opened with NO
+  // listeners, so typing was never "dirty" and a mode switch discarded it
+  // silently. The guard is parent-side now. The seeded document carries the
+  // old marker (an already-stored draft); typing must still be tracked, so the
+  // switch to Single element asks first (which also drives the nested
+  // useConfirm), and a rich paste lands as plain text.
+  test('a stored paste-wired marker no longer disables dirty tracking or plain-text paste', async ({
+    page,
+  }) => {
+    if (!MOCKED()) {
+      test.skip()
+      return
+    }
+    const draft = await createExportedDraft(api, `Inline Marker ${Date.now()}`)
+    const id = String(draft.id)
+    await pin(
+      api,
+      id,
+      TWO.replace('<body ', '<body data-inline-edit-paste-wired="1" '),
+    )
+
+    await pageLogin(page)
+    await page.goto(`/drafts/${id}`)
+    await page.getByRole('button', { name: 'Edit inline' }).click()
+    const dialog = page.getByRole('dialog')
+    const frame = page.frameLocator('iframe[title="Inline editor"]')
+    await expect(dialog.getByRole('button', { name: 'Save & re-export' })).toBeEnabled()
+    const h1 = frame.locator('h1')
+    await h1.click()
+    await page.keyboard.press('End')
+    await page.keyboard.type(' typed')
+    await expect(h1).toContainText('Old headline typed')
+
+    // A rich paste (text/html + text/plain) lands as the plain text only.
+    await h1.evaluate((el) => {
+      const dt = new DataTransfer()
+      dt.setData('text/html', '<b id="rich-paste">RICH</b>')
+      dt.setData('text/plain', ' PLAIN')
+      el.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }))
+    })
+    await expect(h1).toContainText('PLAIN')
+    await expect(frame.locator('#rich-paste')).toHaveCount(0)
+
+    await dialog.getByRole('tab', { name: 'Single element' }).click()
+    await expect(page.getByText('Discard unsaved edits?')).toBeVisible()
+    await page.getByRole('button', { name: 'Cancel' }).click()
+    await expect(page.getByText('Discard unsaved edits?')).toBeHidden()
+    await expect(h1).toContainText('PLAIN')
+  })
+
   // TC-INLINE-04 — a foreign draft id is a 404 (no existence leak).
   test('an unknown draft id is 404', async () => {
     if (!MOCKED()) {

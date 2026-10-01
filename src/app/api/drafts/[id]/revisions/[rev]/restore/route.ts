@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server'
-import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { getDraftAccessInfo } from '@/lib/auth'
 import { withTeamAuth } from '@/lib/api/handler'
@@ -7,7 +6,7 @@ import { canAccessContent } from '@/lib/authz/visibility'
 import { renderHtmlToPng } from '@/lib/renderer/puppeteer'
 import { uploadObject, resolveExportUrl, exportKey, BUCKET_EXPORTS } from '@/lib/storage/minio'
 import { dimensionsFor } from '@/lib/aspectRatio'
-import { findCommittedRevision, discardNotAppliedRender, NOT_APPLIED_CLEARED } from '@/lib/drafts/revisions'
+import { findCommittedRevision, restoreDraftToRevision, DraftBusyError } from '@/lib/drafts/revisions'
 
 export const maxDuration = 120
 
@@ -63,23 +62,17 @@ export const POST = withTeamAuth<Params>(async (_req, { params }, user) => {
   // T18 (Ruling, T17 concern 4): a restore also clears any not-applied
   // outcome. The rejected render a "Use anyway" would adopt was made from the
   // PRE-restore design — leaving it live would let a later adopt silently
-  // undo this restore. Same two statements commitDraftRevision uses, batched
-  // (not interactive) since neither reads.
-  await prisma.$transaction([
-    discardNotAppliedRender(prisma, params.id),
-    prisma.draft.update({
-      where: { id: params.id },
-      data: {
-        htmlContent: revision.htmlSnapshot,
-        exportUrl: key,
-        // Move the "current version" pointer — this is what makes reverting
-        // reversible: you can jump forward again to any other revision.
-        currentRevisionNumber: revisionNumber,
-        pendingConflict: Prisma.JsonNull,
-        ...NOT_APPLIED_CLEARED,
-      },
-    }),
-  ])
+  // undo this restore. F2: the draft write is guarded on pendingAction being
+  // null, so an action that claimed the draft after the pre-check above
+  // makes this a 409 that writes nothing.
+  try {
+    await restoreDraftToRevision(params.id, revisionNumber, revision.htmlSnapshot, key)
+  } catch (err) {
+    if (err instanceof DraftBusyError) {
+      return NextResponse.json({ error: err.message }, { status: 409 })
+    }
+    throw err
+  }
 
   return NextResponse.json({ exportUrl: await resolveExportUrl(key) })
 })

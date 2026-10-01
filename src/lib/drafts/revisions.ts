@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { PROMPT_VERSION } from '@/lib/agent/prompts/shared'
 import { INSTRUCTION_CLASS_KEYS } from '@/lib/agent/instructionClasses'
 import { getFontSetId } from '@/lib/renderer/fontSet'
+import type { DraftAction } from '@prisma/client'
 import type { DraftNotApplied } from '@/lib/api-types'
 
 // ── The revision chain vs. rejected renders (change 004 Phase 2, T15/T16) ────
@@ -445,16 +446,62 @@ export const NOT_APPLIED_CLEARED = { notAppliedReason: null, notAppliedRevisionI
 // Only rejected rows may carry discardedAt (CHECK constraint), and the filter
 // says so too. One statement, no read, so it also fits a batch transaction —
 // it runs on every draft-action completion (draftActions.completeDraftAction).
-export function discardNotAppliedRender(client: Prisma.TransactionClient, draftId: string) {
+//
+// `claimedAction` (draft-action completion only): the stamp applies only while
+// the draft STILL carries that claim, so a late settle from a swept run cannot
+// discard a newer action's outcome.
+export function discardNotAppliedRender(
+  client: Prisma.TransactionClient,
+  draftId: string,
+  claimedAction?: DraftAction,
+) {
   return client.draftRevision.updateMany({
     where: {
       draftId,
       rejectedAt: { not: null },
       adoptedAt: null,
       discardedAt: null,
-      notAppliedOn: { some: { id: draftId } },
+      notAppliedOn: { some: { id: draftId, ...(claimedAction ? { pendingAction: claimedAction } : {}) } },
     },
     data: { discardedAt: new Date() },
+  })
+}
+
+// Thrown by restoreDraftToRevision when an action claimed the draft between the
+// route's pre-check and the write; the route answers 409.
+export class DraftBusyError extends Error {
+  constructor() {
+    super('Another action is already running on this draft')
+    this.name = 'DraftBusyError'
+  }
+}
+
+// The restore route's write: moves the revision pointer to an existing chain
+// revision and clears any not-applied outcome (T18). Lock order as everywhere:
+// rejected rows first, the draft row LAST. The draft write carries
+// pendingAction: null in its WHERE (a late claim wins with 0 rows, and the
+// transaction rolls back with a DraftBusyError).
+export async function restoreDraftToRevision(
+  draftId: string,
+  revisionNumber: number,
+  htmlSnapshot: string,
+  exportKey: string,
+): Promise<void> {
+  await prisma.$transaction(async (tx) => {
+    await discardNotAppliedRender(tx, draftId)
+    const { count } = await tx.draft.updateMany({
+      where: { id: draftId, pendingAction: null },
+      data: {
+        htmlContent: htmlSnapshot,
+        exportUrl: exportKey,
+        // Move the "current version" pointer: this is what makes reverting
+        // reversible, since you can jump forward again to any other revision.
+        currentRevisionNumber: revisionNumber,
+        pendingConflict: Prisma.JsonNull,
+        ...NOT_APPLIED_CLEARED,
+      },
+    })
+    if (count !== 1) throw new DraftBusyError()
   })
 }
 

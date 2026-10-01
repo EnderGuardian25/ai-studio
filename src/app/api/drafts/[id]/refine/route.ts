@@ -141,7 +141,7 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
   // actor is the acting teammate (NOT the brief owner) — image-provider
   // resolution must follow whoever is running this refine.
   const actor = { userId: user.userId, teamId: user.teamId }
-  await startDraftAction(draft.id, user.userId, user.teamId, async () => {
+  await startDraftAction(draft.id, user.userId, user.teamId, 'REFINE', async () => {
     // Background pre-step: generates a new background ONLY when the instruction
     // asks for one (e.g. "change the background to a city skyline"); null
     // otherwise, and on any failure. See agent/background.ts.

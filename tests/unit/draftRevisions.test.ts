@@ -278,6 +278,8 @@ import {
   withNextRevisionNumber,
   commitDraftRevision,
   AdoptConflictError,
+  DraftBusyError,
+  restoreDraftToRevision,
   RevisionConflictError,
   recordRejectedRender,
   resolveNotAppliedOutcome,
@@ -1094,5 +1096,36 @@ describe('resolveNotAppliedOutcome (T18, Ruling E)', () => {
       'rejectedAt',
       'revisionId',
     ])
+  })
+})
+
+// ── F2 (change 004 final fix wave): restore's draft write is guarded ────────
+// The restore route pre-checks pendingAction, but a refine/regenerate can claim
+// the draft between that read and the write. The guard is folded into the
+// final draft write (like adopt's), so a late claim is a 409 that writes nothing.
+
+describe('restoreDraftToRevision (F2 — restore guard)', () => {
+  it('moves the pointer and clears the not-applied outcome when no action is claimed', async () => {
+    db.currentRevisionNumber = 3
+    await restoreDraftToRevision('d1', 2, '<html>v2</html>', 'exports/d1-2.png')
+    expect(db.currentRevisionNumber).toBe(2)
+    expect(db.draftUpdates.at(-1)!.data).toMatchObject({
+      htmlContent: '<html>v2</html>',
+      exportUrl: 'exports/d1-2.png',
+      currentRevisionNumber: 2,
+    })
+    // Lock order: the rejected-row stamp first, the draft row last.
+    expect(db.ops).toEqual(['revision.updateMany', 'draft.updateMany'])
+  })
+
+  it('a claimed action refuses the restore, writes nothing and rolls back', async () => {
+    db.currentRevisionNumber = 3
+    db.pendingAction = 'REFINE'
+    await expect(
+      restoreDraftToRevision('d1', 2, '<html>v2</html>', 'exports/d1-2.png'),
+    ).rejects.toThrow(DraftBusyError)
+    expect(db.currentRevisionNumber).toBe(3)
+    expect(db.draftUpdates).toEqual([])
+    expect(db.ops.at(-1)).toBe('rollback')
   })
 })

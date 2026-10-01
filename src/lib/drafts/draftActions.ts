@@ -25,6 +25,10 @@ import { NOT_APPLIED_CLEARED, discardNotAppliedRender } from '@/lib/drafts/revis
 // by which point the settling run has already overwritten it. Every crash is
 // also logged by startDraftAction, so it is recorded even after a later
 // success clears the field.
+//
+// Settling is guarded on the action THIS run claimed (release/complete below):
+// a run the stale sweep already cleared settles late as a no-op instead of
+// clearing, or overwriting the outcome of, a newer action's claim.
 export async function claimDraftAction(draftId: string, action: DraftAction): Promise<boolean> {
   const { count } = await prisma.draft.updateMany({
     where: { id: draftId, pendingAction: null },
@@ -47,11 +51,24 @@ export async function touchDraftAction(draftId: string, action: DraftAction): Pr
 
 // Release the action slot, optionally recording why the run failed.
 // updateMany (not update) so a draft deleted mid-action is a silent no-op.
-export async function releaseDraftAction(draftId: string, error?: string): Promise<void> {
-  await prisma.draft.updateMany({
-    where: { id: draftId },
+// Guarded on `action` (the one this run claimed): when the claim is no longer
+// ours (swept, then re-claimed) 0 rows match. That is logged, never thrown.
+export async function releaseDraftAction(
+  draftId: string,
+  action: DraftAction,
+  error?: string,
+): Promise<void> {
+  const { count } = await prisma.draft.updateMany({
+    where: { id: draftId, pendingAction: action },
     data: { pendingAction: null, pendingActionError: error ?? null },
   })
+  if (count === 0) logLostClaim(draftId, action)
+}
+
+function logLostClaim(draftId: string, action: DraftAction) {
+  console.warn(
+    `[draft-action] draft ${draftId}: ${action} no longer holds the claim (swept or superseded); settle ignored`,
+  )
 }
 
 // Release the action slot after a SUCCESSFUL run. A success also clears the
@@ -61,14 +78,17 @@ export async function releaseDraftAction(draftId: string, error?: string): Promi
 // render it referenced as discarded, so a late "Use anyway" on it 409s.
 // A batch (not interactive) transaction: two statements in order, no read and
 // no held connection, since this runs on every action completion.
-export async function completeDraftAction(draftId: string): Promise<void> {
-  await prisma.$transaction([
-    discardNotAppliedRender(prisma, draftId),
+// Both statements are guarded on the claimed `action`, so a late settle from a
+// swept run neither stamps nor clears a newer action's not-applied outcome.
+export async function completeDraftAction(draftId: string, action: DraftAction): Promise<void> {
+  const [, draft] = await prisma.$transaction([
+    discardNotAppliedRender(prisma, draftId, action),
     prisma.draft.updateMany({
-      where: { id: draftId },
+      where: { id: draftId, pendingAction: action },
       data: { pendingAction: null, pendingActionError: null, ...NOT_APPLIED_CLEARED },
     }),
   ])
+  if (draft.count === 0) logLostClaim(draftId, action)
 }
 
 // What a work closure may return. 'not-applied' = the refine completed
@@ -93,16 +113,18 @@ export async function startDraftAction(
   draftId: string,
   userId: string,
   teamId: string,
+  action: DraftAction,
   work: () => Promise<void | DraftActionCompletion>
 ): Promise<void> {
   const auth = await resolveClaudeAuth(userId, teamId)
   void runWithClaudeAuth(auth, work)
-    .then((completion) => (completion === 'not-applied' ? releaseDraftAction(draftId) : completeDraftAction(draftId)))
+    .then((completion) => (completion === 'not-applied' ? releaseDraftAction(draftId, action) : completeDraftAction(draftId, action)))
     .catch((err) => {
-      // Logged as well as recorded: the next claim clears pendingActionError,
-      // so without this a crashed run can vanish without trace.
+      // Logged as well as recorded: the next run to settle overwrites
+      // pendingActionError, so without this a crashed run can vanish without
+      // trace.
       console.error(`[draft-action] draft ${draftId} failed:`, err)
-      return releaseDraftAction(draftId, err instanceof Error ? err.message : String(err))
+      return releaseDraftAction(draftId, action, err instanceof Error ? err.message : String(err))
     })
     // Belt-and-braces: a release failure (e.g. DB down) must not become an
     // unhandled rejection.

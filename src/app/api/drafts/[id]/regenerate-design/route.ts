@@ -56,7 +56,7 @@ export const POST = withTeamAuth<{ id: string }>(async (_req, { params }, user) 
   // (the team token otherwise) — startDraftAction resolves it before the
   // request unwinds and pins it onto the background run. A throw below is
   // recorded on Draft.pendingActionError; the draft itself is left untouched.
-  await startDraftAction(draft.id, user.userId, user.teamId, async () => {
+  await startDraftAction(draft.id, user.userId, user.teamId, 'REGENERATE_DESIGN', async () => {
     // Run the new design first — if it fails, the draft is left untouched.
     // actor is the acting teammate (NOT the brief owner) — the image-provider
     // resolution must follow whoever clicked Regenerate.

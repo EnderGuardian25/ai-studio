@@ -271,6 +271,23 @@ function countElements(html: string): number {
   return n
 }
 
+// F2 (final-3 Minor 2): stored HTML carrying editor chrome would make the
+// client's path counting (chrome stripped / skipped) disagree with the server's.
+describe('applyElementEdit — chrome guard', () => {
+  it.each([
+    ['an element', '<span data-inline-edit-chrome="img-wrap"><img src="https://x/a.png"></span>'],
+    ['an attribute on any element', '<p DATA-INLINE-EDIT-CHROME="x">Hi</p>'],
+  ])('refuses stored HTML containing %s with 409 element-unsupported', (_n, chrome) => {
+    const doc = `<!doctype html><html><body><h1>Title</h1>${chrome}</body></html>`
+    const r = applyElementEdit(doc, req([0], 'h1', 'Title', 'text', 'New'))
+    expect(r.ok).toBe(false)
+    if (!r.ok) {
+      expect(r.status).toBe(409)
+      expect(r.code).toBe('element-unsupported')
+    }
+  })
+})
+
 describe('applyElementEdit — text (FR-15)', () => {
   it('AC-21: <script>alert(1)</script> is written as literal text, never as an element', () => {
     const r = applyElementEdit(HTML, req([0, 0], 'H1', 'Launch day', 'text', '<script>alert(1)</script>'))

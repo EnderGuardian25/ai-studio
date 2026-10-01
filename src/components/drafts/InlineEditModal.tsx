@@ -134,6 +134,9 @@ export function InlineEditModal({
     focusId: string
   } | null>(null)
   const wiredDocs = useRef(new WeakSet<Document>())
+  // Documents whose paste/dirty listeners are already registered. Parent-side on
+  // purpose: a marker attribute on <body> is saved into the stored HTML.
+  const pasteWiredDocs = useRef(new WeakSet<Document>())
 
   // The true-size canvas is scaled down to fit the stage on BOTH axes (the old
   // width-only fit let tall ratios — PORTRAIT/STORY — overflow). Seed from the
@@ -192,9 +195,9 @@ export function InlineEditModal({
     })
 
     // Plain-text paste only. Registered once (a duplicate listener would insert
-    // the pasted text twice) — guarded by a marker on <body>.
-    if (!doc.body.dataset.inlineEditPasteWired) {
-      doc.body.dataset.inlineEditPasteWired = '1'
+    // the pasted text twice) — guarded by a parent-side WeakSet of documents.
+    if (!pasteWiredDocs.current.has(doc)) {
+      pasteWiredDocs.current.add(doc)
       doc.body.addEventListener('paste', (e: ClipboardEvent) => {
         e.preventDefault()
         const text = e.clipboardData?.getData('text/plain') ?? ''

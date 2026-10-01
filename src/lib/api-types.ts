@@ -229,7 +229,7 @@ export interface ProviderInfo {
 export type DraftAction = 'REGENERATE_COPY' | 'REGENERATE_DESIGN' | 'REFINE'
 
 // GET /api/drafts/[id] — the not-applied refine outcome (change 004 FR-14,
-// AC-18; T18). A refine that failed its fidelity check twice, twice, commits
+// AC-18; T18). A refine that failed its fidelity check twice commits
 // nothing (FR-12) — this is that failure, re-derived from the retained
 // rejected render on every poll rather than trusted off the stored FK (Ruling
 // E), so a discard/adopt elsewhere is reflected immediately. `null` when there

@@ -368,8 +368,10 @@ export default function DraftDetailPage() {
             </div>
 
             {/* A background action failed — surface the error inline; the
-                buttons below are re-enabled so the user can simply re-trigger
-                (which clears this message). */}
+                buttons below are re-enabled so the user can simply re-trigger.
+                Claiming a new run does not clear the message (it is hidden
+                while that run is pending); the run settling does: success
+                clears it, a failure replaces it. */}
             {draft.pendingActionError && !actionPending && (
               <p className="mt-3 text-xs text-red-500 flex items-start gap-1.5">
                 <AlertTriangle size={13} className="flex-shrink-0 mt-0.5" />

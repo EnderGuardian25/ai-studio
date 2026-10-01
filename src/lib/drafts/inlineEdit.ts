@@ -74,6 +74,9 @@ export function sanitizeInlineHtml(html: string): string {
 export function stripEditingChrome(html: string): string {
   return html
     .replace(/\scontenteditable(\s*=\s*("[^"]*"|'[^']*'|[^\s>]+))?/gi, '')
+    // A leftover from the editor's earlier paste-wiring guard (now a parent-side
+    // WeakSet). Documents saved by that version carry it on <body>.
+    .replace(/\sdata-inline-edit-paste-wired(\s*=\s*("[^"]*"|'[^']*'|[^\s>]+))?/gi, '')
     .replace(/<style\b[^>]*id\s*=\s*["']inline-edit-style["'][^>]*>[\s\S]*?<\/style\s*>/gi, '')
     .replace(
       /<div\b[^>]*data-inline-edit-chrome\s*=\s*["']banner["'][^>]*>[\s\S]*?<\/div\s*>/gi,
@@ -301,6 +304,13 @@ function countElements(el: HtmlElement): number {
   return 1 + elementChildren(el).reduce((n, c) => n + countElements(c), 0)
 }
 
+function containsEditorChrome(el: HtmlElement): boolean {
+  return (
+    el.attrs.some((a) => asciiLower(a.name) === 'data-inline-edit-chrome') ||
+    elementChildren(el).some(containsEditorChrome)
+  )
+}
+
 // The pure core of an element edit: grammar → resolve against `html` (the
 // CURRENT stored document) → fingerprint → eligibility → node-scoped write →
 // post-write verification. Every failure is a refusal; nothing is passed
@@ -336,6 +346,10 @@ export function applyElementEdit(html: string, req: ElementEditRequest): Element
   // 2. Resolve server-side against the current HTML (FR-17/18).
   const parsed = parseHtmlDocument(html)
   if (!parsed.ok) return fail(409, 'element-unsupported', UNSUPPORTED_MESSAGE)
+  // Stored HTML that still carries editor chrome (a whole-document save that
+  // never stripped it): the client counts element paths with chrome skipped and
+  // the server counts every element, so the two would disagree. Refuse.
+  if (containsEditorChrome(parsed.body)) return fail(409, 'element-unsupported', UNSUPPORTED_MESSAGE)
   const el = resolveElementPath(parsed.body, locator.path)
   if (!el) return fail(409, 'element-stale', STALE_MESSAGE)
 

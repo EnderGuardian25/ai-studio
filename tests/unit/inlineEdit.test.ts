@@ -31,6 +31,17 @@ describe('sanitizeInlineHtml', () => {
 })
 
 describe('stripEditingChrome', () => {
+  // F2: the paste-wired marker used to be a DOM attribute on <body> and leaked
+  // into the saved HTML, which then suppressed the paste/dirty listeners on
+  // every later open of that document.
+  it('removes the paste-wired marker from <body>', () => {
+    const out = stripEditingChrome('<body data-inline-edit-paste-wired="1" style="margin:0"><p>Hi</p></body>')
+    expect(out).not.toContain('data-inline-edit-paste-wired')
+    expect(out).toContain('<body style="margin:0">')
+    expect(stripEditingChrome("<body data-inline-edit-paste-wired='1'>x</body>")).toBe('<body>x</body>')
+    expect(stripEditingChrome('<body data-inline-edit-paste-wired>x</body>')).toBe('<body>x</body>')
+  })
+
   it('removes contenteditable attributes', () => {
     const out = stripEditingChrome('<p contenteditable="true">Hi</p>')
     expect(out).not.toContain('contenteditable')
