@@ -31,10 +31,11 @@ export const PATCH = withTeamAdmin<Params>(async (req, { params }, user) => {
       { status: 400 },
     )
   }
-  // 005 FR-03: a disabled row is never the default (the resolver would skip it
-  // and teammates would silently lose the slot's default).
+  // 005 FR-03 (IMAGE only; COPY is unchanged from before T1): a disabled row
+  // is never the default (the resolver would skip it and teammates would
+  // silently lose the slot's default).
   const enabledAfter = isEnabled ?? existing.isEnabled
-  if (isDefault === true && !enabledAfter) {
+  if (existing.slot === 'IMAGE' && isDefault === true && !enabledAfter) {
     return NextResponse.json({ error: 'A disabled provider cannot be the default' }, { status: 400 })
   }
 
@@ -42,7 +43,7 @@ export const PATCH = withTeamAdmin<Params>(async (req, { params }, user) => {
   if (isEnabled !== undefined) data.isEnabled = isEnabled
   if (isDefault !== undefined) data.isDefault = isDefault
   // Disabling the default also clears it, so the resolver's fallback serves.
-  if (isEnabled === false) data.isDefault = false
+  if (existing.slot === 'IMAGE' && isEnabled === false) data.isDefault = false
   if (label !== undefined) data.label = label
 
   // Clearing the prior default + updating this row must be atomic so a

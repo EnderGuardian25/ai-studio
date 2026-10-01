@@ -421,6 +421,15 @@ describe('resolveImageProvider — tier 4 fallback (FR-01)', () => {
     expect(await servedKey()).toBe(keyFor('on'))
   })
 
+  it('AC-04 fallback half: with the default row deleted, the oldest remaining enabled row serves', async () => {
+    // The same fixtures minus the deleted default row.
+    useRows([
+      { id: 'newer', providerName: 'openai', isEnabled: true, isDefault: false, createdAt: MAR },
+      { id: 'older', providerName: 'openai', isEnabled: true, isDefault: false, createdAt: FEB },
+    ])
+    expect(await servedKey()).toBe(keyFor('older'))
+  })
+
   it('returns null when the team has no enabled image-capable row', async () => {
     useRows([
       { id: 'off', providerName: 'openai', isEnabled: false, isDefault: false, createdAt: JAN },

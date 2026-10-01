@@ -95,7 +95,7 @@ export const POST = withTeamAdmin(async (req: NextRequest, _ctx, user) => {
     return NextResponse.json({ error: 'API key validation failed', detail: validationError }, { status: 422 })
   }
 
-  const providerKey = `${providerName}-${Date.now()}`
+  const providerKey = `${providerName}-${Date.now()}-${crypto.randomUUID().slice(0, 6)}`
   // Store only a masked last-4 suffix — never a leading slice of the secret.
   const keyPrefix = `…${apiKey.slice(-4)}`
   const encryptedApiKey = encrypt(apiKey)
@@ -105,17 +105,18 @@ export const POST = withTeamAdmin(async (req: NextRequest, _ctx, user) => {
   // Clearing the prior default + creating the new row must be atomic so a
   // failure can't leave the slot with zero (or two) defaults.
   const provider = await prisma.$transaction(async (tx) => {
-    // 005 FR-02: a row registered while the slot has no enabled default
-    // becomes the default; a later row only takes it when asked to. A legacy
-    // incompatible IMAGE default doesn't count: the resolver skips it.
-    const enabledDefault = await tx.availableProvider.findFirst({
-      where: {
-        slot, teamId, isEnabled: true, isDefault: true,
-        ...(slot === 'IMAGE' ? { providerName: { in: [...IMAGE_PROVIDERS] } } : {}),
-      },
-      select: { id: true },
-    })
-    const makeDefault = isDefault === true || !enabledDefault
+    // 005 FR-02 (IMAGE only): a row registered while the slot has no enabled
+    // default becomes the default; a later row only takes it when asked to. A
+    // legacy incompatible IMAGE default doesn't count: the resolver skips it.
+    // COPY is unchanged: default only when the request asks for it.
+    let makeDefault = isDefault === true
+    if (slot === 'IMAGE' && !makeDefault) {
+      const enabledDefault = await tx.availableProvider.findFirst({
+        where: { slot, teamId, isEnabled: true, isDefault: true, providerName: { in: [...IMAGE_PROVIDERS] } },
+        select: { id: true },
+      })
+      makeDefault = !enabledDefault
+    }
     if (makeDefault) {
       await tx.availableProvider.updateMany({ where: { slot, teamId }, data: { isDefault: false } })
     }

@@ -12,7 +12,7 @@ export const SLOT_PROVIDERS = {
   IMAGE: IMAGE_PROVIDERS,
   COPY: ['anthropic', 'openai', 'cli'],
 } as const satisfies Record<string, readonly string[]>
-export type ProviderSlot = keyof typeof SLOT_PROVIDERS
+export type CapabilitySlot = keyof typeof SLOT_PROVIDERS
 
 const KNOWN_PROVIDERS = new Set<string>([...SLOT_PROVIDERS.IMAGE, ...SLOT_PROVIDERS.COPY])
 
@@ -20,7 +20,7 @@ const KNOWN_PROVIDERS = new Set<string>([...SLOT_PROVIDERS.IMAGE, ...SLOT_PROVID
 // COPY keeps the custom-provider registration flow it has always had (an
 // unrecognized key format plus a free-text providerName), so it refuses only a
 // KNOWN provider that is known not to serve copy, e.g. gemini.
-export function canServeSlot(slot: ProviderSlot, providerName: string): boolean {
+export function canServeSlot(slot: CapabilitySlot, providerName: string): boolean {
   if ((SLOT_PROVIDERS[slot] as readonly string[]).includes(providerName)) return true
   return slot === 'COPY' && !KNOWN_PROVIDERS.has(providerName)
 }

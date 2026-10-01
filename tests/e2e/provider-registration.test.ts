@@ -47,14 +47,9 @@ test.describe('Provider registration', () => {
       apiKey: 'sk-ant-test-key-abc123',
       slot: 'COPY',
     })
-    // 422 = key rejected by provider (expected — it's a fake key)
-    // 201 = created (if validation is skipped for unknown format)
-    expect([201, 422]).toContain(res.status())
-    if (res.status() === 422) {
-      const body = await res.json()
-      // The error message should come from Anthropic, not from our code
-      expect(body.error).toBe('API key validation failed')
-    }
+    // The MOCK_AI key-validation seam accepts any key without "invalid".
+    expect(res.status()).toBe(201)
+    expect((await res.json()).providerName).toBe('anthropic')
   })
 
   test('sk- prefix auto-detects OpenAI', async () => {
@@ -62,7 +57,8 @@ test.describe('Provider registration', () => {
       apiKey: 'sk-test-openai-fake-key',
       slot: 'COPY',
     })
-    expect([201, 422]).toContain(res.status())
+    expect(res.status()).toBe(201)
+    expect((await res.json()).providerName).toBe('openai')
   })
 
   test('unknown prefix requires manual name + label', async () => {
@@ -73,15 +69,14 @@ test.describe('Provider registration', () => {
     })
     expect(res.status()).toBe(400)
 
-    // With name + label — should proceed to validation (skip or 422)
+    // With name + label — accepted
     const res2 = await api.post('/api/admin/providers', {
       apiKey: 'gsk_abcdef123456',
       slot: 'COPY',
       providerName: 'groq',
       label: 'Llama 3 (Groq)',
     })
-    // Unknown providers skip validation, so this should succeed or 201
-    expect([201, 422]).toContain(res2.status())
+    expect(res2.status()).toBe(201)
   })
 
   test('registered provider appears in available list', async () => {
@@ -92,7 +87,7 @@ test.describe('Provider registration', () => {
       providerName: 'testprovider',
       label: 'Test Model (TestProvider)',
     })
-    if (regRes.status() !== 201) return // skip if already registered
+    expect(regRes.status()).toBe(201)
 
     const provider = await regRes.json()
     expect(provider.label).toBe('Test Model (TestProvider)')
@@ -123,7 +118,7 @@ test.describe('Provider registration', () => {
     const a = await api.post('/api/admin/providers', {
       apiKey: 'provA_key_123456789', slot: 'COPY', providerName: 'provA', label: 'Provider A', isDefault: true,
     })
-    if (a.status() !== 201) { test.skip(); return }
+    expect(a.status()).toBe(201)
     const provA = await a.json()
 
     const b = await api.post('/api/admin/providers', {
@@ -140,6 +135,39 @@ test.describe('Provider registration', () => {
     // Cleanup.
     await api.del(`/api/admin/providers/${provA.id}`)
     await api.del(`/api/admin/providers/${provB.id}`)
+  })
+
+  // ── 005 T1 fix round: the auto-default / disable-clears rules are IMAGE-only;
+  // COPY behaves exactly as before T1.
+  test('COPY: a first registration is NOT auto-default; disabling a COPY default keeps isDefault', async () => {
+    const first = await (await api.post('/api/admin/providers', {
+      apiKey: 'copyA_key_123456789', slot: 'COPY', providerName: 'copyA', label: 'Copy A',
+    })).json()
+    expect(first.isDefault).toBe(false)
+
+    const def = await (await api.post('/api/admin/providers', {
+      apiKey: 'copyB_key_123456789', slot: 'COPY', providerName: 'copyB', label: 'Copy B', isDefault: true,
+    })).json()
+    expect(def.isDefault).toBe(true)
+
+    const off = await api.patch(`/api/admin/providers/${def.id}`, { isEnabled: false })
+    expect(off.status()).toBe(200)
+    expect((await off.json()).isDefault).toBe(true)
+    const on = await api.patch(`/api/admin/providers/${def.id}`, { isEnabled: true })
+    expect((await on.json()).isDefault).toBe(true)
+
+    // Pre-T1: a disabled COPY row could be made the default.
+    const off2 = await api.patch(`/api/admin/providers/${first.id}`, { isEnabled: false, isDefault: true })
+    expect(off2.status()).toBe(200)
+  })
+
+  test('two registrations in the same millisecond get distinct providerKeys', async () => {
+    const [a, b] = await Promise.all([
+      api.post('/api/admin/providers', { apiKey: 'sk-image-race-a-0020', slot: 'IMAGE' }),
+      api.post('/api/admin/providers', { apiKey: 'sk-image-race-b-0021', slot: 'IMAGE' }),
+    ])
+    expect([a.status(), b.status()]).toEqual([201, 201])
+    expect((await a.json()).providerKey).not.toBe((await b.json()).providerKey)
   })
 
   // ── 005 T1: IMAGE slot rules (FR-02, FR-03, FR-04) ────────────────────────
