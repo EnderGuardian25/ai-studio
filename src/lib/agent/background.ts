@@ -13,13 +13,20 @@
 // a generated background (CSS/SVG as before). The callers store an unintended
 // skip on the draft so the draft page can say why (FR-07, drafts/backgroundNotice.ts).
 // MOCK_AI skips the step entirely so the E2E suite stays deterministic — unless
-// the brief topic carries a __MOCK_BG__ sentinel (the NFR-06 seam, testHooks.ts).
+// the brief topic (or, for refine, the instruction) carries a __MOCK_BG__
+// sentinel (the NFR-06 seam, testHooks.ts).
 
 import Anthropic from '@anthropic-ai/sdk'
 import { z } from 'zod'
 import type { Brief } from '@prisma/client'
 import { env } from '@/lib/env'
-import { MOCK_AI, mockBackgroundDecision, mockImageProvider, shouldMockBackground } from '@/lib/testHooks'
+import {
+  MOCK_AI,
+  backgroundSeamText,
+  mockBackgroundDecision,
+  mockImageProvider,
+  shouldMockBackground,
+} from '@/lib/testHooks'
 import type { ResolvedBrandKit } from '@/lib/brandkit/resolve'
 import { resolveImageProvider } from '@/providers/registry'
 import type { ImageProvider } from '@/providers/interfaces/ImageProvider'
@@ -33,7 +40,7 @@ import {
   type BackgroundDecisionPrompt,
 } from '@/lib/agent/prompts/background'
 import {
-  clipSkipDetail,
+  cleanSkipDetail,
   type BackgroundResult,
   type BackgroundSkipReason,
 } from '@/lib/drafts/backgroundNotice'
@@ -54,11 +61,12 @@ function errorText(err: unknown): string {
   return err instanceof Error ? err.message : String(err)
 }
 
-// One skip, logged once. detail is clipped to SKIP_DETAIL_MAX here, at the
-// source, so no caller can store or show more.
+// One skip, logged once (the raw detail, server-side only). The returned
+// detail is redacted and clipped to SKIP_DETAIL_MAX here, at the source, so no
+// caller can store or show a key, an internal URL, or more than that.
 function skip(reason: BackgroundSkipReason, detail?: string): BackgroundResult {
   log(`skipped (${reason})${detail ? ` — ${detail}` : ''}`)
-  return detail ? { url: null, skip: reason, detail: clipSkipDetail(detail) } : { url: null, skip: reason }
+  return detail ? { url: null, skip: reason, detail: cleanSkipDetail(detail) } : { url: null, skip: reason }
 }
 
 // Provider-native image size for the post's aspect ratio. gpt-image supports
@@ -105,24 +113,27 @@ async function runDecision(prompt: BackgroundDecisionPrompt): Promise<Background
   return text && text.type === 'text' ? parseBackgroundDecision(text.text) : null
 }
 
-// Shared tail: run the decision, then (when needed) generate + persist the image.
-// imageProviderKey is the brief's optional per-brief override. actor is WHO is
-// running this call (see GenerationActor) — deliberately NOT derived from the
-// brief, since the acting teammate and the brief's owner are often different
-// people on a shared team brief.
+// Shared tail: resolve the provider, run the decision, then (when needed)
+// generate + persist the image. imageProviderKey is the brief's optional
+// per-brief override. actor is WHO is running this call (see GenerationActor)
+// — deliberately NOT derived from the brief, since the acting teammate and the
+// brief's owner are often different people on a shared team brief.
 //
 // Every ending is a BackgroundResult (FR-06); nothing here throws. The reason
 // for an unexpected throw comes from `stage`, advanced as the step runs — never
 // from the error's wording: before the decision has parsed it is a
 // DECISION_ERROR, after it a PROVIDER_ERROR (generation or persisting).
 //
-// Order: generation resolves the provider FIRST — with none configured there
-// is no point spending a Claude call on the decision, and NO_PROVIDER is the
-// answer whatever the model would say. Refine decides FIRST: its decision is
-// instruction-gated, and its writer only records a skip when the instruction
-// asked for a background (refineSkipFields), so "no provider" has to be told
-// apart from "didn't want one". That costs refine one Haiku call on a team
-// with no provider; with a provider the calls are the same as before.
+// Order: both entry points resolve the provider FIRST. With none configured
+// there is no point spending a Claude call on the decision: generation records
+// NO_PROVIDER whatever the model would say, and refine's writer leaves the
+// draft's skip unchanged on a refine NO_PROVIDER (refineSkipFields), since it
+// never learned whether the instruction wanted a background.
+//
+// One refine-only wrinkle: a resolver that THROWS (resolveImageProvider never
+// does today; a DB hiccup could) is held until the decision has run. refine
+// stores PROVIDER_ERROR, so it may only report one when the instruction wanted
+// a background — otherwise that is NOT_NEEDED like any other refine.
 async function runBackgroundStep(
   buildPrompt: () => BackgroundDecisionPrompt,
   opts: {
@@ -130,37 +141,34 @@ async function runBackgroundStep(
     brandKitId: string
     aspectRatio: string
     imageProviderKey?: string | null
-    topic: string
-    resolveFirst: boolean
+    // The text the NFR-06 seam reads its sentinel from (testHooks.ts).
+    seamText: string
+    kind: 'generation' | 'refine'
   },
 ): Promise<BackgroundResult> {
   // NFR-06 seam: without a __MOCK_BG__ sentinel, MOCK_AI skips the step (no
   // background, nothing recorded) exactly as it always has.
-  const mockSeam = shouldMockBackground(opts.topic)
+  const mockSeam = shouldMockBackground(opts.seamText)
   if (MOCK_AI && !mockSeam) return { url: null, skip: 'NOT_NEEDED' }
+
+  const resolved = await resolveProvider(opts)
+  if (!resolved.provider) {
+    if (!resolved.failed) return skip('NO_PROVIDER')
+    if (opts.kind === 'generation') return skip('PROVIDER_ERROR', resolved.detail)
+  }
 
   let stage: 'decision' | 'provider' = 'decision'
   try {
-    let provider: ImageProvider | null = null
-    if (opts.resolveFirst) {
-      const resolved = await resolveProvider(opts)
-      if (!resolved.provider) return resolved.skip
-      provider = resolved.provider
-    }
-
-    // The seam replaces only the Haiku decision here; resolution below is real.
-    const decision = mockSeam ? mockBackgroundDecision(opts.topic) : await runDecision(buildPrompt())
+    // The seam replaces only the Haiku decision here; resolution above is real.
+    const decision = mockSeam ? mockBackgroundDecision(opts.seamText) : await runDecision(buildPrompt())
     if (!decision) return skip('DECISION_ERROR', 'decision response was not valid JSON')
     stage = 'provider'
     if (!decision.needed || !decision.prompt.trim()) return skip('NOT_NEEDED')
+    // refine only: the held resolver failure, now that a background was wanted.
+    if (!resolved.provider) return skip('PROVIDER_ERROR', resolved.detail)
 
-    if (!provider) {
-      const resolved = await resolveProvider(opts)
-      if (!resolved.provider) return resolved.skip
-      provider = resolved.provider
-    }
     // The fixture swap happens AFTER the real resolver chose the provider.
-    if (mockSeam) provider = mockImageProvider(provider, opts.topic)
+    const provider = mockSeam ? mockImageProvider(resolved.provider, opts.seamText) : resolved.provider
 
     log(`generating background · size=${imageSizeFor(opts.aspectRatio)} · prompt="${decision.prompt.slice(0, 120)}..."`)
     const startedAt = Date.now()
@@ -185,18 +193,22 @@ async function runBackgroundStep(
 
 // resolveImageProvider never throws (returns null), but keep the guard: a DB
 // hiccup here must still degrade gracefully, not fail the whole generation.
+// It returns the outcome, not a skip: the caller decides when a failure is
+// reported (refine holds it until its decision has run).
 async function resolveProvider(opts: {
   actor: GenerationActor
   imageProviderKey?: string | null
-}): Promise<{ provider: ImageProvider; skip?: never } | { provider: null; skip: BackgroundResult }> {
+}): Promise<
+  { provider: ImageProvider; failed?: never; detail?: never } | { provider: null; failed: boolean; detail?: string }
+> {
   try {
     const provider = await resolveImageProvider(
       { teamId: opts.actor.teamId, userId: opts.actor.userId },
       opts.imageProviderKey ?? undefined
     )
-    return provider ? { provider } : { provider: null, skip: skip('NO_PROVIDER') }
+    return provider ? { provider } : { provider: null, failed: false }
   } catch (err) {
-    return { provider: null, skip: skip('PROVIDER_ERROR', errorText(err)) }
+    return { provider: null, failed: true, detail: errorText(err) }
   }
 }
 
@@ -228,8 +240,8 @@ export async function generateBackgroundForBrief(
       brandKitId: kit.id,
       aspectRatio: brief.aspectRatio,
       imageProviderKey: brief.imageProviderKey,
-      topic: brief.topic,
-      resolveFirst: true,
+      seamText: brief.topic,
+      kind: 'generation',
     },
   )
 }
@@ -237,8 +249,13 @@ export async function generateBackgroundForBrief(
 /**
  * AGUI refine: generate a new background ONLY when the instruction asks for one
  * (neutral bias — see the refine decision prompt). Returns the URL, or the
- * reason there is none: NOT_NEEDED means the instruction didn't ask. Never
- * throws. The mock seam's sentinel is read from the draft's brief topic.
+ * reason there is none: NOT_NEEDED means the instruction didn't ask, and
+ * NO_PROVIDER means none resolved, so the decision never ran (the refine
+ * writer leaves the draft's skip unchanged for both). Never throws.
+ *
+ * The mock seam reads its sentinel from the instruction when it carries one,
+ * so a test can make one refine fail on a draft whose generation produced a
+ * background; otherwise from the draft's brief topic.
  */
 export async function generateBackgroundForRefine(
   brief: Brief,
@@ -253,8 +270,8 @@ export async function generateBackgroundForRefine(
       brandKitId: kit.id,
       aspectRatio: brief.aspectRatio,
       imageProviderKey: brief.imageProviderKey,
-      topic: brief.topic,
-      resolveFirst: false,
+      seamText: backgroundSeamText(instruction, brief.topic),
+      kind: 'refine',
     },
   )
 }

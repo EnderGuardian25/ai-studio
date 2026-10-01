@@ -1,5 +1,5 @@
 import { test, expect, type APIRequestContext, type Page } from '@playwright/test'
-import { loginAs, waitForAction, waitForDraft, type ApiClient } from '../helpers/api'
+import { addTeamMember, loginAs, waitForAction, waitForDraft, type ApiClient } from '../helpers/api'
 import { prisma, dbAvailable } from '../helpers/db'
 
 // §BG — skipped AI backgrounds are recorded and shown (005 FR-06/FR-07,
@@ -13,7 +13,9 @@ import { prisma, dbAvailable } from '../helpers/db'
 //   __MOCK_BG_FAIL__       same, but the fixture throws  → PROVIDER_ERROR
 //   __MOCK_BG_NOT_NEEDED__ the decision is "not needed"  → NOT_NEEDED
 // Without a sentinel MOCK_AI keeps its early return, so no other suite changes.
-// Refine reads the sentinel from the draft's brief topic too.
+// Refine reads the sentinel from its INSTRUCTION when that carries one (so one
+// refine can fail on a draft whose generation produced a background), else
+// from the draft's brief topic.
 //
 // Every case runs in its OWN fresh team (soft-deleted afterwards), because the
 // point is the team's IMAGE rows: none, or one enabled NON-default row
@@ -22,12 +24,15 @@ import { prisma, dbAvailable } from '../helpers/db'
 
 const ADMIN_EMAIL = 'admin@bisteccare.lk' // super admin
 const ADMIN_PASSWORD = 'BistecStudio2026!'
+const EDITOR_EMAIL = 'editor@bisteccare.lk' // seed editor; global role EDITOR
+const EDITOR_PASSWORD = 'BistecStudio2026!'
 
-const NO_PROVIDER_TEXT = 'no image provider is set up'
+const NO_PROVIDER_TEXT = 'No image provider is set up'
 
 interface TeamSession {
   api: ApiClient
   teamId: string
+  teamName: string
   kitId: string
   copyKey: string
   dispose(): Promise<void>
@@ -59,6 +64,7 @@ async function freshTeam(request: APIRequestContext, label: string): Promise<Tea
   return {
     api,
     teamId: team.id,
+    teamName: name,
     kitId: kit.id,
     copyKey: copy.providerKey,
     async dispose() {
@@ -120,10 +126,10 @@ async function refine(t: TeamSession, draftId: string, instruction: string): Pro
   return done
 }
 
-async function pageLoginToTeam(page: Page, teamId: string) {
+async function pageLoginToTeam(page: Page, teamId: string, email = ADMIN_EMAIL, password = ADMIN_PASSWORD) {
   await page.goto('/login')
-  await page.getByPlaceholder('Username').fill(ADMIN_EMAIL)
-  await page.getByPlaceholder('Password').fill(ADMIN_PASSWORD)
+  await page.getByPlaceholder('Username').fill(email)
+  await page.getByPlaceholder('Password').fill(password)
   await page.getByRole('button', { name: 'Sign in' }).click()
   await page.waitForURL((url) => url.pathname === '/' || url.pathname === '/choose-team')
   // page.request shares the browser context's cookie jar.
@@ -164,8 +170,8 @@ test.describe('§BG — skipped AI background notice', () => {
     const notice = page.getByTestId('background-notice')
     await expect(notice).toBeVisible()
     await expect(notice).toHaveAttribute('role', 'status')
-    await expect(notice).toContainText('No AI background')
-    await expect(notice).toContainText(NO_PROVIDER_TEXT)
+    await expect(notice).toContainText('No AI background') // the title
+    await expect(notice).toContainText(NO_PROVIDER_TEXT) // the body, leading with the cause
     // A team admin (here a super admin) is sent to /team to fix it.
     await expect(notice.getByRole('link', { name: 'Open Team settings' })).toHaveAttribute('href', '/team')
   })
@@ -208,7 +214,7 @@ test.describe('§BG — skipped AI background notice', () => {
     expect(draft.backgroundSkipped).toEqual({
       reason: 'PROVIDER_ERROR',
       message:
-        "The image provider couldn't create a background (Mock image provider failure (__MOCK_BG_FAIL__ sentinel)). The post was designed without one.",
+        'The image provider returned an error (Mock image provider failure (__MOCK_BG_FAIL__ sentinel)), so the post was designed without one.',
     })
   })
 
@@ -241,33 +247,83 @@ test.describe('§BG — skipped AI background notice', () => {
 
   // TC-BG-07 — AC-11, refine that wanted a background and failed.
   test('AC-11: a refine that wanted a background and failed sets the skip', async () => {
-    const row = await addNonDefaultImageRow(t.api)
+    await addNonDefaultImageRow(t.api)
     const draft = await generate(t, `BG refine sets __MOCK_BG__ ${Date.now()}`)
     expect(draft.backgroundSkipped).toBeNull()
     const firstBackground = draft.imageUrl
-    expect(firstBackground).toBeTruthy()
+    expect(firstBackground).toMatch(/\/background-.+\.png$/)
 
-    // The team loses its only image provider; the next refine asks for one.
-    expect((await t.api.patch(`/api/admin/providers/${row.id}`, { isEnabled: false })).status()).toBe(200)
-    const done = await refine(t, draft.id as string, 'Swap the background for a beach __VERIFY_PASS__')
+    // The instruction's sentinel wins over the topic's: this refine's decision
+    // wants a background, the real resolver finds the row, and the provider fails.
+    const done = await refine(t, draft.id as string, 'Swap the background for a beach __MOCK_BG_FAIL__ __VERIFY_PASS__')
     expect(done.currentRevisionNumber).toBe(2) // the edit itself committed
     expect(done.backgroundSkipped).toEqual({
-      reason: 'NO_PROVIDER',
-      message: expect.stringContaining(NO_PROVIDER_TEXT),
+      reason: 'PROVIDER_ERROR',
+      message:
+        'The image provider returned an error (Mock image provider failure (__MOCK_BG_FAIL__ sentinel)), so the post was designed without one.',
     })
+    if (dbAvailable) {
+      const row = await prisma!.draft.findUnique({ where: { id: draft.id as string } })
+      expect(row?.backgroundSkipReason).toBe('PROVIDER_ERROR')
+      expect(row?.backgroundSkipDetail).toBe('Mock image provider failure (__MOCK_BG_FAIL__ sentinel)')
+      expect(row?.imageUrl).toBe(firstBackground)
+    }
     // Like imageUrl, a failed refine background never clears what was there.
     expect(done.imageUrl).toBe(firstBackground)
   })
 
   // TC-BG-08 — AC-11, refine that didn't want a background.
   test("AC-11: a refine that didn't want a background leaves the skip unchanged", async () => {
-    // No image row: generation records NO_PROVIDER whatever the decision (it
-    // resolves first); the refine decides first and does not want one.
-    const draft = await generate(t, `BG refine leaves __MOCK_BG_NOT_NEEDED__ ${Date.now()}`)
-    expect((draft.backgroundSkipped as { reason: string }).reason).toBe('NO_PROVIDER')
+    await addNonDefaultImageRow(t.api)
+    const draft = await generate(t, `BG refine leaves __MOCK_BG_FAIL__ ${Date.now()}`)
+    expect((draft.backgroundSkipped as { reason: string }).reason).toBe('PROVIDER_ERROR')
 
-    const done = await refine(t, draft.id as string, 'Make the headline bigger __VERIFY_PASS__')
+    // A provider resolves, so this refine really decides — and does not want one.
+    const done = await refine(t, draft.id as string, 'Make the headline bigger __MOCK_BG_NOT_NEEDED__ __VERIFY_PASS__')
     expect(done.currentRevisionNumber).toBe(2) // committed, and still...
     expect(done.backgroundSkipped).toEqual(draft.backgroundSkipped) // ...unchanged
+  })
+
+  // TC-BG-09 — the FR-07 refine rule with no provider: refine resolves first and
+  // never decides, so it can't know whether one was wanted and leaves the skip.
+  test('AC-11: a refine on a team with no image provider leaves the skip unchanged (never NO_PROVIDER)', async () => {
+    const row = await addNonDefaultImageRow(t.api)
+    const draft = await generate(t, `BG refine no provider __MOCK_BG_FAIL__ ${Date.now()}`)
+    expect((draft.backgroundSkipped as { reason: string }).reason).toBe('PROVIDER_ERROR')
+
+    // The team loses its only image provider; the next refine asks for one.
+    expect((await t.api.patch(`/api/admin/providers/${row.id}`, { isEnabled: false })).status()).toBe(200)
+    const done = await refine(t, draft.id as string, 'Put a city skyline behind it __MOCK_BG__ __VERIFY_PASS__')
+    expect(done.currentRevisionNumber).toBe(2)
+    expect(done.backgroundSkipped).toEqual(draft.backgroundSkipped) // still the PROVIDER_ERROR
+    expect(done.imageUrl).toBeNull()
+  })
+
+  // TC-BG-10 — FR-07 link: a team EDITOR is sent to /settings, never /team.
+  test('FR-07: a team editor viewing a NO_PROVIDER draft gets the /settings link, not /team', async ({ request, page }) => {
+    const sa = await loginAs(request, ADMIN_EMAIL, ADMIN_PASSWORD)
+    const probe = await loginAs(request, EDITOR_EMAIL, EDITOR_PASSWORD)
+    const editorId = (await (await probe.get('/api/me')).json()).userId as string
+    expect(editorId).toBeTruthy()
+    await probe.dispose()
+    await addTeamMember(sa, t.teamId, editorId, 'EDITOR')
+    try {
+      const editor = await loginAs(request, EDITOR_EMAIL, EDITOR_PASSWORD, { team: t.teamName })
+      const draft = await generate({ ...t, api: editor }, `BG editor link __MOCK_BG__ ${Date.now()}`)
+      expect((draft.backgroundSkipped as { reason: string }).reason).toBe('NO_PROVIDER')
+      await editor.dispose()
+
+      await pageLoginToTeam(page, t.teamId, EDITOR_EMAIL, EDITOR_PASSWORD)
+      await page.goto(`/drafts/${draft.id}`)
+      const notice = page.getByTestId('background-notice')
+      await expect(notice).toBeVisible()
+      await expect(notice).toContainText(NO_PROVIDER_TEXT)
+      await expect(notice.getByRole('link', { name: 'Open Settings' })).toHaveAttribute('href', '/settings')
+      await expect(notice.locator('a[href="/team"]')).toHaveCount(0)
+    } finally {
+      // The seed editor must leave with exactly the memberships it came with.
+      expect((await sa.del(`/api/admin/teams/${t.teamId}/members/${editorId}`)).status()).toBe(204)
+      await sa.dispose()
+    }
   })
 })

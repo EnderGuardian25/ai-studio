@@ -212,8 +212,9 @@ export function mockProviderKeyValidation(apiKey: string): { ok: boolean; error?
 
 /**
  * Whether the background step (agent/background.ts) runs its MOCK_AI seam for
- * this brief topic. True only with MOCK_AI on and one of the sentinels
- * "__MOCK_BG__", "__MOCK_BG_FAIL__" or "__MOCK_BG_NOT_NEEDED__" in the topic.
+ * this brief topic (or refine instruction, see backgroundSeamText). True only
+ * with MOCK_AI on and one of the sentinels "__MOCK_BG__", "__MOCK_BG_FAIL__"
+ * or "__MOCK_BG_NOT_NEEDED__" in that text.
  * Without one, MOCK_AI keeps the step's early return (no background, nothing
  * recorded), so every suite written before the seam is unchanged.
  */
@@ -221,6 +222,17 @@ const MOCK_BG_SENTINEL = /__MOCK_BG(?:_FAIL|_NOT_NEEDED)?__/
 
 export function shouldMockBackground(topic: string): boolean {
   return MOCK_AI && MOCK_BG_SENTINEL.test(topic)
+}
+
+/**
+ * Which text a refine's seam reads: the instruction when it carries a
+ * sentinel (so one refine can fail on a draft whose generation produced a
+ * background), else the brief topic. Only picks a string — whether the seam
+ * runs at all is still shouldMockBackground, gated on MOCK_AI, so a sentinel
+ * typed into a real refine instruction changes nothing outside the mock suite.
+ */
+export function backgroundSeamText(instruction: string, topic: string): string {
+  return MOCK_BG_SENTINEL.test(instruction) ? instruction : topic
 }
 
 /**

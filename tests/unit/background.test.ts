@@ -8,8 +8,11 @@ import {
 import {
   BACKGROUND_SKIP_CLEARED,
   backgroundSkippedFor,
+  cleanSkipDetail,
   clipSkipDetail,
   generationSkipFields,
+  MODERATION_RE,
+  redactSkipDetail,
   refineSkipFields,
   SKIP_DETAIL_MAX,
 } from '@/lib/drafts/backgroundNotice'
@@ -305,26 +308,43 @@ describe('generateBackgroundForRefine — refine semantics (FR-07)', () => {
     h.persistDataUrlImage.mockReset()
   })
 
-  it('instruction did not ask for a background ⇒ NOT_NEEDED, and no provider is resolved', async () => {
+  it('instruction did not ask for a background ⇒ NOT_NEEDED, the provider is never asked for an image', async () => {
+    const provider = providerReturning('https://cdn.example.com/x.png')
+    h.resolveImageProvider.mockResolvedValue(provider)
     h.anthropicCreate.mockResolvedValueOnce(decisionReply('{"needed": false}'))
-    await expect(generateBackgroundForRefine(brief, kit, 'make the headline bigger', actor)).resolves.toEqual({
-      url: null,
-      skip: 'NOT_NEEDED',
-    })
-    expect(h.resolveImageProvider).not.toHaveBeenCalled()
+    const result = await generateBackgroundForRefine(brief, kit, 'make the headline bigger', actor)
+    expect(result).toEqual({ url: null, skip: 'NOT_NEEDED' })
+    expect(provider.generateImage).not.toHaveBeenCalled()
+    expect(refineSkipFields(result)).toBeUndefined()
   })
 
-  it('wanted a background but no provider is configured ⇒ NO_PROVIDER (the decision runs first)', async () => {
+  it('a provider-less team ⇒ NO_PROVIDER, the decision is NEVER called, and the skip is left unchanged', async () => {
+    // Resolution runs first (with the actor's ctx); nothing resolves, so no
+    // Haiku call is spent on a decision whose answer could not be acted on.
+    const result = await generateBackgroundForRefine(brief, kit, 'add a city skyline background', actor)
+    expect(result).toEqual({ url: null, skip: 'NO_PROVIDER' })
+    expect(h.resolveImageProvider).toHaveBeenCalledWith({ teamId: 'team-actor', userId: 'user-actor' }, undefined)
+    expect(h.anthropicCreate).not.toHaveBeenCalled()
+    expect(h.runClaudeCli).not.toHaveBeenCalled()
+    expect(refineSkipFields(result)).toBeUndefined()
+  })
+
+  it('a resolver that throws is held until the decision: not wanted ⇒ NOT_NEEDED (nothing recorded)', async () => {
+    h.resolveImageProvider.mockRejectedValue(new Error('db unreachable'))
+    h.anthropicCreate.mockResolvedValueOnce(decisionReply('{"needed": false}'))
+    const result = await generateBackgroundForRefine(brief, kit, 'make the headline bigger', actor)
+    expect(result).toEqual({ url: null, skip: 'NOT_NEEDED' })
+    expect(refineSkipFields(result)).toBeUndefined()
+  })
+
+  it('a resolver that throws is held until the decision: wanted ⇒ PROVIDER_ERROR with the resolver error', async () => {
+    h.resolveImageProvider.mockRejectedValue(new Error('db unreachable'))
     h.anthropicCreate.mockResolvedValueOnce(decisionReply('{"needed": true, "prompt": "a city skyline"}'))
     await expect(generateBackgroundForRefine(brief, kit, 'add a background', actor)).resolves.toEqual({
       url: null,
-      skip: 'NO_PROVIDER',
+      skip: 'PROVIDER_ERROR',
+      detail: 'db unreachable',
     })
-    expect(h.anthropicCreate).toHaveBeenCalledTimes(1)
-    expect(h.resolveImageProvider).toHaveBeenCalledWith(
-      { teamId: 'team-actor', userId: 'user-actor' },
-      undefined
-    )
   })
 
   it('wanted a background and generation failed ⇒ PROVIDER_ERROR', async () => {
@@ -341,7 +361,20 @@ describe('generateBackgroundForRefine — refine semantics (FR-07)', () => {
     })
   })
 
+  it('without MOCK_AI a seam sentinel in the instruction changes nothing: the real decision and provider run', async () => {
+    expect(process.env.MOCK_AI).not.toBe('true')
+    const provider = providerReturning('https://cdn.example.com/real.png')
+    h.resolveImageProvider.mockResolvedValue(provider)
+    h.anthropicCreate.mockResolvedValueOnce(decisionReply('{"needed": true, "prompt": "a beach"}'))
+    await expect(
+      generateBackgroundForRefine(brief, kit, 'Swap it for a beach __MOCK_BG_FAIL__', actor),
+    ).resolves.toEqual({ url: 'https://cdn.example.com/real.png' })
+    expect(h.anthropicCreate).toHaveBeenCalledTimes(1)
+    expect(provider.generateImage).toHaveBeenCalledTimes(1)
+  })
+
   it('the decision failing ⇒ DECISION_ERROR (never throws)', async () => {
+    h.resolveImageProvider.mockResolvedValue(providerReturning('https://cdn.example.com/x.png'))
     h.anthropicCreate.mockRejectedValueOnce(new Error('overloaded'))
     await expect(generateBackgroundForRefine(brief, kit, 'add a background', actor)).resolves.toEqual({
       url: null,
@@ -509,16 +542,44 @@ describe('background mock seam (MOCK_AI + __MOCK_BG__ sentinels)', () => {
     expect(real.generateImage).not.toHaveBeenCalled()
   })
 
-  it('refine reads the sentinel from the brief topic', async () => {
+  it('refine reads the sentinel from the brief topic when the instruction has none', async () => {
     h.resolveImageProvider.mockResolvedValue(null)
     await expect(seam.generateBackgroundForRefine(seamBrief('Launch __MOCK_BG__'), kit, 'make it pop', actor)).resolves.toEqual({
       url: null,
       skip: 'NO_PROVIDER',
     })
+    h.resolveImageProvider.mockResolvedValue(providerReturning('https://x.example.com/x.png'))
     await expect(seam.generateBackgroundForRefine(seamBrief('Launch __MOCK_BG_NOT_NEEDED__'), kit, 'make it pop', actor)).resolves.toEqual({
       url: null,
       skip: 'NOT_NEEDED',
     })
+  })
+
+  it('a sentinel in the refine INSTRUCTION wins over the topic', async () => {
+    const real = providerReturning('https://real-provider.example.com/should-not-be-used.png')
+    h.resolveImageProvider.mockResolvedValue(real)
+    // The draft was generated with a background (__MOCK_BG__ topic); this refine fails.
+    const failed = await seam.generateBackgroundForRefine(seamBrief('Launch __MOCK_BG__'), kit, 'Swap it for a beach __MOCK_BG_FAIL__', actor)
+    expect(failed).toEqual({ url: null, skip: 'PROVIDER_ERROR', detail: 'Mock image provider failure (__MOCK_BG_FAIL__ sentinel)' })
+    expect(refineSkipFields(failed)).toEqual({
+      backgroundSkipReason: 'PROVIDER_ERROR',
+      backgroundSkipDetail: 'Mock image provider failure (__MOCK_BG_FAIL__ sentinel)',
+    })
+    await expect(
+      seam.generateBackgroundForRefine(seamBrief('Launch __MOCK_BG__'), kit, 'Bigger headline __MOCK_BG_NOT_NEEDED__', actor),
+    ).resolves.toEqual({ url: null, skip: 'NOT_NEEDED' })
+    // An instruction sentinel turns the seam on for a plain topic too.
+    await expect(seam.generateBackgroundForRefine(seamBrief('Plain'), kit, 'Add one __MOCK_BG__', actor)).resolves.toEqual({
+      url: 'http://minio.example.com/generated-images/background-mock.png',
+    })
+    expect(real.generateImage).not.toHaveBeenCalled()
+    expect(h.anthropicCreate).not.toHaveBeenCalled()
+  })
+
+  it('backgroundSeamText: the instruction when it carries a sentinel, else the topic', () => {
+    expect(hooks.backgroundSeamText('x __MOCK_BG_FAIL__', 'y __MOCK_BG__')).toBe('x __MOCK_BG_FAIL__')
+    expect(hooks.backgroundSeamText('make it pop', 'y __MOCK_BG__')).toBe('y __MOCK_BG__')
+    expect(hooks.backgroundSeamText('make it pop', 'Plain')).toBe('Plain')
   })
 })
 
@@ -551,18 +612,30 @@ describe('refineSkipFields — refine only touches the skip when it wanted a bac
   it('a produced background clears the fields', () => {
     expect(refineSkipFields({ url: 'https://x/bg.png' })).toEqual(BACKGROUND_SKIP_CLEARED)
   })
-  it.each(['NO_PROVIDER', 'PROVIDER_ERROR'] as const)('wanted one and %s ⇒ sets the reason', (reason) => {
-    expect(refineSkipFields({ url: null, skip: reason, detail: 'd' })).toEqual({
-      backgroundSkipReason: reason,
+  it('wanted one and the provider failed (PROVIDER_ERROR) ⇒ sets the reason and the detail', () => {
+    expect(refineSkipFields({ url: null, skip: 'PROVIDER_ERROR', detail: 'd' })).toEqual({
+      backgroundSkipReason: 'PROVIDER_ERROR',
       backgroundSkipDetail: 'd',
     })
   })
-  it.each(['NOT_NEEDED', 'DECISION_ERROR'] as const)('%s ⇒ undefined (leave the fields unchanged)', (reason) => {
+  // NO_PROVIDER: refine resolves first and never decided. NOT_NEEDED: not
+  // asked for. DECISION_ERROR: the decision gave no answer, so nothing was asked.
+  it.each(['NO_PROVIDER', 'NOT_NEEDED', 'DECISION_ERROR'] as const)('%s ⇒ undefined (leave the fields unchanged)', (reason) => {
     expect(refineSkipFields({ url: null, skip: reason })).toBeUndefined()
+    expect(refineSkipFields({ url: null, skip: reason, detail: 'd' })).toBeUndefined()
+  })
+  it('a stored detail is redacted', () => {
+    expect(refineSkipFields({ url: null, skip: 'PROVIDER_ERROR', detail: '401 bad key sk-proj-abc123' })).toEqual({
+      backgroundSkipReason: 'PROVIDER_ERROR',
+      backgroundSkipDetail: '401 bad key <redacted>',
+    })
   })
 })
 
 describe('backgroundSkippedFor — the poll payload', () => {
+  // The notice's title is "No AI background"; no body may repeat it.
+  const TITLE = /no ai background/i
+
   it('nothing stored ⇒ null', () => {
     expect(backgroundSkippedFor(null, null)).toBeNull()
   })
@@ -570,51 +643,131 @@ describe('backgroundSkippedFor — the poll payload', () => {
     expect(backgroundSkippedFor('NOT_NEEDED', null)).toBeNull()
     expect(backgroundSkippedFor('SOMETHING_ELSE', null)).toBeNull()
   })
-  it('NO_PROVIDER ⇒ the fixed fix-it message', () => {
+  it('NO_PROVIDER ⇒ the fixed fix-it message, leading with the cause', () => {
     expect(backgroundSkippedFor('NO_PROVIDER', null)).toEqual({
       reason: 'NO_PROVIDER',
       message:
-        'No AI background was added because no image provider is set up. Add an OpenAI key in Settings, or ask a team admin to add an image provider in Team settings.',
+        'No image provider is set up. Add an OpenAI key in Settings, or ask a team admin to add an image provider in Team settings.',
     })
   })
-  it('PROVIDER_ERROR carries the clipped detail', () => {
+  it('PROVIDER_ERROR carries the detail', () => {
     expect(backgroundSkippedFor('PROVIDER_ERROR', '429 rate limited')).toEqual({
       reason: 'PROVIDER_ERROR',
-      message: "The image provider couldn't create a background (429 rate limited). The post was designed without one.",
+      message: 'The image provider returned an error (429 rate limited), so the post was designed without one.',
     })
   })
   it('PROVIDER_ERROR with no detail reads cleanly', () => {
     expect(backgroundSkippedFor('PROVIDER_ERROR', null)!.message).toBe(
-      "The image provider couldn't create a background. The post was designed without one.",
-    )
-  })
-  it('a moderation refusal reads as "the image request was refused", never the raw provider text', () => {
-    const openAi = backgroundSkippedFor(
-      'PROVIDER_ERROR',
-      '400 Your request was rejected as a result of our safety system. moderation_blocked',
-    )!
-    expect(openAi.message).toBe(
-      "The image provider couldn't create a background (the image request was refused). The post was designed without one.",
-    )
-    expect(openAi.message).not.toContain('safety system')
-    expect(backgroundSkippedFor('PROVIDER_ERROR', 'Gemini blocked the prompt: SAFETY')!.message).toContain(
-      'the image request was refused',
+      'The image provider returned an error, so the post was designed without one.',
     )
   })
   it('DECISION_ERROR ⇒ the fixed message, provider/model text never echoed', () => {
     expect(backgroundSkippedFor('DECISION_ERROR', 'overloaded_error')).toEqual({
       reason: 'DECISION_ERROR',
-      message: 'The background step failed, so the post was designed without an AI image.',
+      message: 'The step that plans the background failed, so the post was designed without one.',
     })
+  })
+  it.each([
+    ['NO_PROVIDER', null],
+    ['PROVIDER_ERROR', '429 rate limited'],
+    ['PROVIDER_ERROR', null],
+    ['PROVIDER_ERROR', 'moderation_blocked'],
+    ['DECISION_ERROR', null],
+  ] as const)('%s (%s): the body does not repeat the title', (reason, detail) => {
+    expect(backgroundSkippedFor(reason, detail)!.message).not.toMatch(TITLE)
   })
   it('detail longer than the limit is clipped before it reaches the message', () => {
     const msg = backgroundSkippedFor('PROVIDER_ERROR', 'y'.repeat(1000))!.message
     expect(msg.length).toBeLessThan(SKIP_DETAIL_MAX + 120)
   })
+  it('a stored detail is redacted again on read (rows written before redaction)', () => {
+    const msg = backgroundSkippedFor('PROVIDER_ERROR', 'Incorrect API key provided: sk-proj-AbC123')!.message
+    expect(msg).toBe(
+      'The image provider returned an error (Incorrect API key provided: <redacted>), so the post was designed without one.',
+    )
+  })
   it('clipSkipDetail clips to SKIP_DETAIL_MAX (300)', () => {
     expect(SKIP_DETAIL_MAX).toBe(300)
     expect(clipSkipDetail('z'.repeat(301)).length).toBe(300)
     expect(clipSkipDetail('short')).toBe('short')
+  })
+})
+
+describe('MODERATION_RE — refusals read as refused; transport and account errors do not', () => {
+  const REFUSED = 'The image request was refused by the provider, so the post was designed without one.'
+
+  it.each([
+    '400 Your request was rejected as a result of our safety system. moderation_blocked',
+    'moderation_blocked',
+    'Gemini blocked the prompt: SAFETY',
+    'Blocked by content policy',
+    'content_policy_violation',
+    'The image request was refused',
+    'request refused by upstream filter',
+    'Flagged by moderation',
+  ])('refusal: %s', (detail) => {
+    expect(MODERATION_RE.test(detail)).toBe(true)
+    expect(backgroundSkippedFor('PROVIDER_ERROR', detail)!.message).toBe(REFUSED)
+  })
+
+  it.each([
+    'ECONNREFUSED',
+    'connect ECONNREFUSED 127.0.0.1:9000',
+    'Your account is blocked',
+    'Connection refused',
+    '429 rate limited',
+    'Incorrect API key provided',
+  ])('not a refusal: %s', (detail) => {
+    expect(MODERATION_RE.test(detail)).toBe(false)
+    expect(backgroundSkippedFor('PROVIDER_ERROR', detail)!.message).not.toBe(REFUSED)
+  })
+
+  it('a connection error keeps its own (redacted) text', () => {
+    expect(backgroundSkippedFor('PROVIDER_ERROR', 'connect ECONNREFUSED 127.0.0.1:9000')!.message).toBe(
+      'The image provider returned an error (connect ECONNREFUSED <host>), so the post was designed without one.',
+    )
+  })
+})
+
+describe('redactSkipDetail — no credential or internal endpoint reaches a draft viewer', () => {
+  it.each([
+    ['Incorrect API key provided: sk-proj-AbC_12.3-x', 'Incorrect API key provided: <redacted>'],
+    ['bad key sk-****************abcd', 'bad key <redacted>'],
+    ['API key not valid: AIzaSyD-abc_123XYZ', 'API key not valid: <redacted>'],
+    ['request failed ?key=AIzaSecret&alt=json', 'request failed ?key=<redacted>&alt=json'],
+    ['api_key=abc123 rejected', 'api_key=<redacted> rejected'],
+    ['POST https://generativelanguage.googleapis.com/v1beta/models/x:generate?key=abc failed', 'POST <url> failed'],
+    ['fetch failed (http://minio:9000/generated-images/bg.png)', 'fetch failed (<url>)'],
+    ['connect ECONNREFUSED 127.0.0.1:9000', 'connect ECONNREFUSED <host>'],
+    ['getaddrinfo ENOTFOUND minio.internal:9000', 'getaddrinfo ENOTFOUND <host>'],
+    ['upstream localhost:3001 closed', 'upstream <host> closed'],
+    ['429 rate limited', '429 rate limited'],
+    ['Mock image provider failure (__MOCK_BG_FAIL__ sentinel)', 'Mock image provider failure (__MOCK_BG_FAIL__ sentinel)'],
+  ])('%s', (raw, redacted) => {
+    expect(redactSkipDetail(raw)).toBe(redacted)
+  })
+
+  it('cleanSkipDetail redacts BEFORE clipping, so a key straddling the limit never leaks a prefix', () => {
+    const raw = `${'x'.repeat(280)} sk-proj-${'A'.repeat(40)}`
+    const cleaned = cleanSkipDetail(raw)
+    expect(cleaned).not.toContain('sk-')
+    expect(raw.slice(0, SKIP_DETAIL_MAX)).toContain('sk-proj-') // clipping alone would have leaked it
+    expect(cleaned.endsWith('<redacted>')).toBe(true)
+    expect(cleaned.length).toBeLessThanOrEqual(SKIP_DETAIL_MAX)
+  })
+
+  it('generation: a provider error is redacted at the source, before it is returned', async () => {
+    h.resolveImageProvider.mockReset().mockResolvedValue({
+      generateImage: async () => {
+        throw new Error('401 Incorrect API key provided: sk-proj-Secret123 (https://api.openai.com/v1/images)')
+      },
+    })
+    h.anthropicCreate.mockReset().mockResolvedValueOnce(decisionReply('{"needed": true, "prompt": "waves"}'))
+    await expect(generateBackgroundForBrief(brief, kit, 'Big news!', null, actor)).resolves.toEqual({
+      url: null,
+      skip: 'PROVIDER_ERROR',
+      detail: '401 Incorrect API key provided: <redacted> (<url>)',
+    })
   })
 })
 

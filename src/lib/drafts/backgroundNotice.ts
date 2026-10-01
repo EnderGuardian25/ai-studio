@@ -31,6 +31,29 @@ export function clipSkipDetail(detail: string): string {
   return detail.length > SKIP_DETAIL_MAX ? detail.slice(0, SKIP_DETAIL_MAX) : detail
 }
 
+// Provider error text is shown to EVERY viewer of the draft, not just the
+// person who configured the key, so anything that identifies a credential or
+// an internal endpoint is removed before it is clipped or stored. Order
+// matters: whole URLs go first (a key in a query string goes with them), then
+// bare keys, then key=… pairs outside a URL, then host:port pairs.
+const REDACTIONS: Array<[RegExp, string]> = [
+  [/\b[a-z][a-z0-9+.-]*:\/\/[^\s'"<>()]+/gi, '<url>'],
+  [/\bsk-[\w*.-]+/g, '<redacted>'],
+  [/\bAIza[\w-]+/g, '<redacted>'],
+  // No leading \b: "api_key=" and "apikey=" must match too.
+  [/(key=)[^&\s]+/gi, '$1<redacted>'],
+  [/\b(?:\d{1,3}(?:\.\d{1,3}){3}|[a-z][a-z0-9-]*(?:\.[a-z0-9-]+)*):\d{2,5}\b/gi, '<host>'],
+]
+
+export function redactSkipDetail(detail: string): string {
+  return REDACTIONS.reduce((text, [re, replacement]) => text.replace(re, replacement), detail)
+}
+
+// Redact, then clip: what every writer stores and every reader shows.
+export function cleanSkipDetail(detail: string): string {
+  return clipSkipDetail(redactSkipDetail(detail))
+}
+
 // The draft columns, as a write fragment.
 export interface BackgroundSkipFields {
   backgroundSkipReason: BackgroundNoticeReason | null
@@ -43,7 +66,7 @@ export const BACKGROUND_SKIP_CLEARED: BackgroundSkipFields = {
 }
 
 function storedSkip(reason: BackgroundNoticeReason, detail?: string): BackgroundSkipFields {
-  return { backgroundSkipReason: reason, backgroundSkipDetail: detail ? clipSkipDetail(detail) : null }
+  return { backgroundSkipReason: reason, backgroundSkipDetail: detail ? cleanSkipDetail(detail) : null }
 }
 
 // Generation, regenerate-design and Path A: the design was made from scratch,
@@ -55,37 +78,48 @@ export function generationSkipFields(result: BackgroundResult | null): Backgroun
 }
 
 // Refine: its decision is instruction-gated, so it only speaks to the
-// background when the instruction asked for one. Produced → clear; wanted one
-// and failed (NO_PROVIDER / PROVIDER_ERROR) → set; anything else (did not
-// want one, or the decision itself failed so we don't know) → undefined,
-// meaning leave the fields as they are — the same way refine treats imageUrl.
+// background when the instruction asked for one. Produced → clear. Wanted one
+// and the provider failed (PROVIDER_ERROR) → set. Everything else → undefined,
+// meaning leave the fields as they are, the same way refine treats imageUrl:
+//   - NO_PROVIDER: refine resolves the provider FIRST and, with none, never
+//     runs its decision, so it cannot know whether one was wanted;
+//   - NOT_NEEDED: the instruction didn't ask for a background;
+//   - DECISION_ERROR: the decision produced no answer, so nothing was asked
+//     for (the step only reports PROVIDER_ERROR once the decision has parsed).
 export function refineSkipFields(result: BackgroundResult): BackgroundSkipFields | undefined {
   if (result.url !== null) return BACKGROUND_SKIP_CLEARED
-  if (result.skip === 'NO_PROVIDER' || result.skip === 'PROVIDER_ERROR') return storedSkip(result.skip, result.detail)
+  if (result.skip === 'PROVIDER_ERROR') return storedSkip(result.skip, result.detail)
   return undefined
 }
 
 // Provider safety/moderation refusals (OpenAI "moderation_blocked" / "safety
 // system", Gemini SAFETY blocks). The notice says the request was refused
 // rather than echoing the provider's wording, which reads like a key problem.
-const MODERATION_RE = /moderation|safety|content[ _-]?policy|refused|blocked/i
+// Word-anchored so a transport error never reads as a refusal: ECONNREFUSED
+// and "Your account is blocked" must stay the provider's own text.
+export const MODERATION_RE =
+  /\bmoderation\b|moderation_blocked|\bsafety\b|content[ _-]?policy|\brequest (?:was )?refused\b/i
 
+// Each message leads with the cause: the notice's title already says
+// "No AI background", so no body repeats it.
 function providerErrorMessage(detail: string | null): string {
-  const clipped = detail?.trim() ? clipSkipDetail(detail.trim()) : null
-  const why = clipped ? (MODERATION_RE.test(clipped) ? 'the image request was refused' : clipped) : null
-  return why
-    ? `The image provider couldn't create a background (${why}). The post was designed without one.`
-    : "The image provider couldn't create a background. The post was designed without one."
+  const cleaned = detail?.trim() ? cleanSkipDetail(detail.trim()) : null
+  if (cleaned && MODERATION_RE.test(cleaned)) {
+    return 'The image request was refused by the provider, so the post was designed without one.'
+  }
+  return cleaned
+    ? `The image provider returned an error (${cleaned}), so the post was designed without one.`
+    : 'The image provider returned an error, so the post was designed without one.'
 }
 
 const FIXED_MESSAGES: Record<Exclude<BackgroundNoticeReason, 'PROVIDER_ERROR'>, string> = {
   NO_PROVIDER:
-    'No AI background was added because no image provider is set up. Add an OpenAI key in Settings, or ask a team admin to add an image provider in Team settings.',
-  DECISION_ERROR: 'The background step failed, so the post was designed without an AI image.',
+    'No image provider is set up. Add an OpenAI key in Settings, or ask a team admin to add an image provider in Team settings.',
+  DECISION_ERROR: 'The step that plans the background failed, so the post was designed without one.',
 }
 
 // The stored columns → the poll payload. Provider text appears at most as the
-// clipped detail inside the PROVIDER_ERROR sentence; every other message is
+// redacted, clipped detail inside the PROVIDER_ERROR sentence; every other message is
 // fixed. An unknown stored value (or NOT_NEEDED) shows nothing.
 export function backgroundSkippedFor(reason: string | null, detail: string | null): BackgroundSkipped | null {
   switch (reason) {

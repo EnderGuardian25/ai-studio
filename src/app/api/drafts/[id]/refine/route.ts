@@ -145,9 +145,10 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
   await startDraftAction(draft.id, user.userId, user.teamId, 'REFINE', async () => {
     // Background pre-step: generates a new background ONLY when the instruction
     // asks for one (e.g. "change the background to a city skyline"); a skip
-    // with its reason otherwise. See agent/background.ts. 005 FR-07: the skip
-    // is recorded only when the instruction wanted a background
-    // (refineSkipFields), and only if this refine commits.
+    // with its reason otherwise. See agent/background.ts: it resolves the
+    // provider first and, with none, never runs the decision. 005 FR-07: the
+    // skip is recorded only when the instruction wanted a background and the
+    // provider then failed (refineSkipFields), and only if this refine commits.
     const background = await generateBackgroundForRefine(draft.brief, kit, instruction, actor)
     const backgroundImageUrl = background.url
 

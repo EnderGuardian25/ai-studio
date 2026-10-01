@@ -171,9 +171,11 @@ export interface CommitRevisionArgs {
   exportKey?: string
   backgroundImageUrl?: string | null
   // 005 FR-07: the refine's background-skip write (refineSkipFields), stored
-  // in the same final draft write as backgroundImageUrl. Omitted — every
-  // caller but a refine whose instruction asked for a background — leaves
-  // the draft's backgroundSkipReason/backgroundSkipDetail unchanged.
+  // in the same final draft write as backgroundImageUrl. Undefined (every
+  // other caller, and a refine whose background step has nothing to report:
+  // NO_PROVIDER, since refine resolves first and then never decides, or
+  // NOT_NEEDED, or DECISION_ERROR) leaves the draft's
+  // backgroundSkipReason/backgroundSkipDetail unchanged.
   backgroundSkip?: BackgroundSkipFields
   // "Use anyway" (T19, FR-14a): the id of the rejected DraftRevision row being
   // adopted. When set, it is stamped adoptedAt + adoptedRevisionNumber

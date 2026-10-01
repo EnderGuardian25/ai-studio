@@ -48,7 +48,7 @@ All §6 cases are now written. New/changed files:
 
 **The 3 intentional skips (everything else passes):**
 
-- ~~**TC-GEN-05**~~ **runs since 005 T2** (in `path-b.test.ts`): the background mock seam (`__MOCK_BG__` topic sentinel, `shouldMockBackground` in `src/lib/testHooks.ts`) resolves the team's IMAGE row for real, swaps only `generateImage` for a fixture PNG, and the persisted background is read back anonymously (200, `image/png`). The same seam drives `background-notice.test.ts` (§BG, 005 AC-01/AC-08..AC-11).
+- ~~**TC-GEN-05**~~ **runs since 005 T2** (in `path-b.test.ts`): the background mock seam (`__MOCK_BG__` topic sentinel, `shouldMockBackground` in `src/lib/testHooks.ts`) resolves the team's IMAGE row for real, swaps only `generateImage` for a fixture PNG, and the persisted background is read back anonymously (200, `image/png`). The same seam drives `background-notice.test.ts` (§BG, TC-BG-01…10, 005 AC-01/AC-08..AC-11).
 - **TC-REG-H11b** (concurrency cap): needs a real-Chromium serve (`MOCK_PUPPETEER` unset); skips in the mock run.
 - **TC-REG-H11a / H11c** (one Chromium process per run / relaunch-after-kill): require host process observation / killing Chromium — not auto-driveable from a black-box test; `test.skip` with rationale.
 
@@ -469,6 +469,37 @@ Most cases pin a known document through whole-document mode first, then address 
 | AC-25 no persisted address; a rewrite between sessions can't misdirect | TC-INLINE-05, -08 (whole-document rewrite), **-13 (real refine)**, -15 (UI reload)                                      | `checkElementBaseRevision`, stale path/tag/text   |
 | AC-26 client selector never chooses the target                         | TC-INLINE-05 (top-level decoy), **-14 (decoys at every level, naming a different element)**                             | schema strips `selector`/`target` at every level  |
 
+### BG. Skipped AI background notice (`background-notice.test.ts`, change 005 T2 — AC-01, AC-08 → AC-11)
+
+A Path B background that was not produced is recorded with its reason (FR-06: `NO_PROVIDER`, `PROVIDER_ERROR`, `DECISION_ERROR`, `NOT_NEEDED`) on `Draft.backgroundSkipReason` / `backgroundSkipDetail`, polled as `backgroundSkipped: { reason, message } | null`, and shown as an amber `role="status"` notice under the preview (FR-07). `NOT_NEEDED` is never stored. The provider's error text appears only as a redacted (keys, URLs and `host:port` removed), 300-char-clipped detail inside the `PROVIDER_ERROR` sentence; a moderation refusal reads as "the image request was refused".
+
+The cases drive the NFR-06 background seam (`shouldMockBackground` / `backgroundSeamText` in `src/lib/testHooks.ts`, consulted only under `MOCK_AI`): the sentinel `__MOCK_BG__` makes the decision "needed", **the real resolver picks the provider**, and only its `generateImage` is swapped for a fixture PNG; `__MOCK_BG_FAIL__` makes that fixture throw; `__MOCK_BG_NOT_NEEDED__` makes the decision "not needed". Generation reads the sentinel from the brief topic; a refine reads it from its **instruction** when that carries one, else from the topic. Without a sentinel `MOCK_AI` keeps its early return, so no other suite changes. Every case runs in its own fresh team (soft-deleted afterwards), with either no IMAGE row or one enabled **non-default** IMAGE row registered over the API (T1's key-validation seam); the acting super admin has no personal OpenAI key. Refines carry `__VERIFY_PASS__` so the 004 verifier commits them. Needs `MOCK_AI` + `MOCK_PUPPETEER`; the DB assertions use test-DB access when available.
+
+Refine writes by its own rule: it resolves the provider **first** and, with none, never runs its decision (`NO_PROVIDER` → leave the skip unchanged). It sets the skip only when its decision wanted a background and the provider then failed (`PROVIDER_ERROR`), clears it when it produced one, and otherwise leaves it unchanged, as it does `imageUrl`.
+
+- **TC-BG-01 — No IMAGE row ⇒ NO_PROVIDER, shown (AC-08).** P: no IMAGE row. S: Path B generation, topic `__MOCK_BG__`. E: draft `EXPORTED`, `imageUrl` null; polled `backgroundSkipped.reason` `NO_PROVIDER` with the fix-it message; DB reason `NO_PROVIDER`, detail null. Browser (super admin): the notice is visible, `role="status"`, title "No AI background", body "No image provider is set up…", link "Open Team settings" → `/team`.
+- **TC-BG-02 — Non-default row serves a no-key brief (AC-01, E2E half).** P: one enabled non-default IMAGE row; `/api/me/openai-key` reports `connected:false`; the brief has no `imageProviderKey` (what the scheduler, MCP and ACP send). S: generation, `__MOCK_BG__`. E: `imageUrl` is a persisted `background-*.png`; `backgroundSkipped` null.
+- **TC-BG-03 — Not needed ⇒ no skip, no notice (AC-09).** P: one non-default row. S: generation, `__MOCK_BG_NOT_NEEDED__`. E: `imageUrl` null, `backgroundSkipped` null, DB reason null; the browser shows no notice.
+- **TC-BG-04 — Provider throws ⇒ PROVIDER_ERROR, the draft completes (AC-10).** P: one non-default row. S: generation, `__MOCK_BG_FAIL__`. E: `EXPORTED` with an `exportUrl`, `imageUrl` null, message exactly "The image provider returned an error (Mock image provider failure (**MOCK_BG_FAIL** sentinel)), so the post was designed without one."
+- **TC-BG-05 — Regenerate-design clears an earlier skip (AC-11).** P: a `NO_PROVIDER` draft, then a non-default row is added. S: `POST /regenerate-design`. E: `backgroundSkipped` null, a `background-*.png` `imageUrl`, revision 2.
+- **TC-BG-06 — A refine that produces a background clears the skip (AC-11).** P: a `NO_PROVIDER` draft, then a non-default row is added. S: refine (topic `__MOCK_BG__`). E: revision 2, `backgroundSkipped` null, a `background-*.png` `imageUrl`.
+- **TC-BG-07 — A refine that wanted a background and failed sets the skip (AC-11).** P: one non-default row; generation with topic `__MOCK_BG__` produced a background (skip null). S: refine with `__MOCK_BG_FAIL__` in the **instruction**. E: the edit commits (revision 2); polled and stored reason `PROVIDER_ERROR` with the mock detail; `imageUrl` (polled and in the DB) is the generation's background, unchanged.
+- **TC-BG-08 — A refine that didn't want a background leaves the skip unchanged (AC-11).** P: one non-default row; generation `__MOCK_BG_FAIL__` stored `PROVIDER_ERROR`. S: refine with `__MOCK_BG_NOT_NEEDED__` in the instruction (a provider resolves, so the decision really runs). E: revision 2; `backgroundSkipped` equal to the generation's.
+- **TC-BG-09 — A refine on a team with no provider leaves the skip unchanged (FR-07 refine rule).** P: one non-default row; generation `__MOCK_BG_FAIL__` stored `PROVIDER_ERROR`; then the row is disabled. S: refine with `__MOCK_BG__` in the instruction. E: revision 2; `backgroundSkipped` still the `PROVIDER_ERROR` (never `NO_PROVIDER`); `imageUrl` null. The unit suite proves the decision model is never called on this path.
+- **TC-BG-10 — A team editor gets the /settings link (FR-07).** P: the seed editor (`editor@bisteccare.lk`) is added to the fresh team as `EDITOR` and generates a `NO_PROVIDER` draft. S: open the draft in the browser as the editor. E: the notice shows the `NO_PROVIDER` body and an "Open Settings" link → `/settings`, and no `/team` link. Teardown removes the membership, so the seed editor keeps its original teams.
+- **TC-GEN-05** (§D, `path-b.test.ts`) uses the same seam for the public-URL check.
+
+**AC → case map (change 005 item 3).** The unit file is `tests/unit/background.test.ts`: every reason including the stage-based catches, never throwing, the refine order (resolve first; a provider-less refine never decides), the seam (resolution runs for real; the instruction sentinel wins; no effect without `MOCK_AI`), the writer rules, the message table, the moderation and redaction tables, and the `commitDraftRevision` threading.
+
+| AC                                                  | E2E                 |
+| --------------------------------------------------- | ------------------- |
+| AC-01 (E2E half) non-default row, no personal key   | TC-BG-02            |
+| AC-08 NO_PROVIDER stored, polled, shown; EXPORTED   | TC-BG-01, TC-BG-10  |
+| AC-09 not needed ⇒ no notice                        | TC-BG-03            |
+| AC-10 provider failure ⇒ PROVIDER_ERROR, completes  | TC-BG-04            |
+| AC-11 regenerate clears; refine sets / leaves alone | TC-BG-05 … TC-BG-09 |
+| AC-12 TC-GEN-05 runs                                | TC-GEN-05           |
+
 ---
 
 ## 7. Fixes required to the existing specs (before/while implementing)
@@ -505,31 +536,32 @@ CI gate: **`.github/workflows/e2e.yml`** runs the whole suite (§A–§S, includ
 
 ## 9. Coverage traceability
 
-| Finding(s)                                  | Guarded by                                                                             |
-| ------------------------------------------- | -------------------------------------------------------------------------------------- |
-| H1 ACP/MCP auth                             | TC-ACP-01/02/03                                                                        |
-| H2 IDOR                                     | TC-AGUI-06, TC-LIB-01, ownership asserts across D/E/F                                  |
-| H3 library leak                             | TC-LIB-01                                                                              |
-| H4 admin gating                             | TC-AUTH-05, TC-PUB-09, TC-BK-08, TC-RES-05                                             |
-| H5 publish button                           | TC-UI-03                                                                               |
-| H7 atomicity                                | TC-PUB-02/03, TC-REG-H7a/b/c                                                           |
-| H8 upload validation                        | TC-BK-07                                                                               |
-| H9 indexes                                  | TC-REG-H9                                                                              |
-| H10 storage                                 | TC-BK-04, TC-GEN-05, TC-PUB-08, TC-LIB-05, TC-ACP-05, TC-REG-H10a/b/c, TC-UI-04        |
-| H11 puppeteer                               | TC-REG-H11a/b/c                                                                        |
-| H12 scheduler                               | TC-PUB-04, TC-REG-H12a/b/c                                                             |
-| H13 /api/me                                 | TC-AUTH-04                                                                             |
-| M1 atomic default                           | TC-BK-02, TC-PROV-06                                                                   |
-| M4 soft-delete resolve                      | TC-RES-04                                                                              |
-| M5 artifact sync                            | TC-BK-06                                                                               |
-| M6 ACP validation                           | TC-ACP-03                                                                              |
-| M9 middleware prefix                        | TC-AUTH-07                                                                             |
-| M10 key prefix mask                         | TC-PROV-04                                                                             |
-| M11 bounded lists                           | TC-RES-06                                                                              |
-| M12 brief validation                        | TC-GEN-03/04                                                                           |
-| L1 IG header / system user                  | TC-ACP-04                                                                              |
-| L2 shared helpers                           | TC-REG-L2                                                                              |
-| Known Issue (oversized template)            | TC-GEN-06                                                                              |
-| Change 004 refine fidelity (AC-08 → AC-20b) | §U TC-REJ-01…04, §V TC-FID-01…17, T18/T19 in `refine-not-applied.test.ts` (see §V map) |
+| Finding(s)                                                  | Guarded by                                                                             |
+| ----------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| H1 ACP/MCP auth                                             | TC-ACP-01/02/03                                                                        |
+| H2 IDOR                                                     | TC-AGUI-06, TC-LIB-01, ownership asserts across D/E/F                                  |
+| H3 library leak                                             | TC-LIB-01                                                                              |
+| H4 admin gating                                             | TC-AUTH-05, TC-PUB-09, TC-BK-08, TC-RES-05                                             |
+| H5 publish button                                           | TC-UI-03                                                                               |
+| H7 atomicity                                                | TC-PUB-02/03, TC-REG-H7a/b/c                                                           |
+| H8 upload validation                                        | TC-BK-07                                                                               |
+| H9 indexes                                                  | TC-REG-H9                                                                              |
+| H10 storage                                                 | TC-BK-04, TC-GEN-05, TC-PUB-08, TC-LIB-05, TC-ACP-05, TC-REG-H10a/b/c, TC-UI-04        |
+| H11 puppeteer                                               | TC-REG-H11a/b/c                                                                        |
+| H12 scheduler                                               | TC-PUB-04, TC-REG-H12a/b/c                                                             |
+| H13 /api/me                                                 | TC-AUTH-04                                                                             |
+| M1 atomic default                                           | TC-BK-02, TC-PROV-06                                                                   |
+| M4 soft-delete resolve                                      | TC-RES-04                                                                              |
+| M5 artifact sync                                            | TC-BK-06                                                                               |
+| M6 ACP validation                                           | TC-ACP-03                                                                              |
+| M9 middleware prefix                                        | TC-AUTH-07                                                                             |
+| M10 key prefix mask                                         | TC-PROV-04                                                                             |
+| M11 bounded lists                                           | TC-RES-06                                                                              |
+| M12 brief validation                                        | TC-GEN-03/04                                                                           |
+| L1 IG header / system user                                  | TC-ACP-04                                                                              |
+| L2 shared helpers                                           | TC-REG-L2                                                                              |
+| Known Issue (oversized template)                            | TC-GEN-06                                                                              |
+| Change 004 refine fidelity (AC-08 → AC-20b)                 | §U TC-REJ-01…04, §V TC-FID-01…17, T18/T19 in `refine-not-applied.test.ts` (see §V map) |
+| Change 005 skipped-background notice (AC-01, AC-08 → AC-11) | §BG TC-BG-01…10, TC-GEN-05 (see §BG map)                                               |
 
 > Items with no behavioral surface (M2 init race, M3 stdin, M7 polling, M8 crypto guards, M13 dead code) are best covered by unit tests; M7 polling can optionally be a UI test (draft auto-refresh while `IN_PROGRESS`).
