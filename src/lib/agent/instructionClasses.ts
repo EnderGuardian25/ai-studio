@@ -179,10 +179,9 @@ export interface PostConditionInput {
   // Every class the instruction carried (after effectiveClasses), including the
   // one being checked.
   classes: InstructionClass[]
-  // The user's instruction. Only the two zero-call lexicons read it: the
-  // text-reduction lexicon (TEXT_REDUCTION_LEXICON) and the move-intent lexicon
-  // (MOVE_INTENT_LEXICON, which replace's move exemption consults). Omitted →
-  // no text-reduction check and no move intent.
+  // The user's instruction. Only the zero-call text-reduction lexicon
+  // (TEXT_REDUCTION_LEXICON) reads it; replace's move exemption never does
+  // (final F1d). Omitted → no text-reduction check.
   instruction?: string
 }
 
@@ -549,19 +548,26 @@ function targetMiss(was: DomElementFact, now: DomElementFact, direction?: Constr
 //      carried such an X that no AFTER element with that id still carries.
 //      An id'd BEFORE carrier keeps the F1 id logic: no element may keep that
 //      id (the identified element must be gone).
-//   3. MOVE INTENT (final F1c). The vacated-slot rule alone certified the swap
-//      above whatever the user asked. That swap is right only when the user
-//      asked for the old image to go somewhere; for a plain "use the upload as
-//      the background" it is the AC-09 failure (the old background kept, moved
-//      into the inset). So the full rule 2 applies only when the INSTRUCTION
-//      expresses explicit move intent (hasMoveIntent, a zero-call lexicon —
-//      AC-12). Without move intent a surviving superseded image passes only as
-//      a PURE move: every image displaced from the vacated slot must be gone
-//      from the whole AFTER design. The canonical correct edit — the inset
-//      upload becomes the background and the old background is gone, with
-//      supersedes [old background, ".inset"] as the replace example steers —
-//      is a pure move and passes; a swap or any relocation (the displaced image
-//      survives somewhere) misses, vacated slot or not.
+//   3. PURE MOVES ONLY (final F1d, a binding controller ruling). The
+//      vacated-slot rule alone certified the swap above whatever the user
+//      asked; for a plain "use the upload as the background" that swap is the
+//      AC-09 failure (the old background kept, moved into the inset). A
+//      surviving superseded image therefore passes only as a PURE move: every
+//      image displaced from the vacated slot must be gone from the whole AFTER
+//      design. The canonical correct edit — the inset upload becomes the
+//      background and the old background is gone, with supersedes [old
+//      background, ".inset"] as the replace example steers — is a pure move and
+//      passes; a swap or any relocation (the displaced image survives
+//      somewhere) misses, vacated slot or not.
+//      A REQUESTED swap misses too, by design ("swap the background and the
+//      inset", "… and put the old one in the inset"). Final F1c let explicit
+//      move intent in the instruction exempt a swap, through a zero-call
+//      lexicon; it was repeatedly gameable — "…but keep the original logo",
+//      "move the current photo to the background", "switch the background over
+//      to the upload", "avoid moving the old background into the inset" all
+//      read as intent and passed the swap with zero calls. No wording of the
+//      instruction is consulted here: a requested swap fails closed, and the
+//      user gets "not applied" + Use anyway.
 // URLs are compared normalised (normalisedSource): an http(s) URL without its
 // query string or fragment, so `UP?v=1` or `UP#bg` is still UP. Inline-asset
 // tokens and data URIs are compared as-is.
@@ -578,13 +584,18 @@ function targetMiss(was: DomElementFact, now: DomElementFact, direction?: Constr
 //   - two distinct CDN images that differ only by query string (`img?w=400`
 //     vs `img?w=800`) count as ONE image, so showing both misses as a
 //     duplicate; srcset candidates are not counted at all;
-//   - a move request phrased outside the move-intent lexicon (it is
-//     English-only — see MOVE_INTENT_LEXICON) gets the pure-move rule, so a
-//     legitimate swap asked for in other words misses.
-// Known limit (fail OPEN, no move intent): the pure-move test cannot tell which
-// image the user meant to move. If the model deletes an UNRELATED image and
-// puts the old background in that image's slot (the old background "moved"
-// into a slot whose image is gone everywhere), it passes as a pure move.
+//   - every swap misses, including one the user explicitly asked for (rule 3).
+// Known limit (fail OPEN): structure cannot tell which image the user meant to
+// keep. A pure move passes whenever every image displaced from the slot the old
+// image now occupies is gone from the design — whichever image that was. So:
+//   - the model deletes an UNRELATED image (a logo, a second photo) and puts
+//     the old background in its slot: it passes as a pure move;
+//   - the model deletes the UPLOAD ITSELF and moves the old background into
+//     the upload's old inset slot: every image displaced from that slot (the
+//     upload) is gone, so it passes as a pure move too — although the image
+//     the user wanted as the background is the one that was deleted.
+// Both need the model to delete an image unasked; the reported AC-09 shape (the
+// old background kept alongside the upload) is not one of them.
 
 // An http(s) URL with its query string and fragment stripped; any other source
 // (an __INLINE_ASSET_n__ token, a data: URI) unchanged.
@@ -615,89 +626,11 @@ function identifiedSources(before: DomFacts, r: ResolvedFragment): string[] {
   )
 }
 
-// ── Move-intent lexicon (final F1c) ──────────────────────────────────────────
-//
-// Decides whether the INSTRUCTION explicitly asks for an image to go somewhere
-// else (rule 3 above). Zero model calls (AC-12): replace is checked
-// structurally, so the decision cannot be handed to a model.
-//
-// Governing principle: WHEN UNSURE, NO MOVE INTENT. A wrong "no" is a false
-// miss on a rare, legitimate move request — it fails closed, and Use anyway
-// still works. A wrong "yes" is a zero-call false pass on the core bug (the
-// old background kept, moved into the inset).
-//
-// Two phrasings, case-insensitive, anchored on word boundaries:
-//   1. A RECIPROCAL swap — swap / switch / exchange / interchange — of
-//      "the X and the Y" (two image nouns), of "the two / both" images, or of
-//      image nouns followed by round / around / over / places / positions /
-//      sides ("swap the background and the inset", "switch the two images",
-//      "swap the photos round"). "swap out", "swap X for Y", "switch X to Y"
-//      and "swap X with Y" never match: they REPLACE one thing with another
-//      ("swap the background with the uploaded photo" is ambiguous, so no).
-//      A reciprocal swap followed by to / for / out / with / into is not one
-//      either ("switch the two images to black and white").
-//   2. A MOVE verb — move, put, place, relocate, shift, keep, retain — whose
-//      object is a SUPERSEDED-IMAGE reference: old / previous / original /
-//      current / existing / former, then at most one word, then an image noun
-//      or "one" ("put the old one in the inset", "move the current background
-//      to the small frame", "keep the old background as the inset photo").
-//      After keep / retain only old / previous / original / former count:
-//      "keep the existing photo" means leave it be, not move it.
-//      The object must be a superseded image: "put the upload in the
-//      background" and "place the uploaded image behind the text" place the
-//      NEW image; "keep the headline", "keep it on brand", "keep the current
-//      layout" and "move the headline up" name no image.
-// Either phrasing is void after a negation directly before the verb:
-// n't / not / cannot / never / no / without / than / instead of / no need to
-// ("don't keep the old one", "without keeping the old one").
-//
-// Known limits:
-//   - fail closed (the request gets the pure-move rule, so a legitimate swap
-//     misses and "Use anyway" is offered): the lexicon is ENGLISH-ONLY, and a
-//     move request phrased outside it — "swap them round", "trade places",
-//     "the old background can go in the corner", "swap X with Y" — has no move
-//     intent;
-//   - fail open (toward the F1b vacated-slot rule): only a negation DIRECTLY
-//     before the verb voids it, so "don't ever keep the old one" or "keep
-//     neither the old one nor …" reads as intent.
-const IMAGE_NOUN = String.raw`(?:images?|photos?|photographs?|pictures?|pics?|backgrounds?|backdrops?|bgs?|insets?|logos?|graphics?|illustrations?|visuals?|frames?)`
-const OPT_WORD = String.raw`(?:[\p{L}\p{N}][\p{L}\p{N}-]*\s+)?`
-const NOT_NEGATED = String.raw`(?<!(?:n['’]t|\bnot|\bcannot|\bnever|\bno|\bwithout|\bthan|\binstead\s+of|\b(?:no|not|n['’]t)\s+(?:need|have|want)\s+to)\s+)`
-const SWAP_VERB = String.raw`(?:swap|swapping|switch|switching|exchange|exchanging|interchange|interchanging)`
-// Determiner, then at most one word that is not "out"/"in" ("swap out …").
-const SWAP_DET = String.raw`(?:(?:the|their|its|my|our|these|those)\s+)?(?!(?:out|in)\b)${OPT_WORD}`
-const NOT_REPLACING_TAIL = String.raw`(?!\s+(?:to|for|out|with|into)\b)`
-const MOVE_VERB = String.raw`(?:move|moving|put|putting|place|placing|relocate|relocating|shift|shifting)`
-const KEEP_VERB = String.raw`(?:keep|keeping|retain|retaining)`
-const REF_DET = String.raw`(?:(?:the|that|this|those|these|my|our)\s+)?`
-const REF_NOUN = String.raw`\s+${OPT_WORD}(?:${IMAGE_NOUN}|ones?)\b`
-const SUPERSEDED_REF = String.raw`${REF_DET}(?:old|previous|original|current|existing|former)${REF_NOUN}`
-// After keep / retain, "current" and "existing" mean "leave it as it is", not
-// "move it" ("keep the existing photo"), so only old / previous / original /
-// former count there.
-const KEPT_REF = String.raw`${REF_DET}(?:old|previous|original|former)${REF_NOUN}`
-
-export const MOVE_INTENT_LEXICON: readonly RegExp[] = [
-  // "swap the background and the inset"
-  new RegExp(String.raw`${NOT_NEGATED}\b${SWAP_VERB}\s+${SWAP_DET}${IMAGE_NOUN}\s+and\s+${SWAP_DET}${IMAGE_NOUN}\b${NOT_REPLACING_TAIL}`, 'iu'),
-  // "switch the two images", "swap both photos"
-  new RegExp(String.raw`${NOT_NEGATED}\b${SWAP_VERB}\s+(?:the\s+)?(?:two|2|both)\s+(?:of\s+the\s+)?${OPT_WORD}${IMAGE_NOUN}\b${NOT_REPLACING_TAIL}`, 'iu'),
-  // "swap the photos round"
-  new RegExp(String.raw`${NOT_NEGATED}\b${SWAP_VERB}\s+${SWAP_DET}${IMAGE_NOUN}\s+(?:round|around|over|places|positions|sides)\b`, 'iu'),
-  // "put the old one in the inset", "move the current background to the small frame"
-  new RegExp(String.raw`${NOT_NEGATED}\b${MOVE_VERB}\s+${SUPERSEDED_REF}`, 'iu'),
-  // "keep the old background as the inset photo"
-  new RegExp(String.raw`${NOT_NEGATED}\b${KEEP_VERB}\s+${KEPT_REF}`, 'iu'),
-]
-
-export function hasMoveIntent(instruction: string): boolean {
-  return MOVE_INTENT_LEXICON.some((re) => re.test(instruction))
-}
-
 // Rules 2 and 3 above: the fragment's images are still present, but only
-// because they moved into slots other images vacated — and, without move
-// intent, only when every image they displaced is gone from the design.
-function movedAway(before: DomFacts, after: DomFacts, r: ResolvedFragment, moveIntent: boolean): boolean {
+// because they moved into slots other images vacated, and every image they
+// displaced is gone from the design (a pure move). The instruction is never
+// consulted: a swap misses even when it was asked for.
+function movedAway(before: DomFacts, after: DomFacts, r: ResolvedFragment): boolean {
   const sources = identifiedSources(before, r)
   if (sources.length === 0) return false
   if (sources.some((s) => countOf(after.imageSources, s) > countOf(before.imageSources, s))) return false
@@ -710,14 +643,13 @@ function movedAway(before: DomFacts, after: DomFacts, r: ResolvedFragment, moveI
 
   const afterSources = new Set(after.imageSources.map(normalisedSource))
   // In BEFORE, elements matching `slot` carried an image X outside `held`, and
-  // in AFTER none of them carries X. Without move intent (rule 3), every such
-  // displaced X must also be gone from the whole design — a pure move, not a
-  // swap or a relocation.
+  // in AFTER none of them carries X. Every such displaced X must also be gone
+  // from the whole design (rule 3) — a pure move, not a swap or a relocation.
   const vacated = (slot: (e: DomElementFact) => boolean, held: Set<string>) => {
     const prior = unique(before.elements.filter(slot).flatMap(heldBy)).filter((x) => !held.has(x))
     const displaced = prior.filter((x) => !after.elements.some((e) => slot(e) && heldBy(e).includes(x)))
     if (displaced.length === 0) return false
-    return moveIntent || displaced.every((x) => !afterSources.has(x))
+    return displaced.every((x) => !afterSources.has(x))
   }
   const carriers = after.elements.filter(carries)
   // The image is present but on no element: nothing shows it moved.
@@ -748,9 +680,8 @@ const supersededElementAbsent: PostCondition = (input) => {
   if (!Array.isArray(resolved)) return resolved
   const { before, after } = input
   const withRemove = input.classes.includes('remove')
-  const moveIntent = !!input.instruction && hasMoveIntent(input.instruction)
   const kept = resolved.filter((r) => {
-    if (imagesPresent(after, r) && !movedAway(before, after, r, moveIntent)) return true
+    if (imagesPresent(after, r) && !movedAway(before, after, r)) return true
     const t = textPart(r)
     return withRemove ? !contentReduced(before, after, t) && !replacedWholesale(after, t) : !contentAbsent(after, t)
   })
@@ -923,7 +854,7 @@ ${SUPERSEDES_RULE}
 ${CONSTRAINS_RULE}`
 }
 
-// ── Text-reduction lexicon (final F1 / I-2, final F1b) ───────────────────────
+// ── Text-reduction lexicon (final F1 / I-2, final F1b, final F1d) ────────────
 //
 // The model classifies its own instruction, so "reduce the text" answered as
 // replace (the phrase is gone — contentAbsent is satisfied by a LONGER
@@ -940,20 +871,51 @@ ${CONSTRAINS_RULE}`
 //
 // The lexicon is deliberately NARROW. A text object — text(s), copy, word(s),
 // word count, wording, paragraph(s), caption(s), body, description(s) — must
-// be followed by a CLAUSE BOUNDARY (final F1b):
+// be followed by a CLAUSE BOUNDARY (final F1b), optionally after up to four
+// TAILS (final F1d).
+// The clause boundary is one of:
 //   - the end of the instruction;
-//   - . , ; : ! ? or a quote or closing bracket — but never an apostrophe-s
+//   - . ; : ! ? or a quote or closing bracket — but never an apostrophe-s
 //     ("the text's size");
-//   - a conjunction: and, but, so, then, while, or;
-//   - a degree word that itself ends the clause: a bit, a little, a lot,
-//     slightly, further, significantly, considerably, drastically,
-//     substantially, please ("reduce the body text a bit");
-//   - a location tail: on|in|across|throughout|from|at + the|this|that|my|our
-//     + a word ("reduce the text on the right panel"; "in size" is not one);
-//   - by + an amount of CONTENT that ends the clause: half, a half, a third, a
-//     quarter, or N words / lines / sentences ("by 2px", "by 4pt", "by 0.5rem"
-//     are sizes and never trigger; a percentage is ambiguous between content
-//     and size, so "by 20%" never triggers).
+//   - a comma, or a conjunction: and, but, so, then, while, or ("reduce the
+//     text so it fits" triggers, as it should);
+//   - a new chat-style clause: it / this / that / there + is / 's / looks /
+//     feels / seems ("reduce the text it is too busy");
+//   - a location tail: on|in|within|inside|across|throughout|from|at +
+//     the|this|that|my|our + a word ("reduce the text on the right panel",
+//     "… inside the card"; "in size" is not one);
+//   - a purpose clause from a closed list: "to make it" + cleaner / clearer /
+//     simpler / tidier / more readable / easier to read / less busy /
+//     cluttered / crowded / wordy / dense, then a boundary ("to make it
+//     smaller" is not one).
+// A tail is a degree or scope word, or an amount of content, and none is a
+// size word (final F1d):
+//   - a bit, a little, a lot, slightly, further, significantly, considerably,
+//     drastically, substantially, please, more, even / much / far / way +
+//     more / further, again, overall, here, everywhere, down, in half, for
+//     mobile ("reduce the text a bit more", "cut the text down", "cut the copy
+//     in half");
+//   - by + an amount of CONTENT, optionally after about / around / roughly /
+//     approximately / nearly / almost / at least / over / more than / up to:
+//     half, a half, a third, a quarter, a lot, a bit, a little, much, or N
+//     words / lines / sentences ("reduce the text by about half"). "by 2px",
+//     "by 4pt", "by 0.5rem" are sizes and never trigger; a percentage is
+//     ambiguous between content and size, so "by 20%" never triggers.
+// Tails chain ("trim the text down a bit", "reduce the text by half again"),
+// but the last must be followed by a boundary, so "reduce the text a bit
+// smaller", "reduce the text down to 12px" and "reduce the text more than the
+// logo" do not trigger.
+// SIZE VOID (final F1d): after a comma, a conjunction or a chat-style clause,
+// a SIZE WORD — size(s), smaller, bigger, larger, font(s), scale, tiny, huge —
+// in the same clause voids that boundary: a coordinated resize, not a
+// reduction. "The same clause" is the next six words, stopping at . ; ? or !,
+// and stopping at a NEW VERB (make, keep, move, add, use, change, put), which
+// starts a clause about something else. So "reduce the text and logo size",
+// "reduce the text and image size a little" and "reduce the text, the font is
+// too big" do not trigger, while "reduce the body text, and make the logo
+// bigger" does. One exception to the new-verb stop: a new verb whose object is
+// it / them / this / that / these / those refers back to the text, so "reduce
+// the text, make it smaller" (and "…, and make them bigger") is voided too.
 // So a content noun used as a MODIFIER — "the body text size", "the caption
 // text size", "the body copy font size", "the text overlay", "the
 // text-shadow", "the text's size" — is followed by a visual word, a hyphen or
@@ -975,15 +937,25 @@ ${CONSTRAINS_RULE}`
 //      optional determiners only ("shorter text", "more concise copy"), then a
 //      boundary.
 //
-// Known limit (the boundary): phrasings outside the lexicon — "tighten the
+// Known limits (the boundary): phrasings outside the lexicon — "tighten the
 // copy", "shorten the headline", "too much text", "minimise the text", "make
 // the text concise", "too wordy", other languages — remain
 // classifier-dependent: they are checked only by the classes the model
-// declared. A match inside it can false-miss (fail closed): "shorten the
+// declared. So does a clause ending in a boundary or tail the list does not
+// name (an em dash, "reduce the text massively", "reduce the text to the
+// essentials"). A match inside it can false-miss (fail closed): "shorten the
 // caption and add a tagline" must still lower the whole document's word
-// count, and new copy quoted in the instruction ("change the headline to
-// \"Less text, more impact\"") matches. A clause ending in a boundary the list
-// does not name (an em dash, "reduce the text so it fits") does not trigger.
+// count; new copy quoted in the instruction ("change the headline to \"Less
+// text, more impact\"") matches; "reduce the text slightly" or "reduce the
+// text so it does not overlap the logo" may have meant a resize. The size void
+// is English-only and window-bound: a size word more than six words after the
+// boundary, or one the list does not name ("it is too big", "too small"), does
+// not void (fail closed: the word count must still fall). In the other
+// direction, a later clause about ANOTHER object that starts with a verb the
+// list does not name and carries a size word ("reduce the body text, and set
+// the logo bigger") is voided, so no text-reduction check runs — the classes
+// and the judge still decide, which is the lexicon's normal out-of-lexicon
+// state.
 export const TEXT_REDUCTION_CHECK = 'text-reduction' as const
 
 const REDUCING_VERB = String.raw`(?:reduce|reducing|shorten|shortening|trim|trimming|cut|cutting|condense|condensing)(?:\s+(?:down|back|out))?`
@@ -994,12 +966,24 @@ const DETERMINERS = String.raw`(?:(?:the|this|that|these|those|all|some|of|a|bit
 // At most one arbitrary word before the object ("supporting", "body", "sub-heading").
 const ONE_WORD = String.raw`(?:[\p{L}\p{N}][\p{L}\p{N}-]*\s+)?`
 const TEXT_OBJECT = String.raw`(?:word[\s-]+counts?|texts?|copy|words?|wording|paragraphs?|captions?|body|descriptions?)`
-const CLAUSE_END = String.raw`(?:\s*$|\s*[.,;:!?)\]}"“”«»]|\s*['‘’](?!s\b)|\s+(?:and|but|so|then|while|or)\b)`
-const DEGREE_TAIL = String.raw`\s+(?:a\s+(?:bit|little|lot)|slightly|further|significantly|considerably|drastically|substantially|please)${CLAUSE_END}`
-const LOCATION_TAIL = String.raw`\s+(?:on|in|across|throughout|from|at)\s+(?:the|this|that|my|our)\s+[\p{L}\p{N}]`
-const CONTENT_AMOUNT = String.raw`\s+by\s+(?:(?:a\s+|one\s+)?half|a\s+third|one\s+third|a\s+quarter|one\s+quarter|(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten|a\s+few|a\s+couple\s+of)\s+(?:words?|lines?|sentences?))(?:${CLAUSE_END}|${LOCATION_TAIL})`
-// What must follow the text object: a clause boundary.
-const BOUNDARY = String.raw`(?=${CLAUSE_END}|${DEGREE_TAIL}|${LOCATION_TAIL}|${CONTENT_AMOUNT})`
+// The size void (final F1d): a size word in the same clause, before any new verb
+// — or after a new verb whose object refers back to the text ("make it smaller").
+const SIZE_WORD = String.raw`(?:sizes?|smaller|bigger|larger|fonts?|scale|tiny|huge)\b`
+const NEW_VERB = String.raw`(?:make|keep|move|add|use|change|put)\b`
+const CLAUSE_WORD = String.raw`[^\s.;?!]+`
+const BACK_REF = String.raw`(?:it|them|this|that|these|those)`
+const SIZE_VOID = String.raw`(?!\s*(?:(?!${NEW_VERB})${CLAUSE_WORD}\s+){0,5}${SIZE_WORD}|\s*(?:(?:and|but|so|then|while|or)\s+)?${NEW_VERB}\s+${BACK_REF}\s+(?:${CLAUSE_WORD}\s+){0,2}${SIZE_WORD})`
+const PRONOUN_CLAUSE = String.raw`(?:it|this|that|there)(?:\s+(?:is|looks|feels|seems)\b|['’]s\b)`
+const CLAUSE_END = String.raw`(?:\s*$|\s*[.;:!?)\]}"“”«»]|\s*['‘’](?!s\b)|(?:\s*,|\s+(?:and|but|so|then|while|or)\b|\s+${PRONOUN_CLAUSE})${SIZE_VOID})`
+const LOCATION_TAIL = String.raw`\s+(?:on|in|within|inside|across|throughout|from|at)\s+(?:the|this|that|my|our)\s+[\p{L}\p{N}]`
+const PURPOSE_TAIL = String.raw`\s+to\s+make\s+it\s+(?:cleaner|clearer|simpler|tidier|more\s+readable|easier\s+to\s+read|less\s+(?:busy|cluttered|crowded|wordy|dense))${CLAUSE_END}`
+const APPROX = String.raw`(?:about|around|roughly|approximately|nearly|almost|at\s+least|over|more\s+than|up\s+to)`
+const CONTENT_AMOUNT = String.raw`by\s+(?:${APPROX}\s+)?(?:(?:a\s+|one\s+)?half|a\s+third|one\s+third|a\s+quarter|one\s+quarter|a\s+(?:lot|bit|little)|much|(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten|a\s+few|a\s+couple\s+of)\s+(?:words?|lines?|sentences?))`
+const DEGREE_WORD = String.raw`(?:a\s+(?:bit|little|lot)|slightly|further|significantly|considerably|drastically|substantially|please|(?:even|much|far|way)\s+(?:more|further)|more|again|overall|here|everywhere|down|in\s+half|for\s+mobile)`
+// Up to four tails ("a bit more", "down a bit", "by half again").
+const DEGREE_TAIL = String.raw`(?:\s+(?:${DEGREE_WORD}|${CONTENT_AMOUNT})){0,4}`
+// What must follow the text object: optional tails, then a clause boundary.
+const BOUNDARY = String.raw`(?=${DEGREE_TAIL}(?:${CLAUSE_END}|${LOCATION_TAIL}|${PURPOSE_TAIL}))`
 const COPULA = String.raw`(?:(?:should|must|could|can)\s+be\s+|needs?\s+to\s+be\s+|is\s+|are\s+)?`
 const DEGREE = String.raw`(?:(?:a\s+)?(?:bit|little|lot|much|far)\s+)?`
 
