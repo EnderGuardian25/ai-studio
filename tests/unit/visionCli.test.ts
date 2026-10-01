@@ -7,7 +7,8 @@
 //   AC-13  (vision site) the argv carries the stream-json flags and
 //          `--tools ""`, never `--allowedTools` — on POSIX and on win32.
 //   Auth   a stream-json auth failure still classes as one, so the
-//          personal → team retry keeps working.
+//          personal → team retry keeps working — and (T6) model-written text
+//          never drives that classification.
 //
 // Driven through the REAL runVisionModel → runClaudeCliStreamJson → spawnClaude
 // with a scripted fake `spawn`, a stubbed `fetch`, and spied fs writes. The
@@ -19,7 +20,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 const h = vi.hoisted(() => ({
   // Each entry scripts one spawned process, consumed FIFO. `chunks` are emitted
   // as separate stdout `data` events, so a test can split a line mid-JSON.
-  scripts: [] as Array<{ exitCode: number; chunks?: string[]; stderr?: string }>,
+  scripts: [] as Array<{ exitCode: number | null; chunks?: string[]; stderr?: string }>,
   spawnCalls: [] as Array<{
     cmd: string
     args: string[]
@@ -217,11 +218,16 @@ describe('AC-15: CLI vision sends one stream-json message and writes no file', (
     expect(text).not.toMatch(/Read tool|current directory|ref-\d|bistec-vision-/i)
   })
 
-  it('writes no file and creates no temp dir', async () => {
+  it('writes no file and creates no temp dir of its own', async () => {
     h.scripts.push({ exitCode: 0, chunks: [INIT, result({ result: 'ok' })] })
     await inAuth(() => runVisionModel(req()))
-    for (const [name, spy] of Object.entries(fsSpies)) {
-      expect(spy, name).not.toHaveBeenCalled()
+    for (const name of ['writeFile', 'appendFile', 'open', 'writeFileSync'] as const) {
+      expect(fsSpies[name], name).not.toHaveBeenCalled()
+    }
+    // The one directory any spawn may create is the shared, empty spawn cwd
+    // (T6: `bistec-cli-*`, once per process) — never a file holding image data.
+    for (const name of ['mkdtemp', 'mkdtempSync'] as const) {
+      for (const [prefix] of fsSpies[name].mock.calls) expect(String(prefix), name).toMatch(/bistec-cli-$/)
     }
   })
 
@@ -275,14 +281,27 @@ describe('AC-15: CLI vision sends one stream-json message and writes no file', (
     expect(msg.message.content[0].type).toBe('text')
   })
 
-  it('the 600k guard measures the serialized line, base64 images included — and never spawns', async () => {
-    // ~450k bytes → ~600k base64 chars: the text alone is tiny, the line is not.
-    IMAGES['https://minio.test/big.png'] = { bytes: Buffer.alloc(460_000, 1), type: 'image/png' }
+  it('the 600k guard measures the text only: a ~2 MB reference image is sent (T6, superseding T5)', async () => {
+    // ~2 MB raw → ~2.8M base64 chars. Before T6 this tripped the 600k guard.
+    IMAGES['https://minio.test/big.png'] = { bytes: Buffer.alloc(2 * 1024 * 1024, 1), type: 'image/png' }
     try {
-      await expect(inAuth(() => runVisionModel(req(['https://minio.test/big.png'])))).rejects.toThrow(/too large/i)
-      expect(h.spawnCalls).toHaveLength(0)
+      h.scripts.push({ exitCode: 0, chunks: [INIT, result({ result: 'ok' })] })
+      await expect(inAuth(() => runVisionModel(req(['https://minio.test/big.png'])))).resolves.toBe('ok')
+      expect(h.spawnCalls).toHaveLength(1)
     } finally {
       delete IMAGES['https://minio.test/big.png']
+    }
+  })
+
+  it('a reference image over 5 MB is refused by index and size, and never spawns', async () => {
+    IMAGES['https://minio.test/huge.png'] = { bytes: Buffer.alloc(6 * 1024 * 1024, 1), type: 'image/png' }
+    try {
+      await expect(
+        inAuth(() => runVisionModel(req(['https://minio.test/a.png', 'https://minio.test/huge.png']))),
+      ).rejects.toThrow(/image 2 of 2 is 6\.0 MB/i)
+      expect(h.spawnCalls).toHaveLength(0)
+    } finally {
+      delete IMAGES['https://minio.test/huge.png']
     }
   })
 })
@@ -364,5 +383,84 @@ describe('auth: a stream-json auth failure triggers the personal → team retry'
     await expect(inAuth(() => runVisionModel(req()), auth)).rejects.toBeInstanceOf(ClaudeCliError)
     expect(auth.onAuthFailure).not.toHaveBeenCalled()
     expect(h.spawnCalls).toHaveLength(1)
+  })
+})
+
+// T6 (T5 review, Important): text the MODEL wrote must never drive auth
+// classification. A reply that reads "401" off an attacker-influenced image (a
+// phone number, a room number) or says "invalid API key" must not mark a good
+// personal token INVALID when a run ends without a result event — a crash, a
+// kill, or stream-json schema drift.
+describe('auth: model-written text never classifies as an auth failure', () => {
+  const MODEL_TEXT = ['Call 401-555-0100 to enrol.', 'The sign says INVALID API KEY.', 'Room 401, Floor 4.']
+  const cases = MODEL_TEXT.flatMap((text) => [0, null, 1].map((exitCode) => [text, exitCode] as const))
+
+  it.each(cases)('no result event, assistant text %j, exit %s → not an auth failure, no retry', async (text, exitCode) => {
+    const { isClaudeAuthFailure } = await import('@/lib/agent/claudeCli')
+    h.scripts.push({ exitCode, chunks: [INIT, assistant(text)] })
+    const auth = userAuth({ resolveFallback: vi.fn(async () => teamAuth()) })
+    const err = await inAuth(() => runVisionModel(req()), auth).catch((e: unknown) => e)
+    expect(err).toBeInstanceOf(ClaudeCliError)
+    expect(isClaudeAuthFailure(err)).toBe(false)
+    expect(auth.onAuthFailure).not.toHaveBeenCalled()
+    expect(auth.resolveFallback).not.toHaveBeenCalled()
+    expect(h.spawnCalls).toHaveLength(1)
+    // The model text is kept for humans (diagnostic), out of the classified fields.
+    const e = err as InstanceType<typeof ClaudeCliError>
+    expect(e.stdout).not.toContain(text)
+    expect(e.diagnostic).toContain(text)
+  })
+
+  it('no result event keeps the real exit code (no 0 → null coercion)', async () => {
+    h.scripts.push({ exitCode: 0, chunks: [INIT, assistant('half an answer')] })
+    const err = await inAuth(() => runVisionModel(req())).catch((e: unknown) => e)
+    expect((err as InstanceType<typeof ClaudeCliError>).exitCode).toBe(0)
+  })
+
+  it('CLI non-JSON stdout lines are not classified either', async () => {
+    const { isClaudeAuthFailure } = await import('@/lib/agent/claudeCli')
+    h.scripts.push({ exitCode: 1, chunks: [INIT, 'Room 401 — not logged in\n'] })
+    const err = await inAuth(() => runVisionModel(req())).catch((e: unknown) => e)
+    expect(isClaudeAuthFailure(err)).toBe(false)
+  })
+
+  it('a result-bearing failure is classified on api_error_status first: 401 → auth failure whatever the text', async () => {
+    const { isClaudeAuthFailure } = await import('@/lib/agent/claudeCli')
+    h.scripts.push({ exitCode: 1, chunks: [INIT, result({ is_error: true, result: 'Request failed.', api_error_status: 401 })] })
+    const err = await inAuth(() => runVisionModel(req())).catch((e: unknown) => e)
+    expect(isClaudeAuthFailure(err)).toBe(true)
+  })
+
+  it('a result-bearing failure with another api_error_status is NOT an auth failure, even if its text says 401', async () => {
+    const { isClaudeAuthFailure } = await import('@/lib/agent/claudeCli')
+    h.scripts.push({
+      exitCode: 1,
+      chunks: [INIT, result({ is_error: true, result: 'API Error: 529 overloaded (retry 401 ms)', api_error_status: 529 })],
+    })
+    const err = await inAuth(() => runVisionModel(req())).catch((e: unknown) => e)
+    expect(isClaudeAuthFailure(err)).toBe(false)
+  })
+
+  it('an is_error result with no status falls back to the regex over the result text only', async () => {
+    const { isClaudeAuthFailure } = await import('@/lib/agent/claudeCli')
+    h.scripts.push({ exitCode: 1, chunks: [INIT, assistant('Room 401'), result({ is_error: true, result: 'Not logged in · Please run /login' })] })
+    const err = await inAuth(() => runVisionModel(req())).catch((e: unknown) => e)
+    expect(isClaudeAuthFailure(err)).toBe(true)
+  })
+
+  it('a non-success subtype WITHOUT is_error is never an auth failure (its result may be model text)', async () => {
+    const { isClaudeAuthFailure } = await import('@/lib/agent/claudeCli')
+    h.scripts.push({ exitCode: 0, chunks: [INIT, result({ subtype: 'error_max_turns', is_error: false, result: 'Room 401' })] })
+    const err = await inAuth(() => runVisionModel(req())).catch((e: unknown) => e)
+    expect(err).toBeInstanceOf(ClaudeCliError)
+    expect(isClaudeAuthFailure(err)).toBe(false)
+  })
+
+  it('the real 2.1.287 auth-failure shape at exit 0 still classifies (is_error → exit code null)', async () => {
+    const { isClaudeAuthFailure } = await import('@/lib/agent/claudeCli')
+    h.scripts.push({ ...authFailure, exitCode: 0 })
+    const err = await inAuth(() => runVisionModel(req())).catch((e: unknown) => e)
+    expect((err as InstanceType<typeof ClaudeCliError>).exitCode).toBeNull()
+    expect(isClaudeAuthFailure(err)).toBe(true)
   })
 })

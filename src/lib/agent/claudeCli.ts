@@ -1,4 +1,8 @@
 import { spawn } from "child_process"
+import { mkdtemp } from "node:fs/promises"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
+import { StringDecoder } from "node:string_decoder"
 import { env } from "@/lib/env"
 import { currentClaudeAuth } from "@/lib/agent/claudeAuth"
 
@@ -47,6 +51,12 @@ type EnvMap = Record<string, string | undefined>
 // `PATH`), so there names match case-insensitively and keep the parent's
 // original casing; on POSIX they match exactly. The OAuth token is set last,
 // so a stale parent value can never win.
+//
+// On win32, libuv copies a fixed set of system variables from the parent into
+// any child env that lacks them (its `required_vars`: SYSTEMROOT, SYSTEMDRIVE,
+// TEMP, PATH, USERPROFILE, WINDIR, HOMEDRIVE/HOMEPATH, USERNAME/USERDOMAIN,
+// LOGONSERVER). So the child's real env there can hold slightly more than this
+// function returns — never a secret, only those fixed, non-secret names.
 export function buildChildEnv(
   parentEnv: EnvMap,
   platform: NodeJS.Platform,
@@ -60,6 +70,9 @@ export function buildChildEnv(
     if (value === undefined) continue
     if (wanted.has(win32 ? key.toUpperCase() : key)) child[key] = value
   }
+  // A constant, never read from the parent: the pinned container CLI (FR-11)
+  // must not replace itself mid-flight.
+  child.DISABLE_AUTOUPDATER = "1"
   child.CLAUDE_CODE_OAUTH_TOKEN = token
   return child
 }
@@ -73,6 +86,51 @@ function emptyArg(shell: boolean): string {
   return shell ? '""' : ""
 }
 
+// The argv every spawn opens with, in both input modes (005 T6), so none of it
+// can drift between them:
+//   --strict-mcp-config + no --mcp-config   ZERO MCP servers. Without it the
+//       child inherits the developer's connectors (Canva, Drive, Atlassian, …):
+//       startup latency, dozens of unused tool definitions, higher cost.
+//   --tools ""                    no built-in tool (FR-08): pure text in, text out.
+//   --no-session-persistence      no transcript under $HOME/.claude/projects/ —
+//       without it every -p run writes its whole prompt there, growing without
+//       limit in the container.
+//   --safe-mode                   no CLAUDE.md, skills, installed plugins, hooks,
+//       custom commands/agents or output styles. Auth, model selection and
+//       built-in tools (none, here) work normally.
+//   --setting-sources ""          no user, project or local settings files —
+//       and so no hooks or enabled plugins they declare. Admin-managed policy
+//       settings still apply.
+// Both settings flags were verified against CLI 2.1.287 (005 reports/T6.md):
+// with them a stream-json run emits no hook events and loads no user plugin,
+// and auth still works. The spawn also runs in an empty temp cwd (spawnCwd), so
+// no project CLAUDE.md or .claude/settings*.json is in reach either way.
+function baseArgs(shell: boolean): string[] {
+  return [
+    "-p",
+    "--strict-mcp-config",
+    "--tools",
+    emptyArg(shell),
+    "--no-session-persistence",
+    "--safe-mode",
+    "--setting-sources",
+    emptyArg(shell),
+  ]
+}
+
+// The spawn's working directory: one dedicated, empty temp dir per process
+// (`<os.tmpdir()>/bistec-cli-*`), created on first use and reused. Running in
+// the app's own cwd would put the repo's CLAUDE.md and .claude/settings*.json
+// in the CLI's reach. A failed creation is not cached, so the next call retries.
+let spawnCwdPromise: Promise<string> | undefined
+function spawnCwd(): Promise<string> {
+  spawnCwdPromise ??= mkdtemp(join(tmpdir(), "bistec-cli-")).catch((err: unknown) => {
+    spawnCwdPromise = undefined
+    throw err
+  })
+  return spawnCwdPromise
+}
+
 // Model the spawned `claude -p` runs under. Precedence:
 //   1. CLAUDE_CLI_MODEL env — a GLOBAL override across every `claude -p` call
 //      (handy for testing all stages on one model).
@@ -83,13 +141,25 @@ function emptyArg(shell: boolean): string {
 // Accepts a CLI alias ("sonnet"/"opus"/"haiku") or a full model id. A value of
 // "default" (from either source) omits --model and uses the account default
 // (the costly Opus tier) — the reason we never want that implicitly.
+//
+// Any other value must match MODEL_NAME_RE or the call throws before spawning
+// (005 T6): on win32 argv is joined into a cmd.exe command line with no quoting,
+// so a model string is the one argv value a user may one day choose (008) that
+// could carry shell syntax. Aliases, full ids, `[1m]` suffixes and
+// provider-prefixed ids (`us.anthropic.…:1`) all pass.
+const MODEL_NAME_RE = /^[A-Za-z0-9._:\-[\]]+$/
 function claudeModelArgs(explicitModel?: string, pinned = false): string[] {
   // A pinned call (the refine add-verifier, change 004 FR-14b) runs on exactly
   // the model it names: the global override must not route it elsewhere.
-  if (pinned && explicitModel?.trim()) return ["--model", explicitModel.trim()]
+  const pinnedModel = pinned ? explicitModel?.trim() : undefined
   const override = (env.CLAUDE_CLI_MODEL ?? "").trim()
-  const model = override || (explicitModel ?? "haiku").trim()
-  if (!model || model.toLowerCase() === "default") return []
+  const model = pinnedModel || override || (explicitModel ?? "haiku").trim()
+  if (!model || (!pinnedModel && model.toLowerCase() === "default")) return []
+  if (!MODEL_NAME_RE.test(model)) {
+    throw new Error(
+      `Invalid Claude model name ${JSON.stringify(model.slice(0, 80))}: only letters, digits and . _ : - [ ] are allowed.`,
+    )
+  }
   return ["--model", model]
 }
 
@@ -115,31 +185,53 @@ export interface ClaudeCliOptions {
   authToken?: string
 }
 
-// Non-zero-exit CLI failure with the raw process output attached, so callers
-// (isClaudeAuthFailure) can classify it. Timeout/ENOENT/buffer-limit failures
-// stay plain Errors — they say nothing about the token's validity.
+// A CLI run that failed, with what the auth classifier may read attached.
+// Timeout/ENOENT/buffer-limit/size-guard failures stay plain Errors — they say
+// nothing about the token's validity.
+//
+// The contract (isClaudeAuthFailure reads ONLY these):
+//   exitCode        the process exit code; null for a stream-json run that
+//                   reported is_error but exited 0 (so it is still classified).
+//   stderr          the CLI's own stderr.
+//   stdout          text-mode: the raw stdout of the failed run. stream-json:
+//                   ONLY the `result` text of an is_error result event — never
+//                   assistant (model-written) text and never non-JSON lines.
+//   apiErrorStatus  stream-json: the result event's `api_error_status`.
+// `diagnostic` is for humans and logs only and is never classified: it may
+// hold model text, which could say "401" or "invalid API key" because an
+// attacker-influenced reference image did.
 export class ClaudeCliError extends Error {
+  public apiErrorStatus: number | null
+  public diagnostic: string
   constructor(
     message: string,
     public exitCode: number | null,
     public stderr: string,
     public stdout: string,
+    extra: { apiErrorStatus?: number | null; diagnostic?: string } = {},
   ) {
     super(message)
     this.name = "ClaudeCliError"
+    this.apiErrorStatus = extra.apiErrorStatus ?? null
+    this.diagnostic = extra.diagnostic ?? ""
   }
 }
 
 // Does this error mean the OAuth token was rejected (expired/revoked/garbage)?
-// Pure + exported for unit tests. Deliberately conservative: only non-zero-exit
-// ClaudeCliErrors whose output matches a known auth-failure phrasing — anything
-// else (timeouts, prompt-size, buffer, generic exit 1) must NOT invalidate a
-// stored token or trigger the shared-credential retry.
+// Pure + exported for unit tests. Deliberately conservative — a false positive
+// marks a good personal token INVALID — so:
+//   - only a ClaudeCliError with a non-zero (or null) exit code;
+//   - a structured API status decides on its own: 401 is an auth failure, any
+//     other status is not, whatever the text says;
+//   - with no status, a known auth phrasing in stderr / stdout (see the field
+//     contract on ClaudeCliError — never model text) decides.
+// Timeouts, the size guards, buffer limits and generic exits never qualify.
 const AUTH_FAILURE_RE =
   /oauth token (is )?(invalid|expired|revoked)|invalid api key|please run \/login|authentication[_ ]?error|not (logged in|authenticated)|\b401\b/i
 export function isClaudeAuthFailure(err: unknown): boolean {
   if (!(err instanceof ClaudeCliError)) return false
   if (err.exitCode === 0) return false
+  if (err.apiErrorStatus !== null) return err.apiErrorStatus === 401
   return AUTH_FAILURE_RE.test(`${err.stderr}\n${err.stdout}`)
 }
 
@@ -184,8 +276,16 @@ function killTree(child: ReturnType<typeof spawn>, label: string) {
 // Conservative input ceiling. The model's context is ~200k tokens; past roughly
 // this many characters a single-shot CLI prompt fails opaquely (exit 1). Guard so
 // callers get an actionable message instead — e.g. an oversized brand template.
-// It measures the stdin payload (spawnClaude), whatever the input mode.
+// It measures TEXT only: the text-mode prompt, or the sum of a stream-json
+// message's text blocks. Image base64 never counts (005 T6) — image tokens are
+// priced by pixels, not by base64 length; images have their own caps below.
 const MAX_PROMPT_CHARS = 600_000
+
+function assertPromptSize(chars: number, hint: string): void {
+  if (chars > MAX_PROMPT_CHARS) {
+    throw new Error(`Prompt too large for CLI mode (${chars} chars > ${MAX_PROMPT_CHARS}). ` + hint)
+  }
+}
 
 export async function runClaudeCli(prompt: string, opts: ClaudeCliOptions = {}): Promise<string> {
   return withAuthRetry(opts, (token) => runClaudeCliOnce(prompt, opts, token))
@@ -243,20 +343,9 @@ export async function runClaudeCliOnce(
   opts: ClaudeCliOptions,
   tokenOverride: string | undefined,
 ): Promise<string> {
+  assertPromptSize(prompt.length, "This usually means the brand template is too big — use a smaller template or Path B.")
   const command = claudeCommand()
-  // --strict-mcp-config + no --mcp-config => load ZERO MCP servers. Without it the
-  // spawned CLI inherits the developer's full Claude Code config (Canva, Google
-  // Drive, Atlassian, … connectors), adding startup latency, bloating the prompt
-  // context with dozens of unused tool definitions, and raising token cost — none
-  // of which a single-shot HTML/copy generation needs. `--tools ""` removes every
-  // built-in tool too (FR-08), so the run is pure text in, text out.
-  const args = [
-    "-p",
-    "--strict-mcp-config",
-    "--tools",
-    emptyArg(command.shell),
-    ...claudeModelArgs(opts.model, opts.pinModel),
-  ]
+  const args = [...baseArgs(command.shell), ...claudeModelArgs(opts.model, opts.pinModel)]
   return spawnClaude(args, prompt, { ...opts, command, tokenOverride })
 }
 
@@ -287,21 +376,62 @@ export type ContentBlock =
   | { type: "text"; text: string }
   | { type: "image"; source: { type: "base64"; media_type: string; data: string } }
 
+// Image caps for stream-json mode (005 T6). Each image's decoded size is capped
+// at 5 MB, so a reference image too big for CLI mode is refused up front by
+// index and size rather than failing opaquely. The whole serialized stdin line
+// is capped at 32 MB: CLI 2.1.287 accepted a 67 MB line in a local test (no
+// stdin limit was found — reports/T6.md), so this is headroom against memory
+// and against the Messages API's own 32 MB request limit, not a CLI limit.
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024
+const MAX_STREAM_JSON_BYTES = 32 * 1024 * 1024
+
+const mb = (bytes: number) => `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+
+// Decoded size of a base64 string, without decoding it.
+function base64Bytes(data: string): number {
+  const padding = data.endsWith("==") ? 2 : data.endsWith("=") ? 1 : 0
+  return Math.floor((data.length * 3) / 4) - padding
+}
+
+// Validates a stream-json message's size and returns its one stdin line.
+// Throws a plain Error (never classified as an auth failure) before any spawn.
+function streamJsonLine(content: ContentBlock[]): string {
+  const textChars = content.reduce((n, b) => n + (b.type === "text" ? b.text.length : 0), 0)
+  assertPromptSize(textChars, "Shorten the prompt text.")
+  const images = content.filter((b) => b.type === "image")
+  images.forEach((b, i) => {
+    const bytes = base64Bytes(b.source.data)
+    if (bytes > MAX_IMAGE_BYTES) {
+      throw new Error(
+        `Reference image ${i + 1} of ${images.length} is ${mb(bytes)} — the limit is 5 MB per image in CLI mode. Use a smaller image.`,
+      )
+    }
+  })
+  // Exactly one user message, then stdin ends — the CLI answers it and exits.
+  const line = JSON.stringify({ type: "user", message: { role: "user", content } }) + "\n"
+  const lineBytes = Buffer.byteLength(line, "utf8")
+  if (lineBytes > MAX_STREAM_JSON_BYTES) {
+    throw new Error(
+      `Message too large for CLI mode (${mb(lineBytes)} > ${MAX_STREAM_JSON_BYTES / (1024 * 1024)} MB). ` +
+        "The reference images are too big together — use fewer or smaller images.",
+    )
+  }
+  return line
+}
+
 export async function runClaudeCliStreamJson(content: ContentBlock[], opts: ClaudeCliOptions = {}): Promise<string> {
-  return withAuthRetry(opts, (token) => runClaudeCliStreamJsonOnce(content, opts, token))
+  const line = streamJsonLine(content)
+  return withAuthRetry(opts, (token) => runClaudeCliStreamJsonOnce(line, opts, token))
 }
 
 async function runClaudeCliStreamJsonOnce(
-  content: ContentBlock[],
+  line: string,
   opts: ClaudeCliOptions,
   tokenOverride: string | undefined,
 ): Promise<string> {
   const command = claudeCommand()
   const args = [
-    "-p",
-    "--strict-mcp-config",
-    "--tools",
-    emptyArg(command.shell),
+    ...baseArgs(command.shell),
     "--input-format",
     "stream-json",
     "--output-format",
@@ -309,17 +439,7 @@ async function runClaudeCliStreamJsonOnce(
     "--verbose",
     ...claudeModelArgs(opts.model, opts.pinModel),
   ]
-  // Exactly one user message, then stdin ends — the CLI answers it and exits.
-  // The 600k guard in spawnClaude measures this whole serialized line, so the
-  // base64 images count against it, not only the text.
-  const line = JSON.stringify({ type: "user", message: { role: "user", content } }) + "\n"
-  return spawnClaude(args, line, {
-    ...opts,
-    command,
-    tokenOverride,
-    finalize: finalizeStreamJson,
-    tooLargeHint: "With images attached this usually means the reference images are too big — use smaller images.",
-  })
+  return spawnClaude(args, line, { ...opts, command, tokenOverride, finalize: finalizeStreamJson })
 }
 
 interface StreamJsonResultEvent {
@@ -370,16 +490,21 @@ export function parseStreamJson(stdout: string): ParsedStreamJson {
 
 // Turns a finished stream-json run into its answer or a ClaudeCliError.
 //
-// The error's `stdout` is a short DIAGNOSTIC — the result / error text, the
-// API status, assistant text and any non-JSON lines — never the raw NDJSON:
-// the raw stream is full of numbers (durations, token counts) and base64
-// signatures, any of which could contain `401` and make isClaudeAuthFailure
-// mark a good token invalid. A run that exited 0 yet reported an error gets
-// exitCode null rather than 0, so the classifier still reads its text (it
-// treats exit 0 as "not an auth failure").
+// What the auth classifier may read is narrow (see ClaudeCliError): never the
+// raw NDJSON — it is full of numbers (durations, token counts) and base64
+// signatures, any of which could contain `401` — and never assistant text or
+// non-JSON lines, which are model-written or unknown: a reply that read "Room
+// 401" off a reference image must not mark a good token invalid when the run
+// then ends without a result (a crash, a kill, a schema drift). Those go to the
+// human-only `diagnostic`. Classification rests on the result event alone:
+// its `api_error_status`, else its text — and only when it says is_error.
+//
+// Exit code: kept as-is, except that an is_error result on a run that exited 0
+// gets null, so the classifier still reads it (it treats exit 0 as "not an
+// auth failure"). The real 2.1.287 auth failure is exactly that shape's
+// sibling: exit 1, is_error true, api_error_status 401.
 function finalizeStreamJson({ code, stdout, stderr }: SpawnResult): string {
   const { result, assistantText, nonJson } = parseStreamJson(stdout)
-  const errorCode = code === 0 ? null : code
   const diagnostic = (parts: unknown[]) =>
     parts
       .flat()
@@ -390,23 +515,30 @@ function finalizeStreamJson({ code, stdout, stderr }: SpawnResult): string {
   if (!result) {
     throw new ClaudeCliError(
       `Claude CLI stream-json run ended with no result event (exit code ${code}): ${stderr.trim().slice(0, 500)}`,
-      errorCode,
+      code,
       stderr,
-      diagnostic([assistantText, nonJson]),
+      "",
+      { diagnostic: diagnostic([assistantText, nonJson]) },
     )
   }
   const text = typeof result.result === "string" ? result.result : ""
   if (result.is_error || result.subtype !== "success") {
+    const isError = result.is_error === true
     throw new ClaudeCliError(
       `Claude CLI reported an error (subtype=${result.subtype ?? "none"}, exit code ${code}): ${(text || diagnostic([result.errors])).slice(0, 500)}`,
-      errorCode,
+      isError && code === 0 ? null : code,
       stderr,
-      diagnostic([
-        text,
-        result.errors,
-        result.api_error_status != null ? `api_error_status: ${result.api_error_status}` : undefined,
-        nonJson,
-      ]),
+      isError ? text : "",
+      {
+        apiErrorStatus: typeof result.api_error_status === "number" ? result.api_error_status : null,
+        diagnostic: diagnostic([
+          text,
+          result.errors,
+          result.api_error_status != null ? `api_error_status: ${result.api_error_status}` : undefined,
+          assistantText,
+          nonJson,
+        ]),
+      },
     )
   }
   return text.trim()
@@ -433,13 +565,17 @@ interface SpawnClaudeOptions extends Pick<ClaudeCliOptions, "timeoutMs" | "maxBu
   // How a finished run (any exit code) becomes the answer or an error. The
   // input mode owns this; everything before it is shared.
   finalize?: (r: SpawnResult) => string
-  // The second sentence of the 600k-guard error, naming the likely cause.
-  tooLargeHint?: string
 }
 
-// The one spawn core: the size guard, the credential, the allowlisted child
-// env, the timeout / kill-tree / buffer limit, logging and the error mapping.
-// Every input mode goes through here, so none of it can drift between modes.
+const NOT_FOUND_MESSAGE = "Claude CLI not found on PATH. Install Claude Code or set CLAUDE_CLI_PATH."
+// With shell:true (win32) a missing binary is not ENOENT: cmd.exe starts fine,
+// prints this and exits 1.
+const CMD_NOT_RECOGNIZED_RE = /is not recognized as an internal or external command/i
+
+// The one spawn core: the credential, the allowlisted child env, the isolated
+// cwd, the timeout / kill-tree / buffer limit, UTF-8 decoding, logging and the
+// error mapping. Every input mode goes through here, so none of it can drift
+// between modes. Each mode checks its own input size before calling in.
 async function spawnClaude(args: string[], stdinPayload: string, opts: SpawnClaudeOptions): Promise<string> {
   const {
     command,
@@ -448,16 +584,8 @@ async function spawnClaude(args: string[], stdinPayload: string, opts: SpawnClau
     maxBuffer = 16 * 1024 * 1024,
     label = "",
     finalize = finalizeText,
-    tooLargeHint = "This usually means the brand template is too big — use a smaller template or Path B.",
   } = opts
   const { cmd, shell } = command
-
-  if (stdinPayload.length > MAX_PROMPT_CHARS) {
-    throw new Error(
-      `Prompt too large for CLI mode (${stdinPayload.length} chars > ${MAX_PROMPT_CHARS}). ` +
-        tooLargeHint,
-    )
-  }
 
   // CLI-mode auth is REQUIRED — there is no env/dev-session fallback tier.
   // Order of preference:
@@ -481,6 +609,7 @@ async function spawnClaude(args: string[], stdinPayload: string, opts: SpawnClau
     )
   }
   const childEnv = buildChildEnv(process.env, process.platform, oauthToken)
+  const cwd = await spawnCwd()
 
   const modelIdx = args.indexOf("--model")
   const resolvedModel = modelIdx >= 0 ? args[modelIdx + 1] : "(account default)"
@@ -494,7 +623,11 @@ async function spawnClaude(args: string[], stdinPayload: string, opts: SpawnClau
 
   return new Promise<string>((resolve, reject) => {
     // The cast only drops Next's required NODE_ENV: the child deliberately has none.
-    const child = spawn(cmd, args, { shell, windowsHide: true, env: childEnv as NodeJS.ProcessEnv })
+    const child = spawn(cmd, args, { shell, windowsHide: true, cwd, env: childEnv as NodeJS.ProcessEnv })
+    // Decode as UTF-8 across chunk boundaries: a multibyte character (Sinhala,
+    // emoji) split between two `data` events would otherwise become U+FFFD.
+    const stdoutDecoder = new StringDecoder("utf8")
+    const stderrDecoder = new StringDecoder("utf8")
 
     let stdout = ""
     let stderr = ""
@@ -527,7 +660,7 @@ async function spawnClaude(args: string[], stdinPayload: string, opts: SpawnClau
         sawOutput = true
         cliLog(label, `first stdout byte at ${elapsed()}`)
       }
-      stdout += d.toString()
+      stdout += stdoutDecoder.write(d)
       if (stdout.length > maxBuffer) {
         cliLog(label, `output exceeded buffer (${maxBuffer}B) at ${elapsed()} — killing process tree`)
         killTree(child, label)
@@ -535,7 +668,7 @@ async function spawnClaude(args: string[], stdinPayload: string, opts: SpawnClau
       }
     })
     child.stderr.on("data", (d: Buffer) => {
-      const chunk = d.toString()
+      const chunk = stderrDecoder.write(d)
       stderr += chunk
       // Surface CLI diagnostics live (auth prompts, trust dialogs, errors) — these
       // are the usual cause of an otherwise-silent hang/timeout.
@@ -546,7 +679,7 @@ async function spawnClaude(args: string[], stdinPayload: string, opts: SpawnClau
       finish(() =>
         reject(
           err.code === "ENOENT"
-            ? new Error("Claude CLI not found on PATH. Install Claude Code or set CLAUDE_CLI_PATH.")
+            ? new Error(NOT_FOUND_MESSAGE)
             : new Error(`Claude CLI failed: ${err.message}`),
         ),
       )
@@ -554,7 +687,13 @@ async function spawnClaude(args: string[], stdinPayload: string, opts: SpawnClau
 
     child.on("close", (code: number | null) => {
       finish(() => {
+        stdout += stdoutDecoder.end()
+        stderr += stderrDecoder.end()
         if (code !== 0) cliLog(label, `exited code=${code} at ${elapsed()}`)
+        if (code !== 0 && shell && CMD_NOT_RECOGNIZED_RE.test(stderr)) {
+          reject(new Error(NOT_FOUND_MESSAGE))
+          return
+        }
         try {
           const answer = finalize({ code, stdout, stderr })
           cliLog(label, `done at ${elapsed()} · ${answer.length} chars`)

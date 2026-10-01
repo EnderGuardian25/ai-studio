@@ -3,9 +3,14 @@
 //   AC-13  every text-mode call site spawns with `--tools` + an empty value and
 //          never `--allowedTools`; on win32 the empty value survives the
 //          shell's argv join.
-//   AC-14  the child env is exactly the FR-10 allowlist plus the OAuth token —
+//   AC-14  the child env is exactly the FR-10 allowlist plus the constant
+//          DISABLE_AUTOUPDATER=1 (T6) and the OAuth token —
 //          no server secret ever reaches the child.
 //   AC-25  the command + shell choice per platform and CLAUDE_CLI_PATH.
+//   T6     settings isolation (flags + temp cwd), no session persistence, the
+//          constant DISABLE_AUTOUPDATER, the model-name charset, the win32
+//          not-found mapping, UTF-8 chunk decoding, and the stream-json size
+//          guards (text-only 600k, 5 MB per image, a total stdin cap).
 //
 // Driven through the REAL runClaudeCli (and the real call wrappers where they
 // are cheap to reach) with a scripted fake `spawn`, so the assertions are on
@@ -19,17 +24,23 @@ const h = vi.hoisted(() => ({
     args: string[]
     shell: boolean
     env: NodeJS.ProcessEnv
+    cwd: string | undefined
     stdin: string
   }>,
   // Reply every fake child prints; tests that need a specific shape set it.
-  stdout: 'ok',
+  stdout: 'ok' as string,
+  // Optional overrides: raw stdout chunks (to split a UTF-8 sequence), stderr
+  // and the exit code.
+  chunks: null as Buffer[] | null,
+  stderr: '',
+  exitCode: 0 as number | null,
 }))
 
 vi.mock('child_process', async () => {
   const { EventEmitter } = await import('node:events')
   return {
-    spawn: vi.fn((cmd: string, args: string[], opts: { shell: boolean; env: NodeJS.ProcessEnv }) => {
-      const call = { cmd, args, shell: opts.shell, env: opts.env, stdin: '' }
+    spawn: vi.fn((cmd: string, args: string[], opts: { shell: boolean; env: NodeJS.ProcessEnv; cwd?: string }) => {
+      const call = { cmd, args, shell: opts.shell, env: opts.env, cwd: opts.cwd, stdin: '' }
       h.spawnCalls.push(call)
       const child = Object.assign(new EventEmitter(), {
         stdout: new EventEmitter(),
@@ -39,8 +50,9 @@ vi.mock('child_process', async () => {
         kill: vi.fn(),
       })
       setImmediate(() => {
-        child.stdout.emit('data', Buffer.from(h.stdout))
-        child.emit('close', 0)
+        if (h.stderr) child.stderr.emit('data', Buffer.from(h.stderr))
+        for (const c of h.chunks ?? [Buffer.from(h.stdout)]) child.stdout.emit('data', c)
+        child.emit('close', h.exitCode)
       })
       return child
     }),
@@ -64,7 +76,8 @@ process.env.CLAUDE_CLI_DEBUG = '0'
 delete process.env.CLAUDE_CLI_MODEL
 delete process.env.CLAUDE_CLI_PATH
 
-const { runClaudeCli, buildChildEnv, claudeCommand } = await import('@/lib/agent/claudeCli')
+const { runClaudeCli, runClaudeCliStreamJson, buildChildEnv, claudeCommand, isClaudeAuthFailure, ClaudeCliError } =
+  await import('@/lib/agent/claudeCli')
 const { runWithClaudeAuth } = await import('@/lib/agent/claudeAuth')
 const { ClaudeCliCopyProvider } = await import('@/providers/implementations/copy/claude-cli')
 const { runDesignAgentCli, runDesignAgentCliRefine } = await import('@/lib/agent/designAgentCli')
@@ -89,6 +102,9 @@ function setPlatform(p: NodeJS.Platform) {
 beforeEach(() => {
   h.spawnCalls.length = 0
   h.stdout = 'ok'
+  h.chunks = null
+  h.stderr = ''
+  h.exitCode = 0
 })
 afterEach(() => setPlatform(realPlatform))
 
@@ -102,8 +118,8 @@ function expectNoTools(args: string[], empty: string) {
 
 describe('AC-13: every text-mode call site spawns with --tools "" and never --allowedTools', () => {
   // The option objects each call site passes today (copied from the source,
-  // so a new option on a site shows up here as a diff). Vision is listed with
-  // its interim T4 options: no allowedTools (T5 moves it to stream-json).
+  // so a new option on a site shows up here as a diff). Vision is not listed:
+  // it runs in stream-json mode, and its site is covered by visionCli.test.ts.
   const sites: Array<[string, ClaudeCliOptions]> = [
     ['copy', { timeoutMs: 120_000, label: 'copy' }],
     ['design', { timeoutMs: 300_000, label: 'design', model: 'sonnet' }],
@@ -112,7 +128,6 @@ describe('AC-13: every text-mode call site spawns with --tools "" and never --al
     ['background', { label: 'background', model: modelForBackground('cli'), timeoutMs: 90_000 }],
     ['briefing', { timeoutMs: 180_000, label: 'briefing', model: modelFor('B', 'cli') }],
     ['token-validate', { model: 'haiku', timeoutMs: 60_000, label: 'token-validate', authToken: TOKEN }],
-    ['vision', { timeoutMs: 180_000, label: 'vision', model: modelFor('B', 'cli') }],
   ]
 
   it.each(sites)('%s (option table, POSIX)', async (_site, opts) => {
@@ -222,17 +237,17 @@ describe('AC-14: buildChildEnv is exactly the FR-10 allowlist plus the token', (
 
   it('POSIX: the always-list plus the token; win32-only names and every secret are absent', () => {
     const child = buildChildEnv({ ...ALWAYS, ...WIN32_ONLY, ...SECRETS, NODE_ENV: 'production' }, 'linux', TOKEN)
-    expect(child).toEqual({ ...ALWAYS, CLAUDE_CODE_OAUTH_TOKEN: TOKEN })
+    expect(child).toEqual({ ...ALWAYS, DISABLE_AUTOUPDATER: '1', CLAUDE_CODE_OAUTH_TOKEN: TOKEN })
   })
 
   it('POSIX: names are matched case-sensitively (Path is not PATH)', () => {
     const child = buildChildEnv({ Path: '/x', path: '/y', Home: '/h' }, 'linux', TOKEN)
-    expect(child).toEqual({ CLAUDE_CODE_OAUTH_TOKEN: TOKEN })
+    expect(child).toEqual({ DISABLE_AUTOUPDATER: '1', CLAUDE_CODE_OAUTH_TOKEN: TOKEN })
   })
 
   it('win32: the always-list plus the win32 list plus the token; every secret is absent', () => {
     const child = buildChildEnv({ ...ALWAYS, ...WIN32_ONLY, ...SECRETS, windir: 'C:\\WINDOWS' }, 'win32', TOKEN)
-    expect(child).toEqual({ ...ALWAYS, ...WIN32_ONLY, CLAUDE_CODE_OAUTH_TOKEN: TOKEN })
+    expect(child).toEqual({ ...ALWAYS, ...WIN32_ONLY, DISABLE_AUTOUPDATER: '1', CLAUDE_CODE_OAUTH_TOKEN: TOKEN })
   })
 
   it('win32: keys match case-insensitively and keep their original casing', () => {
@@ -255,6 +270,7 @@ describe('AC-14: buildChildEnv is exactly the FR-10 allowlist plus the token', (
       PathExt: '.EXE',
       Temp: 'C:\\Temp',
       UserProfile: 'C:\\Users\\dev',
+      DISABLE_AUTOUPDATER: '1',
       CLAUDE_CODE_OAUTH_TOKEN: TOKEN,
     })
   })
@@ -262,6 +278,7 @@ describe('AC-14: buildChildEnv is exactly the FR-10 allowlist plus the token', (
   it('skips undefined parent values', () => {
     expect(buildChildEnv({ PATH: undefined, HOME: '/h' }, 'linux', TOKEN)).toEqual({
       HOME: '/h',
+      DISABLE_AUTOUPDATER: '1',
       CLAUDE_CODE_OAUTH_TOKEN: TOKEN,
     })
   })
@@ -319,5 +336,195 @@ describe('the 600k guard measures the stdin payload', () => {
     h.spawnCalls.length = 0
     await expect(inAuth(() => runClaudeCli('x'.repeat(600_001)))).rejects.toThrow('Prompt too large')
     expect(h.spawnCalls).toHaveLength(0)
+  })
+})
+
+// ─── 005 T6: hardening ────────────────────────────────────────────────────────
+
+const RESULT_OK = (text: string) =>
+  JSON.stringify({ type: 'result', subtype: 'success', is_error: false, result: text }) + '\n'
+const img = (bytes: number) => ({
+  type: 'image' as const,
+  source: { type: 'base64' as const, media_type: 'image/png', data: Buffer.alloc(bytes, 7).toString('base64') },
+})
+const MB = 1024 * 1024
+
+describe('T6: every spawn is isolated from settings, hooks, plugins and project context', () => {
+  // The flags every spawn carries after `-p --strict-mcp-config --tools <EMPTY>`.
+  const isolation = (empty: string) => ['--no-session-persistence', '--safe-mode', '--setting-sources', empty]
+  const modes = [
+    ['text', () => runClaudeCli('prompt')],
+    ['stream-json', () => runClaudeCliStreamJson([{ type: 'text', text: 'hi' }])],
+  ] as const
+
+  it.each(modes)('%s mode, POSIX: --no-session-persistence --safe-mode --setting-sources ""', async (_m, run) => {
+    setPlatform('linux')
+    h.stdout = RESULT_OK('ok')
+    await inAuth(run)
+    expect(h.spawnCalls[0].args.slice(4, 8)).toEqual(isolation(''))
+  })
+
+  it.each(modes)('%s mode, win32: the empty --setting-sources value survives the shell join', async (_m, run) => {
+    setPlatform('win32')
+    h.stdout = RESULT_OK('ok')
+    await inAuth(run)
+    const call = h.spawnCalls[0]
+    expect(call.args.slice(4, 8)).toEqual(isolation('""'))
+    expect([call.cmd, ...call.args].join(' ')).toContain(' --setting-sources "" ')
+  })
+
+  it('runs in one dedicated, empty temp dir (bistec-cli-*) reused across calls and modes', async () => {
+    const { tmpdir } = await import('node:os')
+    const { basename, dirname } = await import('node:path')
+    const { statSync, readdirSync, realpathSync } = await import('node:fs')
+    setPlatform('linux')
+    h.stdout = RESULT_OK('ok')
+    await inAuth(() => runClaudeCli('one'))
+    await inAuth(() => runClaudeCliStreamJson([{ type: 'text', text: 'two' }]))
+    const [a, b] = h.spawnCalls.map((c) => c.cwd)
+    expect(a).toBeTruthy()
+    expect(b).toBe(a)
+    expect(realpathSync(dirname(a!))).toBe(realpathSync(tmpdir()))
+    expect(basename(a!)).toMatch(/^bistec-cli-/)
+    expect(statSync(a!).isDirectory()).toBe(true)
+    expect(readdirSync(a!)).toEqual([])
+  })
+
+  it('DISABLE_AUTOUPDATER is the constant "1", never taken from the parent', () => {
+    expect(buildChildEnv({ DISABLE_AUTOUPDATER: '0', PATH: '/bin' }, 'linux', TOKEN).DISABLE_AUTOUPDATER).toBe('1')
+    expect(buildChildEnv({ disable_autoupdater: '0' }, 'win32', TOKEN)).toEqual({
+      DISABLE_AUTOUPDATER: '1',
+      CLAUDE_CODE_OAUTH_TOKEN: TOKEN,
+    })
+  })
+})
+
+describe('T6: the model name is charset-checked before it can reach argv', () => {
+  const bad = ['sonnet; rm -rf /', 'sonnet && calc', 'a b', '$(id)', 'x"y', 'm|n', '%PATH%', 'h^aiku', 'o>p', '`id`']
+  it.each(bad)('refuses %j and never spawns', async (model) => {
+    setPlatform('win32')
+    await expect(inAuth(() => runClaudeCli('p', { model }))).rejects.toThrow(/Invalid Claude model name/)
+    await expect(inAuth(() => runClaudeCli('p', { model, pinModel: true }))).rejects.toThrow(
+      /Invalid Claude model name/,
+    )
+    expect(h.spawnCalls).toHaveLength(0)
+  })
+
+  it.each(['haiku', 'claude-sonnet-4-6', 'claude-sonnet-4-6[1m]', 'us.anthropic.claude-sonnet:1', 'claude_x.y'])(
+    'accepts %j verbatim',
+    async (model) => {
+      setPlatform('linux')
+      await inAuth(() => runClaudeCli('p', { model }))
+      const args = h.spawnCalls[0].args
+      expect(args[args.indexOf('--model') + 1]).toBe(model)
+    },
+  )
+
+  it('"default" and an empty model still omit --model', async () => {
+    setPlatform('linux')
+    await inAuth(() => runClaudeCli('p', { model: 'default' }))
+    await inAuth(() => runClaudeCli('p', { model: '' }))
+    expect(h.spawnCalls).toHaveLength(2)
+    for (const c of h.spawnCalls) expect(c.args).not.toContain('--model')
+  })
+})
+
+describe('T6: a missing CLI on win32 (shell:true) gets the friendly not-found error', () => {
+  it("maps cmd.exe's \"'claude' is not recognized\" exit to the ENOENT message — not an auth failure", async () => {
+    setPlatform('win32')
+    h.exitCode = 1
+    h.stdout = ''
+    h.stderr = "'claude' is not recognized as an internal or external command,\r\noperable program or batch file.\r\n"
+    const onAuthFailure = vi.fn(async () => {})
+    const err = await runWithClaudeAuth({ ...auth, onAuthFailure }, () => runClaudeCli('p')).catch((e: unknown) => e)
+    expect((err as Error).message).toBe('Claude CLI not found on PATH. Install Claude Code or set CLAUDE_CLI_PATH.')
+    expect(err).not.toBeInstanceOf(ClaudeCliError)
+    expect(isClaudeAuthFailure(err)).toBe(false)
+    expect(onAuthFailure).not.toHaveBeenCalled()
+    expect(h.spawnCalls).toHaveLength(1)
+  })
+})
+
+describe('T6: stdout is decoded as UTF-8 across chunk boundaries', () => {
+  it('a Sinhala reply split mid-codepoint arrives intact (text mode)', async () => {
+    setPlatform('linux')
+    const bytes = Buffer.from('සිංහල පෝස්ට්', 'utf8')
+    h.chunks = [bytes.subarray(0, 4), bytes.subarray(4, 11), bytes.subarray(11)]
+    await expect(inAuth(() => runClaudeCli('p'))).resolves.toBe('සිංහල පෝස්ට්')
+  })
+
+  it('and in stream-json mode', async () => {
+    setPlatform('linux')
+    const bytes = Buffer.from(RESULT_OK('සිංහල'), 'utf8')
+    const cut = bytes.indexOf(Buffer.from('සිං', 'utf8')) + 1 // inside the first codepoint
+    h.chunks = [bytes.subarray(0, cut), bytes.subarray(cut)]
+    await expect(inAuth(() => runClaudeCliStreamJson([{ type: 'text', text: 'hi' }]))).resolves.toBe('සිංහල')
+  })
+})
+
+describe('T6: stream-json size guards — text only for 600k, 5 MB per image, a total stdin cap', () => {
+  beforeEach(() => {
+    setPlatform('linux')
+    h.stdout = RESULT_OK('ok')
+  })
+
+  it('a 2 MB image passes (the 600k guard no longer counts base64)', async () => {
+    await expect(
+      inAuth(() => runClaudeCliStreamJson([img(2 * MB), { type: 'text', text: 'colour?' }])),
+    ).resolves.toBe('ok')
+    expect(h.spawnCalls).toHaveLength(1)
+  })
+
+  it('an image of exactly 5 MB passes', async () => {
+    await expect(inAuth(() => runClaudeCliStreamJson([img(5 * MB), { type: 'text', text: 'x' }]))).resolves.toBe('ok')
+  })
+
+  it('a 6 MB image is refused, naming its index and size, and never spawns', async () => {
+    const err = await inAuth(() =>
+      runClaudeCliStreamJson([img(1 * MB), img(6 * MB), { type: 'text', text: 'x' }]),
+    ).catch((e: unknown) => e)
+    expect((err as Error).message).toMatch(/image 2 of 2 is 6\.0 MB/i)
+    expect((err as Error).message).toMatch(/5 MB/)
+    expect(isClaudeAuthFailure(err)).toBe(false)
+    expect(h.spawnCalls).toHaveLength(0)
+  })
+
+  it('a 700k-char text block is refused and never spawns', async () => {
+    await expect(
+      inAuth(() => runClaudeCliStreamJson([img(1000), { type: 'text', text: 'x'.repeat(700_000) }])),
+    ).rejects.toThrow(/Prompt too large for CLI mode \(700000 chars > 600000\)/)
+    expect(h.spawnCalls).toHaveLength(0)
+  })
+
+  it('the text guard sums every text block', async () => {
+    await expect(
+      inAuth(() =>
+        runClaudeCliStreamJson([
+          { type: 'text', text: 'x'.repeat(300_000) },
+          { type: 'text', text: 'y'.repeat(300_001) },
+        ]),
+      ),
+    ).rejects.toThrow(/600001 chars/)
+  })
+
+  it('the serialized stdin line is capped in total (7 × 4.5 MB images) and never spawns', async () => {
+    const content = [...Array.from({ length: 7 }, () => img(4.5 * MB)), { type: 'text' as const, text: 'x' }]
+    await expect(inAuth(() => runClaudeCliStreamJson(content))).rejects.toThrow(/too large for CLI mode .* MB > 32 MB/)
+    expect(h.spawnCalls).toHaveLength(0)
+  })
+})
+
+describe('T6: scripts/cli-sandbox-check.mjs (AC-16) mirrors the real stream-json spawn', () => {
+  // The in-image check cannot import claudeCli.ts (the runner image has only
+  // Next's bundled chunks), so it restates the spawn. Pin the two together.
+  it('the same argv as a POSIX vision spawn, and the same child env', async () => {
+    const { sandboxArgs, sandboxChildEnv, VISION_MODEL } = await import('../../scripts/cli-sandbox-check.mjs')
+    expect(VISION_MODEL).toBe(modelFor('B', 'cli'))
+    setPlatform('linux')
+    h.stdout = RESULT_OK('ok')
+    await inAuth(() => runClaudeCliStreamJson([{ type: 'text', text: 'x' }], { model: modelFor('B', 'cli') }))
+    expect(sandboxArgs()).toEqual(h.spawnCalls[0].args)
+    const parent = { PATH: '/usr/bin', HOME: '/home/nextjs', LANG: 'C', DATABASE_URL: 'postgres://x', BISTEC_CANARY: 'c' }
+    expect(sandboxChildEnv(parent, TOKEN)).toEqual(buildChildEnv(parent, 'linux', TOKEN))
   })
 })
