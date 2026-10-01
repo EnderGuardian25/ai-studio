@@ -442,8 +442,8 @@ async function verifyOrThrow(input: VerifyRefineInput): Promise<VerifyResult> {
     supersedes: input.supersedes,
     constrains: input.constrains,
     classes,
-    // Two zero-call lexicons in instructionClasses.ts read it (AC-12): text
-    // reduction, and move intent (whether a superseded image may relocate).
+    // The text-reduction lexicon (instructionClasses.ts) reads it: structural,
+    // zero model calls (AC-12).
     instruction: input.instruction,
   }).flatMap(({ result }) => (result.ok ? [] : [result.reason]))
   if (misses.length > 0) {
