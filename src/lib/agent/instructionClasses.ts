@@ -947,15 +947,14 @@ ${CONSTRAINS_RULE}`
 // caption and add a tagline" must still lower the whole document's word
 // count; new copy quoted in the instruction ("change the headline to \"Less
 // text, more impact\"") matches; "reduce the text slightly" or "reduce the
-// text so it does not overlap the logo" may have meant a resize. The size void
-// is English-only and window-bound: a size word more than six words after the
-// boundary, or one the list does not name ("it is too big", "too small"), does
-// not void (fail closed: the word count must still fall). In the other
-// direction, a later clause about ANOTHER object that starts with a verb the
-// list does not name and carries a size word ("reduce the body text, and set
-// the logo bigger") is voided, so no text-reduction check runs — the classes
-// and the judge still decide, which is the lexicon's normal out-of-lexicon
-// state.
+// text so it does not overlap the logo" may have meant a resize.
+// A size clause after the boundary never switches the check off (F1d
+// re-review): for replace/constrain no judge runs, so a switched-off check is
+// a zero-call PASS — "less text, bigger font" answered with a longer rewrite
+// passed under F1d's "size void". A real reduction plus a resize still passes
+// (the word count falls); a coordinated pure resize ("reduce the text and logo
+// size", "reduce the text, make it smaller") false-misses — fail closed, Use
+// anyway.
 export const TEXT_REDUCTION_CHECK = 'text-reduction' as const
 
 const REDUCING_VERB = String.raw`(?:reduce|reducing|shorten|shortening|trim|trimming|cut|cutting|condense|condensing)(?:\s+(?:down|back|out))?`
@@ -966,15 +965,8 @@ const DETERMINERS = String.raw`(?:(?:the|this|that|these|those|all|some|of|a|bit
 // At most one arbitrary word before the object ("supporting", "body", "sub-heading").
 const ONE_WORD = String.raw`(?:[\p{L}\p{N}][\p{L}\p{N}-]*\s+)?`
 const TEXT_OBJECT = String.raw`(?:word[\s-]+counts?|texts?|copy|words?|wording|paragraphs?|captions?|body|descriptions?)`
-// The size void (final F1d): a size word in the same clause, before any new verb
-// — or after a new verb whose object refers back to the text ("make it smaller").
-const SIZE_WORD = String.raw`(?:sizes?|smaller|bigger|larger|fonts?|scale|tiny|huge)\b`
-const NEW_VERB = String.raw`(?:make|keep|move|add|use|change|put)\b`
-const CLAUSE_WORD = String.raw`[^\s.;?!]+`
-const BACK_REF = String.raw`(?:it|them|this|that|these|those)`
-const SIZE_VOID = String.raw`(?!\s*(?:(?!${NEW_VERB})${CLAUSE_WORD}\s+){0,5}${SIZE_WORD}|\s*(?:(?:and|but|so|then|while|or)\s+)?${NEW_VERB}\s+${BACK_REF}\s+(?:${CLAUSE_WORD}\s+){0,2}${SIZE_WORD})`
 const PRONOUN_CLAUSE = String.raw`(?:it|this|that|there)(?:\s+(?:is|looks|feels|seems)\b|['’]s\b)`
-const CLAUSE_END = String.raw`(?:\s*$|\s*[.;:!?)\]}"“”«»]|\s*['‘’](?!s\b)|(?:\s*,|\s+(?:and|but|so|then|while|or)\b|\s+${PRONOUN_CLAUSE})${SIZE_VOID})`
+const CLAUSE_END = String.raw`(?:\s*$|\s*[.;:!?)\]}"“”«»]|\s*['‘’](?!s\b)|(?:\s*,|\s+(?:and|but|so|then|while|or)\b|\s+${PRONOUN_CLAUSE}))`
 const LOCATION_TAIL = String.raw`\s+(?:on|in|within|inside|across|throughout|from|at)\s+(?:the|this|that|my|our)\s+[\p{L}\p{N}]`
 const PURPOSE_TAIL = String.raw`\s+to\s+make\s+it\s+(?:cleaner|clearer|simpler|tidier|more\s+readable|easier\s+to\s+read|less\s+(?:busy|cluttered|crowded|wordy|dense))${CLAUSE_END}`
 const APPROX = String.raw`(?:about|around|roughly|approximately|nearly|almost|at\s+least|over|more\s+than|up\s+to)`

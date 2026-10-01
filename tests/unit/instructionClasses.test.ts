@@ -1142,16 +1142,6 @@ describe('final F1 / I-2 — the text-reduction lexicon adds a visible-word-coun
     'fewer colours',
     'shorter line spacing',
     'make the caption area smaller',
-    // final F1d (Minor 1): a size word in the same clause after a conjunction
-    // or comma voids the match — a coordinated resize, not a reduction.
-    'reduce the text and logo size',
-    'reduce the text and icon sizes',
-    'reduce the text and image size a little',
-    'reduce the text, make it smaller',
-    'reduce the text, the font is too big',
-    'reduce the text, and make them bigger',
-    'reduce the text so the font is bigger',
-    'reduce the text it is too huge',
     // final F1d: the new tails never carry a size, and need a boundary.
     'reduce the text a bit smaller',
     'reduce the text down to 12px',
@@ -1163,6 +1153,47 @@ describe('final F1 / I-2 — the text-reduction lexicon adds a visible-word-coun
   ]
   for (const t of TRIGGERS) it(`lexicon matches: ${JSON.stringify(t)}`, () => expect(asksForTextReduction(t)).toBe(true))
   for (const t of NON_TRIGGERS) it(`lexicon does NOT match: ${JSON.stringify(t)}`, () => expect(asksForTextReduction(t)).toBe(false))
+
+  // F1d re-review: the F1d "size void" (a size word in a later clause switched
+  // the check off) is gone. For replace/constrain no judge runs, so a switched-off
+  // check is a ZERO-CALL PASS — "less text, bigger font" with a longer rewrite
+  // passed. A text-reduction phrase followed by a size clause therefore always
+  // triggers: a real reduction plus a resize still passes (the count falls), and a
+  // coordinated pure resize ("reduce the text and logo size") is a false miss —
+  // fail closed, Use anyway.
+  const COMPOUND_TRIGGERS = [
+    'less text, bigger font',
+    'less text and a bigger font',
+    'fewer words, larger type',
+    'less copy, bigger headline',
+    'shorter copy, bigger font',
+    'make the copy shorter and the font bigger',
+    'fewer words please, bigger font',
+    'reduce the text by half, bigger font',
+    'reduce the text and increase the font size',
+    'reduce the text and enlarge the font',
+    'shorten the copy and increase the font size',
+    'reduce the text, then bump up the font size',
+    'reduce the text so the font can be bigger',
+    'reduce the text so the headline can be larger',
+    'reduce the text so it fits at this size',
+    // the accepted fail-closed side: formerly voided coordinated resizes
+    'reduce the text and logo size',
+    'reduce the text and icon sizes',
+    'reduce the text and image size a little',
+    'reduce the text, make it smaller',
+    'reduce the text, the font is too big',
+    'reduce the text, and make them bigger',
+    'reduce the text so the font is bigger',
+    'reduce the text it is too huge',
+  ]
+  for (const t of COMPOUND_TRIGGERS) it(`lexicon matches a compound: ${JSON.stringify(t)}`, () => expect(asksForTextReduction(t)).toBe(true))
+
+  it('"less text, bigger font" with a LONGER rewrite misses whatever the class (no zero-call pass)', () => {
+    const longer = nested(`${H} ${P} plus several more words`, [el({ tag: 'body', text: `${H} ${P} plus several more words` }), el({ tag: 'h1', text: H }), el({ tag: 'p', classes: ['body-copy'], text: `${P} plus several more words` })])
+    const rs = checkPostConditions({ before: B, after: longer, supersedes: [], constrains: [], classes: ['add'], instruction: 'less text, bigger font' })
+    expect(rs.some((r) => !r.result.ok)).toBe(true)
+  })
 
   it('size words never trigger the word-count check (a smaller headline with the same words passes structurally)', () => {
     const smaller = nested(`${H} ${P}`, [el({ tag: 'body', text: `${H} ${P}` }), el({ tag: 'h1', text: H, fontSizePx: 40 }), el({ tag: 'p', classes: ['body-copy'], text: P })])
