@@ -683,6 +683,13 @@ model DraftRevision {
   // Set when a rejected render is dismissed/superseded, so adopting it later is
   // a 409 (FR-14a "already-adopted or discarded").
   discardedAt    DateTime?
+  // The render stamp of THIS row's render (F3, AC-04): the prompt version that
+  // produced htmlSnapshot and the font set that rasterized exportUrl — the
+  // same values Draft.promptVersion/fontSet carry while the draft shows it.
+  // Restore and "Use anyway" copy them back onto the draft. Null on rows
+  // written before this existed (unknown, and copied as null).
+  promptVersion  String?
+  fontSet        String?
   // Drafts whose current not-applied outcome references this rejected row.
   notAppliedOn   Draft[]  @relation("DraftNotAppliedRevision")
 

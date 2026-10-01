@@ -6,7 +6,12 @@ import { canAccessContent } from '@/lib/authz/visibility'
 import { renderHtmlToPng } from '@/lib/renderer/puppeteer'
 import { uploadObject, resolveExportUrl, exportKey, BUCKET_EXPORTS } from '@/lib/storage/minio'
 import { dimensionsFor } from '@/lib/aspectRatio'
-import { findCommittedRevision, restoreDraftToRevision, DraftBusyError } from '@/lib/drafts/revisions'
+import {
+  findCommittedRevision,
+  restoreDraftToRevision,
+  restoredRenderStamp,
+  DraftBusyError,
+} from '@/lib/drafts/revisions'
 
 export const maxDuration = 120
 
@@ -48,6 +53,9 @@ export const POST = withTeamAuth<Params>(async (_req, { params }, user) => {
   // its exportUrl (EXPORTS object key) at creation; only legacy rows that lack
   // one fall back to a re-render.
   let key = revision.exportUrl
+  // F3 (AC-04): the draft takes the restored revision's own render stamp — or,
+  // when its PNG is re-rendered below, the font set that rasterizes it now.
+  const stamp = restoredRenderStamp(revision, !key)
   if (!key) {
     const draft = await prisma.draft.findUnique({
       where: { id: params.id },
@@ -66,7 +74,7 @@ export const POST = withTeamAuth<Params>(async (_req, { params }, user) => {
   // null, so an action that claimed the draft after the pre-check above
   // makes this a 409 that writes nothing.
   try {
-    await restoreDraftToRevision(params.id, revisionNumber, revision.htmlSnapshot, key)
+    await restoreDraftToRevision(params.id, revisionNumber, revision.htmlSnapshot, key, stamp)
   } catch (err) {
     if (err instanceof DraftBusyError) {
       return NextResponse.json({ error: err.message }, { status: 409 })

@@ -24,6 +24,40 @@ import type { DraftNotApplied } from '@/lib/api-types'
 // legitimately see rejected rows are ones that target them explicitly (T19's
 // adopt, by row id) and the draft hard-delete, which must remove every row.
 
+// ── Render stamps (change 004 F3, AC-04/FR-22) ──────────────────────────────
+// Which prompt version produced a render's HTML and which installed font set
+// rasterized its PNG. Draft.promptVersion/fontSet describe the draft's CURRENT
+// render; every DraftRevision row carries the stamp of ITS render, so restore
+// and "Use anyway" — which reinstate an older render — copy that row's stamp
+// back onto the draft instead of leaving (or writing) the current values. A
+// pre-F3 row has no stamp: it is copied as null, because unknown is honest and
+// a stale value is not.
+export interface RenderStamp {
+  promptVersion: string | null
+  fontSet: string | null
+}
+
+// The stamp of a render made NOW. Resolve it once per render and write the
+// same value to the draft and the revision row.
+export function currentRenderStamp(): RenderStamp {
+  return { promptVersion: PROMPT_VERSION, fontSet: getFontSetId() }
+}
+
+// The stamp a restore gives the draft. Normally the revision's stored PNG is
+// reused, so the stamp is the row's own (null on a legacy row). A legacy row
+// with no stored PNG is re-rendered by the restore route: the HTML is still
+// the row's (its prompt version), but the pixels come from the font set
+// installed now.
+export function restoredRenderStamp(
+  revision: { promptVersion?: string | null; fontSet?: string | null },
+  rerendered: boolean,
+): RenderStamp {
+  return {
+    promptVersion: revision.promptVersion ?? null,
+    fontSet: rerendered ? getFontSetId() : (revision.fontSet ?? null),
+  }
+}
+
 // The one definition of "a row of the revision chain". Both conditions are
 // stated even though the CHECK constraint makes them equivalent, so the filter
 // holds on its own terms and a row that somehow had one without the other is
@@ -218,6 +252,17 @@ export async function commitDraftRevision(
   const casExpected = args.expectedRevisionNumber
   const cas = casExpected !== undefined
 
+  // F3: the stamp of the render this commit makes current, resolved once and
+  // written to both the new row and the draft. An adopt reinstates the
+  // rejected render as-is, so it carries THAT render's stamp, read before the
+  // transaction: a plain read takes no lock, so the lock order below is
+  // unchanged, and the stamp columns are never updated after insert. An
+  // unknown row reads as null here and the guard inside the transaction
+  // refuses it.
+  const stamp = adoptRejectedRevisionId
+    ? await rejectedRenderStamp(draftId, adoptRejectedRevisionId)
+    : currentRenderStamp()
+
   let finalExportKey = args.exportKey
   // Set only when THIS call rendered + uploaded the export — the only object
   // it may remove again (a caller-supplied key belongs to someone else, e.g.
@@ -280,6 +325,7 @@ export async function commitDraftRevision(
         instruction,
         htmlSnapshot: html,
         exportUrl: committedExportKey,
+        ...stamp,
       },
       select: { id: true },
     })
@@ -315,8 +361,7 @@ export async function commitDraftRevision(
       exportUrl: committedExportKey,
       currentRevisionNumber: revisionNumber,
       pendingConflict: Prisma.JsonNull,
-      promptVersion: PROMPT_VERSION,
-      fontSet: getFontSetId(),
+      ...stamp,
       ...(backgroundImageUrl ? { imageUrl: backgroundImageUrl } : {}),
     }
 
@@ -362,6 +407,16 @@ export async function commitDraftRevision(
     }
     return { id: created.id, revisionNumber }
   }
+}
+
+// The adopted rejected row's own stamp (null on a pre-F3 row, or on a row
+// that is not this draft's).
+async function rejectedRenderStamp(draftId: string, revisionId: string): Promise<RenderStamp> {
+  const row = await prisma.draftRevision.findFirst({
+    where: { id: revisionId, draftId },
+    select: { promptVersion: true, fontSet: true },
+  })
+  return { promptVersion: row?.promptVersion ?? null, fontSet: row?.fontSet ?? null }
 }
 
 // ── Not-applied outcome + rejected renders (change 004 Phase 2, T17) ─────────
@@ -477,8 +532,9 @@ export class DraftBusyError extends Error {
 }
 
 // The restore route's write: moves the revision pointer to an existing chain
-// revision and clears any not-applied outcome (T18). Lock order as everywhere:
-// rejected rows first, the draft row LAST. The draft write carries
+// revision, gives the draft that revision's render stamp (F3: the route builds
+// it with restoredRenderStamp) and clears any not-applied outcome (T18).
+// Lock order as everywhere: rejected rows first, the draft row LAST. The draft write carries
 // pendingAction: null in its WHERE (a late claim wins with 0 rows, and the
 // transaction rolls back with a DraftBusyError).
 export async function restoreDraftToRevision(
@@ -486,6 +542,7 @@ export async function restoreDraftToRevision(
   revisionNumber: number,
   htmlSnapshot: string,
   exportKey: string,
+  stamp: RenderStamp,
 ): Promise<void> {
   await prisma.$transaction(async (tx) => {
     await discardNotAppliedRender(tx, draftId)
@@ -498,6 +555,8 @@ export async function restoreDraftToRevision(
         // reversible, since you can jump forward again to any other revision.
         currentRevisionNumber: revisionNumber,
         pendingConflict: Prisma.JsonNull,
+        promptVersion: stamp.promptVersion,
+        fontSet: stamp.fontSet,
         ...NOT_APPLIED_CLEARED,
       },
     })
@@ -536,6 +595,10 @@ export async function recordRejectedRender(
 ): Promise<{ revisionId: string; exportKey: string | null }> {
   const { draftId, instruction, html, width, height } = args
   const diagnostics = rejectionDiagnosticsSchema.omit({ export: true }).parse(args.diagnostics)
+  // F3: the rejected row carries the stamp of ITS render, so a later "Use
+  // anyway" can reinstate it. The draft's stamp is untouched: its current
+  // render did not change.
+  const stamp = currentRenderStamp()
 
   let exportKey: string | null = null
   let exported: RejectionDiagnostics['export'] = 'none'
@@ -569,6 +632,7 @@ export async function recordRejectedRender(
         htmlSnapshot: html ?? args.unusableHtml ?? '',
         exportUrl: exportKey,
         rejection: rejection as Prisma.InputJsonValue,
+        ...stamp,
       },
       select: { id: true },
     })

@@ -25,6 +25,9 @@ interface Row {
   adoptedAt?: Date | null
   adoptedRevisionNumber?: number | null
   discardedAt?: Date | null
+  // F3 (AC-04): the render stamp each row carries.
+  fontSet?: string | null
+  promptVersion?: string | null
 }
 
 const fake = vi.hoisted(() => {
@@ -286,8 +289,11 @@ import {
   rejectionDiagnosticsSchema,
   MAX_NOT_APPLIED_REASON,
   TX_MAX_WAIT_MS,
+  currentRenderStamp,
+  restoredRenderStamp,
   type RejectionDiagnostics,
 } from '@/lib/drafts/revisions'
+import { PROMPT_VERSION } from '@/lib/agent/prompts/shared'
 
 let seq = 0
 function committed(
@@ -1104,10 +1110,12 @@ describe('resolveNotAppliedOutcome (T18, Ruling E)', () => {
 // the draft between that read and the write. The guard is folded into the
 // final draft write (like adopt's), so a late claim is a 409 that writes nothing.
 
+const STAMP_V2 = { promptVersion: 'pv-v2', fontSet: 'fonts-v2' }
+
 describe('restoreDraftToRevision (F2 — restore guard)', () => {
   it('moves the pointer and clears the not-applied outcome when no action is claimed', async () => {
     db.currentRevisionNumber = 3
-    await restoreDraftToRevision('d1', 2, '<html>v2</html>', 'exports/d1-2.png')
+    await restoreDraftToRevision('d1', 2, '<html>v2</html>', 'exports/d1-2.png', STAMP_V2)
     expect(db.currentRevisionNumber).toBe(2)
     expect(db.draftUpdates.at(-1)!.data).toMatchObject({
       htmlContent: '<html>v2</html>',
@@ -1125,10 +1133,160 @@ describe('restoreDraftToRevision (F2 — restore guard)', () => {
     db.currentRevisionNumber = 3
     db.pendingAction = 'REFINE'
     await expect(
-      restoreDraftToRevision('d1', 2, '<html>v2</html>', 'exports/d1-2.png'),
+      restoreDraftToRevision('d1', 2, '<html>v2</html>', 'exports/d1-2.png', STAMP_V2),
     ).rejects.toThrow(DraftBusyError)
     expect(db.currentRevisionNumber).toBe(3)
     expect(db.draftUpdates).toEqual([])
     expect(db.ops.at(-1)).toBe('rollback')
+  })
+})
+
+// ── F3 (change 004 final fix wave, AC-04): per-revision render stamps ───────
+// "A draft record carries the font-set identifier used for its render,
+// readable alongside promptVersion." Every DraftRevision row records the
+// prompt version that produced its HTML and the font set that rasterized its
+// PNG, so restore and adopt can carry the stamp of the render they reinstate
+// instead of leaving (restore) or writing (adopt) the CURRENT values. The
+// fontSet mock above resolves to 'fonts-test'; PROMPT_VERSION is the real one.
+
+describe('F3 render stamps: every revision write records the render it holds', () => {
+  it('currentRenderStamp is the prompt version + the installed font set', () => {
+    expect(currentRenderStamp()).toEqual({ promptVersion: PROMPT_VERSION, fontSet: 'fonts-test' })
+  })
+
+  it('commitDraftRevision stamps BOTH the new revision row and the draft (caller-supplied export)', async () => {
+    db.rows = [committed('d1', 1)]
+    const { revisionId } = await commitDraftRevision({
+      draftId: 'd1', instruction: 'darker', html: '<html>n</html>', width: 1080, height: 1080, exportKey: 'exports/n.png',
+    })
+    const row = db.rows.find((r) => r.id === revisionId)!
+    expect(row.fontSet).toBe('fonts-test')
+    expect(row.promptVersion).toBe(PROMPT_VERSION)
+    expect(db.draftUpdates.at(-1)!.data).toMatchObject({ fontSet: 'fonts-test', promptVersion: PROMPT_VERSION })
+  })
+
+  it('commitDraftRevision stamps both when it renders the export itself', async () => {
+    db.rows = [committed('d1', 1)]
+    const { revisionId } = await commitDraftRevision({
+      draftId: 'd1', instruction: 'inline edit', html: '<html>e</html>', width: 1080, height: 1080,
+    })
+    expect(db.render.calls).toBe(1)
+    const row = db.rows.find((r) => r.id === revisionId)!
+    expect(row).toMatchObject({ fontSet: 'fonts-test', promptVersion: PROMPT_VERSION })
+    expect(db.draftUpdates.at(-1)!.data).toMatchObject({ fontSet: 'fonts-test', promptVersion: PROMPT_VERSION })
+  })
+
+  it('commitDraftRevision CAS path stamps both too', async () => {
+    db.rows = [committed('d1', 1)]
+    db.currentRevisionNumber = 1
+    const { revisionId } = await commitDraftRevision({
+      draftId: 'd1', instruction: 'el', html: '<html>c</html>', width: 1080, height: 1080, exportKey: 'k', expectedRevisionNumber: 1,
+    })
+    expect(db.rows.find((r) => r.id === revisionId)).toMatchObject({ fontSet: 'fonts-test', promptVersion: PROMPT_VERSION })
+    expect(db.draftUpdates.at(-1)!.data).toMatchObject({ fontSet: 'fonts-test', promptVersion: PROMPT_VERSION })
+  })
+
+  it('recordRejectedRender stamps the rejected row with the values of ITS OWN render, and leaves the draft stamp alone', async () => {
+    db.rows = [committed('d1', 1)]
+    const { revisionId } = await recordRejectedRender(rejectArgs())
+    const row = db.rows.find((r) => r.id === revisionId)!
+    expect(row).toMatchObject({ fontSet: 'fonts-test', promptVersion: PROMPT_VERSION })
+    // The draft's current render did not change, so neither does its stamp.
+    const data = db.draftUpdates.at(-1)!.data
+    expect('fontSet' in data).toBe(false)
+    expect('promptVersion' in data).toBe(false)
+  })
+
+  it('a rejected row with no usable document still carries the stamp of the attempt', async () => {
+    const { revisionId } = await recordRejectedRender(rejectArgs({ html: null, unusableHtml: '<html>cut' }))
+    expect(db.rows.find((r) => r.id === revisionId)).toMatchObject({ fontSet: 'fonts-test', promptVersion: PROMPT_VERSION })
+  })
+})
+
+describe("F3 restore: the draft takes the restored revision's stamp", () => {
+  it('restoreDraftToRevision writes the given stamp onto the draft', async () => {
+    db.currentRevisionNumber = 3
+    await restoreDraftToRevision('d1', 2, '<html>v2</html>', 'exports/d1-2.png', STAMP_V2)
+    expect(db.draftUpdates.at(-1)!.data).toMatchObject({ promptVersion: 'pv-v2', fontSet: 'fonts-v2' })
+  })
+
+  it('a legacy (pre-F3) revision nulls the draft stamp: unknown is honest, a stale value is not', async () => {
+    db.currentRevisionNumber = 3
+    await restoreDraftToRevision(
+      'd1', 2, '<html>v2</html>', 'exports/d1-2.png',
+      restoredRenderStamp({ promptVersion: null, fontSet: null }, false),
+    )
+    const data = db.draftUpdates.at(-1)!.data
+    expect(data).toHaveProperty('promptVersion', null)
+    expect(data).toHaveProperty('fontSet', null)
+  })
+
+  it("restoredRenderStamp copies the revision's own values when its stored PNG is reused", () => {
+    expect(restoredRenderStamp({ promptVersion: 'pv-old', fontSet: 'fonts-old' }, false)).toEqual({
+      promptVersion: 'pv-old',
+      fontSet: 'fonts-old',
+    })
+  })
+
+  it("restoredRenderStamp never lets the CURRENT font set leak onto a reused legacy PNG", () => {
+    expect(restoredRenderStamp({ promptVersion: null, fontSet: null }, false)).toEqual({ promptVersion: null, fontSet: null })
+  })
+
+  it('a restore that RE-RENDERS (legacy row with no stored PNG) stamps the font set that just rasterized it', () => {
+    // The HTML is still the revision's (its prompt version, null if legacy);
+    // the pixels are this render's.
+    expect(restoredRenderStamp({ promptVersion: null, fontSet: null }, true)).toEqual({
+      promptVersion: null,
+      fontSet: 'fonts-test',
+    })
+  })
+})
+
+describe('F3 adopt: "Use anyway" carries the rejected render\'s OWN stamp', () => {
+  function liveRejected(over: Partial<Row> = {}): Row {
+    const r = { ...rejected('d1'), ...over }
+    db.rows.push(r)
+    db.notAppliedRevisionId = r.id
+    return r
+  }
+
+  function adopt(r: Row) {
+    return commitDraftRevision({
+      draftId: 'd1',
+      instruction: `Use anyway: ${r.instruction}`,
+      html: r.htmlSnapshot,
+      width: 1080,
+      height: 1080,
+      exportKey: r.exportUrl!,
+      adoptRejectedRevisionId: r.id,
+    })
+  }
+
+  it("writes the rejected row's fontSet/promptVersion onto the new chain revision AND the draft, not the current ones", async () => {
+    db.rows = [committed('d1', 1)]
+    const r = liveRejected({ fontSet: 'fonts-old', promptVersion: 'pv-old' })
+    const { revisionId } = await adopt(r)
+    expect(db.rows.find((x) => x.id === revisionId)).toMatchObject({ fontSet: 'fonts-old', promptVersion: 'pv-old' })
+    expect(db.draftUpdates.at(-1)!.data).toMatchObject({ fontSet: 'fonts-old', promptVersion: 'pv-old' })
+  })
+
+  it('a legacy (pre-F3) rejected row nulls both, on the revision and the draft', async () => {
+    db.rows = [committed('d1', 1)]
+    const r = liveRejected()
+    const { revisionId } = await adopt(r)
+    const created = db.rows.find((x) => x.id === revisionId)!
+    expect(created.fontSet).toBeNull()
+    expect(created.promptVersion).toBeNull()
+    const data = db.draftUpdates.at(-1)!.data
+    expect(data).toHaveProperty('fontSet', null)
+    expect(data).toHaveProperty('promptVersion', null)
+  })
+
+  it('keeps the adopt lock order: the stamp lookup adds no write before the revision insert', async () => {
+    db.rows = [committed('d1', 1)]
+    const r = liveRejected({ fontSet: 'fonts-old', promptVersion: 'pv-old' })
+    db.ops = []
+    await adopt(r)
+    expect(db.ops).toEqual(['revision.create', 'revision.updateMany', 'revision.updateMany', 'draft.updateMany'])
   })
 })

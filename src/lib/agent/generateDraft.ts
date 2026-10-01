@@ -6,8 +6,7 @@ import { resolveCopyProvider } from '@/providers/registry'
 import { buildBriefInput } from '@/lib/agent/briefInput'
 import { runPathADesign, assertTemplateMatchesBrief } from '@/lib/agent/pathA'
 import { runPathBDesign } from '@/lib/agent/pathB'
-import { PROMPT_VERSION } from '@/lib/agent/prompts/shared'
-import { getFontSetId } from '@/lib/renderer/fontSet'
+import { currentRenderStamp, type RenderStamp } from '@/lib/drafts/revisions'
 import { humanizeGenerationError } from '@/lib/agent/generationErrors'
 import type { GenerationActor } from '@/lib/agent/types'
 
@@ -74,6 +73,9 @@ interface ProducedDesign {
   htmlContent: string
   exportUrl: string
   backgroundImageUrl: string | null
+  // F3 (AC-04): the prompt version + font set of THIS render, resolved once
+  // and written to both the draft and its v1 revision.
+  stamp: RenderStamp
 }
 
 // Path A/B design dispatch → rendered PNG. The heavy model + Puppeteer work,
@@ -86,13 +88,19 @@ async function produceDesign(
 ): Promise<ProducedDesign> {
   if (template) {
     const result = await runPathADesign(brief, kit, template, copyText, campaignBriefing, actor)
-    return { htmlContent: result.htmlContent, exportUrl: result.exportUrl, backgroundImageUrl: null }
+    return {
+      htmlContent: result.htmlContent,
+      exportUrl: result.exportUrl,
+      backgroundImageUrl: null,
+      stamp: currentRenderStamp(),
+    }
   }
   const result = await runPathBDesign(brief, kit!, copyText, campaignBriefing, actor)
   return {
     htmlContent: result.htmlContent,
     exportUrl: result.exportUrl,
     backgroundImageUrl: result.backgroundImageUrl,
+    stamp: currentRenderStamp(),
   }
 }
 
@@ -115,8 +123,7 @@ async function finalizeDraftV1(
         // skipped, and always null for Path A).
         imageUrl: design.backgroundImageUrl,
         status: 'EXPORTED',
-        promptVersion: PROMPT_VERSION,
-        fontSet: getFontSetId(),
+        ...design.stamp,
         currentRevisionNumber: 1,
         failureReason: null,
       },
@@ -128,6 +135,7 @@ async function finalizeDraftV1(
         instruction: 'Original design',
         htmlSnapshot: design.htmlContent,
         exportUrl: design.exportUrl,
+        ...design.stamp,
       },
     })
   })
@@ -166,8 +174,7 @@ export async function generateDraftForBrief(
         exportUrl: design.exportUrl,
         imageUrl: design.backgroundImageUrl,
         status: 'EXPORTED',
-        promptVersion: PROMPT_VERSION,
-        fontSet: getFontSetId(),
+        ...design.stamp,
         currentRevisionNumber: 1,
       },
     })
@@ -178,6 +185,7 @@ export async function generateDraftForBrief(
         instruction: 'Original design',
         htmlSnapshot: design.htmlContent,
         exportUrl: design.exportUrl,
+        ...design.stamp,
       },
     })
     return created
