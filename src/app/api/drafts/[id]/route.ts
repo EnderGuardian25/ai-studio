@@ -8,6 +8,7 @@ import { resolveBrandKit } from '@/lib/brandkit/resolve'
 import { resolveExportUrl } from '@/lib/storage/minio'
 import { planDraftRecovery, STUCK_ACTION_REASON, STUCK_REASON } from '@/lib/drafts/recovery'
 import { COMMITTED_REVISION, resolveNotAppliedOutcome } from '@/lib/drafts/revisions'
+import { backgroundSkippedFor } from '@/lib/drafts/backgroundNotice'
 
 type Params = { id: string }
 
@@ -155,6 +156,9 @@ async function loadDraft(id: string) {
       ? { conflictId: pendingConflict.conflictId, explanation: pendingConflict.explanation }
       : null,
     notApplied,
+    // 005 FR-07: why there is no AI background, when that was not the
+    // model's choice. The message is a fixed per-reason sentence.
+    backgroundSkipped: backgroundSkippedFor(draft.backgroundSkipReason, draft.backgroundSkipDetail),
     createdAt: draft.createdAt,
     revisionCount: draft._count.revisions,
     currentRevisionNumber: draft.currentRevisionNumber,

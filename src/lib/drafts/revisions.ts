@@ -6,6 +6,7 @@ import { INSTRUCTION_CLASS_KEYS } from '@/lib/agent/instructionClasses'
 import { getFontSetId } from '@/lib/renderer/fontSet'
 import type { DraftAction } from '@prisma/client'
 import type { DraftNotApplied } from '@/lib/api-types'
+import type { BackgroundSkipFields } from '@/lib/drafts/backgroundNotice'
 
 // ── The revision chain vs. rejected renders (change 004 Phase 2, T15/T16) ────
 // DraftRevision holds two kinds of row. COMMITTED rows are the chain: numbered
@@ -169,6 +170,11 @@ export interface CommitRevisionArgs {
   height: number
   exportKey?: string
   backgroundImageUrl?: string | null
+  // 005 FR-07: the refine's background-skip write (refineSkipFields), stored
+  // in the same final draft write as backgroundImageUrl. Omitted — every
+  // caller but a refine whose instruction asked for a background — leaves
+  // the draft's backgroundSkipReason/backgroundSkipDetail unchanged.
+  backgroundSkip?: BackgroundSkipFields
   // "Use anyway" (T19, FR-14a): the id of the rejected DraftRevision row being
   // adopted. When set, it is stamped adoptedAt + adoptedRevisionNumber
   // atomically INSIDE this same transaction, after the chain insert and
@@ -248,7 +254,7 @@ export class AdoptConflictError extends Error {
 export async function commitDraftRevision(
   args: CommitRevisionArgs,
 ): Promise<{ revisionId: string; exportKey: string; revisionNumber: number }> {
-  const { draftId, instruction, html, width, height, backgroundImageUrl, adoptRejectedRevisionId } = args
+  const { draftId, instruction, html, width, height, backgroundImageUrl, backgroundSkip, adoptRejectedRevisionId } = args
   const casExpected = args.expectedRevisionNumber
   const cas = casExpected !== undefined
 
@@ -363,6 +369,7 @@ export async function commitDraftRevision(
       pendingConflict: Prisma.JsonNull,
       ...stamp,
       ...(backgroundImageUrl ? { imageUrl: backgroundImageUrl } : {}),
+      ...backgroundSkip,
     }
 
     if (!cas && !adoptRejectedRevisionId) {

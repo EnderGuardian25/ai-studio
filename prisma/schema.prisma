@@ -482,6 +482,13 @@ model Draft {
   // draft hard-delete, which removes revisions first, is unaffected.
   notAppliedRevisionId String?
   notAppliedRevision   DraftRevision? @relation("DraftNotAppliedRevision", fields: [notAppliedRevisionId], references: [id], onDelete: SetNull)
+  // Why the current design has no AI background, when that was NOT the
+  // model's choice (005 FR-06/FR-07): NO_PROVIDER | PROVIDER_ERROR |
+  // DECISION_ERROR, enforced in src/lib/drafts/backgroundNotice.ts (plain TEXT
+  // so a new reason needs no migration). NOT_NEEDED is never stored. The
+  // detail is the clipped (≤300 chars) error text. Null = no notice.
+  backgroundSkipReason String?
+  backgroundSkipDetail String?
   createdAt       DateTime        @default(now())
   // @default(now()) keeps the added column valid for pre-existing rows
   updatedAt       DateTime        @default(now()) @updatedAt

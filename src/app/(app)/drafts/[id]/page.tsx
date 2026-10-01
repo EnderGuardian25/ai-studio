@@ -24,6 +24,7 @@ import { PublishDialog } from '@/components/library/PublishDialog'
 import { CopyEditor } from '@/components/drafts/CopyEditor'
 import { RefinementPanel } from '@/components/drafts/RefinementPanel'
 import { InlineEditModal } from '@/components/drafts/InlineEditModal'
+import { BackgroundNotice } from '@/components/drafts/BackgroundNotice'
 import { apiFetch } from '@/lib/apiFetch'
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser'
 import { useUndoableAction } from '@/lib/hooks/useUndoableAction'
@@ -366,6 +367,10 @@ export default function DraftDetailPage() {
                 </div>
               )}
             </div>
+
+            {/* 005 FR-07: why this design has no AI background, when that
+                was not the model's choice. Non-blocking. */}
+            {draft.backgroundSkipped && <BackgroundNotice skipped={draft.backgroundSkipped} />}
 
             {/* A background action failed — surface the error inline; the
                 buttons below are re-enabled so the user can simply re-trigger.

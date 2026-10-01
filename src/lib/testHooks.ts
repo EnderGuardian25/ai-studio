@@ -16,6 +16,7 @@ import type { ConstrainTarget, InstructionClass } from '@/lib/agent/instructionC
 // not create a runtime import cycle with refineVerify.ts, which imports this
 // module for MOCK_AI + the two seams below.
 import type { VerifyResult } from '@/lib/drafts/refineVerify'
+import type { ImageProvider } from '@/providers/interfaces/ImageProvider'
 
 export const MOCK_AI = process.env.MOCK_AI === 'true'
 export const MOCK_PUPPETEER = process.env.MOCK_PUPPETEER === 'true'
@@ -205,6 +206,52 @@ export function mockProviderKeyValidation(apiKey: string): { ok: boolean; error?
     return { ok: false, error: 'Provider rejected the key (mock validation)' }
   }
   return { ok: true }
+}
+
+// ── 005 NFR-06: the background mock seam ─────────────────────────────────────
+
+/**
+ * Whether the background step (agent/background.ts) runs its MOCK_AI seam for
+ * this brief topic. True only with MOCK_AI on and one of the sentinels
+ * "__MOCK_BG__", "__MOCK_BG_FAIL__" or "__MOCK_BG_NOT_NEEDED__" in the topic.
+ * Without one, MOCK_AI keeps the step's early return (no background, nothing
+ * recorded), so every suite written before the seam is unchanged.
+ */
+const MOCK_BG_SENTINEL = /__MOCK_BG(?:_FAIL|_NOT_NEEDED)?__/
+
+export function shouldMockBackground(topic: string): boolean {
+  return MOCK_AI && MOCK_BG_SENTINEL.test(topic)
+}
+
+/**
+ * The seam's stand-in for the Haiku decision: needed, with a fixed prompt —
+ * or not needed for "__MOCK_BG_NOT_NEEDED__".
+ */
+export function mockBackgroundDecision(topic: string): { needed: boolean; prompt: string } {
+  return topic.includes('__MOCK_BG_NOT_NEEDED__')
+    ? { needed: false, prompt: '' }
+    : { needed: true, prompt: 'Mock background: soft abstract gradient (E2E seam)' }
+}
+
+/** A valid 1×1 PNG as a data URL — the shape real providers return, so persistDataUrlImage stores it unchanged. */
+export const MOCK_BACKGROUND_DATA_URL =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='
+
+/**
+ * Wrap the provider the REAL resolver returned so only its generateImage is
+ * replaced: the fixture PNG, or a throw for "__MOCK_BG_FAIL__". Everything
+ * else (the resolved row, its providerName) is the real provider's, via the
+ * prototype, so the resolver is what's under test, not a stand-in.
+ */
+export function mockImageProvider(provider: ImageProvider, topic: string): ImageProvider {
+  const mocked = Object.create(provider) as ImageProvider
+  mocked.generateImage = async () => {
+    if (topic.includes('__MOCK_BG_FAIL__')) {
+      throw new Error('Mock image provider failure (__MOCK_BG_FAIL__ sentinel)')
+    }
+    return { url: MOCK_BACKGROUND_DATA_URL }
+  }
+  return mocked
 }
 
 /** Deterministic 1×1 transparent PNG returned by the mock Puppeteer renderer. */

@@ -8,6 +8,7 @@ import { getActiveCampaignBriefing } from '@/lib/campaign/briefing'
 import { runPathBDesign } from '@/lib/agent/pathB'
 import { currentRenderStamp, withNextRevisionNumber } from '@/lib/drafts/revisions'
 import { claimDraftAction, startDraftAction } from '@/lib/drafts/draftActions'
+import { generationSkipFields } from '@/lib/drafts/backgroundNotice'
 
 // Regenerates the freeform (Path B) design for a draft: produces a brand-new
 // design variant from the same brief + existing copy. Validation runs
@@ -113,6 +114,9 @@ export const POST = withTeamAuth<{ id: string }>(async (_req, { params }, user) 
           exportUrl: result.exportUrl,
           // New background (or null when the pre-step skipped — clears the stale one).
           imageUrl: result.backgroundImageUrl,
+          // 005 FR-07: this design was made from scratch, so its skip (or
+          // none) replaces whatever the previous render recorded.
+          ...generationSkipFields(result.background),
           status: 'EXPORTED',
           currentRevisionNumber: revisionNumber,
           pendingConflict: Prisma.JsonNull,

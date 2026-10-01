@@ -46,9 +46,9 @@ All §6 cases are now written. New/changed files:
 - Unauthenticated API calls are **redirected to `/login` by middleware (3xx), not 401** (except `/api/acp`, which 401s at the route). TC-AUTH-03/07 assert the redirect.
 - TC-GEN-A1/B1 etc. return **200** `{draftId,exportUrl}` (not 201) — already corrected in the skeleton, kept.
 
-**The 4 intentional skips (everything else passes):**
+**The 3 intentional skips (everything else passes):**
 
-- **TC-GEN-05** (generated image → public URL): the MOCK_AI agent never calls `generateImage` and there is no mock IMAGE-provider seam; the public-IMAGES-bucket guarantee it targets is covered by TC-REG-H10a.
+- ~~**TC-GEN-05**~~ **runs since 005 T2** (in `path-b.test.ts`): the background mock seam (`__MOCK_BG__` topic sentinel, `shouldMockBackground` in `src/lib/testHooks.ts`) resolves the team's IMAGE row for real, swaps only `generateImage` for a fixture PNG, and the persisted background is read back anonymously (200, `image/png`). The same seam drives `background-notice.test.ts` (§BG, 005 AC-01/AC-08..AC-11).
 - **TC-REG-H11b** (concurrency cap): needs a real-Chromium serve (`MOCK_PUPPETEER` unset); skips in the mock run.
 - **TC-REG-H11a / H11c** (one Chromium process per run / relaunch-after-kill): require host process observation / killing Chromium — not auto-driveable from a black-box test; `test.skip` with rationale.
 
@@ -256,7 +256,7 @@ Legend: **P** precondition · **S** steps · **E** expected. "Guards" = remediat
 - **TC-GEN-B2 — Path B requires a brand kit.** P: no resolvable kit. E: 422 `NO_BRAND_KIT`.
 - **TC-GEN-03 — Brief validation.** S: POST `/api/briefs` missing `goal`/`channels`/bad FK. E: 4xx with field error. **Guards M12 (parallel validation still correct).**
 - **TC-GEN-04 — Brief validation is parallelized & correct.** S: brief with invalid campaign + invalid template + invalid provider. E: 4xx (any/all bad FKs reported). **Guards M12.**
-- **TC-GEN-05 — Generated image stored as public URL.** P: mock image provider returns a data URL. S: run generation that calls `generateImage`. E: image embedded in HTML is a **public** URL (anonymous GET 200), so re-render later works. **Guards H10.**
+- **TC-GEN-05 — Generated image stored as public URL.** P: a team with an IMAGE row; brief topic carries `__MOCK_BG__` (the 005 background seam: real resolution, fixture `generateImage` data URL). S: Path B generation. E: `Draft.imageUrl` (the URL the design prompt embeds) is a **public**, unsigned URL (anonymous GET 200, `image/png`), so re-render later works. **Guards H10.**
 - **TC-GEN-06 — Oversized template guard.** P: Hearts Talk template (1.81 MB). S: Path A with it. E: clean error (`Prompt too large…`), not a crash. **Known Issue regression.**
 - **TC-GEN-A3 — Path A 3:4 portrait.** P: kit + PORTRAIT template + brief (`aspectRatio:PORTRAIT`, `designMode:TEMPLATE`). S: assemble-a. E: 200; `status:EXPORTED`; `GET /api/drafts/[id]` → `brief.aspectRatio:PORTRAIT`. **Guards the aspect-ratio threading.**
 - **TC-GEN-A4 — Path A aspect-ratio mismatch rejected.** P: SQUARE template + PORTRAIT brief. S: assemble-a. E: 400 (no stretching; the wizard only offers matching templates, the API enforces it).

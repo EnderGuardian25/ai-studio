@@ -7,6 +7,7 @@
 // inline interface in a page.
 import type { AspectRatio, Channel, DesignMode, TeamRole } from '@prisma/client'
 import type { Role } from '@/lib/auth'
+import type { BackgroundSkipped } from '@/lib/drafts/backgroundNotice'
 
 // ── Auth ─────────────────────────────────────────────────────────────────
 
@@ -262,6 +263,9 @@ export interface DraftDetail {
   pendingActionError: string | null
   conflict: { conflictId: string; explanation: string } | null
   notApplied: DraftNotApplied | null
+  // 005 FR-07: set when the current design has no AI background for a reason
+  // other than the model deciding it didn't need one.
+  backgroundSkipped: BackgroundSkipped | null
   createdAt: string
   revisionCount: number
   currentRevisionNumber: number | null

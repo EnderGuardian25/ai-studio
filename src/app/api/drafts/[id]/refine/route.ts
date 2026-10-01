@@ -13,6 +13,7 @@ import { dimensionsFor } from '@/lib/aspectRatio'
 import { modelFor, pathForDesignMode, pipelineMode } from '@/lib/agent/config'
 import { buildRefineSystemPrompt, buildRefineUserMessage } from '@/lib/agent/prompts/refine'
 import { generateBackgroundForRefine } from '@/lib/agent/background'
+import { refineSkipFields } from '@/lib/drafts/backgroundNotice'
 import { commitDraftRevision, recordRejectedRender } from '@/lib/drafts/revisions'
 import { claimDraftAction, startDraftAction, touchDraftAction } from '@/lib/drafts/draftActions'
 import { runRefineAttempts, settleRefine } from '@/lib/drafts/refineAttempt'
@@ -143,9 +144,12 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
   const actor = { userId: user.userId, teamId: user.teamId }
   await startDraftAction(draft.id, user.userId, user.teamId, 'REFINE', async () => {
     // Background pre-step: generates a new background ONLY when the instruction
-    // asks for one (e.g. "change the background to a city skyline"); null
-    // otherwise, and on any failure. See agent/background.ts.
-    const backgroundImageUrl = await generateBackgroundForRefine(draft.brief, kit, instruction, actor)
+    // asks for one (e.g. "change the background to a city skyline"); a skip
+    // with its reason otherwise. See agent/background.ts. 005 FR-07: the skip
+    // is recorded only when the instruction wanted a background
+    // (refineSkipFields), and only if this refine commits.
+    const background = await generateBackgroundForRefine(draft.brief, kit, instruction, actor)
+    const backgroundImageUrl = background.url
 
     // One system prompt and the ORIGINAL slim HTML for both attempts; the retry
     // only appends the miss (prompts/refine.ts buildRefineRetryNote).
@@ -232,7 +236,15 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
       commit: async (html) => {
         // No export key: commitDraftRevision renders + uploads this document —
         // the one that was verified (Ruling D).
-        await commitDraftRevision({ draftId: draft.id, instruction, html, width, height, backgroundImageUrl })
+        await commitDraftRevision({
+          draftId: draft.id,
+          instruction,
+          html,
+          width,
+          height,
+          backgroundImageUrl,
+          backgroundSkip: refineSkipFields(background),
+        })
       },
       conflict: async (conflict) => {
         await prisma.draft.update({
