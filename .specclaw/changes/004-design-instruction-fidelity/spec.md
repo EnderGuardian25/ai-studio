@@ -81,6 +81,7 @@ It goes through the same HTML-writing and revision-commit path as `src/lib/draft
 
 **FR-20 — Placeholder handling is reconciliation, not detection.**
 The set of `__INLINE_ASSET_n__` tokens sent out must equal the set returned, same tokens and same multiplicity. A clean absence is restored; any other mismatch is treated as not applied and takes the FR-11 path.
+_Amended 2026-10-01 (Ruling C, build Wave 4):_ an absent token can't be put back, because its location is gone, so "restored" would ship the dropped-image bug. An absent token is therefore reconciled as follows. It is **covered** when a `replace`/`remove` supersedes fragment names it. A covered token commits with the asset gone. An **uncovered** absent token is a preservation miss and takes the FR-11 path: retry, then not applied, with Use anyway.
 
 **FR-21 — The runner image carries monochrome symbol font coverage.**
 Narrowest coverage that fixes the reported defect. Not a full colour emoji set.
@@ -155,7 +156,7 @@ Each criterion must pass for the change to be considered complete.
 - **AC-03** — The harness runs the real `renderHtmlToPng` path with `MOCK_PUPPETEER` off.
 - **AC-04** — A draft record carries the font-set identifier used for its render, readable alongside `promptVersion`.
 - **AC-05** — Given HTML sent out with N inline-asset placeholders, a model reply returning the same N tokens reconciles clean and commits.
-- **AC-06** — A reply with a placeholder **absent** restores it and commits.
+- **AC-06** — A reply with a placeholder **absent** restores it and commits. _Amended 2026-10-01 (Ruling C):_ it commits with the asset gone only when a `replace`/`remove` supersedes names it. Otherwise it is a preservation miss: retried, then not applied.
 - **AC-07** — A reply with a placeholder **renamed, duplicated, or reindexed** is treated as not applied; no revision is committed.
 - **AC-07a** — The shared design prompt note instructs the agent to use covered symbols and never emoji in the rendered design, and `PROMPT_VERSION` is bumped.
 
