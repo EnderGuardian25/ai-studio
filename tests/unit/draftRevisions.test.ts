@@ -1116,6 +1116,9 @@ describe('restoreDraftToRevision (F2 — restore guard)', () => {
     })
     // Lock order: the rejected-row stamp first, the draft row last.
     expect(db.ops).toEqual(['revision.updateMany', 'draft.updateMany'])
+    // Interactive, so it must wait on the pool like every other one here —
+    // Prisma's 2000 ms default throws P2028 when a new connection is opening.
+    expect(db.txOptions).toEqual([{ maxWait: TX_MAX_WAIT_MS }])
   })
 
   it('a claimed action refuses the restore, writes nothing and rolls back', async () => {

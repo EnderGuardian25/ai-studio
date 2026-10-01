@@ -502,7 +502,7 @@ export async function restoreDraftToRevision(
       },
     })
     if (count !== 1) throw new DraftBusyError()
-  })
+  }, TX_OPTIONS)
 }
 
 export interface RecordRejectedRenderArgs {

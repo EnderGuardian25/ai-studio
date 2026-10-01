@@ -73,10 +73,12 @@ export function sanitizeInlineHtml(html: string): string {
 // the replace-photo wrappers (unwrapped to leave the <img> in place).
 export function stripEditingChrome(html: string): string {
   return html
-    .replace(/\scontenteditable(\s*=\s*("[^"]*"|'[^']*'|[^\s>]+))?/gi, '')
+    // The (?=[\s=/>]) boundary keeps a longer attribute name (or plain text
+    // that merely starts with these words) intact.
+    .replace(/\scontenteditable(?=[\s=/>])(\s*=\s*("[^"]*"|'[^']*'|[^\s>]+))?/gi, '')
     // A leftover from the editor's earlier paste-wiring guard (now a parent-side
     // WeakSet). Documents saved by that version carry it on <body>.
-    .replace(/\sdata-inline-edit-paste-wired(\s*=\s*("[^"]*"|'[^']*'|[^\s>]+))?/gi, '')
+    .replace(/\sdata-inline-edit-paste-wired(?=[\s=/>])(\s*=\s*("[^"]*"|'[^']*'|[^\s>]+))?/gi, '')
     .replace(/<style\b[^>]*id\s*=\s*["']inline-edit-style["'][^>]*>[\s\S]*?<\/style\s*>/gi, '')
     .replace(
       /<div\b[^>]*data-inline-edit-chrome\s*=\s*["']banner["'][^>]*>[\s\S]*?<\/div\s*>/gi,
