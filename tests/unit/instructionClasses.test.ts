@@ -6,6 +6,7 @@ import {
   CONSTRAINS_RULE,
   checkPostConditions,
   asksForTextReduction,
+  hasMoveIntent,
   TEXT_REDUCTION_CHECK,
   decodeHtmlEntities,
   renderClassSemantics,
@@ -914,10 +915,21 @@ describe('final F1 / C-1 — replace: no existing image may appear more often, a
   // images trade places on the SAME slots ("use the upload as the background
   // and put the old one in the inset") is a correct move and passes in every
   // form. A swap onto a renamed/new slot still misses (see the F1b block).
-  it('a SWAP onto the same slots (upload to .bg, old background into .inset) passes in every form — each image occupies a slot the other vacated', () => {
+  // Changed again by final F1c: only when the instruction asks for the move.
+  it('a SWAP onto the same slots (upload to .bg, old background into .inset) passes in every form when the instruction asks for it — each image occupies a slot the other vacated', () => {
+    const swapped = facts([bgLayer(UPLOAD), headline(), body(), inset(OLD_BG)])
+    const instruction = 'use the upload as the background and put the old one in the inset'
+    for (const supersedes of [[OLD_BG], [UPLOAD], ['.inset'], [OLD_BG, '.inset']]) {
+      expect(check('replace', { before, after: swapped, supersedes, classes: ['replace'], instruction })).toEqual({ ok: true })
+    }
+  })
+
+  it('final F1c: the same SWAP misses in every form when the instruction does not ask for a move', () => {
     const swapped = facts([bgLayer(UPLOAD), headline(), body(), inset(OLD_BG)])
     for (const supersedes of [[OLD_BG], [UPLOAD], ['.inset'], [OLD_BG, '.inset']]) {
-      expect(replace(swapped, supersedes)).toEqual({ ok: true })
+      for (const instruction of [undefined, 'use the upload as the background']) {
+        expect(check('replace', { before, after: swapped, supersedes, classes: ['replace'], instruction }).ok).toBe(false)
+      }
     }
   })
 
@@ -1120,10 +1132,13 @@ describe('final F1b / Important 1 — a superseded image survives only in a vaca
   const img = (cls: string[], src: string, id: string | null = null) => el({ tag: 'img', id, classes: cls, imageSources: [src] })
   const bgOnly = facts([div(['bg'], OLD_BG), headline()])
   const bgInset = facts([div(['bg'], OLD_BG), headline(), img(['inset'], UPLOAD)])
-  const replace = (before: DomFacts, after: DomFacts, supersedes: string[]) =>
-    check('replace', { before, after, supersedes, classes: ['replace'] })
+  const replace = (before: DomFacts, after: DomFacts, supersedes: string[], instruction?: string) =>
+    check('replace', { before, after, supersedes, classes: ['replace'], instruction })
+  // Final F1c: the vacated-slot rule applies in full only with move intent.
+  const MOVE = 'use the upload as the background and put the old one in the inset'
+  const NO_MOVE = 'use the upload as the background'
 
-  // The re-review's Important 1 table — every row MISSES.
+  // The re-review's Important 1 table — every row MISSES, with or without move intent.
   const MISSES: Array<[string, DomFacts, DomFacts, string[]]> = [
     ['rename + underlay (.hero-bg NEW, .underlay OLD), supersedes [OLD]', bgOnly, facts([div(['hero-bg'], NEW), div(['underlay'], OLD_BG), headline()]), [OLD_BG]],
     ['rename + underlay (.hero-bg NEW, .underlay OLD), supersedes [.bg]', bgOnly, facts([div(['hero-bg'], NEW), div(['underlay'], OLD_BG), headline()]), ['.bg']],
@@ -1145,28 +1160,42 @@ describe('final F1b / Important 1 — a superseded image survives only in a vaca
     ["id'd carrier survives (#photo now carries OLD), supersedes [UP]", facts([div(['bg'], OLD_BG), img([], UPLOAD, 'photo')]), facts([div(['bg'], UPLOAD), img([], OLD_BG, 'photo')]), [UPLOAD]],
   ]
   for (const [name, before, after, supersedes] of MISSES) {
-    it(`MISSES: ${name}`, () => {
-      const r = replace(before, after, supersedes)
-      expect(r.ok).toBe(false)
-      if (!r.ok) expect(r.reason).toMatch(/^replace: .*still present/)
-    })
+    for (const instruction of [MOVE, NO_MOVE, undefined]) {
+      it(`MISSES: ${name} — instruction ${JSON.stringify(instruction ?? null)}`, () => {
+        const r = replace(before, after, supersedes, instruction)
+        expect(r.ok).toBe(false)
+        if (!r.ok) expect(r.reason).toMatch(/^replace: .*still present/)
+      })
+    }
   }
 
-  // Correct moves — every one PASSES.
+  // Correct moves — every one PASSES with move intent (final F1c). The last
+  // column is the result WITHOUT move intent: a swap (the displaced image
+  // survives) misses; a pure move (the displaced image is gone) still passes.
   const twoInsets = facts([div(['bg'], OLD_BG), headline(), img(['inset'], UPLOAD), img(['inset'], NEW)])
-  const PASSES: Array<[string, DomFacts, DomFacts, string[]]> = [
-    ['swap on the same slots (.bg UP, .inset OLD), supersedes [OLD]', bgInset, facts([div(['bg'], UPLOAD), headline(), img(['inset'], OLD_BG)]), [OLD_BG]],
-    ['swap on the same slots (.bg UP, .inset OLD), supersedes [UP]', bgInset, facts([div(['bg'], UPLOAD), headline(), img(['inset'], OLD_BG)]), [UPLOAD]],
-    ['swap on the same slots (.bg UP, .inset OLD), supersedes [OLD, .inset]', bgInset, facts([div(['bg'], UPLOAD), headline(), img(['inset'], OLD_BG)]), [OLD_BG, '.inset']],
-    ['swap with classes in another order (div.bg.full ↔ div.full.bg)', facts([el({ tag: 'div', classes: ['bg', 'full'], imageSources: [OLD_BG] }), img(['inset'], UPLOAD)]), facts([el({ tag: 'div', classes: ['full', 'bg'], imageSources: [UPLOAD] }), img(['inset'], OLD_BG)]), [OLD_BG]],
-    ['inset moved to the background, inset gone, supersedes [UP]', bgInset, facts([div(['bg'], UPLOAD), headline()]), [UPLOAD]],
-    ['inset moved, its .inset slot now a caption, supersedes [UP]', bgInset, facts([div(['bg'], UPLOAD), headline(), el({ tag: 'p', classes: ['inset'], text: 'Photo credit' })]), [UPLOAD]],
-    ['one of two .inset images moved, supersedes [OLD]', twoInsets, facts([div(['bg'], UPLOAD), headline(), img(['inset'], NEW)]), [OLD_BG]],
-    ['one of two .inset images moved, supersedes [UP]', twoInsets, facts([div(['bg'], UPLOAD), headline(), img(['inset'], NEW)]), [UPLOAD]],
-    ['swap onto a class-less <img> whose id slot was vacated, supersedes [OLD]', facts([div(['bg'], OLD_BG), headline(), img([], UPLOAD, 'ph')]), facts([div(['bg'], UPLOAD), headline(), img([], OLD_BG, 'ph')]), [OLD_BG]],
+  const PASSES: Array<[string, DomFacts, DomFacts, string[], 'pass' | 'miss']> = [
+    ['swap on the same slots (.bg UP, .inset OLD), supersedes [OLD]', bgInset, facts([div(['bg'], UPLOAD), headline(), img(['inset'], OLD_BG)]), [OLD_BG], 'miss'],
+    ['swap on the same slots (.bg UP, .inset OLD), supersedes [UP]', bgInset, facts([div(['bg'], UPLOAD), headline(), img(['inset'], OLD_BG)]), [UPLOAD], 'miss'],
+    ['swap on the same slots (.bg UP, .inset OLD), supersedes [OLD, .inset]', bgInset, facts([div(['bg'], UPLOAD), headline(), img(['inset'], OLD_BG)]), [OLD_BG, '.inset'], 'miss'],
+    ['swap with classes in another order (div.bg.full ↔ div.full.bg)', facts([el({ tag: 'div', classes: ['bg', 'full'], imageSources: [OLD_BG] }), img(['inset'], UPLOAD)]), facts([el({ tag: 'div', classes: ['full', 'bg'], imageSources: [UPLOAD] }), img(['inset'], OLD_BG)]), [OLD_BG], 'miss'],
+    ['inset moved to the background, inset gone, supersedes [UP]', bgInset, facts([div(['bg'], UPLOAD), headline()]), [UPLOAD], 'pass'],
+    ['inset moved, its .inset slot now a caption, supersedes [UP]', bgInset, facts([div(['bg'], UPLOAD), headline(), el({ tag: 'p', classes: ['inset'], text: 'Photo credit' })]), [UPLOAD], 'pass'],
+    ['one of two .inset images moved, supersedes [OLD]', twoInsets, facts([div(['bg'], UPLOAD), headline(), img(['inset'], NEW)]), [OLD_BG], 'pass'],
+    ['one of two .inset images moved, supersedes [UP]', twoInsets, facts([div(['bg'], UPLOAD), headline(), img(['inset'], NEW)]), [UPLOAD], 'pass'],
+    ['swap onto a class-less <img> whose id slot was vacated, supersedes [OLD]', facts([div(['bg'], OLD_BG), headline(), img([], UPLOAD, 'ph')]), facts([div(['bg'], UPLOAD), headline(), img([], OLD_BG, 'ph')]), [OLD_BG], 'miss'],
   ]
-  for (const [name, before, after, supersedes] of PASSES) {
-    it(`PASSES: ${name}`, () => expect(replace(before, after, supersedes)).toEqual({ ok: true }))
+  for (const [name, before, after, supersedes, noIntent] of PASSES) {
+    it(`PASSES with move intent: ${name}`, () => expect(replace(before, after, supersedes, MOVE)).toEqual({ ok: true }))
+    for (const instruction of [NO_MOVE, undefined]) {
+      it(`without move intent (${JSON.stringify(instruction ?? null)}) ${noIntent === 'pass' ? 'PASSES' : 'MISSES'}: ${name}`, () => {
+        const r = replace(before, after, supersedes, instruction)
+        if (noIntent === 'pass') expect(r).toEqual({ ok: true })
+        else {
+          expect(r.ok).toBe(false)
+          if (!r.ok) expect(r.reason).toMatch(/^replace: .*still present/)
+        }
+      })
+    }
   }
 })
 
@@ -1224,4 +1253,115 @@ describe('final F1b / Important 2 — a resize refine gets no text-reduction che
       expect(rs).toEqual([{ class: 'constrain', result: { ok: true } }])
     })
   }
+})
+
+// ── Final fix wave F1c (change 004): the image-move exemption needs move intent ─
+
+// F1b's vacated-slot rule certified div.bg(OLD) + img.inset(UP) →
+// div.bg(UP) + img.inset(OLD) with zero calls whatever the user asked. That is
+// a correct move only when the user asked for the old image to go somewhere;
+// for "use the upload as the background" it is the AC-09 "kept/moved
+// elsewhere" failure. Move intent comes from a zero-call lexicon (AC-12).
+describe('final F1c — hasMoveIntent, the move-intent lexicon', () => {
+  // The brief's binding tables.
+  const MUST: string[] = [
+    'use the upload as the background and put the old one in the inset',
+    'move the old background into the inset',
+    'swap the background and the inset',
+    'switch the two images',
+    'keep the old background as the inset photo',
+    'make the upload the background and move the current background to the small frame',
+    'swap the photos round',
+    'place the previous image in the corner',
+  ]
+  const MUST_NOT: string[] = [
+    'use the upload as the background',
+    'replace the background with the uploaded image',
+    'make the uploaded photo the background',
+    'swap out the background for the upload',
+    'switch the background to the upload',
+    'swap the background for the new photo',
+    'keep the headline, replace the background with the upload',
+    'keep it on brand and use the upload as the background',
+    'move the headline up and use the upload as the background',
+    'put the upload in the background',
+    'place the uploaded image behind the text',
+  ]
+  // Further non-triggers (when unsure, NO move intent): negations, an ambiguous
+  // "swap … with", a reciprocal verb with a non-move tail.
+  const ALSO_NOT: string[] = [
+    "use the upload as the background, don't keep the old one",
+    'use the upload as the background and do not move the old background',
+    'use the upload as the background without keeping the old one',
+    'use the upload as the background instead of keeping the old image',
+    'there is no need to keep the old background',
+    'swap the background with the uploaded photo',
+    'switch the two images to black and white',
+    'swap the two photos for new ones',
+    'keep the current layout and use the upload as the background',
+    'keep the existing text and replace the background',
+    'swap the background',
+    'cannot keep the old background',
+    'make the background the upload and keep the existing photo',
+    'keep the current background',
+  ]
+  // Case, curly apostrophes and other phrasings inside the lexicon.
+  const ALSO_MUST: string[] = [
+    'Swap The Background And The Inset',
+    'exchange the logo and the photo',
+    'switch the photos around',
+    'swap both images over',
+    'relocate the original photo to the top',
+    'retain the original background image as a small inset',
+    'put the existing logo top left',
+  ]
+
+  for (const s of [...MUST, ...ALSO_MUST]) it(`move intent: ${JSON.stringify(s)}`, () => expect(hasMoveIntent(s)).toBe(true))
+  for (const s of [...MUST_NOT, ...ALSO_NOT]) it(`no move intent: ${JSON.stringify(s)}`, () => expect(hasMoveIntent(s)).toBe(false))
+  it('a curly-apostrophe negation is still a negation', () => {
+    expect(hasMoveIntent('use the upload as the background and don’t keep the old one')).toBe(false)
+  })
+})
+
+describe('final F1c — end to end through checkPostConditions: the swap needs move intent', () => {
+  const inset = (src: string) => el({ tag: 'img', classes: ['inset'], imageSources: [src], box: { width: 300, height: 300 } })
+  const before = facts([bgLayer(OLD_BG), headline(), body(), inset(UPLOAD)])
+  const swapped = facts([bgLayer(UPLOAD), headline(), body(), inset(OLD_BG)])
+  // The canonical correct edit: the inset upload becomes the background, the old background is gone.
+  const moved = facts([bgLayer(UPLOAD), headline(), body()])
+  const FORMS: string[][] = [[OLD_BG], [UPLOAD], ['.inset'], [OLD_BG, '.inset']]
+  const run = (after: DomFacts, supersedes: string[], instruction: string) =>
+    checkPostConditions({ before, after, supersedes, constrains: [], classes: ['replace'], instruction })
+
+  for (const supersedes of FORMS) {
+    it(`the swap MISSES for "use the upload as the background" — supersedes ${JSON.stringify(supersedes)}`, () => {
+      const rs = run(swapped, supersedes, 'use the upload as the background')
+      expect(rs).toHaveLength(1)
+      expect(rs[0].class).toBe('replace')
+      expect(rs[0].result.ok).toBe(false)
+      if (!rs[0].result.ok) expect(rs[0].result.reason).toMatch(/^replace: .*still present/)
+    })
+    it(`the swap PASSES for "use the upload as the background and put the old one in the inset" — supersedes ${JSON.stringify(supersedes)}`, () => {
+      expect(run(swapped, supersedes, 'use the upload as the background and put the old one in the inset')).toEqual([
+        { class: 'replace', result: { ok: true } },
+      ])
+    })
+    it(`the canonical move (inset → background, old background gone) PASSES without move intent — supersedes ${JSON.stringify(supersedes)}`, () => {
+      expect(run(moved, supersedes, 'use the upload as the background')).toEqual([{ class: 'replace', result: { ok: true } }])
+    })
+  }
+
+  it('the swap misses for every no-move-intent instruction in the table and passes for every move-intent one', () => {
+    const NO = ['use the upload as the background', 'replace the background with the uploaded image', 'make the uploaded photo the background', 'swap out the background for the upload', 'switch the background to the upload', 'put the upload in the background']
+    const YES = ['swap the background and the inset', 'switch the two images', 'move the old background into the inset', 'keep the old background as the inset photo', 'swap the photos round']
+    for (const instruction of NO) expect(run(swapped, [OLD_BG, '.inset'], instruction)[0].result.ok).toBe(false)
+    for (const instruction of YES) expect(run(swapped, [OLD_BG, '.inset'], instruction)[0].result).toEqual({ ok: true })
+  })
+
+  it('move intent does not excuse a duplicate (multiplicity still applies)', () => {
+    const dup = facts([bgLayer(UPLOAD), headline(), body(), inset(UPLOAD)])
+    const r = run(dup, [OLD_BG], 'swap the background and the inset')[0].result
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.reason).toMatch(/1 → 2/)
+  })
 })

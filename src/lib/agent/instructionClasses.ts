@@ -179,9 +179,10 @@ export interface PostConditionInput {
   // Every class the instruction carried (after effectiveClasses), including the
   // one being checked.
   classes: InstructionClass[]
-  // The user's instruction. Only the text-reduction lexicon reads it (see
-  // TEXT_REDUCTION_LEXICON); the class post-conditions never do. Omitted → no
-  // lexicon check.
+  // The user's instruction. Only the two zero-call lexicons read it: the
+  // text-reduction lexicon (TEXT_REDUCTION_LEXICON) and the move-intent lexicon
+  // (MOVE_INTENT_LEXICON, which replace's move exemption consults). Omitted →
+  // no text-reduction check and no move intent.
   instruction?: string
 }
 
@@ -548,6 +549,19 @@ function targetMiss(was: DomElementFact, now: DomElementFact, direction?: Constr
 //      carried such an X that no AFTER element with that id still carries.
 //      An id'd BEFORE carrier keeps the F1 id logic: no element may keep that
 //      id (the identified element must be gone).
+//   3. MOVE INTENT (final F1c). The vacated-slot rule alone certified the swap
+//      above whatever the user asked. That swap is right only when the user
+//      asked for the old image to go somewhere; for a plain "use the upload as
+//      the background" it is the AC-09 failure (the old background kept, moved
+//      into the inset). So the full rule 2 applies only when the INSTRUCTION
+//      expresses explicit move intent (hasMoveIntent, a zero-call lexicon —
+//      AC-12). Without move intent a surviving superseded image passes only as
+//      a PURE move: every image displaced from the vacated slot must be gone
+//      from the whole AFTER design. The canonical correct edit — the inset
+//      upload becomes the background and the old background is gone, with
+//      supersedes [old background, ".inset"] as the replace example steers —
+//      is a pure move and passes; a swap or any relocation (the displaced image
+//      survives somewhere) misses, vacated slot or not.
 // URLs are compared normalised (normalisedSource): an http(s) URL without its
 // query string or fragment, so `UP?v=1` or `UP#bg` is still UP. Inline-asset
 // tokens and data URIs are compared as-is.
@@ -563,7 +577,14 @@ function targetMiss(was: DomElementFact, now: DomElementFact, direction?: Constr
 //     survives on it;
 //   - two distinct CDN images that differ only by query string (`img?w=400`
 //     vs `img?w=800`) count as ONE image, so showing both misses as a
-//     duplicate; srcset candidates are not counted at all.
+//     duplicate; srcset candidates are not counted at all;
+//   - a move request phrased outside the move-intent lexicon (it is
+//     English-only — see MOVE_INTENT_LEXICON) gets the pure-move rule, so a
+//     legitimate swap asked for in other words misses.
+// Known limit (fail OPEN, no move intent): the pure-move test cannot tell which
+// image the user meant to move. If the model deletes an UNRELATED image and
+// puts the old background in that image's slot (the old background "moved"
+// into a slot whose image is gone everywhere), it passes as a pure move.
 
 // An http(s) URL with its query string and fragment stripped; any other source
 // (an __INLINE_ASSET_n__ token, a data: URI) unchanged.
@@ -594,9 +615,89 @@ function identifiedSources(before: DomFacts, r: ResolvedFragment): string[] {
   )
 }
 
-// Rule 2 above: the fragment's images are still present, but only because they
-// moved into slots other images vacated.
-function movedAway(before: DomFacts, after: DomFacts, r: ResolvedFragment): boolean {
+// ── Move-intent lexicon (final F1c) ──────────────────────────────────────────
+//
+// Decides whether the INSTRUCTION explicitly asks for an image to go somewhere
+// else (rule 3 above). Zero model calls (AC-12): replace is checked
+// structurally, so the decision cannot be handed to a model.
+//
+// Governing principle: WHEN UNSURE, NO MOVE INTENT. A wrong "no" is a false
+// miss on a rare, legitimate move request — it fails closed, and Use anyway
+// still works. A wrong "yes" is a zero-call false pass on the core bug (the
+// old background kept, moved into the inset).
+//
+// Two phrasings, case-insensitive, anchored on word boundaries:
+//   1. A RECIPROCAL swap — swap / switch / exchange / interchange — of
+//      "the X and the Y" (two image nouns), of "the two / both" images, or of
+//      image nouns followed by round / around / over / places / positions /
+//      sides ("swap the background and the inset", "switch the two images",
+//      "swap the photos round"). "swap out", "swap X for Y", "switch X to Y"
+//      and "swap X with Y" never match: they REPLACE one thing with another
+//      ("swap the background with the uploaded photo" is ambiguous, so no).
+//      A reciprocal swap followed by to / for / out / with / into is not one
+//      either ("switch the two images to black and white").
+//   2. A MOVE verb — move, put, place, relocate, shift, keep, retain — whose
+//      object is a SUPERSEDED-IMAGE reference: old / previous / original /
+//      current / existing / former, then at most one word, then an image noun
+//      or "one" ("put the old one in the inset", "move the current background
+//      to the small frame", "keep the old background as the inset photo").
+//      After keep / retain only old / previous / original / former count:
+//      "keep the existing photo" means leave it be, not move it.
+//      The object must be a superseded image: "put the upload in the
+//      background" and "place the uploaded image behind the text" place the
+//      NEW image; "keep the headline", "keep it on brand", "keep the current
+//      layout" and "move the headline up" name no image.
+// Either phrasing is void after a negation directly before the verb:
+// n't / not / cannot / never / no / without / than / instead of / no need to
+// ("don't keep the old one", "without keeping the old one").
+//
+// Known limits:
+//   - fail closed (the request gets the pure-move rule, so a legitimate swap
+//     misses and "Use anyway" is offered): the lexicon is ENGLISH-ONLY, and a
+//     move request phrased outside it — "swap them round", "trade places",
+//     "the old background can go in the corner", "swap X with Y" — has no move
+//     intent;
+//   - fail open (toward the F1b vacated-slot rule): only a negation DIRECTLY
+//     before the verb voids it, so "don't ever keep the old one" or "keep
+//     neither the old one nor …" reads as intent.
+const IMAGE_NOUN = String.raw`(?:images?|photos?|photographs?|pictures?|pics?|backgrounds?|backdrops?|bgs?|insets?|logos?|graphics?|illustrations?|visuals?|frames?)`
+const OPT_WORD = String.raw`(?:[\p{L}\p{N}][\p{L}\p{N}-]*\s+)?`
+const NOT_NEGATED = String.raw`(?<!(?:n['’]t|\bnot|\bcannot|\bnever|\bno|\bwithout|\bthan|\binstead\s+of|\b(?:no|not|n['’]t)\s+(?:need|have|want)\s+to)\s+)`
+const SWAP_VERB = String.raw`(?:swap|swapping|switch|switching|exchange|exchanging|interchange|interchanging)`
+// Determiner, then at most one word that is not "out"/"in" ("swap out …").
+const SWAP_DET = String.raw`(?:(?:the|their|its|my|our|these|those)\s+)?(?!(?:out|in)\b)${OPT_WORD}`
+const NOT_REPLACING_TAIL = String.raw`(?!\s+(?:to|for|out|with|into)\b)`
+const MOVE_VERB = String.raw`(?:move|moving|put|putting|place|placing|relocate|relocating|shift|shifting)`
+const KEEP_VERB = String.raw`(?:keep|keeping|retain|retaining)`
+const REF_DET = String.raw`(?:(?:the|that|this|those|these|my|our)\s+)?`
+const REF_NOUN = String.raw`\s+${OPT_WORD}(?:${IMAGE_NOUN}|ones?)\b`
+const SUPERSEDED_REF = String.raw`${REF_DET}(?:old|previous|original|current|existing|former)${REF_NOUN}`
+// After keep / retain, "current" and "existing" mean "leave it as it is", not
+// "move it" ("keep the existing photo"), so only old / previous / original /
+// former count there.
+const KEPT_REF = String.raw`${REF_DET}(?:old|previous|original|former)${REF_NOUN}`
+
+export const MOVE_INTENT_LEXICON: readonly RegExp[] = [
+  // "swap the background and the inset"
+  new RegExp(String.raw`${NOT_NEGATED}\b${SWAP_VERB}\s+${SWAP_DET}${IMAGE_NOUN}\s+and\s+${SWAP_DET}${IMAGE_NOUN}\b${NOT_REPLACING_TAIL}`, 'iu'),
+  // "switch the two images", "swap both photos"
+  new RegExp(String.raw`${NOT_NEGATED}\b${SWAP_VERB}\s+(?:the\s+)?(?:two|2|both)\s+(?:of\s+the\s+)?${OPT_WORD}${IMAGE_NOUN}\b${NOT_REPLACING_TAIL}`, 'iu'),
+  // "swap the photos round"
+  new RegExp(String.raw`${NOT_NEGATED}\b${SWAP_VERB}\s+${SWAP_DET}${IMAGE_NOUN}\s+(?:round|around|over|places|positions|sides)\b`, 'iu'),
+  // "put the old one in the inset", "move the current background to the small frame"
+  new RegExp(String.raw`${NOT_NEGATED}\b${MOVE_VERB}\s+${SUPERSEDED_REF}`, 'iu'),
+  // "keep the old background as the inset photo"
+  new RegExp(String.raw`${NOT_NEGATED}\b${KEEP_VERB}\s+${KEPT_REF}`, 'iu'),
+]
+
+export function hasMoveIntent(instruction: string): boolean {
+  return MOVE_INTENT_LEXICON.some((re) => re.test(instruction))
+}
+
+// Rules 2 and 3 above: the fragment's images are still present, but only
+// because they moved into slots other images vacated — and, without move
+// intent, only when every image they displaced is gone from the design.
+function movedAway(before: DomFacts, after: DomFacts, r: ResolvedFragment, moveIntent: boolean): boolean {
   const sources = identifiedSources(before, r)
   if (sources.length === 0) return false
   if (sources.some((s) => countOf(after.imageSources, s) > countOf(before.imageSources, s))) return false
@@ -607,11 +708,16 @@ function movedAway(before: DomFacts, after: DomFacts, r: ResolvedFragment): bool
   // The F1 id logic: an id'd BEFORE carrier must be gone.
   if (before.elements.some((was) => was.id && carries(was) && after.elements.some((e) => e.id === was.id))) return false
 
+  const afterSources = new Set(after.imageSources.map(normalisedSource))
   // In BEFORE, elements matching `slot` carried an image X outside `held`, and
-  // in AFTER none of them carries X.
+  // in AFTER none of them carries X. Without move intent (rule 3), every such
+  // displaced X must also be gone from the whole design — a pure move, not a
+  // swap or a relocation.
   const vacated = (slot: (e: DomElementFact) => boolean, held: Set<string>) => {
     const prior = unique(before.elements.filter(slot).flatMap(heldBy)).filter((x) => !held.has(x))
-    return prior.some((x) => !after.elements.some((e) => slot(e) && heldBy(e).includes(x)))
+    const displaced = prior.filter((x) => !after.elements.some((e) => slot(e) && heldBy(e).includes(x)))
+    if (displaced.length === 0) return false
+    return moveIntent || displaced.every((x) => !afterSources.has(x))
   }
   const carriers = after.elements.filter(carries)
   // The image is present but on no element: nothing shows it moved.
@@ -642,8 +748,9 @@ const supersededElementAbsent: PostCondition = (input) => {
   if (!Array.isArray(resolved)) return resolved
   const { before, after } = input
   const withRemove = input.classes.includes('remove')
+  const moveIntent = !!input.instruction && hasMoveIntent(input.instruction)
   const kept = resolved.filter((r) => {
-    if (imagesPresent(after, r) && !movedAway(before, after, r)) return true
+    if (imagesPresent(after, r) && !movedAway(before, after, r, moveIntent)) return true
     const t = textPart(r)
     return withRemove ? !contentReduced(before, after, t) && !replacedWholesale(after, t) : !contentAbsent(after, t)
   })
