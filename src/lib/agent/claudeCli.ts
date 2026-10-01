@@ -191,8 +191,8 @@ export async function runClaudeCli(prompt: string, opts: ClaudeCliOptions = {}):
   return withAuthRetry(opts, (token) => runClaudeCliOnce(prompt, opts, token))
 }
 
-// The personal → team auth-retry wrapper, shared by every entry point (text
-// mode today; T5's stream-json mode next). `attempt` runs one spawn under the
+// The personal → team auth-retry wrapper, shared by both entry points (text
+// mode and stream-json mode). `attempt` runs one spawn under the
 // token it is handed (undefined ⇒ spawnClaude reads the ALS context, and with
 // none throws the no-credential error).
 async function withAuthRetry<T>(
@@ -260,22 +260,202 @@ export async function runClaudeCliOnce(
   return spawnClaude(args, prompt, { ...opts, command, tokenOverride })
 }
 
+// ─── stream-json mode (005 FR-09) ────────────────────────────────────────────
+//
+// The only way to hand a headless `claude -p` an image with no tool and no
+// file: one stream-json user message on stdin whose content holds base64 image
+// blocks beside the text. Contract, per Anthropic's docs and verified locally
+// against CLI 2.1.287 (see .specclaw/changes/005-…/reports/T5.md):
+//   https://code.claude.com/docs/en/cli-reference   (--input-format / --output-format
+//                                                    stream-json; stream-json output
+//                                                    needs --verbose under -p)
+//   https://code.claude.com/docs/en/headless        ("The last line of the stream is a
+//                                                    `result` message"; a failure inside
+//                                                    the run, e.g. missing auth, is
+//                                                    printed as the result on stdout)
+//   https://code.claude.com/docs/en/agent-sdk/typescript  (SDKUserMessage, SDKResultMessage)
+// Input: one line `{"type":"user","message":{"role":"user","content":[...]}}`.
+// Output: NDJSON — system/init, hook and retry events, one or more `assistant`
+// messages, then a terminal `{"type":"result","subtype":"success",
+// "is_error":false,"result":"<text>",…}`. A rejected token arrives as exit 1
+// with a `result` event of subtype "success" but is_error true, its text
+// "Failed to authenticate. API Error: 401 …", and `api_error_status: 401` —
+// nothing on stderr. The schema can drift between CLI versions, which is why
+// the container pins one (FR-11).
+
+export type ContentBlock =
+  | { type: "text"; text: string }
+  | { type: "image"; source: { type: "base64"; media_type: string; data: string } }
+
+export async function runClaudeCliStreamJson(content: ContentBlock[], opts: ClaudeCliOptions = {}): Promise<string> {
+  return withAuthRetry(opts, (token) => runClaudeCliStreamJsonOnce(content, opts, token))
+}
+
+async function runClaudeCliStreamJsonOnce(
+  content: ContentBlock[],
+  opts: ClaudeCliOptions,
+  tokenOverride: string | undefined,
+): Promise<string> {
+  const command = claudeCommand()
+  const args = [
+    "-p",
+    "--strict-mcp-config",
+    "--tools",
+    emptyArg(command.shell),
+    "--input-format",
+    "stream-json",
+    "--output-format",
+    "stream-json",
+    "--verbose",
+    ...claudeModelArgs(opts.model, opts.pinModel),
+  ]
+  // Exactly one user message, then stdin ends — the CLI answers it and exits.
+  // The 600k guard in spawnClaude measures this whole serialized line, so the
+  // base64 images count against it, not only the text.
+  const line = JSON.stringify({ type: "user", message: { role: "user", content } }) + "\n"
+  return spawnClaude(args, line, {
+    ...opts,
+    command,
+    tokenOverride,
+    finalize: finalizeStreamJson,
+    tooLargeHint: "With images attached this usually means the reference images are too big — use smaller images.",
+  })
+}
+
+interface StreamJsonResultEvent {
+  type: "result"
+  subtype?: string
+  is_error?: boolean
+  result?: unknown
+  errors?: unknown
+  api_error_status?: number | null
+}
+
+export interface ParsedStreamJson {
+  // The LAST `result` event — the terminal one. Assistant messages before it
+  // never count, however many there are.
+  result: StreamJsonResultEvent | null
+  // Text blocks of the assistant messages and any non-JSON lines: kept only
+  // to explain a failure, never returned as an answer.
+  assistantText: string[]
+  nonJson: string[]
+}
+
+// Pure + exported. Parses the whole buffered stdout at close, so a line split
+// across `data` chunks is reassembled before it is parsed; a final line with
+// no trailing newline still parses.
+export function parseStreamJson(stdout: string): ParsedStreamJson {
+  const parsed: ParsedStreamJson = { result: null, assistantText: [], nonJson: [] }
+  for (const raw of stdout.split("\n")) {
+    const line = raw.trim()
+    if (!line) continue
+    let ev: unknown
+    try {
+      ev = JSON.parse(line)
+    } catch {
+      parsed.nonJson.push(line)
+      continue
+    }
+    if (!ev || typeof ev !== "object") continue
+    const e = ev as { type?: unknown; message?: { content?: unknown } }
+    if (e.type === "result") parsed.result = ev as StreamJsonResultEvent
+    else if (e.type === "assistant" && Array.isArray(e.message?.content)) {
+      for (const b of e.message.content as Array<{ type?: unknown; text?: unknown }>) {
+        if (b?.type === "text" && typeof b.text === "string") parsed.assistantText.push(b.text)
+      }
+    }
+  }
+  return parsed
+}
+
+// Turns a finished stream-json run into its answer or a ClaudeCliError.
+//
+// The error's `stdout` is a short DIAGNOSTIC — the result / error text, the
+// API status, assistant text and any non-JSON lines — never the raw NDJSON:
+// the raw stream is full of numbers (durations, token counts) and base64
+// signatures, any of which could contain `401` and make isClaudeAuthFailure
+// mark a good token invalid. A run that exited 0 yet reported an error gets
+// exitCode null rather than 0, so the classifier still reads its text (it
+// treats exit 0 as "not an auth failure").
+function finalizeStreamJson({ code, stdout, stderr }: SpawnResult): string {
+  const { result, assistantText, nonJson } = parseStreamJson(stdout)
+  const errorCode = code === 0 ? null : code
+  const diagnostic = (parts: unknown[]) =>
+    parts
+      .flat()
+      .filter((p) => p !== undefined && p !== null && p !== "")
+      .map((p) => (typeof p === "string" ? p : JSON.stringify(p)))
+      .join("\n")
+
+  if (!result) {
+    throw new ClaudeCliError(
+      `Claude CLI stream-json run ended with no result event (exit code ${code}): ${stderr.trim().slice(0, 500)}`,
+      errorCode,
+      stderr,
+      diagnostic([assistantText, nonJson]),
+    )
+  }
+  const text = typeof result.result === "string" ? result.result : ""
+  if (result.is_error || result.subtype !== "success") {
+    throw new ClaudeCliError(
+      `Claude CLI reported an error (subtype=${result.subtype ?? "none"}, exit code ${code}): ${(text || diagnostic([result.errors])).slice(0, 500)}`,
+      errorCode,
+      stderr,
+      diagnostic([
+        text,
+        result.errors,
+        result.api_error_status != null ? `api_error_status: ${result.api_error_status}` : undefined,
+        nonJson,
+      ]),
+    )
+  }
+  return text.trim()
+}
+
+interface SpawnResult {
+  code: number | null
+  stdout: string
+  stderr: string
+}
+
+// Text mode: a non-zero exit is a ClaudeCliError carrying the raw output;
+// otherwise stdout IS the answer.
+function finalizeText({ code, stdout, stderr }: SpawnResult): string {
+  if (code !== 0) {
+    throw new ClaudeCliError(`Claude CLI exited with code ${code}: ${stderr.trim().slice(0, 500)}`, code, stderr, stdout)
+  }
+  return stdout.trim()
+}
+
 interface SpawnClaudeOptions extends Pick<ClaudeCliOptions, "timeoutMs" | "maxBuffer" | "label"> {
   command: { cmd: string; shell: boolean }
   tokenOverride: string | undefined
+  // How a finished run (any exit code) becomes the answer or an error. The
+  // input mode owns this; everything before it is shared.
+  finalize?: (r: SpawnResult) => string
+  // The second sentence of the 600k-guard error, naming the likely cause.
+  tooLargeHint?: string
 }
 
 // The one spawn core: the size guard, the credential, the allowlisted child
 // env, the timeout / kill-tree / buffer limit, logging and the error mapping.
 // Every input mode goes through here, so none of it can drift between modes.
 async function spawnClaude(args: string[], stdinPayload: string, opts: SpawnClaudeOptions): Promise<string> {
-  const { command, tokenOverride, timeoutMs = 180_000, maxBuffer = 16 * 1024 * 1024, label = "" } = opts
+  const {
+    command,
+    tokenOverride,
+    timeoutMs = 180_000,
+    maxBuffer = 16 * 1024 * 1024,
+    label = "",
+    finalize = finalizeText,
+    tooLargeHint = "This usually means the brand template is too big — use a smaller template or Path B.",
+  } = opts
   const { cmd, shell } = command
 
   if (stdinPayload.length > MAX_PROMPT_CHARS) {
     throw new Error(
       `Prompt too large for CLI mode (${stdinPayload.length} chars > ${MAX_PROMPT_CHARS}). ` +
-        `This usually means the brand template is too big — use a smaller template or Path B.`,
+        tooLargeHint,
     )
   }
 
@@ -374,19 +554,14 @@ async function spawnClaude(args: string[], stdinPayload: string, opts: SpawnClau
 
     child.on("close", (code: number | null) => {
       finish(() => {
-        if (code !== 0) {
-          cliLog(label, `exited code=${code} at ${elapsed()}`)
-          reject(
-            new ClaudeCliError(
-              `Claude CLI exited with code ${code}: ${stderr.trim().slice(0, 500)}`,
-              code,
-              stderr,
-              stdout,
-            ),
-          )
-        } else {
-          cliLog(label, `done at ${elapsed()} · ${stdout.length} chars`)
-          resolve(stdout.trim())
+        if (code !== 0) cliLog(label, `exited code=${code} at ${elapsed()}`)
+        try {
+          const answer = finalize({ code, stdout, stderr })
+          cliLog(label, `done at ${elapsed()} · ${answer.length} chars`)
+          resolve(answer)
+        } catch (err) {
+          if (code === 0) cliLog(label, `exited 0 but failed at ${elapsed()}: ${(err as Error).message.slice(0, 300)}`)
+          reject(err)
         }
       })
     })
