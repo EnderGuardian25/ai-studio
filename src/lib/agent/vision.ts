@@ -126,7 +126,9 @@ async function runVisionCli(req: VisionRequest, images: FetchedImage[]): Promise
       timeoutMs: CLI_TIMEOUT_MS,
       label: req.label ?? 'vision',
       model: modelFor('B', 'cli'),
-      allowedTools: ['Read'],
+      // T5: allowedTools is gone (005 FR-08, every spawn is `--tools ""`), so this
+      // interim text-mode call cannot Read the temp files; T5 moves vision to
+      // stream-json image blocks on stdin and deletes the temp-file code.
     })
   } finally {
     await Promise.all(paths.map((p) => unlink(p).catch(() => {})))

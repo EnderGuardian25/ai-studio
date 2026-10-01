@@ -2,12 +2,75 @@ import { spawn } from "child_process"
 import { env } from "@/lib/env"
 import { currentClaudeAuth } from "@/lib/agent/claudeAuth"
 
-// Resolve the Claude Code CLI binary. On Windows the npm shim is `claude.cmd`,
-// which needs a shell to launch; elsewhere `claude` runs directly.
-function claudeCommand(): { cmd: string; shell: boolean } {
-  if (env.CLAUDE_CLI_PATH) return { cmd: env.CLAUDE_CLI_PATH, shell: false }
-  if (process.platform === "win32") return { cmd: "claude.cmd", shell: true }
+// Resolve the Claude Code CLI binary (005 FR-17). An explicit CLAUDE_CLI_PATH
+// runs directly. On Windows a bare `claude` goes through the shell, so cmd.exe
+// resolves it via PATHEXT to either the npm shim (`claude.cmd`) or the winget /
+// native installer's `claude.exe` — the old hard-coded `claude.cmd` missed the
+// latter. Elsewhere `claude` runs directly. Pure + exported for AC-25.
+export function claudeCommand(
+  platform: NodeJS.Platform = process.platform,
+  cliPath: string | undefined = env.CLAUDE_CLI_PATH,
+): { cmd: string; shell: boolean } {
+  if (cliPath) return { cmd: cliPath, shell: false }
+  if (platform === "win32") return { cmd: "claude", shell: true }
   return { cmd: "claude", shell: false }
+}
+
+// The child env is an ALLOWLIST (005 FR-10, NFR-01), never a copy of
+// process.env: a denylist misses the next secret someone adds to `.env`, an
+// allowlist fails safe. Nothing else reaches the CLI — no DATABASE_URL,
+// TOKEN_ENCRYPTION_KEY, MINIO_*, BETTER_AUTH_*, *_SECRET / *_KEY, and never
+// ANTHROPIC_* (the CLI prefers ANTHROPIC_API_KEY / ANTHROPIC_AUTH_TOKEN over
+// CLAUDE_CODE_OAUTH_TOKEN, so a stray one would exit 1 or bill the API).
+// HOME matters: the CLI writes config/cache under ~/.claude* (Dockerfile sets a
+// writable HOME for the runner user).
+const CHILD_ENV_ALWAYS = [
+  "PATH",
+  "HOME",
+  "LANG",
+  "LC_ALL",
+  "TZ",
+  "TMPDIR",
+  "NODE_EXTRA_CA_CERTS",
+  "HTTP_PROXY",
+  "HTTPS_PROXY",
+  "NO_PROXY",
+  "http_proxy",
+  "https_proxy",
+  "no_proxy",
+]
+const CHILD_ENV_WIN32 = ["USERPROFILE", "APPDATA", "LOCALAPPDATA", "SystemRoot", "ComSpec", "PATHEXT", "TEMP", "TMP"]
+
+type EnvMap = Record<string, string | undefined>
+
+// Pure + exported for AC-14. Win32 env names are case-insensitive (`Path` is
+// `PATH`), so there names match case-insensitively and keep the parent's
+// original casing; on POSIX they match exactly. The OAuth token is set last,
+// so a stale parent value can never win.
+export function buildChildEnv(
+  parentEnv: EnvMap,
+  platform: NodeJS.Platform,
+  token: string,
+): EnvMap {
+  const win32 = platform === "win32"
+  const allowed = win32 ? [...CHILD_ENV_ALWAYS, ...CHILD_ENV_WIN32] : CHILD_ENV_ALWAYS
+  const wanted = new Set(win32 ? allowed.map((k) => k.toUpperCase()) : allowed)
+  const child: EnvMap = {}
+  for (const [key, value] of Object.entries(parentEnv)) {
+    if (value === undefined) continue
+    if (wanted.has(win32 ? key.toUpperCase() : key)) child[key] = value
+  }
+  child.CLAUDE_CODE_OAUTH_TOKEN = token
+  return child
+}
+
+// `--tools ""` (005 FR-08): an empty built-in tool list, so no CLI child can
+// call a tool whatever a prompt injection asks for. With shell:false the empty
+// string is its own argv element. With shell:true (win32) Node joins argv with
+// spaces and does NO quoting, so a bare "" would vanish from the command line —
+// pass the literal two characters `""` so cmd.exe hands claude an empty arg.
+function emptyArg(shell: boolean): string {
+  return shell ? '""' : ""
 }
 
 // Model the spawned `claude -p` runs under. Precedence:
@@ -43,13 +106,9 @@ export interface ClaudeCliOptions {
   // it. Only for calls whose model is a fixed policy rather than a preference —
   // the refine add-verifier is pinned to Haiku (change 004 FR-14b).
   pinModel?: boolean
-  // Tools the headless run may use without a permission prompt (maps to
-  // --allowedTools). Empty/undefined ⇒ no tools (the default single-shot text
-  // generation). Vision extraction passes ["Read"] so the CLI can ingest an
-  // image written to a temp file (the CLI's Read tool feeds image pixels to the
-  // model — verified 2026-07-13). Do NOT widen this without reason: the headless
-  // run executes with the server's privileges.
-  allowedTools?: string[]
+  // There is deliberately NO tools option (005 FR-08): every spawn passes
+  // `--tools ""`, so no caller can opt a headless run — which executes with the
+  // server's privileges — back into a tool without a reviewed code change.
   // Explicit OAuth token override: bypasses the per-user ALS auth context AND
   // the retry-once-with-shared behaviour. Used only by validateClaudeToken()
   // (userToken.ts) to test a candidate token — normal call sites never set it.
@@ -94,7 +153,7 @@ function cliLog(label: string, msg: string) {
 }
 
 // Kill the entire spawned process TREE. On Windows the CLI runs via a `cmd.exe`
-// shell (`claude.cmd`), so child.kill() only signals the shell — the underlying
+// shell (`claude` resolved via PATHEXT), so child.kill() only signals the shell — the underlying
 // `claude` (node) process keeps running to completion and KEEPS BURNING CREDITS
 // after we've already timed out. taskkill /T tears down the whole tree; on POSIX
 // a SIGKILL to the child suffices.
@@ -125,27 +184,32 @@ function killTree(child: ReturnType<typeof spawn>, label: string) {
 // Conservative input ceiling. The model's context is ~200k tokens; past roughly
 // this many characters a single-shot CLI prompt fails opaquely (exit 1). Guard so
 // callers get an actionable message instead — e.g. an oversized brand template.
+// It measures the stdin payload (spawnClaude), whatever the input mode.
 const MAX_PROMPT_CHARS = 600_000
 
 export async function runClaudeCli(prompt: string, opts: ClaudeCliOptions = {}): Promise<string> {
-  if (prompt.length > MAX_PROMPT_CHARS) {
-    throw new Error(
-      `Prompt too large for CLI mode (${prompt.length} chars > ${MAX_PROMPT_CHARS}). ` +
-        `This usually means the brand template is too big — use a smaller template or Path B.`,
-    )
-  }
+  return withAuthRetry(opts, (token) => runClaudeCliOnce(prompt, opts, token))
+}
 
+// The personal → team auth-retry wrapper, shared by every entry point (text
+// mode today; T5's stream-json mode next). `attempt` runs one spawn under the
+// token it is handed (undefined ⇒ spawnClaude reads the ALS context, and with
+// none throws the no-credential error).
+async function withAuthRetry<T>(
+  opts: Pick<ClaudeCliOptions, "authToken" | "label">,
+  attempt: (token: string | undefined) => Promise<T>,
+): Promise<T> {
   // Token-validation path: run once with the candidate token, never retry.
-  if (opts.authToken) return runClaudeCliOnce(prompt, opts, opts.authToken)
+  if (opts.authToken) return attempt(opts.authToken)
 
   // Per-user/team auth (set at the route entry via withClaudeAuth — see
-  // claudeAuth.ts for the ALS design note). Absent context ⇒ runClaudeCliOnce
+  // claudeAuth.ts for the ALS design note). Absent context ⇒ the spawn core
   // itself throws the no-credential error below — there is no further tier.
   const auth = currentClaudeAuth()
-  if (!auth) return runClaudeCliOnce(prompt, opts, undefined)
+  if (!auth) return attempt(undefined)
 
   try {
-    return await runClaudeCliOnce(prompt, opts, auth.token)
+    return await attempt(auth.token)
   } catch (err) {
     if (!isClaudeAuthFailure(err)) throw err
     // The primary token was rejected (expired/revoked). Mark it invalid so the
@@ -161,7 +225,7 @@ export async function runClaudeCli(prompt: string, opts: ClaudeCliOptions = {}):
     const fallback = auth.resolveFallback ? await auth.resolveFallback() : null
     if (!fallback) throw err
     try {
-      return await runClaudeCliOnce(prompt, opts, fallback.token)
+      return await attempt(fallback.token)
     } catch (err2) {
       if (isClaudeAuthFailure(err2)) {
         await fallback.onAuthFailure().catch((e: unknown) => {
@@ -173,32 +237,60 @@ export async function runClaudeCli(prompt: string, opts: ClaudeCliOptions = {}):
   }
 }
 
+// One text-mode attempt: the prompt is the whole stdin payload.
 export async function runClaudeCliOnce(
   prompt: string,
   opts: ClaudeCliOptions,
   tokenOverride: string | undefined,
 ): Promise<string> {
-  const { cmd, shell } = claudeCommand()
-  const { timeoutMs = 180_000, maxBuffer = 16 * 1024 * 1024, label = "", model, pinModel, allowedTools } = opts
+  const command = claudeCommand()
+  // --strict-mcp-config + no --mcp-config => load ZERO MCP servers. Without it the
+  // spawned CLI inherits the developer's full Claude Code config (Canva, Google
+  // Drive, Atlassian, … connectors), adding startup latency, bloating the prompt
+  // context with dozens of unused tool definitions, and raising token cost — none
+  // of which a single-shot HTML/copy generation needs. `--tools ""` removes every
+  // built-in tool too (FR-08), so the run is pure text in, text out.
+  const args = [
+    "-p",
+    "--strict-mcp-config",
+    "--tools",
+    emptyArg(command.shell),
+    ...claudeModelArgs(opts.model, opts.pinModel),
+  ]
+  return spawnClaude(args, prompt, { ...opts, command, tokenOverride })
+}
+
+interface SpawnClaudeOptions extends Pick<ClaudeCliOptions, "timeoutMs" | "maxBuffer" | "label"> {
+  command: { cmd: string; shell: boolean }
+  tokenOverride: string | undefined
+}
+
+// The one spawn core: the size guard, the credential, the allowlisted child
+// env, the timeout / kill-tree / buffer limit, logging and the error mapping.
+// Every input mode goes through here, so none of it can drift between modes.
+async function spawnClaude(args: string[], stdinPayload: string, opts: SpawnClaudeOptions): Promise<string> {
+  const { command, tokenOverride, timeoutMs = 180_000, maxBuffer = 16 * 1024 * 1024, label = "" } = opts
+  const { cmd, shell } = command
+
+  if (stdinPayload.length > MAX_PROMPT_CHARS) {
+    throw new Error(
+      `Prompt too large for CLI mode (${stdinPayload.length} chars > ${MAX_PROMPT_CHARS}). ` +
+        `This usually means the brand template is too big — use a smaller template or Path B.`,
+    )
+  }
 
   // CLI-mode auth is REQUIRED — there is no env/dev-session fallback tier.
   // Order of preference:
   //   1. tokenOverride — the acting user's personal token, or the team token
-  //      passed in by runClaudeCli's retry after a personal-token auth
-  //      failure, or a candidate token under validation (opts.authToken).
+  //      passed in by withAuthRetry after a personal-token auth failure, or a
+  //      candidate token under validation (opts.authToken).
   //   2. currentClaudeAuth()?.token — the ALS auth context set by
   //      withClaudeAuth (userToken.ts), read directly when no override was
-  //      passed in (the no-auth-context early-return in runClaudeCli above).
+  //      passed in (the no-auth-context path in withAuthRetry above).
   // Neither present ⇒ no credential exists for this call (no personal token
   // and no team token) — throw rather than spawn silently unauthenticated.
   // The token travels via env, never argv (argv would leak through `shell: true`
-  // on win32 and process listings). ANTHROPIC_API_KEY / ANTHROPIC_AUTH_TOKEN are
-  // stripped either way: the CLI prefers them over CLAUDE_CODE_OAUTH_TOKEN, so a
-  // stray invalid/placeholder key in the server env would make `claude -p` exit 1
-  // (and a real one would silently bill the API instead of the subscription).
-  const childEnv = { ...process.env }
-  delete childEnv.ANTHROPIC_API_KEY
-  delete childEnv.ANTHROPIC_AUTH_TOKEN
+  // on win32 and process listings).
   const oauthToken = tokenOverride ?? currentClaudeAuth()?.token
   if (!oauthToken) {
     throw new ClaudeCliError(
@@ -208,30 +300,21 @@ export async function runClaudeCliOnce(
       "",
     )
   }
-  childEnv.CLAUDE_CODE_OAUTH_TOKEN = oauthToken
+  const childEnv = buildChildEnv(process.env, process.platform, oauthToken)
 
-  // --strict-mcp-config + no --mcp-config => load ZERO MCP servers. Without it the
-  // spawned CLI inherits the developer's full Claude Code config (Canva, Google
-  // Drive, Atlassian, … connectors), adding startup latency, bloating the prompt
-  // context with dozens of unused tool definitions, and raising token cost — none
-  // of which a single-shot HTML/copy generation needs.
-  const modelArgs = claudeModelArgs(model, pinModel)
-  // --allowedTools lets specific built-in tools run without an interactive
-  // permission prompt (which would hang a headless run). Only passed when a
-  // caller opts in (e.g. vision extraction needs "Read"); omitted ⇒ no tools.
-  const toolArgs = allowedTools && allowedTools.length ? ["--allowedTools", ...allowedTools] : []
-  const args = ["-p", "--strict-mcp-config", ...modelArgs, ...toolArgs]
-  const resolvedModel = modelArgs.length ? modelArgs[1] : "(account default)"
+  const modelIdx = args.indexOf("--model")
+  const resolvedModel = modelIdx >= 0 ? args[modelIdx + 1] : "(account default)"
   const startedAt = Date.now()
   const elapsed = () => `${((Date.now() - startedAt) / 1000).toFixed(1)}s`
 
   cliLog(
     label,
-    `spawn ${cmd} ${args.join(" ")} · model=${resolvedModel} · prompt=${prompt.length} chars · timeout=${timeoutMs}ms`,
+    `spawn ${cmd} ${args.join(" ")} · model=${resolvedModel} · stdin=${stdinPayload.length} chars · timeout=${timeoutMs}ms`,
   )
 
   return new Promise<string>((resolve, reject) => {
-    const child = spawn(cmd, args, { shell, windowsHide: true, env: childEnv })
+    // The cast only drops Next's required NODE_ENV: the child deliberately has none.
+    const child = spawn(cmd, args, { shell, windowsHide: true, env: childEnv as NodeJS.ProcessEnv })
 
     let stdout = ""
     let stderr = ""
@@ -311,7 +394,7 @@ export async function runClaudeCliOnce(
     child.stdin.on("error", () => {
       /* ignore EPIPE if the child exits before stdin is fully written */
     })
-    child.stdin.write(prompt)
+    child.stdin.write(stdinPayload)
     child.stdin.end()
   })
 }
