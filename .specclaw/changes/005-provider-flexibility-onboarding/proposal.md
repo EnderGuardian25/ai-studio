@@ -68,6 +68,20 @@ Make provider choice explicit and correct, and make first-time setup something a
 - **Image sizing uses a per-provider capability map.** Each provider declares the sizes it supports, and `imageSizeFor` picks the best fit per provider.
 - **Item 5, the sandbox mechanism:** researched on 2026-09-30, with the recommendation below. It still needs confirming at plan time.
 
+## Decisions (user, 2026-10-01, at plan start)
+
+- **Item 5, the sandbox: remove the tool.** This confirms the 2026-09-30 research recommendation.
+  - Vision sends its images over stdin (stream-json) with `--tools ""`.
+  - Every CLI child gets an env allowlist.
+  - Non-vision calls also get `--tools ""`.
+  - The CLI version is pinned in the Dockerfile.
+  - Fallback, if stream-json images fail on the container CLI: `--restricted` plus deny rules. These are defence in depth only.
+- **Item 3, the `isDefault` fix: fall back, and make the default explicit.**
+  - When a team has no default IMAGE row, the resolver uses its enabled one, the oldest first if there are several.
+  - /team makes the default explicit.
+  - The draft warns when the AI background was skipped.
+- **Item 4, Gemini: mock-verify only.** No Gemini key is available for a live test, so verify-report records Gemini as not live-verified.
+
 ## Research: CLI `Read` sandbox (2026-09-30, pre-plan)
 
 **Recommendation: remove the tool instead of confining it.** CLI-mode vision (`vision.ts:114-134`) should send the reference images as base64 image blocks over stdin. The invocation is `claude -p --input-format stream-json --output-format stream-json --verbose --strict-mcp-config --tools ""`, and it creates no temp files and passes no `--allowedTools Read`.
