@@ -193,6 +193,20 @@ export function mockClaudeTokenValidation(token: string): { ok: boolean; error?:
   return { ok: true }
 }
 
+/**
+ * Deterministic provider API-key validation (MOCK_AI). The real path calls the
+ * provider's live models endpoint with the candidate key, so an E2E run with a
+ * fake key could never create a usable row. A key containing "invalid" fails;
+ * anything else passes — so tests can drive both the 201 and 422 branches of
+ * POST /api/admin/providers (005 NFR-06).
+ */
+export function mockProviderKeyValidation(apiKey: string): { ok: boolean; error?: string } {
+  if (apiKey.includes('invalid')) {
+    return { ok: false, error: 'Provider rejected the key (mock validation)' }
+  }
+  return { ok: true }
+}
+
 /** Deterministic 1×1 transparent PNG returned by the mock Puppeteer renderer. */
 export const MOCK_PNG_BUFFER = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
