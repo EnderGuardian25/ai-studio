@@ -327,10 +327,12 @@ function resolveFragment(facts: DomFacts, rawFragment: string): ResolvedFragment
   return null
 }
 
+// A token's exact sources are compared normalised (final F1b, normalisedSource):
+// the old image back as `OLD?v=1` is still the old image.
 function imagesPresent(after: DomFacts, r: ResolvedFragment): boolean {
   return r.imageSubstring
     ? after.imageSources.some((s) => r.images.some((u) => s.includes(u)))
-    : after.imageSources.some((s) => r.images.includes(s))
+    : after.imageSources.some((s) => r.images.some((u) => normalisedSource(u) === normalisedSource(s)))
 }
 
 const passageIntact = (after: DomFacts, r: ResolvedFragment) => r.passages.some((p) => fold(after.text).includes(p))
@@ -398,7 +400,9 @@ function replacedWholesale(after: DomFacts, r: ResolvedFragment): boolean {
   return false
 }
 
-const shapeKey = (e: DomElementFact) => [e.tag, ...e.classes].join('.')
+// An element's shape: its tag plus its SORTED class list (class order is not
+// meaningful, so `div.bg.full` and `div.full.bg` are one shape).
+const shapeKey = (e: DomElementFact) => [e.tag, ...[...e.classes].sort()].join('.')
 
 // For a TEXT fragment: each shape (tag+classes) of its passage elements whose
 // total word count, summed over EVERY element of that shape, did not strictly
@@ -515,7 +519,7 @@ function targetMiss(was: DomElementFact, now: DomElementFact, direction?: Constr
 
 // ── Post-conditions ──────────────────────────────────────────────────────────
 
-// ── Image multiplicity and moves (replace, final F1 / C-1) ───────────────────
+// ── Image multiplicity and moves (replace, final F1 / C-1, final F1b) ────────
 //
 // The reported duplicate is "the uploaded image applied as the background AND
 // kept as a separate inset" (proposal.md:18). Refine carries no upload, so that
@@ -526,24 +530,57 @@ function targetMiss(was: DomElementFact, now: DomElementFact, direction?: Constr
 //   1. Multiplicity: in a replace, no image source present in BEFORE may appear
 //      more often in AFTER. The duplicate raises the moved image 1 → 2.
 //   2. A superseded image may still be present only as a MOVE: its count did
-//      not grow, and every element that carried it in BEFORE is GONE (an id'd
-//      element: no element keeps that id; otherwise fewer elements of its
-//      tag+classes remain) and no remaining element of that shape carries it.
-//      "Gone", not merely "no longer carries it": otherwise the old background
-//      moved onto a new layer under a re-imaged .bg — the "layered underneath"
-//      failure — would pass.
+//      not grow, and EVERY AFTER element carrying it occupies a VACATED SLOT
+//      (final F1b). A slot is a shape — tag plus sorted class list (shapeKey).
+//      Shape S is vacated for a carrier when, in BEFORE, some element of shape
+//      S carried an image X other than the superseded image(s) this carrier
+//      now holds, and in AFTER no element of shape S carries X. So
+//      div.bg(OLD) + img.inset(UP) → div.bg(UP) + img.inset(OLD) ("use the
+//      upload as the background and put the old one in the inset") is a move:
+//      each image sits in a slot the other left. Anything else that survives
+//      is a miss, as before F1:
+//        - a NEW shape — a renamed carrier, an underlay, a `.bg-old` — was
+//          never vacated (F1 counted tag+classes, so a rename passed);
+//        - a shape that still carries what it carried before (kept alongside,
+//          layered) is not vacated.
+//      A class-less carrier's shape is just its tag (`div`, `img`), which is
+//      not enough on its own: it must also carry an id whose BEFORE element
+//      carried such an X that no AFTER element with that id still carries.
+//      An id'd BEFORE carrier keeps the F1 id logic: no element may keep that
+//      id (the identified element must be gone).
+// URLs are compared normalised (normalisedSource): an http(s) URL without its
+// query string or fragment, so `UP?v=1` or `UP#bg` is still UP. Inline-asset
+// tokens and data URIs are compared as-is.
 // Known limits (fail closed — a false miss offers "Use anyway"):
 //   - a replace that legitimately reuses an image already in the design in a
 //     second place ("replace the second photo with the first") misses;
-//   - a moved image whose old element survives with another image (a swap)
-//     misses whichever fragment is named;
-//   - a moved image whose old element was the body/html misses (never gone).
+//   - a correct move whose target element was ALSO renamed (the upload moved
+//     onto a `div.backdrop` that replaced `div.bg`) misses — the new shape was
+//     never vacated;
+//   - a swap onto a class-less, id-less element misses, and so does an in-place
+//     swap on id'd elements (the id'd carrier survives);
+//   - a moved image whose old element was the body/html misses when it
+//     survives on it;
+//   - two distinct CDN images that differ only by query string (`img?w=400`
+//     vs `img?w=800`) count as ONE image, so showing both misses as a
+//     duplicate; srcset candidates are not counted at all.
 
-const countOf = (sources: string[], s: string) => sources.reduce((n, x) => (x === s ? n + 1 : n), 0)
+// An http(s) URL with its query string and fragment stripped; any other source
+// (an __INLINE_ASSET_n__ token, a data: URI) unchanged.
+const normalisedSource = (s: string) => (/^https?:\/\//i.test(s) ? s.replace(/[?#][\s\S]*$/, '') : s)
+
+const countOf = (sources: string[], s: string) => {
+  const key = normalisedSource(s)
+  return sources.reduce((n, x) => (normalisedSource(x) === key ? n + 1 : n), 0)
+}
 
 // BEFORE image sources that appear more often in AFTER, described with counts.
 function multipliedImages(before: DomFacts, after: DomFacts): string[] {
-  return unique(before.imageSources).flatMap((s) => {
+  const seen = new Set<string>()
+  return before.imageSources.flatMap((s) => {
+    const key = normalisedSource(s)
+    if (seen.has(key)) return []
+    seen.add(key)
     const n0 = countOf(before.imageSources, s)
     const n1 = countOf(after.imageSources, s)
     return n1 > n0 ? [`${JSON.stringify(s)} (${n0} → ${n1})`] : []
@@ -558,21 +595,35 @@ function identifiedSources(before: DomFacts, r: ResolvedFragment): string[] {
 }
 
 // Rule 2 above: the fragment's images are still present, but only because they
-// moved away from every element that carried them.
+// moved into slots other images vacated.
 function movedAway(before: DomFacts, after: DomFacts, r: ResolvedFragment): boolean {
   const sources = identifiedSources(before, r)
   if (sources.length === 0) return false
   if (sources.some((s) => countOf(after.imageSources, s) > countOf(before.imageSources, s))) return false
-  const carries = (e: DomElementFact) => e.imageSources.some((s) => sources.includes(s))
-  const carriers = before.elements.filter(carries)
+  const superseded = new Set(sources.map(normalisedSource))
+  const heldBy = (e: DomElementFact) => unique(e.imageSources.map(normalisedSource))
+  const carries = (e: DomElementFact) => heldBy(e).some((s) => superseded.has(s))
+
+  // The F1 id logic: an id'd BEFORE carrier must be gone.
+  if (before.elements.some((was) => was.id && carries(was) && after.elements.some((e) => e.id === was.id))) return false
+
+  // In BEFORE, elements matching `slot` carried an image X outside `held`, and
+  // in AFTER none of them carries X.
+  const vacated = (slot: (e: DomElementFact) => boolean, held: Set<string>) => {
+    const prior = unique(before.elements.filter(slot).flatMap(heldBy)).filter((x) => !held.has(x))
+    return prior.some((x) => !after.elements.some((e) => slot(e) && heldBy(e).includes(x)))
+  }
+  const carriers = after.elements.filter(carries)
+  // The image is present but on no element: nothing shows it moved.
   if (carriers.length === 0) return false
-  const shapeCount = (facts: DomFacts, key: string) => facts.elements.filter((e) => shapeKey(e) === key).length
-  return carriers.every((was) => {
-    const key = shapeKey(was)
-    const gone = was.id
-      ? !after.elements.some((e) => e.id === was.id)
-      : shapeCount(after, key) < shapeCount(before, key)
-    return gone && !after.elements.some((e) => shapeKey(e) === key && carries(e))
+  return carriers.every((now) => {
+    const held = new Set(heldBy(now).filter((s) => superseded.has(s)))
+    const key = shapeKey(now)
+    if (!vacated((e) => shapeKey(e) === key, held)) return false
+    if (now.classes.length > 0) return true
+    // A class-less shape (`div`, `img`) is not enough on its own: the id slot
+    // must have been vacated too.
+    return !!now.id && vacated((e) => e.id === now.id, held)
   })
 }
 
@@ -765,7 +816,7 @@ ${SUPERSEDES_RULE}
 ${CONSTRAINS_RULE}`
 }
 
-// ── Text-reduction lexicon (final F1 / I-2) ──────────────────────────────────
+// ── Text-reduction lexicon (final F1 / I-2, final F1b) ───────────────────────
 //
 // The model classifies its own instruction, so "reduce the text" answered as
 // replace (the phrase is gone — contentAbsent is satisfied by a LONGER
@@ -776,41 +827,80 @@ ${CONSTRAINS_RULE}`
 // wholesale exemption: the document's visible word count must strictly
 // decrease. It is structural — zero model calls (AC-12).
 //
-// The lexicon is deliberately NARROW. It matches:
-//   - a reducing verb — reduce, shorten, trim, cut (optionally "down"/"back"/
-//     "out"), condense, or less / fewer — followed (after optional
-//     determiners/modifiers such as "the", "all of the", "the amount of",
-//     "the body") by a text object: text, copy, word(s), wording,
-//     paragraph(s), caption(s), body, description(s);
-//   - "shorter" / "briefer" / "more concise" said of a text object, before it
-//     ("shorter text") or after it ("make the copy more concise", "the caption
-//     should be shorter").
-// A text object followed by a visual property ("the text size", "the body
-// padding", "the text spacing") is NOT a match, and size or visual words
-// alone ("reduce the logo size", "make the image smaller", "make the text
-// smaller", "reduce the padding") never are.
+// Governing principle: WHEN IN DOUBT, DON'T TRIGGER. The check is additive —
+// when it does not fire, the classes and the Haiku judge still decide — while
+// a false trigger is a guaranteed miss on a correct edit, on both attempts.
+//
+// The lexicon is deliberately NARROW. A text object — text(s), copy, word(s),
+// word count, wording, paragraph(s), caption(s), body, description(s) — must
+// be followed by a CLAUSE BOUNDARY (final F1b):
+//   - the end of the instruction;
+//   - . , ; : ! ? or a quote or closing bracket — but never an apostrophe-s
+//     ("the text's size");
+//   - a conjunction: and, but, so, then, while, or;
+//   - a degree word that itself ends the clause: a bit, a little, a lot,
+//     slightly, further, significantly, considerably, drastically,
+//     substantially, please ("reduce the body text a bit");
+//   - a location tail: on|in|across|throughout|from|at + the|this|that|my|our
+//     + a word ("reduce the text on the right panel"; "in size" is not one);
+//   - by + an amount of CONTENT that ends the clause: half, a half, a third, a
+//     quarter, or N words / lines / sentences ("by 2px", "by 4pt", "by 0.5rem"
+//     are sizes and never trigger; a percentage is ambiguous between content
+//     and size, so "by 20%" never triggers).
+// So a content noun used as a MODIFIER — "the body text size", "the caption
+// text size", "the body copy font size", "the text overlay", "the
+// text-shadow", "the text's size" — is followed by a visual word, a hyphen or
+// an apostrophe-s, none of which is a boundary, and does not trigger.
+//
+// The phrasings (all case-insensitive, anchored on word boundaries):
+//   1. a reducing verb — reduce, shorten, trim, cut, condense (optionally
+//      "down"/"back"/"out") — then optional determiners/quantities (the, all
+//      of the, the amount of, the number of, …), then at most ONE arbitrary
+//      word ("the supporting text", "the long text", "the body text"), then
+//      the text object and a boundary;
+//   2. less / fewer, then optional determiners/quantities, then the text
+//      object and a boundary ("use less text", "fewer words please") — no
+//      arbitrary word, so "less bold text" never triggers;
+//   3. "shorter" / "briefer" / "more concise" said of a text object — after
+//      make/keep/get/have or at the start ("make the copy more concise", "the
+//      caption should be shorter"), then a boundary;
+//   4. "shorter" / "briefer" / "more concise" before the text object, with
+//      optional determiners only ("shorter text", "more concise copy"), then a
+//      boundary.
 //
 // Known limit (the boundary): phrasings outside the lexicon — "tighten the
-// copy", "shorten the headline", "too wordy", other languages — remain
+// copy", "shorten the headline", "too much text", "minimise the text", "make
+// the text concise", "too wordy", other languages — remain
 // classifier-dependent: they are checked only by the classes the model
 // declared. A match inside it can false-miss (fail closed): "shorten the
-// caption and add a tagline" must still lower the whole document's word count.
+// caption and add a tagline" must still lower the whole document's word
+// count, and new copy quoted in the instruction ("change the headline to
+// \"Less text, more impact\"") matches. A clause ending in a boundary the list
+// does not name (an em dash, "reduce the text so it fits") does not trigger.
 export const TEXT_REDUCTION_CHECK = 'text-reduction' as const
 
 const REDUCING_VERB = String.raw`(?:reduce|reducing|shorten|shortening|trim|trimming|cut|cutting|condense|condensing)(?:\s+(?:down|back|out))?`
 const FEWER = String.raw`(?:less|fewer)`
 const SHORTER = String.raw`(?:shorter|briefer|more\s+concise)`
-const TEXT_MODIFIERS = String.raw`(?:(?:the|this|that|these|those|all|some|of|a|bit|little|lot|amount|number|length|main|body|intro|headline|sub-?heading|subtitle|post|poster)\s+)*`
-const TEXT_OBJECT = String.raw`(?:text|copy|words?|wording|paragraphs?|captions?|body|descriptions?)`
-const VISUAL_PROPERTY = String.raw`(?!\s+(?:sizes?|fonts?|font-size|heights?|widths?|spacing|padding|margins?|gaps?|colou?rs?|weights?|opacity|contrast|shadows?|box(?:es)?|areas?|scale|lines?|line-height|leading|tracking|styles?|blocks?|bars?|alignment|position|layers?)\b)`
+// Determiners and quantities, any number of them ("all of the", "the amount of").
+const DETERMINERS = String.raw`(?:(?:the|this|that|these|those|all|some|of|a|bit|little|lot|amount|number|length|my|our|your)\s+)*`
+// At most one arbitrary word before the object ("supporting", "body", "sub-heading").
+const ONE_WORD = String.raw`(?:[\p{L}\p{N}][\p{L}\p{N}-]*\s+)?`
+const TEXT_OBJECT = String.raw`(?:word[\s-]+counts?|texts?|copy|words?|wording|paragraphs?|captions?|body|descriptions?)`
+const CLAUSE_END = String.raw`(?:\s*$|\s*[.,;:!?)\]}"“”«»]|\s*['‘’](?!s\b)|\s+(?:and|but|so|then|while|or)\b)`
+const DEGREE_TAIL = String.raw`\s+(?:a\s+(?:bit|little|lot)|slightly|further|significantly|considerably|drastically|substantially|please)${CLAUSE_END}`
+const LOCATION_TAIL = String.raw`\s+(?:on|in|across|throughout|from|at)\s+(?:the|this|that|my|our)\s+[\p{L}\p{N}]`
+const CONTENT_AMOUNT = String.raw`\s+by\s+(?:(?:a\s+|one\s+)?half|a\s+third|one\s+third|a\s+quarter|one\s+quarter|(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten|a\s+few|a\s+couple\s+of)\s+(?:words?|lines?|sentences?))(?:${CLAUSE_END}|${LOCATION_TAIL})`
+// What must follow the text object: a clause boundary.
+const BOUNDARY = String.raw`(?=${CLAUSE_END}|${DEGREE_TAIL}|${LOCATION_TAIL}|${CONTENT_AMOUNT})`
 const COPULA = String.raw`(?:(?:should|must|could|can)\s+be\s+|needs?\s+to\s+be\s+|is\s+|are\s+)?`
 const DEGREE = String.raw`(?:(?:a\s+)?(?:bit|little|lot|much|far)\s+)?`
 
 export const TEXT_REDUCTION_LEXICON: readonly RegExp[] = [
-  new RegExp(String.raw`\b${REDUCING_VERB}\s+${TEXT_MODIFIERS}${TEXT_OBJECT}\b${VISUAL_PROPERTY}`, 'i'),
-  new RegExp(String.raw`\b${FEWER}\s+${TEXT_MODIFIERS}${TEXT_OBJECT}\b${VISUAL_PROPERTY}`, 'i'),
-  new RegExp(String.raw`\b${TEXT_OBJECT}\s+${COPULA}${DEGREE}${SHORTER}\b`, 'i'),
-  new RegExp(String.raw`\b${SHORTER}\s+${TEXT_MODIFIERS}${TEXT_OBJECT}\b${VISUAL_PROPERTY}`, 'i'),
+  new RegExp(String.raw`\b${REDUCING_VERB}\s+${DETERMINERS}${ONE_WORD}${TEXT_OBJECT}\b${BOUNDARY}`, 'iu'),
+  new RegExp(String.raw`\b${FEWER}\s+${DETERMINERS}${TEXT_OBJECT}\b${BOUNDARY}`, 'iu'),
+  new RegExp(String.raw`(?:^\s*|\b(?:make|keep|get|have)\s+)${DETERMINERS}${ONE_WORD}${TEXT_OBJECT}\s+${COPULA}${DEGREE}${SHORTER}\b${BOUNDARY}`, 'iu'),
+  new RegExp(String.raw`\b${SHORTER}\s+${DETERMINERS}${TEXT_OBJECT}\b${BOUNDARY}`, 'iu'),
 ]
 
 export function asksForTextReduction(instruction: string): boolean {

@@ -910,10 +910,14 @@ describe('final F1 / C-1 — replace: no existing image may appear more often, a
     expect(replace(a, [OLD_BG, UPLOAD], ['replace'], b)).toEqual({ ok: true })
   })
 
-  it('a SWAP (upload to the background, old background into the inset) misses in every form — the old image moved to another element', () => {
+  // Changed by final F1b (Important 1, the vacated-slot rule): a swap whose two
+  // images trade places on the SAME slots ("use the upload as the background
+  // and put the old one in the inset") is a correct move and passes in every
+  // form. A swap onto a renamed/new slot still misses (see the F1b block).
+  it('a SWAP onto the same slots (upload to .bg, old background into .inset) passes in every form — each image occupies a slot the other vacated', () => {
     const swapped = facts([bgLayer(UPLOAD), headline(), body(), inset(OLD_BG)])
     for (const supersedes of [[OLD_BG], [UPLOAD], ['.inset'], [OLD_BG, '.inset']]) {
-      expect(replace(swapped, supersedes).ok).toBe(false)
+      expect(replace(swapped, supersedes)).toEqual({ ok: true })
     }
   })
 
@@ -1024,6 +1028,12 @@ describe('final F1 / I-2 — the text-reduction lexicon adds a visible-word-coun
     'more concise copy',
     'make the body text a bit shorter',
     'shorten the paragraphs and add a logo',
+    // final F1b (Minor 3 + the clause boundary):
+    'reduce the supporting text.',
+    'reduce the texts',
+    'reduce the text on the right panel',
+    'reduce the text by half',
+    'reduce the body text, and make the logo bigger',
   ]
   const NON_TRIGGERS = [
     'reduce the logo size',
@@ -1046,6 +1056,38 @@ describe('final F1 / I-2 — the text-reduction lexicon adds a visible-word-coun
     'reduce it',
     'make the caption navy',
     'reduce the line height of the text',
+    // final F1b (Important 2): resize and style refines — no clause boundary
+    // after the object, or the content noun is a modifier of a visual word.
+    'reduce the body text size',
+    'reduce the caption text size',
+    'reduce the body copy font size',
+    'reduce the description text size',
+    'reduce the body text weight',
+    'reduce the text overlay',
+    'reduce the text background',
+    'reduce the text letter-spacing',
+    'reduce the text-shadow',
+    'reduce the text border',
+    'reduce the text outline',
+    'reduce the text glow',
+    'reduce the text container',
+    'reduce the text panel',
+    'reduce the text card',
+    "reduce the text's size",
+    'reduce the text’s size',
+    'reduce the text in size',
+    'reduce the text by 2px',
+    'reduce the text by 4pt',
+    'reduce the text by 0.5rem',
+    'reduce the text by 20%',
+    'reduce the text brightness',
+    // final F1b: the re-review's "checked and correct" non-triggers, pinned.
+    'cut to the chase in the headline',
+    'trim the border',
+    'reduce the gap between the text and the image',
+    'fewer colours',
+    'shorter line spacing',
+    'make the caption area smaller',
   ]
   for (const t of TRIGGERS) it(`lexicon matches: ${JSON.stringify(t)}`, () => expect(asksForTextReduction(t)).toBe(true))
   for (const t of NON_TRIGGERS) it(`lexicon does NOT match: ${JSON.stringify(t)}`, () => expect(asksForTextReduction(t)).toBe(false))
@@ -1062,4 +1104,124 @@ describe('final F1 / M-1 — every class carries its verifier scope in the table
   it('has a non-empty verifierScope per class', () => {
     for (const k of INSTRUCTION_CLASS_KEYS) expect(INSTRUCTION_CLASSES[k].verifierScope.trim().length).toBeGreaterThan(10)
   })
+})
+
+// ── Final fix wave F1b (change 004 final review, F1 re-review) ───────────────
+
+// Important 1: the F1 move exemption decided "carrier gone" by counting
+// tag+classes, so a class rename passed a kept, layered or swapped image with
+// zero model calls (an AC-09 regression). A surviving superseded image now
+// counts as MOVED only when every AFTER element carrying it occupies a VACATED
+// slot: a shape (tag + sorted classes) that in BEFORE carried some other image
+// X, and in AFTER carries X nowhere.
+describe('final F1b / Important 1 — a superseded image survives only in a vacated slot', () => {
+  const NEW = 'http://minio.local/images/generated/new.png'
+  const div = (cls: string[], src: string, id: string | null = null) => el({ tag: 'div', id, classes: cls, imageSources: [src] })
+  const img = (cls: string[], src: string, id: string | null = null) => el({ tag: 'img', id, classes: cls, imageSources: [src] })
+  const bgOnly = facts([div(['bg'], OLD_BG), headline()])
+  const bgInset = facts([div(['bg'], OLD_BG), headline(), img(['inset'], UPLOAD)])
+  const replace = (before: DomFacts, after: DomFacts, supersedes: string[]) =>
+    check('replace', { before, after, supersedes, classes: ['replace'] })
+
+  // The re-review's Important 1 table — every row MISSES.
+  const MISSES: Array<[string, DomFacts, DomFacts, string[]]> = [
+    ['rename + underlay (.hero-bg NEW, .underlay OLD), supersedes [OLD]', bgOnly, facts([div(['hero-bg'], NEW), div(['underlay'], OLD_BG), headline()]), [OLD_BG]],
+    ['rename + underlay (.hero-bg NEW, .underlay OLD), supersedes [.bg]', bgOnly, facts([div(['hero-bg'], NEW), div(['underlay'], OLD_BG), headline()]), ['.bg']],
+    ['kept alongside (.bg-new NEW, .bg-old OLD), supersedes [OLD]', bgOnly, facts([div(['bg-new'], NEW), div(['bg-old'], OLD_BG), headline()]), [OLD_BG]],
+    ['swap onto renamed slots (.background UP, img.photo OLD), supersedes [OLD]', bgInset, facts([div(['background'], UPLOAD), headline(), img(['photo'], OLD_BG)]), [OLD_BG]],
+    ['swap onto renamed slots (.background UP, img.photo OLD), supersedes [OLD, .inset]', bgInset, facts([div(['background'], UPLOAD), headline(), img(['photo'], OLD_BG)]), [OLD_BG, '.inset']],
+    // Further shapes from the reviewer's probes (p1.ts).
+    ['layered, same class (.bg NEW + .underlay OLD), supersedes [OLD]', bgOnly, facts([div(['bg'], NEW), div(['underlay'], OLD_BG), headline()]), [OLD_BG]],
+    ['kept alongside on the same shape (.bg NEW + .bg OLD), supersedes [OLD]', bgOnly, facts([div(['bg'], NEW), div(['bg'], OLD_BG), headline()]), [OLD_BG]],
+    ['id rename (#bg2 NEW, #under OLD), supersedes [OLD]', facts([div([], OLD_BG, 'bg'), headline()]), facts([div([], NEW, 'bg2'), div([], OLD_BG, 'under'), headline()]), [OLD_BG]],
+    // A slot that still carries what it carried before is not vacated.
+    ['old image added to an .inset that still carries its upload, supersedes [OLD]', bgInset, facts([div(['bg'], NEW), headline(), img(['inset'], UPLOAD), img(['inset'], OLD_BG)]), [OLD_BG]],
+    // Accepted fail-closed: a correct move whose target class was also renamed.
+    ['correct move but the target renamed (.backdrop UP), supersedes [OLD, .inset]', bgInset, facts([div(['backdrop'], UPLOAD), headline()]), [OLD_BG, '.inset']],
+    ['correct move but the target renamed (.backdrop UP), supersedes [UP]', bgInset, facts([div(['backdrop'], UPLOAD), headline()]), [UPLOAD]],
+    // A class-less carrier matches shape "img" only — not enough on its own.
+    ['swap onto a class-less, id-less <img>, supersedes [OLD]', facts([div(['bg'], OLD_BG), headline(), img([], UPLOAD)]), facts([div(['bg'], UPLOAD), headline(), img([], OLD_BG)]), [OLD_BG]],
+    // An id'd BEFORE carrier keeps the F1 id logic: it must be gone.
+    ["id'd carrier survives (#photo now carries OLD), supersedes [UP]", facts([div(['bg'], OLD_BG), img([], UPLOAD, 'photo')]), facts([div(['bg'], UPLOAD), img([], OLD_BG, 'photo')]), [UPLOAD]],
+  ]
+  for (const [name, before, after, supersedes] of MISSES) {
+    it(`MISSES: ${name}`, () => {
+      const r = replace(before, after, supersedes)
+      expect(r.ok).toBe(false)
+      if (!r.ok) expect(r.reason).toMatch(/^replace: .*still present/)
+    })
+  }
+
+  // Correct moves — every one PASSES.
+  const twoInsets = facts([div(['bg'], OLD_BG), headline(), img(['inset'], UPLOAD), img(['inset'], NEW)])
+  const PASSES: Array<[string, DomFacts, DomFacts, string[]]> = [
+    ['swap on the same slots (.bg UP, .inset OLD), supersedes [OLD]', bgInset, facts([div(['bg'], UPLOAD), headline(), img(['inset'], OLD_BG)]), [OLD_BG]],
+    ['swap on the same slots (.bg UP, .inset OLD), supersedes [UP]', bgInset, facts([div(['bg'], UPLOAD), headline(), img(['inset'], OLD_BG)]), [UPLOAD]],
+    ['swap on the same slots (.bg UP, .inset OLD), supersedes [OLD, .inset]', bgInset, facts([div(['bg'], UPLOAD), headline(), img(['inset'], OLD_BG)]), [OLD_BG, '.inset']],
+    ['swap with classes in another order (div.bg.full ↔ div.full.bg)', facts([el({ tag: 'div', classes: ['bg', 'full'], imageSources: [OLD_BG] }), img(['inset'], UPLOAD)]), facts([el({ tag: 'div', classes: ['full', 'bg'], imageSources: [UPLOAD] }), img(['inset'], OLD_BG)]), [OLD_BG]],
+    ['inset moved to the background, inset gone, supersedes [UP]', bgInset, facts([div(['bg'], UPLOAD), headline()]), [UPLOAD]],
+    ['inset moved, its .inset slot now a caption, supersedes [UP]', bgInset, facts([div(['bg'], UPLOAD), headline(), el({ tag: 'p', classes: ['inset'], text: 'Photo credit' })]), [UPLOAD]],
+    ['one of two .inset images moved, supersedes [OLD]', twoInsets, facts([div(['bg'], UPLOAD), headline(), img(['inset'], NEW)]), [OLD_BG]],
+    ['one of two .inset images moved, supersedes [UP]', twoInsets, facts([div(['bg'], UPLOAD), headline(), img(['inset'], NEW)]), [UPLOAD]],
+    ['swap onto a class-less <img> whose id slot was vacated, supersedes [OLD]', facts([div(['bg'], OLD_BG), headline(), img([], UPLOAD, 'ph')]), facts([div(['bg'], UPLOAD), headline(), img([], OLD_BG, 'ph')]), [OLD_BG]],
+  ]
+  for (const [name, before, after, supersedes] of PASSES) {
+    it(`PASSES: ${name}`, () => expect(replace(before, after, supersedes)).toEqual({ ok: true }))
+  }
+})
+
+// Minor 1: multiplicity compared exact URL strings, so UP?v=1 or UP#bg evaded it.
+describe('final F1b / Minor 1 — multiplicity counts http(s) URLs without query string or fragment', () => {
+  const inset = (src = UPLOAD) => el({ tag: 'img', classes: ['inset'], imageSources: [src] })
+  const before = facts([bgLayer(OLD_BG), headline(), body(), inset()])
+  for (const variant of [`${UPLOAD}?v=1`, `${UPLOAD}#bg`, `${UPLOAD}?v=2#bg`]) {
+    it(`the background on ${JSON.stringify(variant.slice(UPLOAD.length))} with the inset still on the upload MISSES (supersedes [OLD])`, () => {
+      const after = facts([bgLayer(variant), headline(), body(), inset()])
+      const r = check('replace', { before, after, supersedes: [OLD_BG] })
+      expect(r.ok).toBe(false)
+      if (!r.ok) expect(r.reason).toMatch(/1 → 2/)
+    })
+  }
+  it('the same variant still misses with supersedes [UP] (the count grew)', () => {
+    const after = facts([bgLayer(`${UPLOAD}?v=1`), headline(), body(), inset()])
+    expect(check('replace', { before, after, supersedes: [UPLOAD] }).ok).toBe(false)
+  })
+  it('a correct move whose new URL only adds a query string passes', () => {
+    const after = facts([bgLayer(`${UPLOAD}?v=1`), headline(), body()])
+    expect(check('replace', { before, after, supersedes: [OLD_BG] })).toEqual({ ok: true })
+  })
+  it('inline-asset tokens are compared as-is', () => {
+    const tok = '__INLINE_ASSET_0__'
+    const b = facts([bgLayer(OLD_BG), inset(tok)])
+    expect(check('replace', { before: b, after: facts([bgLayer(tok), inset(tok)]), supersedes: [OLD_BG] }).ok).toBe(false)
+    expect(check('replace', { before: b, after: facts([bgLayer(tok)]), supersedes: [OLD_BG] })).toEqual({ ok: true })
+  })
+})
+
+// p4 (the re-review's end-to-end probe): "reduce the body text size" is a
+// resize. As a passing constrain it must add NO text-reduction check, so no
+// "(13 → 13)" miss.
+describe('final F1b / Important 2 — a resize refine gets no text-reduction check (p4)', () => {
+  const H = 'Join the programme'
+  const P = 'Twelve weeks of real client projects with mentors and peers'
+  const mk = (px: number) =>
+    nested(`${H} ${P}`, [
+      el({ tag: 'body', text: `${H} ${P}` }),
+      el({ tag: 'h1', text: H, fontSizePx: 48 }),
+      el({ tag: 'p', classes: ['body-copy'], text: P, fontSizePx: px }),
+    ])
+  for (const instruction of ['reduce the body text size', 'reduce the text size']) {
+    it(`${JSON.stringify(instruction)} as a passing constrain: no text-reduction check, every result ok`, () => {
+      const rs = checkPostConditions({
+        before: mk(20),
+        after: mk(16),
+        supersedes: [],
+        constrains: [{ fragment: '.body-copy', direction: 'decrease' }],
+        classes: ['constrain'],
+        instruction,
+      })
+      expect(rs.find((r) => r.class === TEXT_REDUCTION_CHECK)).toBeUndefined()
+      expect(rs).toEqual([{ class: 'constrain', result: { ok: true } }])
+    })
+  }
 })

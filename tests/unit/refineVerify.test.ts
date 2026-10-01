@@ -754,6 +754,28 @@ describe('final F1 / I-1 + M-1 — the verifier judges every part no structural 
     for (const def of Object.values(INSTRUCTION_CLASSES)) expect(VERIFIER_SYSTEM).not.toContain(def.verifierScope)
   })
 
+  // final F1b / M-1: VERIFIER_SYSTEM hand-restated the remove and constrain
+  // criteria ("something asked to go must be gone or have fewer words,
+  // something asked to change size must have changed size"). The per-class
+  // criteria come only from verifierScope, through scopeLines.
+  it('the system prompt carries no class criterion — not the table strings, not a paraphrase of them', () => {
+    for (const def of Object.values(INSTRUCTION_CLASSES)) {
+      expect(VERIFIER_SYSTEM).not.toContain(def.verifierScope)
+      // Every clause of the scope (split on its punctuation) is absent too.
+      for (const clause of def.verifierScope.split(/[(),;]/).map((c) => c.trim()).filter((c) => c.split(' ').length >= 3)) {
+        expect(VERIFIER_SYSTEM).not.toContain(clause)
+      }
+    }
+    for (const fragment of [/fewer words/i, /changed size/i, /change size/i, /must be gone/i, /asked to go/i]) {
+      expect(VERIFIER_SYSTEM).not.toMatch(fragment)
+    }
+  })
+
+  it('the per-class criteria still reach the verifier, from the table, through the user message', () => {
+    const p = buildVerifierPrompt({ instruction: 'reduce the text', classes: ['add'], before: BEFORE, after: BEFORE })
+    for (const k of ['remove', 'constrain', 'replace', 'add'] as const) expect(p.user).toContain(INSTRUCTION_CLASSES[k].verifierScope)
+  })
+
   it('AC-19: editing a verifierScope in the table changes the verifier prompt', () => {
     const edited = { ...INSTRUCTION_CLASSES, remove: { ...INSTRUCTION_CLASSES.remove, verifierScope: 'EDITED REMOVE SCOPE' } }
     const p = buildVerifierPrompt({ instruction: 'x', classes: ['add'], before: BEFORE, after: BEFORE }, edited)

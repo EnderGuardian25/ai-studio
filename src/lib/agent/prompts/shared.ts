@@ -8,7 +8,9 @@ import type { PipelineMode } from '@/lib/agent/config'
 // so output quality can be correlated with prompt revisions.
 // 2026-10-01.1: the CLI refine prompt carries SCRIPT_SUPPORT_NOTE (the no-emoji
 // rule), and the replace semantics state the image-multiplicity rule.
-export const PROMPT_VERSION = '2026-10-01.1'
+// 2026-10-01.2: the refine verifier's system prompt no longer paraphrases the
+// remove/constrain criteria; they come only from the table's verifierScope.
+export const PROMPT_VERSION = '2026-10-01.2'
 
 // Multilingual/script fidelity, applied to every design surface (Path A/B +
 // refine). The copy generator can emit non-Latin scripts (Sinhala especially,

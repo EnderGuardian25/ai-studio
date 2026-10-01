@@ -185,7 +185,8 @@ describe('SCRIPT_SUPPORT_NOTE — no-emoji guidance', () => {
 
   it('bumps PROMPT_VERSION alongside the note change', () => {
     // 2026-10-01.1: the CLI refine prompt gained SCRIPT_SUPPORT_NOTE (final F1 / I-3).
-    expect(PROMPT_VERSION).toBe('2026-10-01.1')
+    // 2026-10-01.2: VERIFIER_SYSTEM no longer paraphrases class criteria (final F1b / M-1).
+    expect(PROMPT_VERSION).toBe('2026-10-01.2')
   })
 })
 
