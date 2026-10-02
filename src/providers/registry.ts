@@ -84,7 +84,7 @@ export async function resolveCopyProvider(teamId: string, providerKey?: string):
 
   // The env.OPENAI_API_KEY fallback tier was removed (team-tenancy Task 11) —
   // COPY provider config lives entirely in AvailableProvider rows now. The
-  // ANTHROPIC_API_KEY fallback stays: it's the shared server credential, not a
+  // ANTHROPIC_API_KEY fallback stays: it's a server-wide credential, not a
   // per-team secret, and the API-mode fallback chain still expects it.
   const anthropicKey = env.ANTHROPIC_API_KEY
   if (anthropicKey) return new AnthropicCopyProvider(anthropicKey)
