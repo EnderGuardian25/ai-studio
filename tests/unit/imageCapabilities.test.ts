@@ -9,6 +9,8 @@ import {
   SLOT_PROVIDERS,
   canServeSlot,
   pickServingImageProvider,
+  imageSizeFor,
+  IMAGE_SIZES,
   type ImageProviderRow,
 } from '@/providers/imageCapabilities'
 
@@ -120,5 +122,31 @@ describe('pickServingImageProvider', () => {
       row({ id: 'older', createdAt: '2026-01-01T00:00:00.000Z' }),
     ]
     expect(pickServingImageProvider(rows)?.id).toBe('older')
+  })
+})
+
+describe('imageSizeFor (AC-18)', () => {
+  it.each([
+    ['openai', 'SQUARE', '1024x1024'],
+    ['openai', 'PORTRAIT', '1024x1536'],
+    ['openai', 'STORY', '1024x1536'],
+    ['gemini', 'SQUARE', '1:1'],
+    ['gemini', 'PORTRAIT', '4:5'],
+    ['gemini', 'STORY', '9:16'],
+  ])('%s %s -> %s', (p, a, size) => {
+    expect(imageSizeFor(p, a)).toBe(size)
+  })
+
+  it('every provider has every aspect', () => {
+    for (const p of IMAGE_PROVIDERS) {
+      expect(Object.keys(IMAGE_SIZES[p]).sort()).toEqual(['PORTRAIT', 'SQUARE', 'STORY'])
+    }
+  })
+
+  it('unknown provider or aspect falls back to a square size', () => {
+    expect(imageSizeFor('midjourney', 'STORY')).toBe('1024x1024')
+    expect(imageSizeFor(undefined, 'PORTRAIT')).toBe('1024x1024')
+    expect(imageSizeFor('gemini', 'WIDE')).toBe('1:1')
+    expect(imageSizeFor('openai', null)).toBe('1024x1024')
   })
 })

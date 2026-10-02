@@ -6,6 +6,8 @@ import { toolGenerateImage, toolRenderHtml, toolGetBrandKitContext } from "./too
 import { restoreInlineAssets, missingTokens } from "./inlineAssets"
 import { MOCK_AI, buildMockHtml, buildMockConflict, buildMockRefineReply, shouldMockGenerateFail } from "@/lib/testHooks"
 import { env } from "@/lib/env"
+import { nearestAspectRatio } from "@/lib/aspectRatio"
+import type { AspectRatio } from "@prisma/client"
 
 const TOOL_DEFINITIONS: Tool[] = [
   {
@@ -65,11 +67,12 @@ async function executeTool(
   name: string,
   input: ToolInput,
   briefId: string,
-  actor?: GenerationActor
+  actor?: GenerationActor,
+  aspectRatio?: AspectRatio
 ): Promise<unknown> {
   switch (name) {
     case "generateImage":
-      return toolGenerateImage(input.prompt as string, input.brandKitId as string, briefId, actor)
+      return toolGenerateImage(input.prompt as string, input.brandKitId as string, briefId, actor, aspectRatio)
     case "renderHtml":
       return toolRenderHtml(
         input.html as string,
@@ -191,7 +194,7 @@ export async function runDesignAgent(options: DesignAgentOptions): Promise<Desig
           toolInput = { ...toolInput, html: restoreInlineAssets(html, inlineAssets) }
         }
 
-        const result = await executeTool(block.name, toolInput, briefId, actor)
+        const result = await executeTool(block.name, toolInput, briefId, actor, nearestAspectRatio(width, height))
 
         if (block.name === "renderHtml") {
           lastHtml = (toolInput as { html: string }).html
@@ -333,7 +336,7 @@ export async function runDesignAgentRefine(
         continue
       }
       try {
-        const result = await executeTool(block.name, block.input as ToolInput, briefId, actor)
+        const result = await executeTool(block.name, block.input as ToolInput, briefId, actor, nearestAspectRatio(width, height))
         toolResults.push({ type: "tool_result", tool_use_id: block.id, content: JSON.stringify(result) })
       } catch (err) {
         toolResults.push({

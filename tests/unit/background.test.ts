@@ -72,7 +72,7 @@ vi.mock('@anthropic-ai/sdk', () => ({
 }))
 vi.mock('@/lib/storage/minio', () => ({ persistDataUrlImage: h.persistDataUrlImage }))
 
-const { parseBackgroundDecision, imageSizeFor, generateBackgroundForBrief, generateBackgroundForRefine } =
+const { parseBackgroundDecision, generateBackgroundForBrief, generateBackgroundForRefine } =
   await import('@/lib/agent/background')
 
 const kit: ResolvedBrandKit = {
@@ -122,13 +122,6 @@ describe('parseBackgroundDecision', () => {
 
   it('returns null when the shape is wrong (needed not boolean)', () => {
     expect(parseBackgroundDecision('{"needed": "yes", "prompt": "x"}')).toBeNull()
-  })
-})
-
-describe('imageSizeFor', () => {
-  it('maps SQUARE to 1024x1024 and PORTRAIT to 1024x1536', () => {
-    expect(imageSizeFor('SQUARE')).toBe('1024x1024')
-    expect(imageSizeFor('PORTRAIT')).toBe('1024x1536')
   })
 })
 
@@ -371,6 +364,20 @@ describe('generateBackgroundForRefine — refine semantics (FR-07)', () => {
     ).resolves.toEqual({ url: 'https://cdn.example.com/real.png' })
     expect(h.anthropicCreate).toHaveBeenCalledTimes(1)
     expect(provider.generateImage).toHaveBeenCalledTimes(1)
+  })
+
+  it('passes the provider-mapped size to generateImage (FR-12)', async () => {
+    for (const [providerName, aspectRatio, size] of [
+      ['openai', 'STORY', '1024x1536'],
+      ['gemini', 'PORTRAIT', '4:5'],
+      ['gemini', 'STORY', '9:16'],
+    ] as const) {
+      const provider = { providerName, generateImage: vi.fn(async () => ({ url: 'https://cdn.example.com/x.png' })) }
+      h.resolveImageProvider.mockResolvedValue(provider)
+      h.anthropicCreate.mockResolvedValueOnce(decisionReply('{"needed": true, "prompt": "a beach"}'))
+      await generateBackgroundForBrief({ ...brief, aspectRatio } as typeof brief, kit, 'Big news!', null, actor)
+      expect(provider.generateImage).toHaveBeenCalledWith('a beach', expect.anything(), size)
+    }
   })
 
   it('the decision failing ⇒ DECISION_ERROR (never throws)', async () => {

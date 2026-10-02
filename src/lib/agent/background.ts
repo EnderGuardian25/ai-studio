@@ -29,6 +29,7 @@ import {
 } from '@/lib/testHooks'
 import type { ResolvedBrandKit } from '@/lib/brandkit/resolve'
 import { resolveImageProvider } from '@/providers/registry'
+import { imageSizeFor } from '@/providers/imageCapabilities'
 import type { ImageProvider } from '@/providers/interfaces/ImageProvider'
 import { persistDataUrlImage } from '@/lib/storage/minio'
 import { runClaudeCli, stripCodeFences } from '@/lib/agent/claudeCli'
@@ -67,14 +68,6 @@ function errorText(err: unknown): string {
 function skip(reason: BackgroundSkipReason, detail?: string): BackgroundResult {
   log(`skipped (${reason})${detail ? ` — ${detail}` : ''}`)
   return detail ? { url: null, skip: reason, detail: cleanSkipDetail(detail) } : { url: null, skip: reason }
-}
-
-// Provider-native image size for the post's aspect ratio. gpt-image supports
-// 1024x1024 / 1536x1024 / 1024x1536; the design layer cover-crops to the exact
-// 1080×1080 / 1080×1350 / 1080×1920 canvas, so nearest-orientation is enough.
-// Both PORTRAIT (4:5) and STORY (9:16) are taller-than-wide → portrait source.
-export function imageSizeFor(aspectRatio: string): string {
-  return aspectRatio === 'PORTRAIT' || aspectRatio === 'STORY' ? '1024x1536' : '1024x1024'
 }
 
 // Tolerant strict-JSON extraction, mirroring the refine route's parseConflict:
@@ -170,7 +163,7 @@ async function runBackgroundStep(
     // The fixture swap happens AFTER the real resolver chose the provider.
     const provider = mockSeam ? mockImageProvider(resolved.provider, opts.seamText) : resolved.provider
 
-    log(`generating background · size=${imageSizeFor(opts.aspectRatio)} · prompt="${decision.prompt.slice(0, 120)}..."`)
+    log(`generating background · size=${imageSizeFor(provider.providerName, opts.aspectRatio)} · prompt="${decision.prompt.slice(0, 120)}..."`)
     const startedAt = Date.now()
     // TODO(team-tenancy): if a personal UserOpenAiKey was resolved above and this
     // call fails with an auth error, flip it INVALID here (markUserOpenAiKeyInvalid,
@@ -178,7 +171,7 @@ async function runBackgroundStep(
     // wired yet: there is no existing OpenAI-error auth-classification helper to
     // hang this off (unlike isClaudeAuthFailure for the CLI), and inventing one is
     // out of scope here.
-    const result = await provider.generateImage(decision.prompt, opts.brandKitId, imageSizeFor(opts.aspectRatio))
+    const result = await provider.generateImage(decision.prompt, opts.brandKitId, imageSizeFor(provider.providerName, opts.aspectRatio))
     // persistDataUrlImage enforces the raster allow-list and returns a stable
     // public URL; a provider that already returns an http(s) URL passes through.
     const url = result.url.startsWith('data:')
