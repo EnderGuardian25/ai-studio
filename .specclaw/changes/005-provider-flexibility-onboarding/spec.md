@@ -96,6 +96,11 @@ The step still never throws, and generation still completes with CSS/SVG (NFR-02
 - Every `claude -p` spawn passes `--tools ""`, an empty tool list.
 - The `allowedTools` option is **removed** from `ClaudeCliOptions`, so no caller can opt back in without a code change that a reviewer sees.
 - On win32, where the spawn uses `shell: true`, the empty argument must survive. Today Node joins argv with spaces, so a bare `""` element vanishes.
+- _Amended 2026-10-02 (T6, after the T4 review):_ every spawn also isolates the child from host configuration.
+  - It passes `--no-session-persistence`, `--safe-mode` and `--setting-sources ""`, and runs from an empty per-process temp cwd (`bistec-cli-*`).
+  - So no user, project or local settings, hooks, plugins, project `CLAUDE.md` or session transcript loads or is written.
+  - The CLI's own built-in skills and `cc-plugin-*` plugins still load, but they are inert with `--tools ""`.
+  - Evidence: real CLI 2.1.287 with an env OAuth token. Hook events went 4 → 0, the cwd stayed empty, and the env token was the credential used.
 
 **FR-09: CLI-mode vision sends images over stdin, not files.**
 
@@ -147,6 +152,10 @@ The step still never throws, and generation still completes with CSS/SVG (NFR-02
 - **Linux:** a link to Anthropic's docs.
 - **Then:** open a new terminal, run `claude setup-token`, finish the sign-in, and paste the `sk-ant-oat01-…` token.
 - Every command must match Anthropic's current docs at build time, with the source cited in the guide doc.
+- _Amended 2026-10-02 (T9, as this FR's last bullet requires):_ Anthropic's setup page now lists the **native installer as "Recommended"**.
+  - Windows' primary route is therefore `irm https://claude.ai/install.ps1 | iex`.
+  - `winget install Anthropic.ClaudeCode` is shown as an alternative with the #6200 note. The issue is still open and has no confirmed workaround, so the guide says to try `winget upgrade` / `winget uninstall`, and otherwise reinstall with the native line.
+  - macOS's primary route is `curl -fsSL https://claude.ai/install.sh | bash`.
 
 **FR-15: The stale credential copy is corrected.**
 
@@ -202,7 +211,7 @@ Each criterion must pass for the change to be considered complete.
 ### Item 5
 
 - **AC-13:** **Unit:** for every CLI call site (copy, design, refine, verifier, background, briefing, token-validate, vision), the spawned argv contains `--tools` with an empty value and never `--allowedTools`. On win32 the empty value survives shell joining.
-- **AC-14:** **Unit:** the child env holds exactly the FR-10 allowlist plus the OAuth token. With `DATABASE_URL`, `TOKEN_ENCRYPTION_KEY`, `MINIO_SECRET_KEY`, `BETTER_AUTH_SECRET` and `ANTHROPIC_API_KEY` all set in the parent, none of them appears in the child.
+- **AC-14:** **Unit:** the child env holds exactly the FR-10 allowlist plus the OAuth token and the constant `DISABLE_AUTOUPDATER=1` (amended 2026-10-02 in T6: it is set by the runner, never inherited, so the pinned CLI of FR-11 can't self-update). With `DATABASE_URL`, `TOKEN_ENCRYPTION_KEY`, `MINIO_SECRET_KEY`, `BETTER_AUTH_SECRET` and `ANTHROPIC_API_KEY` all set in the parent, none of them appears in the child.
 - **AC-15:** **Unit:** CLI-mode vision:
   - writes no file;
   - sends one stream-json user message with N base64 image blocks and one text block containing `UNTRUSTED_CONTENT_GUARD`;
@@ -231,7 +240,7 @@ Each criterion must pass for the change to be considered complete.
 
 ### Item 1
 
-- **AC-22:** The /settings and /team Claude cards render the walkthrough with Windows, macOS and Linux options. Windows shows `winget install Anthropic.ClaudeCode` and the #6200 note, and every option ends at `claude setup-token`. The existing `settings-claude-token` E2E cases stay green, with new assertions for the guide.
+- **AC-22:** The /settings and /team Claude cards render the walkthrough with Windows, macOS and Linux options. Windows shows the native installer (`irm https://claude.ai/install.ps1 | iex`) as the primary route, plus `winget install Anthropic.ClaudeCode` as an alternative with the #6200 note (amended 2026-10-02 per FR-14). Every option ends at `claude setup-token`. The existing `settings-claude-token` E2E cases stay green, with new assertions for the guide.
 - **AC-23:** No UI string or doc that 005 touches says "shared server credential" or "logged-in `claude` session by default". A grep shows it.
 - **AC-24:** `docs/claude-account-setup.md` exists, gives full Windows and macOS walkthroughs with troubleshooting, cites its Anthropic sources, and is linked from the cards and `cold-start.md`.
 - **AC-25:** **Unit:** on win32 with no `CLAUDE_CLI_PATH`, the spawn command is `claude` with `shell: true`. With `CLAUDE_CLI_PATH` set, it is that path with `shell: false`.

@@ -27,7 +27,7 @@ There are 10 tasks in 4 waves. All the work lands on `v2`. Each wave is one item
 
 ### Wave 1 — Item 3: image provider resolution
 
-- [ ] `T1` — Capability module, resolver fallback, provider-route rules, key-validation seam
+- [x] `T1` — Capability module, resolver fallback, provider-route rules, key-validation seam
   - Files: `src/providers/imageCapabilities.ts` (new), `src/providers/registry.ts`, `src/app/api/admin/providers/route.ts`, `src/app/api/admin/providers/[id]/route.ts`, `src/lib/testHooks.ts`, `tests/unit/imageProviderResolution.test.ts`, `tests/unit/imageCapabilities.test.ts` (new), `tests/e2e/provider-registration.test.ts`
   - Estimate: medium
   - Kind: impl
@@ -43,7 +43,7 @@ There are 10 tasks in 4 waves. All the work lands on `v2`. Each wave is one item
     - **ACs:** AC-01 (unit half), AC-02 to AC-06.
     - **Existing TC-PROV cases:** they already accept 201, so confirm they stay green under the seam.
 
-- [ ] `T2` — Skip reasons, the draft notice, the background mock seam
+- [x] `T2` — Skip reasons, the draft notice, the background mock seam
   - Files: `src/lib/agent/background.ts`, `src/lib/agent/pathB.ts`, `src/lib/agent/generateDraft.ts`, `src/app/api/drafts/[id]/regenerate-design/route.ts`, `src/app/api/drafts/[id]/refine/route.ts`, `src/lib/drafts/revisions.ts`, `src/lib/drafts/backgroundNotice.ts` (new), `src/app/api/drafts/[id]/route.ts`, `src/lib/api-types.ts`, `src/components/drafts/BackgroundNotice.tsx` (new), `src/app/(app)/drafts/[id]/page.tsx`, `src/lib/testHooks.ts`, `prisma/schema.prisma`, `prisma/migrations/<ts>_draft_background_skip/`, `tests/unit/background.test.ts`, `tests/e2e/background-notice.test.ts` (new), `tests/e2e/path-b.test.ts`
   - Estimate: large
   - Kind: impl
@@ -59,7 +59,7 @@ There are 10 tasks in 4 waves. All the work lands on `v2`. Each wave is one item
     - **Gate:** a full clean mock E2E run with 0 failed and 0 flaky, and no existing case changing outcome.
     - **UI:** amber, `role="status"`; follow `DESIGN_SYSTEM.md`. Take light and dark screenshots.
 
-- [ ] `T3` — Explicit IMAGE default in /team
+- [x] `T3` — Explicit IMAGE default in /team
   - Files: `src/app/(app)/team/page.tsx`, `tests/e2e/provider-registration.test.ts` (or `team-settings.test.ts`)
   - Estimate: small
   - Kind: impl
@@ -75,7 +75,7 @@ There are 10 tasks in 4 waves. All the work lands on `v2`. Each wave is one item
 
 ### Wave 2 — Item 5: CLI hardening
 
-- [ ] `T4` — One spawn core: `--tools ""`, env allowlist, win32 command, no `allowedTools`
+- [x] `T4` — One spawn core: `--tools ""`, env allowlist, win32 command, no `allowedTools`
   - Files: `src/lib/agent/claudeCli.ts`, `tests/unit/claudeCliArgs.test.ts` (new), `tests/unit/claudeCliAuth.test.ts`, `tests/unit/refineVerify.test.ts` (argv expectations only)
   - Estimate: medium
   - Kind: impl
@@ -87,7 +87,7 @@ There are 10 tasks in 4 waves. All the work lands on `v2`. Each wave is one item
     - **Remove `allowedTools`** from the options type. Vision breaks at compile time until T5, so land T4 and T5 together if needed to keep `tsc` green at each commit, or have T4 move vision's call onto a temporary text-mode path with no tools.
     - **ACs:** AC-13 (text-mode sites), AC-14, AC-25.
 
-- [ ] `T5` — Vision over stream-json, with no files
+- [x] `T5` — Vision over stream-json, with no files
   - Files: `src/lib/agent/claudeCli.ts` (`runClaudeCliStreamJson`), `src/lib/agent/vision.ts`, `tests/unit/visionCli.test.ts` (new), `tests/unit/visionPrompt.test.ts`, `docs/mcp-acp-guide.md`, `docs/security-prompt-injection-review-2026-07-22.md`, `docs/handoff.md`, `docs/plans/README.md`, `docs/plans/feature-5-brandkit-from-references.md`, `CLAUDE.md`
   - Estimate: medium
   - Kind: impl
@@ -102,7 +102,7 @@ There are 10 tasks in 4 waves. All the work lands on `v2`. Each wave is one item
     - **ACs:** AC-13 (vision site), AC-15.
     - **Windows smoke test, recommended but not gating:** one real vision and one real copy call on a dev box.
 
-- [ ] `T6` — Pin the container CLI and prove it in the image
+- [~] `T6` — Pin the container CLI and prove it in the image
   - Files: `Dockerfile`, `scripts/cli-sandbox-check.mjs` (new)
   - Estimate: small
   - Kind: config
@@ -117,7 +117,7 @@ There are 10 tasks in 4 waves. All the work lands on `v2`. Each wave is one item
 
 ### Wave 3 — Item 4: Gemini
 
-- [ ] `T7` — Per-provider image sizes
+- [x] `T7` — Per-provider image sizes
   - Files: `src/providers/imageCapabilities.ts`, `src/providers/interfaces/ImageProvider.ts`, `src/providers/implementations/image/openai.ts`, `src/lib/agent/background.ts`, `src/lib/agent/tools.ts`, `src/app/api/generate/image/route.ts`, `tests/unit/imageCapabilities.test.ts`, `tests/unit/background.test.ts`, `tests/unit/toolGenerateImage.test.ts`
   - Estimate: small
   - Kind: impl
@@ -130,7 +130,7 @@ There are 10 tasks in 4 waves. All the work lands on `v2`. Each wave is one item
     - **Tests:** add the missing STORY assertion.
     - **AC:** AC-18.
 
-- [ ] `T8` — Gemini image provider
+- [x] `T8` — Gemini image provider
   - Files: `src/providers/implementations/image/gemini.ts` (new), `src/providers/registry.ts`, `src/app/api/admin/providers/route.ts`, `src/app/(app)/team/page.tsx` (client `detectProvider` gains `AIza`), `tests/unit/geminiImage.test.ts` (new), `tests/e2e/provider-registration.test.ts`, `tests/e2e/background-notice.test.ts`
   - Estimate: medium
   - Kind: impl
@@ -145,7 +145,7 @@ There are 10 tasks in 4 waves. All the work lands on `v2`. Each wave is one item
 
 ### Wave 4 — Item 1: guided Claude connection
 
-- [ ] `T9` — `docs/claude-account-setup.md`
+- [x] `T9` — `docs/claude-account-setup.md`
   - Files: `docs/claude-account-setup.md` (new), `docs/cold-start.md`
   - Estimate: small
   - Kind: docs
@@ -160,7 +160,7 @@ There are 10 tasks in 4 waves. All the work lands on `v2`. Each wave is one item
     - Remove "logged-in `claude` session by default" from `cold-start.md` §2 and link the new doc.
     - **AC:** AC-24.
 
-- [ ] `T10` — In-app connection walkthrough, plus copy fixes
+- [x] `T10` — In-app connection walkthrough, plus copy fixes
   - Files: `src/components/settings/ClaudeConnectGuide.tsx` (new), `src/components/settings/ClaudeTokenCard.tsx`, `src/components/settings/ClaudeTokenPrompt.tsx`, `src/components/team/TeamClaudeTokenCard.tsx`, `tests/e2e/settings-claude-token.test.ts`
   - Estimate: medium
   - Kind: impl
