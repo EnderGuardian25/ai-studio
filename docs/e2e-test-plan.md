@@ -487,18 +487,20 @@ Refine writes by its own rule: it resolves the provider **first** and, with none
 - **TC-BG-08 — A refine that didn't want a background leaves the skip unchanged (AC-11).** P: one non-default row; generation `__MOCK_BG_FAIL__` stored `PROVIDER_ERROR`. S: refine with `__MOCK_BG_NOT_NEEDED__` in the instruction (a provider resolves, so the decision really runs). E: revision 2; `backgroundSkipped` equal to the generation's.
 - **TC-BG-09 — A refine on a team with no provider leaves the skip unchanged (FR-07 refine rule).** P: one non-default row; generation `__MOCK_BG_FAIL__` stored `PROVIDER_ERROR`; then the row is disabled. S: refine with `__MOCK_BG__` in the instruction. E: revision 2; `backgroundSkipped` still the `PROVIDER_ERROR` (never `NO_PROVIDER`); `imageUrl` null. The unit suite proves the decision model is never called on this path.
 - **TC-BG-10 — A team editor gets the /settings link (FR-07).** P: the seed editor (`editor@bisteccare.lk`) is added to the fresh team as `EDITOR` and generates a `NO_PROVIDER` draft. S: open the draft in the browser as the editor. E: the notice shows the `NO_PROVIDER` body and an "Open Settings" link → `/settings`, and no `/team` link. Teardown removes the membership, so the seed editor keeps its original teams.
+- **TC-BG-11 — A Gemini default IMAGE row serves a background (005 T8, AC-20).** P: a fresh team whose only IMAGE row is a Gemini key registered over the API (the first row, so it is the default; `providerName` `gemini`). S: Path B generation, topic `__MOCK_BG__`. E: draft `EXPORTED`, `backgroundSkipped` null (no skip notice), `imageUrl` a persisted `background-*.png`; DB `backgroundSkipReason` null. Test: `background-notice.test.ts:197`. The seam swaps only `generateImage`, so nothing reaches Google (mock-verified only, AC-21); that a gemini row resolves to a `GeminiImageProvider` is asserted in `tests/unit/geminiImage.test.ts`.
 - **TC-GEN-05** (§D, `path-b.test.ts`) uses the same seam for the public-URL check.
 
 **AC → case map (change 005 item 3).** The unit file is `tests/unit/background.test.ts`: every reason including the stage-based catches, never throwing, the refine order (resolve first; a provider-less refine never decides), the seam (resolution runs for real; the instruction sentinel wins; no effect without `MOCK_AI`), the writer rules, the message table, the moderation and redaction tables, and the `commitDraftRevision` threading.
 
-| AC                                                  | E2E                 |
-| --------------------------------------------------- | ------------------- |
-| AC-01 (E2E half) non-default row, no personal key   | TC-BG-02            |
-| AC-08 NO_PROVIDER stored, polled, shown; EXPORTED   | TC-BG-01, TC-BG-10  |
-| AC-09 not needed ⇒ no notice                        | TC-BG-03            |
-| AC-10 provider failure ⇒ PROVIDER_ERROR, completes  | TC-BG-04            |
-| AC-11 regenerate clears; refine sets / leaves alone | TC-BG-05 … TC-BG-09 |
-| AC-12 TC-GEN-05 runs                                | TC-GEN-05           |
+| AC                                                  | E2E                                               |
+| --------------------------------------------------- | ------------------------------------------------- |
+| AC-01 (E2E half) non-default row, no personal key   | TC-BG-02                                          |
+| AC-08 NO_PROVIDER stored, polled, shown; EXPORTED   | TC-BG-01, TC-BG-10                                |
+| AC-09 not needed ⇒ no notice                        | TC-BG-03                                          |
+| AC-10 provider failure ⇒ PROVIDER_ERROR, completes  | TC-BG-04                                          |
+| AC-11 regenerate clears; refine sets / leaves alone | TC-BG-05 … TC-BG-09                               |
+| AC-12 TC-GEN-05 runs                                | TC-GEN-05                                         |
+| AC-20 Gemini default row serves a background        | TC-BG-11 + the provider-registration Gemini cases |
 
 ---
 
