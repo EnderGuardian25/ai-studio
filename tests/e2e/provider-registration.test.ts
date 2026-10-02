@@ -283,6 +283,44 @@ test.describe('Provider registration', () => {
     expect((await api.del(`/api/admin/providers/${legacy.id}`)).status()).toBe(204)
   })
 
+  // ── 005 T8: Gemini (FR-13, AC-20). An AIza… key is detected as gemini with no
+  // providerName in the body; validation goes through the MOCK_AI seam, never
+  // the live Gemini models endpoint (mock-verified only, AC-21).
+  const GEMINI_KEY = 'AIzaSy' + 'E2Egemini_fake_key_0123456789abcd' // AIzaSy + 33 chars
+
+  test('AC-20: an AIza… key registers as gemini in the IMAGE slot and, as the first row, is the default', async () => {
+    const res = await api.post('/api/admin/providers', { apiKey: GEMINI_KEY, slot: 'IMAGE' })
+    expect(res.status()).toBe(201)
+    const row = await res.json()
+    expect(row.providerName).toBe('gemini')
+    expect(row.label).toBe('Gemini (Google)')
+    expect(row.isDefault).toBe(true)
+    expect(row.keyPrefix).toBe('…abcd')
+    expect(JSON.stringify(row)).not.toContain(GEMINI_KEY)
+    expect((await listImageRows()).map((r) => [r.providerName, r.isDefault])).toEqual([['gemini', true]])
+  })
+
+  test('AC-20: a gemini row registered after an OpenAI default can be made the default', async () => {
+    const openai = await registerImage('sk-image-before-gemini-0014')
+    expect(openai.isDefault).toBe(true)
+    const gemini = await registerImage(GEMINI_KEY)
+    expect(gemini.providerName).toBe('gemini')
+    expect(gemini.isDefault).toBe(false)
+
+    const res = await api.patch(`/api/admin/providers/${gemini.id}`, { isDefault: true })
+    expect(res.status()).toBe(200)
+    expect((await res.json()).isDefault).toBe(true)
+    expect((await listImageRows()).filter((r) => r.isDefault).map((r) => r.id)).toEqual([gemini.id])
+  })
+
+  test('AC-20: an AIza… key as COPY is refused with 400 and creates no row', async () => {
+    const res = await api.post('/api/admin/providers', { apiKey: GEMINI_KEY, slot: 'COPY' })
+    expect(res.status()).toBe(400)
+    expect((await res.json()).error).toBe('Provider gemini cannot serve the COPY slot')
+    const all: ProviderRow[] = await (await api.get('/api/admin/providers')).json()
+    expect(all).toEqual([])
+  })
+
   test('NFR-06: the MOCK_AI key-validation seam rejects a key containing "invalid" with 422', async () => {
     const res = await api.post('/api/admin/providers', { apiKey: 'sk-invalid-image-key-0013', slot: 'IMAGE' })
     expect(res.status()).toBe(422)

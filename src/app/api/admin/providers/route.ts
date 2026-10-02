@@ -9,6 +9,8 @@ import { IMAGE_PROVIDERS, canServeSlot } from '@/providers/imageCapabilities'
 function detectProvider(apiKey: string): { providerName: string; autoLabel: string } | null {
   if (apiKey.startsWith('sk-ant-')) return { providerName: 'anthropic', autoLabel: 'Claude (Anthropic)' }
   if (apiKey.startsWith('sk-')) return { providerName: 'openai', autoLabel: 'GPT (OpenAI)' }
+  // Google API keys (Gemini): IMAGE only, which canServeSlot enforces (005 FR-13).
+  if (apiKey.startsWith('AIza')) return { providerName: 'gemini', autoLabel: 'Gemini (Google)' }
   return null
 }
 
@@ -30,6 +32,12 @@ async function validateApiKey(providerName: string, apiKey: string): Promise<str
         headers: { Authorization: `Bearer ${apiKey}` },
       })
       if (!res.ok) return `OpenAI API rejected the key (HTTP ${res.status})`
+    } else if (providerName === 'gemini') {
+      // The key goes in the header, never in a ?key= query string.
+      const res = await fetch('https://generativelanguage.googleapis.com/v1beta/models', {
+        headers: { 'x-goog-api-key': apiKey },
+      })
+      if (!res.ok) return `Gemini API rejected the key (HTTP ${res.status})`
     }
     // Unknown providers: skip validation
     return null

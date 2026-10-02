@@ -187,6 +187,32 @@ test.describe('§BG — skipped AI background notice', () => {
     expect(draft.backgroundSkipped).toBeNull()
   })
 
+  // TC-BG-11 — 005 T8, AC-20. The team's ONLY image row is a gemini key (the
+  // default, as the first row), so the real resolver can only serve it: before
+  // T8 instantiateImageProvider had no gemini case, so the step would fail
+  // with PROVIDER_ERROR. The seam swaps only generateImage, so no request ever
+  // reaches Google (mock-verified only, AC-21). Which class the resolver built
+  // is not visible over HTTP; tests/unit/geminiImage.test.ts asserts that a
+  // gemini row resolves to a GeminiImageProvider.
+  test('AC-20: a gemini default IMAGE row serves a background through the seam', async () => {
+    const res = await t.api.post('/api/admin/providers', {
+      apiKey: 'AIzaSy' + 'E2Egemini_bg_key_00123456789abcde', // AIzaSy + 33 chars
+      slot: 'IMAGE',
+    })
+    expect(res.status()).toBe(201)
+    const row = await res.json()
+    expect(row.providerName).toBe('gemini')
+    expect(row.isDefault).toBe(true)
+
+    const draft = await generate(t, `BG gemini __MOCK_BG__ ${Date.now()}`)
+    expect(draft.backgroundSkipped).toBeNull()
+    expect(draft.imageUrl).toMatch(/^https?:\/\/.+\/background-.+\.png$/)
+    if (dbAvailable) {
+      const stored = await prisma!.draft.findUnique({ where: { id: draft.id as string } })
+      expect(stored?.backgroundSkipReason).toBeNull()
+    }
+  })
+
   // TC-BG-03 — AC-09.
   test('AC-09: the model decided no background ⇒ no skip stored, no notice', async ({ page }) => {
     await addNonDefaultImageRow(t.api)

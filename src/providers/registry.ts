@@ -4,6 +4,7 @@ import type { CopyProvider } from "./interfaces/CopyProvider"
 import type { ImageProvider } from "./interfaces/ImageProvider"
 import { OpenAICopyProvider } from "./implementations/copy/openai"
 import { OpenAIImageProvider } from "./implementations/image/openai"
+import { GeminiImageProvider } from "./implementations/image/gemini"
 import { AnthropicCopyProvider } from "./implementations/copy/anthropic"
 import { ClaudeCliCopyProvider } from "./implementations/copy/claude-cli"
 import { MOCK_AI, buildMockCopy } from "@/lib/testHooks"
@@ -35,6 +36,8 @@ function instantiateImageProvider(providerName: string, apiKey: string): ImagePr
   switch (providerName.toLowerCase()) {
     case "openai":
       return new OpenAIImageProvider(apiKey)
+    case "gemini":
+      return new GeminiImageProvider(apiKey)
     default:
       throw new Error(`Unsupported provider: ${providerName}`)
   }
