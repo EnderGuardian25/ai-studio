@@ -34,6 +34,12 @@ const h = vi.hoisted(() => ({
   chunks: null as Buffer[] | null,
   stderr: '',
   exitCode: 0 as number | null,
+  // When set, the fake child emits a spawn 'error' with this code instead of
+  // output (005 T6 fix round 1: ENOENT from a missing binary or a vanished cwd).
+  spawnErrorCode: null as string | null,
+  // Runs synchronously inside the fake spawn, before any event (e.g. to delete
+  // the cwd the spawn was handed).
+  onSpawn: null as ((cwd: string | undefined) => void) | null,
 }))
 
 vi.mock('child_process', async () => {
@@ -49,7 +55,12 @@ vi.mock('child_process', async () => {
         pid: 4242,
         kill: vi.fn(),
       })
+      h.onSpawn?.(opts.cwd)
       setImmediate(() => {
+        if (h.spawnErrorCode) {
+          child.emit('error', Object.assign(new Error(`spawn ${cmd} ${h.spawnErrorCode}`), { code: h.spawnErrorCode }))
+          return
+        }
         if (h.stderr) child.stderr.emit('data', Buffer.from(h.stderr))
         for (const c of h.chunks ?? [Buffer.from(h.stdout)]) child.stdout.emit('data', c)
         child.emit('close', h.exitCode)
@@ -76,8 +87,16 @@ process.env.CLAUDE_CLI_DEBUG = '0'
 delete process.env.CLAUDE_CLI_MODEL
 delete process.env.CLAUDE_CLI_PATH
 
-const { runClaudeCli, runClaudeCliStreamJson, buildChildEnv, claudeCommand, isClaudeAuthFailure, ClaudeCliError } =
-  await import('@/lib/agent/claudeCli')
+const {
+  runClaudeCli,
+  runClaudeCliStreamJson,
+  buildChildEnv,
+  claudeCommand,
+  isClaudeAuthFailure,
+  ClaudeCliError,
+  CHILD_ENV_ALWAYS,
+  CHILD_ENV_WIN32,
+} = await import('@/lib/agent/claudeCli')
 const { runWithClaudeAuth } = await import('@/lib/agent/claudeAuth')
 const { ClaudeCliCopyProvider } = await import('@/providers/implementations/copy/claude-cli')
 const { runDesignAgentCli, runDesignAgentCliRefine } = await import('@/lib/agent/designAgentCli')
@@ -105,6 +124,8 @@ beforeEach(() => {
   h.chunks = null
   h.stderr = ''
   h.exitCode = 0
+  h.spawnErrorCode = null
+  h.onSpawn = null
 })
 afterEach(() => setPlatform(realPlatform))
 
@@ -390,6 +411,52 @@ describe('T6: every spawn is isolated from settings, hooks, plugins and project 
     expect(readdirSync(a!)).toEqual([])
   })
 
+  // T6 fix round 1: a tmp cleaner can delete the cached `bistec-cli-*` dir
+  // under a long-running server. Spawning into a missing cwd fails with ENOENT,
+  // which used to surface as "CLI not found".
+  it('re-creates the cached temp cwd when it has vanished (tmp cleaner) instead of spawning into it', async () => {
+    const { rmSync, existsSync } = await import('node:fs')
+    setPlatform('linux')
+    await inAuth(() => runClaudeCli('one'))
+    const first = h.spawnCalls[0].cwd!
+    rmSync(first, { recursive: true, force: true })
+    let existedAtSpawn = false
+    h.onSpawn = (cwd) => (existedAtSpawn = !!cwd && existsSync(cwd))
+    await expect(inAuth(() => runClaudeCli('two'))).resolves.toBe('ok')
+    const second = h.spawnCalls[1].cwd!
+    expect(second).not.toBe(first)
+    expect(existedAtSpawn).toBe(true)
+    // …and the fresh dir is the one reused from then on.
+    await inAuth(() => runClaudeCli('three'))
+    expect(h.spawnCalls[2].cwd).toBe(second)
+  })
+
+  it('a spawn ENOENT because the cwd vanished mid-flight is NOT reported as "CLI not found", and the next call recovers', async () => {
+    const { rmSync } = await import('node:fs')
+    setPlatform('linux')
+    // Delete the cwd at spawn time, after the re-validation, and fail the spawn
+    // with the ENOENT a missing cwd produces.
+    h.onSpawn = (cwd) => cwd && rmSync(cwd, { recursive: true, force: true })
+    h.spawnErrorCode = 'ENOENT'
+    const err = await inAuth(() => runClaudeCli('p')).catch((e: unknown) => e)
+    expect((err as Error).message).not.toMatch(/not found on PATH/)
+    expect((err as Error).message).toMatch(/working directory/i)
+    expect(isClaudeAuthFailure(err)).toBe(false)
+    const gone = h.spawnCalls[0].cwd
+    h.onSpawn = null
+    h.spawnErrorCode = null
+    await expect(inAuth(() => runClaudeCli('p'))).resolves.toBe('ok')
+    expect(h.spawnCalls[1].cwd).not.toBe(gone)
+  })
+
+  it('a spawn ENOENT with the cwd intact keeps the friendly not-found message (a genuinely missing binary)', async () => {
+    setPlatform('linux')
+    h.spawnErrorCode = 'ENOENT'
+    await expect(inAuth(() => runClaudeCli('p'))).rejects.toThrow(
+      'Claude CLI not found on PATH. Install Claude Code or set CLAUDE_CLI_PATH.',
+    )
+  })
+
   it('DISABLE_AUTOUPDATER is the constant "1", never taken from the parent', () => {
     expect(buildChildEnv({ DISABLE_AUTOUPDATER: '0', PATH: '/bin' }, 'linux', TOKEN).DISABLE_AUTOUPDATER).toBe('1')
     expect(buildChildEnv({ disable_autoupdater: '0' }, 'win32', TOKEN)).toEqual({
@@ -518,13 +585,67 @@ describe('T6: scripts/cli-sandbox-check.mjs (AC-16) mirrors the real stream-json
   // The in-image check cannot import claudeCli.ts (the runner image has only
   // Next's bundled chunks), so it restates the spawn. Pin the two together.
   it('the same argv as a POSIX vision spawn, and the same child env', async () => {
-    const { sandboxArgs, sandboxChildEnv, VISION_MODEL } = await import('../../scripts/cli-sandbox-check.mjs')
+    const { sandboxArgs, VISION_MODEL } = await import('../../scripts/cli-sandbox-check.mjs')
     expect(VISION_MODEL).toBe(modelFor('B', 'cli'))
     setPlatform('linux')
     h.stdout = RESULT_OK('ok')
     await inAuth(() => runClaudeCliStreamJson([{ type: 'text', text: 'x' }], { model: modelFor('B', 'cli') }))
     expect(sandboxArgs()).toEqual(h.spawnCalls[0].args)
-    const parent = { PATH: '/usr/bin', HOME: '/home/nextjs', LANG: 'C', DATABASE_URL: 'postgres://x', BISTEC_CANARY: 'c' }
-    expect(sandboxChildEnv(parent, TOKEN)).toEqual(buildChildEnv(parent, 'linux', TOKEN))
+  })
+
+  // T6 fix round 1: the sample parent env holds EVERY allowlisted name (both
+  // platforms' lists) plus secrets, so the script dropping — or adding — any
+  // single name fails here, not just the three a small sample happened to use.
+  it('the same child env for a parent holding every allowlisted name (both platforms) plus secrets', async () => {
+    const { sandboxChildEnv } = await import('../../scripts/cli-sandbox-check.mjs')
+    const allowlisted = [...CHILD_ENV_ALWAYS, ...CHILD_ENV_WIN32]
+    expect(allowlisted.length).toBeGreaterThan(20)
+    const parent: Record<string, string> = Object.fromEntries(allowlisted.map((k) => [k, `value-of-${k}`]))
+    Object.assign(parent, {
+      DATABASE_URL: 'postgres://x',
+      BISTEC_CANARY: 'c',
+      TOKEN_ENCRYPTION_KEY: 'k',
+      ANTHROPIC_API_KEY: 'sk-ant-api03-FAKE',
+      CLAUDE_CODE_OAUTH_TOKEN: 'stale-parent-value',
+      DISABLE_AUTOUPDATER: '0',
+    })
+    const expected = buildChildEnv(parent, 'linux', TOKEN)
+    // The real POSIX child carries every POSIX name, so the sample is effective.
+    for (const k of CHILD_ENV_ALWAYS) expect(expected[k], k).toBe(`value-of-${k}`)
+    expect(sandboxChildEnv(parent, TOKEN)).toEqual(expected)
+  })
+})
+
+// T6 fix round 1: the in-image check FAILs on any echo of the OAuth token —
+// the full value, its recognisable `sk-ant-oat01-…` prefix, or any OAuth
+// token-shaped string — as well as on the canaries, anywhere in the output.
+describe('T6: scripts/cli-sandbox-check.mjs leakProblems', () => {
+  // A fake value — never a real credential.
+  const FAKE = 'sk-ant-oat01-FAKEabcdefghijklmnopqrstuvwxyz0123456789'
+  const secrets = { token: FAKE, canaries: ['canary-aaaa', 'canary-bbbb'] }
+
+  it('clean output → no problems', async () => {
+    const { leakProblems } = await import('../../scripts/cli-sandbox-check.mjs')
+    expect(leakProblems('{"type":"result","result":"I cannot read files."}', secrets)).toEqual([])
+  })
+
+  it.each([
+    ['the full token', `env: CLAUDE_CODE_OAUTH_TOKEN=${FAKE}`],
+    ['the token with a few chars cut off the end', FAKE.slice(0, 30)],
+    ['the sk-ant-oat01- prefix followed by its chars', `token starts ${FAKE.slice(0, 21)}…`],
+    ['another OAuth-token-shaped string', 'sk-ant-oat01-ZZZZZZZZZZZZ'],
+  ])('%s → FAIL', async (_name, output) => {
+    const { leakProblems } = await import('../../scripts/cli-sandbox-check.mjs')
+    expect(leakProblems(output, secrets).join(' ')).toMatch(/token/i)
+  })
+
+  it('a canary anywhere → FAIL', async () => {
+    const { leakProblems } = await import('../../scripts/cli-sandbox-check.mjs')
+    expect(leakProblems('… canary-bbbb …', secrets).join(' ')).toMatch(/canary/i)
+  })
+
+  it('the bare prefix alone (no token chars) is not a leak', async () => {
+    const { leakProblems } = await import('../../scripts/cli-sandbox-check.mjs')
+    expect(leakProblems('tokens look like sk-ant-oat01-…', secrets)).toEqual([])
   })
 })

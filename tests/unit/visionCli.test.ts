@@ -456,6 +456,59 @@ describe('auth: model-written text never classifies as an auth failure', () => {
     expect(isClaudeAuthFailure(err)).toBe(false)
   })
 
+  // T6 fix round 1: the pinned CLI reports a REVOKED token as a 403 whose
+  // is_error result text says "OAuth token has been revoked". That must mark
+  // the personal token invalid and retry on the team token, like a 401.
+  const REVOKED_TEXT =
+    'Failed to authenticate. API Error: 403 {"type":"error","error":{"type":"permission_error","message":"OAuth token has been revoked. Please obtain a new token or refresh your existing token."}}'
+
+  it('403 + "OAuth token has been revoked" → auth failure: the personal token is marked invalid and the team retry fires', async () => {
+    h.scripts.push(
+      { exitCode: 1, chunks: [INIT, assistant(REVOKED_TEXT), result({ is_error: true, result: REVOKED_TEXT, api_error_status: 403 })] },
+      { exitCode: 0, chunks: [INIT, result({ result: 'from the team token' })] },
+    )
+    const auth = userAuth({ resolveFallback: vi.fn(async () => teamAuth()) })
+    await expect(inAuth(() => runVisionModel(req()), auth)).resolves.toBe('from the team token')
+    expect(auth.onAuthFailure).toHaveBeenCalledTimes(1)
+    expect(h.spawnCalls).toHaveLength(2)
+    expect(h.spawnCalls[1].env.CLAUDE_CODE_OAUTH_TOKEN).toBe(TEAM_TOKEN)
+  })
+
+  it('403 permission_error with other text → not an auth failure, no retry', async () => {
+    const { isClaudeAuthFailure } = await import('@/lib/agent/claudeCli')
+    const text =
+      'API Error: 403 {"type":"error","error":{"type":"permission_error","message":"Your organization does not allow this model. Please run /login"}}'
+    h.scripts.push({ exitCode: 1, chunks: [INIT, result({ is_error: true, result: text, api_error_status: 403 })] })
+    const auth = userAuth({ resolveFallback: vi.fn(async () => teamAuth()) })
+    const err = await inAuth(() => runVisionModel(req()), auth).catch((e: unknown) => e)
+    expect(isClaudeAuthFailure(err)).toBe(false)
+    expect(auth.onAuthFailure).not.toHaveBeenCalled()
+    expect(h.spawnCalls).toHaveLength(1)
+  })
+
+  it('403 whose result is NOT is_error → not an auth failure, even with revoked text (it may be model text)', async () => {
+    const { isClaudeAuthFailure } = await import('@/lib/agent/claudeCli')
+    h.scripts.push({
+      exitCode: 1,
+      chunks: [INIT, result({ subtype: 'error_during_execution', is_error: false, result: 'OAuth token has been revoked', api_error_status: 403 })],
+    })
+    const err = await inAuth(() => runVisionModel(req())).catch((e: unknown) => e)
+    expect(err).toBeInstanceOf(ClaudeCliError)
+    expect(isClaudeAuthFailure(err)).toBe(false)
+  })
+
+  it('403 with an empty is_error result and the revoked text only in ASSISTANT text → not an auth failure', async () => {
+    const { isClaudeAuthFailure } = await import('@/lib/agent/claudeCli')
+    h.scripts.push({
+      exitCode: 1,
+      chunks: [INIT, assistant('OAuth token has been revoked'), result({ is_error: true, result: '', api_error_status: 403 })],
+    })
+    const auth = userAuth({ resolveFallback: vi.fn(async () => teamAuth()) })
+    const err = await inAuth(() => runVisionModel(req()), auth).catch((e: unknown) => e)
+    expect(isClaudeAuthFailure(err)).toBe(false)
+    expect(auth.onAuthFailure).not.toHaveBeenCalled()
+  })
+
   it('the real 2.1.287 auth-failure shape at exit 0 still classifies (is_error → exit code null)', async () => {
     const { isClaudeAuthFailure } = await import('@/lib/agent/claudeCli')
     h.scripts.push({ ...authFailure, exitCode: 0 })

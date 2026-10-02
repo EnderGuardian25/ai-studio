@@ -1,5 +1,6 @@
 import { spawn } from "child_process"
-import { mkdtemp } from "node:fs/promises"
+import { existsSync } from "node:fs"
+import { mkdtemp, stat } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { StringDecoder } from "node:string_decoder"
@@ -28,7 +29,8 @@ export function claudeCommand(
 // CLAUDE_CODE_OAUTH_TOKEN, so a stray one would exit 1 or bill the API).
 // HOME matters: the CLI writes config/cache under ~/.claude* (Dockerfile sets a
 // writable HOME for the runner user).
-const CHILD_ENV_ALWAYS = [
+// Exported for the drift test that pins scripts/cli-sandbox-check.mjs to it.
+export const CHILD_ENV_ALWAYS: readonly string[] = [
   "PATH",
   "HOME",
   "LANG",
@@ -43,7 +45,7 @@ const CHILD_ENV_ALWAYS = [
   "https_proxy",
   "no_proxy",
 ]
-const CHILD_ENV_WIN32 = ["USERPROFILE", "APPDATA", "LOCALAPPDATA", "SystemRoot", "ComSpec", "PATHEXT", "TEMP", "TMP"]
+export const CHILD_ENV_WIN32: readonly string[] = ["USERPROFILE", "APPDATA", "LOCALAPPDATA", "SystemRoot", "ComSpec", "PATHEXT", "TEMP", "TMP"]
 
 type EnvMap = Record<string, string | undefined>
 
@@ -122,13 +124,32 @@ function baseArgs(shell: boolean): string[] {
 // (`<os.tmpdir()>/bistec-cli-*`), created on first use and reused. Running in
 // the app's own cwd would put the repo's CLAUDE.md and .claude/settings*.json
 // in the CLI's reach. A failed creation is not cached, so the next call retries.
+//
+// The cached dir is re-checked before every reuse (005 T6 fix round 1): a tmp
+// cleaner (systemd-tmpfiles, a Windows disk cleanup) can delete it under a
+// long-running server, and a spawn into a missing cwd fails with ENOENT —
+// which would otherwise read as "Claude CLI not found". A vanished dir is
+// simply re-created.
 let spawnCwdPromise: Promise<string> | undefined
-function spawnCwd(): Promise<string> {
-  spawnCwdPromise ??= mkdtemp(join(tmpdir(), "bistec-cli-")).catch((err: unknown) => {
-    spawnCwdPromise = undefined
+function freshSpawnCwd(): Promise<string> {
+  const created: Promise<string> = mkdtemp(join(tmpdir(), "bistec-cli-")).catch((err: unknown) => {
+    if (spawnCwdPromise === created) spawnCwdPromise = undefined
     throw err
   })
-  return spawnCwdPromise
+  spawnCwdPromise = created
+  return created
+}
+async function spawnCwd(): Promise<string> {
+  const cached = spawnCwdPromise
+  if (!cached) return freshSpawnCwd()
+  const dir = await cached
+  const present = await stat(dir).then(
+    (s) => s.isDirectory(),
+    () => false,
+  )
+  if (present) return dir
+  // Another call may already have replaced it; only reset what we observed.
+  return spawnCwdPromise === cached ? freshSpawnCwd() : spawnCwd()
 }
 
 // Model the spawned `claude -p` runs under. Precedence:
@@ -221,17 +242,28 @@ export class ClaudeCliError extends Error {
 // Pure + exported for unit tests. Deliberately conservative — a false positive
 // marks a good personal token INVALID — so:
 //   - only a ClaudeCliError with a non-zero (or null) exit code;
-//   - a structured API status decides on its own: 401 is an auth failure, any
-//     other status is not, whatever the text says;
+//   - a structured API status decides: 401 is an auth failure; 403 is one
+//     ONLY when the is_error result text says the OAuth token was revoked
+//     (the pinned CLI 2.1.287 reports a revoked token as 403 — its own check
+//     is `status===403 && text includes "OAuth token has been revoked"`, and
+//     it renders "OAuth token revoked · Please run /login"); any other 403 is
+//     a permission or plan error, and any other status is never one, whatever
+//     the text says. The 403 test reads `stdout` only, which for a
+//     stream-json run is the CLI-written text of an is_error result and never
+//     model text (the field contract on ClaudeCliError); apiErrorStatus is
+//     only ever set by a stream-json run;
 //   - with no status, a known auth phrasing in stderr / stdout (see the field
 //     contract on ClaudeCliError — never model text) decides.
 // Timeouts, the size guards, buffer limits and generic exits never qualify.
 const AUTH_FAILURE_RE =
   /oauth token (is )?(invalid|expired|revoked)|invalid api key|please run \/login|authentication[_ ]?error|not (logged in|authenticated)|\b401\b/i
+const REVOKED_TOKEN_RE = /oauth (access )?token (has been )?revoked/i
 export function isClaudeAuthFailure(err: unknown): boolean {
   if (!(err instanceof ClaudeCliError)) return false
   if (err.exitCode === 0) return false
-  if (err.apiErrorStatus !== null) return err.apiErrorStatus === 401
+  if (err.apiErrorStatus !== null) {
+    return err.apiErrorStatus === 401 || (err.apiErrorStatus === 403 && REVOKED_TOKEN_RE.test(err.stdout))
+  }
   return AUTH_FAILURE_RE.test(`${err.stderr}\n${err.stdout}`)
 }
 
@@ -676,13 +708,19 @@ async function spawnClaude(args: string[], stdinPayload: string, opts: SpawnClau
     })
 
     child.on("error", (err: NodeJS.ErrnoException) => {
-      finish(() =>
-        reject(
-          err.code === "ENOENT"
-            ? new Error(NOT_FOUND_MESSAGE)
-            : new Error(`Claude CLI failed: ${err.message}`),
-        ),
-      )
+      finish(() => {
+        if (err.code !== "ENOENT") return reject(new Error(`Claude CLI failed: ${err.message}`))
+        // A spawn into a missing cwd is ENOENT too. spawnCwd() re-checked it
+        // just before, so this is a dir deleted in between: say so (the next
+        // call's re-check re-creates it), and keep the not-found message for a
+        // genuinely missing binary.
+        if (!existsSync(cwd)) {
+          return reject(
+            new Error(`Claude CLI working directory ${cwd} disappeared before the spawn (a temp cleaner?). Retry the request.`),
+          )
+        }
+        reject(new Error(NOT_FOUND_MESSAGE))
+      })
     })
 
     child.on("close", (code: number | null) => {
