@@ -1,13 +1,97 @@
 # bistec-studio — Session Handoff
 
-**Date:** 2026-09-28 (latest: build session — 004 Waves 1–3 built, MinIO → silo, PR #42 + draft PR #43). Previous: 2026-09-23 (later, later the same day: proposal **012** per-channel captions + copy→caption rename, a floating **Create post** button folded into 011, and a launch-video legibility pass. Before that: planning session — proposals 008–011 + roadmap, 004 re-planned to 24 tasks incl. Phase 0, and the deploy pipeline found broken: Coolify 401 since 2026-09-15). Previous: 2026-07-28 (copy-edit status clobber fix).
+**Date:** 2026-10-03 (latest: 004 finished and verified PARTIAL, Phase 0 only; 005 planned and built, 9/10, waiting on one operator check). Previous: 2026-09-28 (build session — 004 Waves 1–3 built, MinIO → silo, PR #42 + draft PR #43). Before that: 2026-09-23 (later, later the same day: proposal **012** per-channel captions + copy→caption rename, a floating **Create post** button folded into 011, and a launch-video legibility pass. Before that: planning session — proposals 008–011 + roadmap, 004 re-planned to 24 tasks incl. Phase 0, and the deploy pipeline found broken: Coolify 401 since 2026-09-15). Previous: 2026-07-28 (copy-edit status clobber fix).
 **Repo:** https://github.com/bistec-oss/studio (formerly `bistec-oss/designer`)
 **Branch:** work continues on **`v2`** (pushed; all 004–012 work lands here, merged to `main` in one go on go-ahead). `main` = `09a38b71`; prod runs `9ea4c045` (deploys broken since 2026-09-15). Open: **PR #42** (004 Phase 0 + MinIO→silo, to `main`) and **draft PR #43** (`v2` CI only — never merge).
 **Production:** `https://studio.bistecglobal.com`
 
 ---
 
-## ⏸️ 2026-09-28 — PICK UP HERE
+## ⏸️ 2026-10-03 — PICK UP HERE
+
+**004 is done** (24/24, verify **PARTIAL**, solely because Phase 0 is still on unmerged PR #42). **005 is built** (9 of 10 tasks; **T6 waits on one operator check**, AC-16). Everything is pushed to `v2`. Nothing is merged to `main`, and prod is unchanged.
+
+### Do this next, in order
+
+1. **The user runs AC-16** (005 T6). It proves CLI vision inside the built image and that an injected prompt can't read files or env secrets. Claude never handles the token.
+   1. In your own editor, create `C:\Users\<you>\bistec-token.env` holding `CLAUDE_CODE_OAUTH_TOKEN=<token>`.
+   2. Run `docker run --rm --env-file C:\Users\<you>\bistec-token.env --entrypoint node bistec-studio:t6 scripts/cli-sandbox-check.mjs`.
+   3. Expect three `PASS` lines, then `PASS: 3/3 checks passed`.
+   4. Delete the file.
+   - `--entrypoint node` is required: the default entrypoint runs migrations and needs a DB.
+   - **On another machine,** rebuild the image first: `export MSYS_NO_PATHCONV=1; docker build -t bistec-studio:t6 .` from `v2`.
+2. **Record the result in `reports/T6.md`,** then `specclaw-update-task-status .specclaw/changes/005-provider-flexibility-onboarding/tasks.md T6 complete`.
+3. **`/specclaw:verify` 005.**
+   - Its inputs are `.specclaw/changes/005-provider-flexibility-onboarding/verify-notes.md`: the known limits plus the build rulings verify must judge against.
+   - Run the **full clean mock E2E** as part of it:
+     1. stop stray node processes;
+     2. `rm -rf .next`;
+     3. drop and recreate `bistec_studio_test`;
+     4. `npm run test:e2e:db`;
+     5. serve;
+     6. `npm run test:e2e:mock`.
+
+     Expect 0 failed, 0 flaky, and 3 skips (TC-REG-H11a/b/c; TC-GEN-05 now runs).
+4. **Merge PR #42 on the user's go-ahead only.** The user said "not yet" on 2026-10-01. Then merge `main` into `v2`, re-check 005 AC-17 under node:22 (`claude --version` → `2.1.287` in the image), and close 004's Phase 0 ACs (AC-P0-1/2/4; see 004's `verify-report.md` Issue 2).
+5. **Next change, per `.specclaw/ROADMAP.md`.**
+
+### What 004 finished (since 2026-09-28)
+
+- **The work:**
+  - Waves 4–5 (T17–T24);
+  - a three-slice whole-branch final review;
+  - a fix wave: F1 `5abee773`, F2 `5809e24d`, `a0926982`, F1b `d29c5b60`, F1c `ea3bd1c2`, F1d `570fb6b5`, `f8a6aa3f`;
+  - AC-04 fix F3 `543e8efa`.
+- **Verify:** `.specclaw/changes/004-design-instruction-fidelity/verify-report.md`. Phases 1–3 pass 29/29 after F3. Phase 0's ACs are pending #42 and the token rotation.
+- **Key rulings, all recorded as known limits in that report:**
+  - **A requested image swap always fails closed.** The move-intent lexicon was deleted as gameable.
+  - **The text-reduction lexicon prefers triggering.** For replace/constrain there is no judge, so not triggering is a zero-call pass.
+  - **The settle guards key on the action, not the claim.** A per-claim token is a follow-up.
+
+### What 005 built (all on `v2`)
+
+| Wave                | Commits                                                           | What                                                                                                                                                                                                                                                                                                                                               |
+| ------------------- | ----------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1, image resolution | `e6649f0a` `6c642b35` `d1c61da9` `b13f3933` `b045129b`            | The resolver falls back to the oldest enabled image provider. Slot/provider compatibility is enforced. The IMAGE-only default rules apply. /team shows the default, serving and none states. A skipped AI background shows an amber notice with its reason. The background and key-validation E2E seams make TC-GEN-05 runnable.                   |
+| 2, CLI hardening    | `a1a6ff8f` `956e7cba` `927a0953` `a6c5539e` `8fc9f6e7` `cc2feecb` | `--tools ""` on every call; an env allowlist; vision over stream-json with no temp files; settings isolation (`--safe-mode`, `--setting-sources ""`, `--no-session-persistence`, a temp cwd); auth classified only on CLI-written fields (`api_error_status` 401, or 403 "revoked"); the CLI pinned to `2.1.287`; `scripts/cli-sandbox-check.mjs`. |
+| 3, Gemini           | `7ae1b424` `129c1e75`                                             | Per-provider image sizes; Gemini (`gemini-3.1-flash-image` via generateContent), **mock-verified only** by user decision.                                                                                                                                                                                                                          |
+| 4, onboarding       | `92c91826` `8bd91ff5`                                             | `docs/claude-account-setup.md` (the native installer is primary, per Anthropic; winget is the alternative with the #6200 note); the in-app `ClaudeConnectGuide` on /settings and /team; the stale "shared server credential" copy is fixed.                                                                                                        |
+
+- **Plan trail:** `.specclaw/changes/005-provider-flexibility-onboarding/`, with spec, design, tasks, `reports/T1–T10.md` and `timeline.md`. Spec amendments made during the build: the FR-08 isolation flags, AC-14 `DISABLE_AUTOUPDATER`, and FR-14/AC-22 native installer.
+- **Machine-only ledgers (gitignored):**
+  - `.superpowers/sdd/005/`: briefs and `progress.md`, which holds every ruling;
+  - `.superpowers/sdd/tasks/`: 004's reviews.
+
+  Their binding content is in the committed reports and verify notes.
+
+### State and gates
+
+- **Gates at `v2` head:** unit **1593/1593**, lint 0 errors (the 7 known warnings), `npm run build` passes.
+  - **Last full clean mock E2E:** 251 passed / 3 skipped / 0 failed / 0 flaky, at `b13f3933`, end of 005 Wave 1. Later waves ran their own E2E files green, and verify re-runs the full suite.
+  - **004's verify run:** 231/4/0.
+- **New migrations on `v2` since 2026-09-28,** applied by a redeploy (locally, `npx prisma migrate deploy`):
+  - `20261001120000_revision_render_stamps` (004 F3);
+  - `20261002120000_draft_background_skip` (005 T2).
+
+  Both are nullable columns. The down paths are in their headers.
+
+- **Release note for the eventual `v2` → `main` merge:** teams whose IMAGE key isn't flagged default start using it for scheduled, MCP and agent images, so that key starts being spent (005 NFR-03).
+
+### Gotchas from this stretch
+
+- **The D: drive logged real I/O errors on 2026-10-01** (System log events 51, 50 and 140). The user said the drive works. Push `v2` often. The drive-failure protocol in memory still applies.
+- **The account switched mid-build** after a weekly usage limit. Resumed agents kept their context.
+- **chrome-devtools and shadcn MCP disconnected after the re-login.** T10's screenshots were taken with a throwaway Playwright script instead.
+- **`git push` and forcing a stale specclaw lock may be blocked by the auto-mode classifier** until the user authorizes them in chat.
+- **Node 24 prints `DEP0190` on win32 `shell:true` spawns.** It's harmless here.
+
+### 🔴 Urgent ops (Coolify administrator), unchanged and not blocked on any merge
+
+Swap prod MinIO to silo (`docs/minio-silo-migration.md` on the #42 branch; CVE-2026-40344), and rotate `COOLIFY_API_TOKEN` (`deploy` + `read`, created by an Admin/Owner). Details are in the 2026-09-28 section below.
+
+---
+
+## 2026-09-28 — build session (superseded by the 2026-10-03 section above for status)
 
 **Build session.** 004 Waves 1–3 are built, reviewed and pushed, and MinIO is replaced by the maintained fork **silo**. **15/24 of 004's tasks are done.** Next is **Wave 4** (Phase 2 wiring). Nothing is merged to `main`, and prod is unchanged.
 

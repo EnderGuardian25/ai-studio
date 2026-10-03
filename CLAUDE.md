@@ -2,30 +2,51 @@
 
 This repo contains planning documents for **bistec-studio**, an internal marketing post generation tool for the Bistec marketing team.
 
-## ✅ Outstanding work — START HERE (updated 2026-09-28)
+## ✅ Outstanding work — START HERE (updated 2026-10-03)
 
-- **⏸️ 2026-09-28 — PICK UP HERE. 004 Waves 1–3 are built, reviewed and pushed; 15/24 of its tasks are done. Next is Wave 4.** Full detail: [`docs/handoff.md`](docs/handoff.md) top section. The plan and binding rulings live in [`.specclaw/changes/004-design-instruction-fidelity/tasks.md`](.specclaw/changes/004-design-instruction-fidelity/tasks.md): task IDs were renumbered to T1–T24, and "Carried in" notes sit on T17–T21.
+- **⏸️ 2026-10-03 — PICK UP HERE. 004 is done (verify PARTIAL, Phase 0 only). 005 is built: 9/10 tasks, with T6 waiting on one operator check.** Full detail: [`docs/handoff.md`](docs/handoff.md) top section.
+  - **Next, in order:**
+    1. **The user runs AC-16 (005 T6).** In their own editor they put `CLAUDE_CODE_OAUTH_TOKEN=<token>` into an env file outside the repo, then run `docker run --rm --env-file <file> --entrypoint node bistec-studio:t6 scripts/cli-sandbox-check.mjs`, expecting 3/3 PASS. **Claude never handles the token.** On another machine, `docker build -t bistec-studio:t6 .` first.
+    2. **Mark T6 complete,** then `/specclaw:verify` 005 with a full clean mock E2E. The inputs are [`.specclaw/changes/005-provider-flexibility-onboarding/verify-notes.md`](.specclaw/changes/005-provider-flexibility-onboarding/verify-notes.md).
+    3. **PR #42 merges only on the user's go-ahead.** On 2026-10-01 the user said "not yet". Then merge `main` into `v2`, re-check 005 AC-17 under node:22, and close 004's Phase 0 ACs.
+    4. **Then the next change,** per [`.specclaw/ROADMAP.md`](.specclaw/ROADMAP.md).
+  - **004:** 24/24 plus a final review fix wave (F1–F3).
+    - [`verify-report.md`](.specclaw/changes/004-design-instruction-fidelity/verify-report.md): Phases 1–3 pass 29/29, and every known limit is stated there.
+    - **Rulings:** a requested image swap always fails closed; the text-reduction lexicon prefers triggering; the settle guards key on the action, not the claim (a claim token is a follow-up).
+  - **005** (spec, design, tasks and `reports/T1–T10.md` in [`.specclaw/changes/005-provider-flexibility-onboarding/`](.specclaw/changes/005-provider-flexibility-onboarding/)):
+    - **Image resolution:** the oldest enabled provider is the fallback; IMAGE-only default rules; /team states; an amber notice when a background is skipped.
+    - **CLI hardening:** `--tools ""`; an env allowlist; stream-json vision with no temp files; settings isolation; auth classified only on CLI-written fields; the CLI pinned to 2.1.287.
+    - **Gemini:** mock-only by user decision.
+    - **Onboarding:** `docs/claude-account-setup.md` (native installer primary) and an in-app guide.
+    - **Item 2 (COPY route) stays deferred to 008.**
   - **Open PRs:**
-    - **#42** `fix/ci-deploy-pipeline` → `main` holds 004 Phase 0 (deploy pipeline) plus the MinIO → silo switch. **Merge it only on the user's go-ahead**, then merge `main` into `v2`.
-    - **#43** `v2` → `main` is a **DRAFT that must never be merged**. It exists only so CI runs on `v2`.
-  - **🔴 Urgent ops for the Coolify administrator, not blocked on any merge:**
-    - **(1) Swap prod MinIO to `pgsty/silo`** following `docs/minio-silo-migration.md` (on the #42 branch). MinIO's community images are withdrawn everywhere. Prod's version has **CVE-2026-40344**, and our presigned URLs expose the access key.
-    - **(2) Rotate `COOLIFY_API_TOKEN`.** It needs **`deploy` + `read`** and must be made by a team **Admin/Owner**. Prove it with a direct POST, **not** by re-running run 34988162569, which still sends GET → 405.
-  - **Next:**
-    - ✅ CI checked: #42 all green; #43's build is green (AC-01 `ci-docker-build` evidence: PR #43 build job, [run 36361971755](https://github.com/bistec-oss/studio/actions/runs/36361971755) — PASS ★ ✓ ✦ → • inside the built runner image (2026-09-28)); #43's e2e stays red until #42 merges into `v2`;
-    - build 004 **Wave 4** on `v2`: **T20 → T17 → T18 → T19 → T21**. T19's route is `/api/drafts/[id]/rejected/[revisionId]/adopt`;
-    - then Wave 5, then `/specclaw:verify`.
-  - **Gates at `v2` head:** unit 562/562, `npm run test:render` 15/15, mock E2E 183/4/0.
-  - **New migrations on `v2`**, applied by a redeploy (locally, run `npx prisma migrate deploy`):
+    - **#42** `fix/ci-deploy-pipeline` → `main` (004 Phase 0 + MinIO → silo). Merge **only on go-ahead**.
+    - **#43** `v2` → `main` is a **DRAFT that must never be merged**. It exists only for CI on `v2`.
+  - **🔴 Urgent ops for the Coolify administrator, unchanged:** swap prod MinIO to `pgsty/silo` (`docs/minio-silo-migration.md`; CVE-2026-40344), and rotate `COOLIFY_API_TOKEN` (`deploy` + `read`, made by an Admin/Owner; prove it with a direct POST).
+  - **Gates at `v2` head:**
+    - unit 1593/1593, lint 0 errors, build passes;
+    - last full clean mock E2E 251/3/0/0, at 005 Wave 1;
+    - render 15/15.
+  - **Migrations on `v2` not yet on `main`:**
     - `20260927120000_draft_font_set`;
-    - `20260927130000_refine_not_applied`. Its header documents an **order-sensitive down path**: delete the unnumbered rejected rows before any Phase 2 code revert.
+    - `20260927130000_refine_not_applied`. Its down path is **order-sensitive**: delete the unnumbered rejected rows first;
+    - `20261001120000_revision_render_stamps`;
+    - `20261002120000_draft_background_skip`.
+
+    A redeploy applies them; locally, run `npx prisma migrate deploy`.
+
+  - **Release note for `v2` → `main`:** teams whose IMAGE key isn't flagged default start using, and spending, it for scheduled, MCP and agent images (005 NFR-03).
   - **Gotchas:**
-    - `export MSYS_NO_PATHCONV=1` before any docker command with a container path. Git Bash rewrites `/data`.
-    - Before a full E2E run: stop stray node processes, `rm -rf .next`, and drop/recreate the test DB (the 200-campaign cap).
-    - Never run two implementers in one checkout; lint-staged stashes. Use worktrees.
+    - `export MSYS_NO_PATHCONV=1` before any docker command with a container path.
+    - Before a full E2E run: stop stray node processes, `rm -rf .next`, and drop/recreate the test DB.
+    - Never run two implementers in one checkout; lint-staged stashes.
+    - The D: drive logged I/O errors on 2026-10-01, so push `v2` often.
+    - The chrome-devtools MCP may be disconnected; Playwright works for screenshots.
     - specclaw `git.strategy` is `direct`.
 
-- **2026-09-23 — planning (superseded by the 2026-09-28 entry above for status; decisions still stand).** Order and dependencies: [`.specclaw/ROADMAP.md`](.specclaw/ROADMAP.md).
+- **2026-09-28 — build session (superseded by the 2026-10-03 entry above for status).** 004 Waves 1–3 were built, MinIO → silo, PR #42 and draft PR #43 were opened. Details are in `docs/handoff.md`'s 2026-09-28 section.
+
+- **2026-09-23 — planning (superseded by the 2026-10-03 entry above for status; decisions still stand).** Order and dependencies: [`.specclaw/ROADMAP.md`](.specclaw/ROADMAP.md).
   - **Added later on 2026-09-23 (planning only):**
     - **New proposal 012: per-channel captions.** Instagram, LinkedIn and WhatsApp each get their own caption, panel, counter and regenerate, and each is published to its own channel.
       - It fixes a live bug: `Draft.copyText` is one unstructured string, and `publishDraft.ts` / `jobRunner.ts` send the **whole combined caption to every channel**.
@@ -330,7 +351,7 @@ Before writing any backend code, API routes, Prisma models, or provider logic, r
 
 ### Specification & planning
 
-- **[`.specclaw/ROADMAP.md`](.specclaw/ROADMAP.md)** — the open changes 004–012 (none built yet): recommended order, hard/soft dependencies, and which change owns what where they overlap. **Read before planning or building any of them.** Each change's `proposal.md` is the source of truth for its own scope.
+- **[`.specclaw/ROADMAP.md`](.specclaw/ROADMAP.md)** — changes 004–012 (004 built and verified PARTIAL, Phase 0 only; 005 built 9/10; 006–012 proposals): recommended order, hard/soft dependencies, and which change owns what where they overlap. **Read before planning or building any of them.** Each change's `proposal.md` is the source of truth for its own scope.
 - **[`docs/coolify-token-rotation.md`](docs/coolify-token-rotation.md)** — ops handoff for the dead Coolify deploy token (merges don't deploy until it's rotated).
 - **[`docs/handoff.md`](docs/handoff.md)** — session handoff with current decisions, Path A/B design descriptions, AGUI spec, provider registration flow, v2 interoperability target, and the latest code-review remediation summary
 - **[`.specclaw/changes/001-marketing-post-studio-v1/spec.md`](.specclaw/changes/001-marketing-post-studio-v1/spec.md)** — full functional requirements (FR-01 through FR-33) and non-functional requirements
