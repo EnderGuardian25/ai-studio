@@ -40,7 +40,7 @@ There are 13 tasks in 7 waves. All the work lands on `v2`.
     - **Tests:** use `{ name: 'Create post', exact: true }`, or the testid, because the dashboard quick action is named "Create Post".
     - **Screenshots:** light and dark, desktop and 375 px.
 
-- [~] `T2` — Three direction studies of the draft review page
+- [x] `T2` — Three direction studies of the draft review page
   - Files: `docs/ui-reference/direction-studies/study-a-*.html`, `study-b-*.html`, `study-c-*.html`, `docs/ui-reference/direction-studies/index.html` (all new)
   - Estimate: medium
   - Kind: docs
