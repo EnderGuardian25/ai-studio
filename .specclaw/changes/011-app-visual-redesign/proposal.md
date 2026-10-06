@@ -81,11 +81,15 @@ The fixed header sits above scrolling content at 60–75% opacity, so text scrol
 - **Complexity:** large
 - **Risk:** medium. There are no data or API changes, but the surface area is the whole app, and a restyle can quietly break interactions: the E2E suite drives the UI through selectors and roles. Mitigated by shipping per screen, keeping roles and accessible names stable, and running the E2E suite after each screen.
 
+## Decisions (2026-10-06, user)
+
+- **Neutral tool UI.** The app does not take BISTEC Global brand cues. Each team's brand kit is the only brand on screen, because Hearts Academy is a separate tenant.
+- **Three direction studies, applied to the draft review page. The user picks one alone.**
+- **The default theme follows the OS preference.** Light and dark both stay mandatory.
+- **Approved for planning on 2026-10-06.**
+
 ## Open Questions
 
-- Should the new direction take cues from **BISTEC Global's brand** (navy / blue / green, Poppins) so the app and the posts feel related? Or should it stay a neutral tool UI that lets each team's brand kit be the only brand on screen? The latter matters because Hearts Academy is a separate tenant.
-- How many direction studies, and who approves the choice (you alone, or the marketing team)?
-- Does the default theme stay "follow OS preference", or does the new direction lead with one theme?
 - Should the E2E suite gain visual-regression screenshots per screen during the restyle, or is that heavier than it is worth?
 - **Create post button:** icon + label ("+ Create post") or icon only, with a tooltip? Proposed: icon + label on desktop, icon-only below `md`. Also, should it resume the newest unfinished brief (002's `BriefDraft`) or always start fresh? Proposed: always start fresh; resuming stays on the dashboard.
 - Mobile: the app is desktop-first today, but **010**'s handoff is used on a phone. Does the redesign make the whole app responsive, or only the screens a phone needs?
