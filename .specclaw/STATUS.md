@@ -1,7 +1,7 @@
 # 🦞 SpecClaw Dashboard
 
 **Project:** bistec-studio
-**Last Updated:** 2026-10-06 16:57 UTC
+**Last Updated:** 2026-10-06 17:25 UTC
 
 ## Active Changes
 
@@ -10,7 +10,7 @@
 - ✅ **003-async-draft-actions** — 12/12 tasks (100%) | 0 failed
 - 🔍 **004-design-instruction-fidelity** — verify PARTIAL | 23/24 tasks (95%) | 0 failed | PR #43 open | 75h58m
 - 🔍 **005-provider-flexibility-onboarding** — verify PASS | 10/10 tasks (100%) | 0 failed | PR #43 open | 122h0m
-- 📝 **011-app-visual-redesign** — tasks done | 0/13 tasks (0%) | 0 failed
+- 🔨 **011-app-visual-redesign** — build in-progress | 2/13 tasks (15%) | 0 failed | PR #43 open | 32m
 
 ## Pending Proposals
 
