@@ -28,7 +28,7 @@ There are 13 tasks in 7 waves. All the work lands on `v2`.
 
 ### Wave 1 — Create post button and direction studies
 
-- [ ] `T1` — Floating Create post button, in today's style
+- [x] `T1` — Floating Create post button, in today's style
   - Files: `src/components/layout/CreatePostButton.tsx` (new), `src/components/layout/AppShell.tsx`, `src/components/providers/ToastProvider.tsx`, `tests/e2e/create-post-button.test.ts` (new)
   - Estimate: small
   - Kind: impl
@@ -40,7 +40,7 @@ There are 13 tasks in 7 waves. All the work lands on `v2`.
     - **Tests:** use `{ name: 'Create post', exact: true }`, or the testid, because the dashboard quick action is named "Create Post".
     - **Screenshots:** light and dark, desktop and 375 px.
 
-- [ ] `T2` — Three direction studies of the draft review page
+- [~] `T2` — Three direction studies of the draft review page
   - Files: `docs/ui-reference/direction-studies/study-a-*.html`, `study-b-*.html`, `study-c-*.html`, `docs/ui-reference/direction-studies/index.html` (all new)
   - Estimate: medium
   - Kind: docs
