@@ -102,7 +102,7 @@ There are 10 tasks in 4 waves. All the work lands on `v2`. Each wave is one item
     - **ACs:** AC-13 (vision site), AC-15.
     - **Windows smoke test, recommended but not gating:** one real vision and one real copy call on a dev box.
 
-- [~] `T6` — Pin the container CLI and prove it in the image
+- [x] `T6` — Pin the container CLI and prove it in the image
   - Files: `Dockerfile`, `scripts/cli-sandbox-check.mjs` (new)
   - Estimate: small
   - Kind: config
