@@ -175,3 +175,20 @@ Anthropic now recommends the native installer (irm https://claude.ai/install.ps1
 Verify install commands against the vendor's current page at build time rather than trusting the proposal
 
 ---
+
+## [L11] best_practice — AC-16 needed a real OAuth token, so T6 sat in_progress fo...
+
+**When:** 2026-10-06 15:50 UTC
+**Category:** best_practice
+**Priority:** medium
+**Status:** pending
+
+### Detail
+
+AC-16 needed a real OAuth token, so T6 sat in_progress for days; the auto-mode classifier also blocks Claude from writing a token to an env file and running docker with it
+
+### Action
+
+Plan secret-gated ACs as explicit operator steps with a ready-to-paste '! ...' command that writes a temp env file, runs the check and deletes it
+
+---
