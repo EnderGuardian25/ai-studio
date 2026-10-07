@@ -4,8 +4,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { Plus, Pencil, Trash2, Star, Upload, ToggleLeft, ToggleRight, Sparkles, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
-import { GlassPanel } from '@/components/ui/GlassPanel'
-import { GlassInput } from '@/components/ui/GlassInput'
+import { Input, fieldLabelClasses } from '@/components/ui/Input'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { apiFetch } from '@/lib/apiFetch'
 import type { AspectRatio } from '@prisma/client'
@@ -16,6 +15,25 @@ import { FontEditor } from './FontEditor'
 import { PromptSection } from './PromptSection'
 import { ColorSwatch, SectionHeader } from './shared'
 import { BrandKitAssistantPanel } from './BrandKitAssistantPanel'
+import {
+  CODE_FIELD,
+  COMPACT_FIELD,
+  FOCUS,
+  ICON,
+  ICON_BUTTON,
+  KIT_TITLE,
+  TAG,
+  TITLE_FIELD,
+  optionCls,
+} from './folio'
+
+// A kit section: ruled apart from its neighbours (§6), never boxed.
+const SECTION = 'pb-8 pt-[22px]'
+
+// The feed-to-AI switch: ICON_BUTTON's shape with its colour left to the
+// caller (--accent when on), since `cn` would not settle two text colours.
+const TOGGLE_BUTTON =
+  'inline-flex h-[30px] w-[30px] flex-shrink-0 items-center justify-center rounded-ui-sm transition-colors duration-fast ease-standard'
 
 // ─── Kit Detail Panel ─────────────────────────────────────────────────────────
 
@@ -214,34 +232,38 @@ export function KitDetail({ kit, onRefresh }: KitDetailProps) {
   }
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    // The open kit: a 2 px --fg rule opens it (§6); its sections are numbered
+    // (§8.14) and ruled apart, not boxed. A region named by the kit, so the
+    // open kit is a landmark (and stays one while its name is being edited).
+    <section aria-label={kit.name} className="min-w-0 animate-fade-in border-t-2 border-fg">
       {/* Header */}
-      <div className="flex items-start justify-between gap-4">
-        <div>
+      <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3 pb-6 pt-[22px]">
+        <div className="min-w-0 flex-1 basis-60">
           {editing ? (
             <input
+              aria-label="Kit name"
               value={name}
               onChange={e => setName(e.target.value)}
-              className="glass-input rounded-xl px-3 py-2 text-xl font-semibold text-light-text dark:text-dark-text"
+              className={TITLE_FIELD}
             />
           ) : (
-            <h2 className="text-xl font-semibold text-light-text dark:text-dark-text flex items-center gap-2">
-              {kit.name}
+            <h2 className={`flex flex-wrap items-baseline gap-x-3 gap-y-1 ${KIT_TITLE}`}>
+              <span className="min-w-0 max-w-full break-words">{kit.name}</span>
               {kit.isDefault && (
-                <span className="text-xs bg-primary/10 dark:bg-primary-light/10 text-primary dark:text-primary-light px-2 py-0.5 rounded-full font-normal">
+                <span className="font-text text-ui-xs font-semibold tracking-normal text-accent">
                   System default
                 </span>
               )}
             </h2>
           )}
         </div>
-        <div className="flex gap-2 flex-shrink-0">
+        <div className="flex flex-wrap items-center gap-2">
           <Button variant="ghost" size="sm" onClick={() => setAssistantOpen(true)}>
-            <Sparkles size={14} /> Extract from references
+            <Sparkles {...ICON} /> Extract from references
           </Button>
           {!kit.isDefault && (
             <Button variant="ghost" size="sm" onClick={setDefault}>
-              <Star size={14} /> Set default
+              <Star {...ICON} /> Set default
             </Button>
           )}
           {editing ? (
@@ -251,271 +273,296 @@ export function KitDetail({ kit, onRefresh }: KitDetailProps) {
             </>
           ) : (
             <Button variant="secondary" size="sm" onClick={() => setEditing(true)}>
-              <Pencil size={14} /> Edit
+              <Pencil {...ICON} /> Edit
             </Button>
           )}
         </div>
       </div>
 
-      {/* Colors */}
-      <GlassPanel className="p-4">
-        <SectionHeader title="Color Palette" />
-        {editing ? (
-          <ColorEditor colors={colors} onChange={setColors} />
-        ) : (
-          <div className="flex flex-wrap gap-2">
-            {kit.colors.length === 0 ? (
-              <span className="text-sm text-light-text-muted dark:text-dark-text-muted">No colors defined</span>
-            ) : kit.colors.map(c => (
-              <div key={c} className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-primary/5 dark:bg-primary-light/5">
-                <ColorSwatch color={c} />
-                <span className="font-mono text-xs text-light-text dark:text-dark-text">{c}</span>
-              </div>
-            ))}
-          </div>
-        )}
-      </GlassPanel>
-
-      {/* Logos */}
-      <GlassPanel className="p-4">
-        <SectionHeader
-          title="Logos"
-          action={
-            <>
-              <input
-                ref={fileRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={handleAddLogo}
-              />
-              <Button variant="ghost" size="sm" onClick={() => fileRef.current?.click()}>
-                <Plus size={13} /> Add logo
-              </Button>
-            </>
-          }
-        />
-        {kit.artifacts.filter((a) => a.type === 'LOGO').length === 0 ? (
-          <span className="text-sm text-light-text-muted dark:text-dark-text-muted">No logos yet.</span>
-        ) : (
-          <ul className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            {kit.artifacts
-              .filter((a) => a.type === 'LOGO')
-              .map((logo) => {
-                const isPrimary = logo.url === kit.logoUrl
-                return (
-                  <li key={logo.id} className="glass-input rounded-xl p-3 flex flex-col gap-2">
-                    <div className="relative h-16 flex items-center justify-center rounded-lg bg-white/40 dark:bg-white/5">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={logo.url}
-                        alt={logo.name}
-                        className="max-h-14 max-w-full object-contain"
-                      />
-                    </div>
-                    <input
-                      defaultValue={logo.name}
-                      onBlur={(e) => {
-                        const v = e.target.value.trim()
-                        if (v && v !== logo.name) renameLogo(logo.id, v)
-                      }}
-                      aria-label="Logo label"
-                      className="glass-input rounded-lg px-2 py-1 text-xs text-light-text dark:text-dark-text"
-                    />
-                    <div className="flex items-center justify-between">
-                      <button
-                        onClick={() => !isPrimary && setPrimaryLogo(logo.url)}
-                        aria-pressed={isPrimary}
-                        title={isPrimary ? 'Primary logo' : 'Set as primary'}
-                        className={`flex items-center gap-1 text-xs transition-colors ${isPrimary ? 'text-primary dark:text-primary-light' : 'text-light-text-muted dark:text-dark-text-muted hover:text-primary dark:hover:text-primary-light'}`}
-                      >
-                        <Star size={14} className={isPrimary ? 'fill-current' : ''} />
-                        {isPrimary ? 'Primary' : 'Set primary'}
-                      </button>
-                      <Button variant="ghost" size="sm" onClick={() => deleteLogo(logo.id)}>
-                        <Trash2 size={13} />
-                      </Button>
-                    </div>
-                  </li>
-                )
-              })}
-          </ul>
-        )}
-      </GlassPanel>
-
-      {/* Fonts */}
-      <GlassPanel className="p-4">
-        <SectionHeader title="Fonts" />
-        {editing ? (
-          <FontEditor fonts={fonts} onChange={setFonts} />
-        ) : fonts.length === 0 ? (
-          <span className="text-sm text-light-text-muted dark:text-dark-text-muted">No fonts added</span>
-        ) : (
-          <ul className="space-y-1">
-            {fonts.map(f => (
-              <li key={f.name} className="text-sm text-light-text dark:text-dark-text flex items-center gap-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-primary dark:bg-primary-light flex-shrink-0" />
-                {f.name}
-              </li>
-            ))}
-          </ul>
-        )}
-      </GlassPanel>
-
-      {/* Templates */}
-      <GlassPanel className="p-4">
-        <SectionHeader
-          title="HTML Templates"
-          action={
-            <div className="flex gap-2">
-              <input
-                ref={templateImageRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={handleTemplateFromImage}
-              />
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => templateImageRef.current?.click()}
-                disabled={templateFromImageBusy}
-                title="Upload an image; the AI turns it into an editable template"
-              >
-                {templateFromImageBusy ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}
-                From image
-              </Button>
-              <Button variant="ghost" size="sm" onClick={() => setAddingTemplate(v => !v)}>
-                <Plus size={13} /> Add
-              </Button>
+      <div className="divide-y divide-line-subtle border-t border-line-subtle">
+        {/* Colors — each swatch shows the kit's own colour (data, not tokens). */}
+        <section className={SECTION}>
+          <SectionHeader numeral="i." title="Color Palette" />
+          {editing ? (
+            <ColorEditor colors={colors} onChange={setColors} />
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {kit.colors.length === 0 ? (
+                <span className="text-ui-sm text-fg-muted">No colors defined</span>
+              ) : kit.colors.map(c => (
+                <div key={c} className="flex items-center gap-1.5 rounded-ui-sm border border-line-subtle bg-surface py-1 pl-1.5 pr-2">
+                  <ColorSwatch color={c} />
+                  <span className="font-mono text-ui-xs text-fg">{c}</span>
+                </div>
+              ))}
             </div>
-          }
-        />
-        {addingTemplate && (
-          <div className="mb-4 space-y-2 animate-fade-in">
-            <GlassInput
-              label="Template name"
-              value={templateName}
-              onChange={e => setTemplateName(e.target.value)}
-              placeholder="e.g. Event Announcement"
-            />
-            <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium text-light-text dark:text-dark-text">Size</label>
-              <div className="flex gap-2">
-                {ASPECT_VALUES.map(r => {
-                  const selected = templateRatio === r
+          )}
+        </section>
+
+        {/* Logos — a contact sheet (§8.13's vocabulary): each logo is shown as
+            uploaded, in a hairline frame; the primary one is framed in ink. */}
+        <section className={SECTION}>
+          <SectionHeader
+            numeral="ii."
+            title="Logos"
+            action={
+              <>
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleAddLogo}
+                />
+                <Button variant="ghost" size="sm" onClick={() => fileRef.current?.click()}>
+                  <Plus {...ICON} /> Add logo
+                </Button>
+              </>
+            }
+          />
+          {kit.artifacts.filter((a) => a.type === 'LOGO').length === 0 ? (
+            <span className="text-ui-sm text-fg-muted">No logos yet.</span>
+          ) : (
+            <ul className="grid grid-cols-2 gap-x-4 gap-y-5 sm:grid-cols-3">
+              {kit.artifacts
+                .filter((a) => a.type === 'LOGO')
+                .map((logo) => {
+                  const isPrimary = logo.url === kit.logoUrl
                   return (
-                    <button
-                      key={r}
-                      type="button"
-                      onClick={() => setTemplateRatio(r)}
-                      className={[
-                        'px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors',
-                        selected
-                          ? 'bg-primary/10 dark:bg-primary-light/15 text-primary dark:text-primary-light border-primary/30 dark:border-primary-light/30'
-                          : 'glass-input border-transparent text-light-text-muted dark:text-dark-text-muted',
-                      ].join(' ')}
-                    >
-                      {ASPECT_LABELS[r]} <span className="opacity-70">· {dimensionsLabel(r)}</span>
-                    </button>
+                    <li key={logo.id} className="flex min-w-0 flex-col gap-2">
+                      <div
+                        className={`relative flex h-20 items-center justify-center rounded-ui-sm border bg-surface-raised p-2 ${
+                          isPrimary ? 'border-fg ring-1 ring-inset ring-fg' : 'border-line-subtle'
+                        }`}
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={logo.url}
+                          alt={logo.name}
+                          className="max-h-14 max-w-full object-contain"
+                        />
+                      </div>
+                      <input
+                        defaultValue={logo.name}
+                        onBlur={(e) => {
+                          const v = e.target.value.trim()
+                          if (v && v !== logo.name) renameLogo(logo.id, v)
+                        }}
+                        aria-label="Logo label"
+                        className={`${COMPACT_FIELD} w-full min-w-0`}
+                      />
+                      <div className="flex items-center justify-between gap-2">
+                        <button
+                          type="button"
+                          onClick={() => !isPrimary && setPrimaryLogo(logo.url)}
+                          aria-pressed={isPrimary}
+                          title={isPrimary ? 'Primary logo' : 'Set as primary'}
+                          className={`inline-flex min-w-0 items-center gap-1 rounded-ui-sm text-ui-xs transition-colors duration-fast ease-standard ${FOCUS} ${
+                            isPrimary ? 'font-semibold text-accent' : 'text-fg-muted hover:text-fg'
+                          }`}
+                        >
+                          <Star {...ICON} className={`flex-shrink-0 ${isPrimary ? 'fill-current' : ''}`} />
+                          {isPrimary ? 'Primary' : 'Set primary'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => deleteLogo(logo.id)}
+                          aria-label={`Delete logo ${logo.name}`}
+                          title="Delete"
+                          className={`${ICON_BUTTON} hover:text-status-failed ${FOCUS}`}
+                        >
+                          <Trash2 {...ICON} />
+                        </button>
+                      </div>
+                    </li>
                   )
                 })}
-              </div>
-              <p className="text-xs text-light-text-muted dark:text-dark-text-muted">
-                The HTML should be sized for the chosen canvas. Briefs only offer this template at the matching size.
-              </p>
-            </div>
-            <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium text-light-text dark:text-dark-text">HTML/CSS</label>
-              <textarea
-                value={templateHtml}
-                onChange={e => setTemplateHtml(e.target.value)}
-                rows={6}
-                placeholder="<!DOCTYPE html>…"
-                className="glass-input rounded-xl px-3 py-2.5 text-sm font-mono text-light-text dark:text-dark-text resize-y"
-              />
-            </div>
-            <div className="flex gap-2">
-              <Button size="sm" onClick={addTemplate} disabled={!templateName.trim() || !templateHtml.trim()}>Save template</Button>
-              <Button variant="ghost" size="sm" onClick={() => { setAddingTemplate(false); setTemplateName(''); setTemplateHtml(''); setTemplateRatio('SQUARE') }}>Cancel</Button>
-            </div>
-          </div>
-        )}
-        {kit.templates.length === 0 ? (
-          <span className="text-sm text-light-text-muted dark:text-dark-text-muted">No templates linked</span>
-        ) : (
-          <ul className="space-y-2">
-            {kit.templates.map(t => (
-              <li key={t.id} className="flex items-center justify-between glass-input rounded-xl px-3 py-2">
-                <span className="flex items-center gap-2 min-w-0">
-                  <span className="text-sm text-light-text dark:text-dark-text truncate">{t.name}</span>
-                  <span className="flex-shrink-0 px-1.5 py-0.5 rounded text-[0.62rem] font-semibold bg-primary/10 dark:bg-primary-light/15 text-primary dark:text-primary-light">
-                    {ASPECT_LABELS[t.aspectRatio]}
-                  </span>
-                </span>
-                <Button variant="ghost" size="sm" onClick={() => deleteTemplate(t.id)}>
-                  <Trash2 size={13} />
+            </ul>
+          )}
+        </section>
+
+        {/* Fonts */}
+        <section className={SECTION}>
+          <SectionHeader numeral="iii." title="Fonts" />
+          {editing ? (
+            <FontEditor fonts={fonts} onChange={setFonts} />
+          ) : fonts.length === 0 ? (
+            <span className="text-ui-sm text-fg-muted">No fonts added</span>
+          ) : (
+            <ul className="border-t border-line-subtle">
+              {fonts.map(f => (
+                <li key={f.name} className="break-words border-b border-line-subtle py-2 text-ui-sm text-fg">
+                  {f.name}
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        {/* Templates */}
+        <section className={SECTION}>
+          <SectionHeader
+            numeral="iv."
+            title="HTML Templates"
+            action={
+              <>
+                <input
+                  ref={templateImageRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleTemplateFromImage}
+                />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => templateImageRef.current?.click()}
+                  disabled={templateFromImageBusy}
+                  title="Upload an image; the AI turns it into an editable template"
+                >
+                  {templateFromImageBusy ? <Loader2 {...ICON} className="animate-spin" /> : <Sparkles {...ICON} />}
+                  From image
                 </Button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </GlassPanel>
-
-      {/* Brand Voice Prompt */}
-      <GlassPanel className="p-4">
-        <SectionHeader title="Brand Voice Prompt" />
-        <PromptSection kitId={kit.id} prompts={kit.prompts} onRefresh={onRefresh} />
-      </GlassPanel>
-
-      {/* Artifacts */}
-      <GlassPanel className="p-4">
-        <SectionHeader
-          title="Artifacts"
-          action={
-            <>
-              <input
-                ref={artifactRef}
-                type="file"
-                accept="image/*,.pdf,.docx,.txt,.md,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,text/markdown"
-                className="hidden"
-                onChange={handleArtifactUpload}
+                <Button variant="ghost" size="sm" onClick={() => setAddingTemplate(v => !v)}>
+                  <Plus {...ICON} /> Add
+                </Button>
+              </>
+            }
+          />
+          {addingTemplate && (
+            <div className="surface mb-5 animate-fade-in space-y-4 p-4">
+              <Input
+                label="Template name"
+                value={templateName}
+                onChange={e => setTemplateName(e.target.value)}
+                placeholder="e.g. Event Announcement"
               />
-              <Button variant="ghost" size="sm" onClick={() => artifactRef.current?.click()}>
-                <Upload size={13} /> Upload
-              </Button>
-            </>
-          }
-        />
-        {kit.artifacts.length === 0 ? (
-          <span className="text-sm text-light-text-muted dark:text-dark-text-muted">No artifacts uploaded</span>
-        ) : (
-          <ul className="space-y-2">
-            {kit.artifacts.map(a => (
-              <li key={a.id} className="flex items-center justify-between glass-input rounded-xl px-3 py-2">
-                <div>
-                  <span className="text-sm text-light-text dark:text-dark-text">{a.name}</span>
-                  <span className="ml-2 font-mono text-xs text-light-text-muted dark:text-dark-text-muted">{a.type}</span>
+              <div className="flex flex-col gap-1.5">
+                <label className={fieldLabelClasses}>Size</label>
+                <div role="group" aria-label="Size" className="flex flex-wrap gap-2">
+                  {ASPECT_VALUES.map(r => {
+                    const selected = templateRatio === r
+                    return (
+                      <button
+                        key={r}
+                        type="button"
+                        aria-pressed={selected}
+                        onClick={() => setTemplateRatio(r)}
+                        className={optionCls(selected, 'px-3 py-1.5 text-ui-sm font-medium')}
+                      >
+                        {ASPECT_LABELS[r]} <span className="text-fg-muted">· {dimensionsLabel(r)}</span>
+                      </button>
+                    )
+                  })}
                 </div>
-                <div className="flex items-center gap-2">
+                <p className="text-ui-xs text-fg-muted">
+                  The HTML should be sized for the chosen canvas. Briefs only offer this template at the matching size.
+                </p>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className={fieldLabelClasses}>HTML/CSS</label>
+                <textarea
+                  value={templateHtml}
+                  onChange={e => setTemplateHtml(e.target.value)}
+                  rows={6}
+                  placeholder="<!DOCTYPE html>…"
+                  className={`${CODE_FIELD} resize-y`}
+                />
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button size="sm" onClick={addTemplate} disabled={!templateName.trim() || !templateHtml.trim()}>Save template</Button>
+                <Button variant="ghost" size="sm" onClick={() => { setAddingTemplate(false); setTemplateName(''); setTemplateHtml(''); setTemplateRatio('SQUARE') }}>Cancel</Button>
+              </div>
+            </div>
+          )}
+          {kit.templates.length === 0 ? (
+            <span className="text-ui-sm text-fg-muted">No templates linked</span>
+          ) : (
+            <ul className="border-t border-line-subtle">
+              {kit.templates.map(t => (
+                <li key={t.id} className="flex items-center justify-between gap-3 border-b border-line-subtle py-1.5">
+                  <span className="flex min-w-0 items-center gap-2">
+                    <span className="truncate text-ui-sm text-fg" title={t.name}>{t.name}</span>
+                    <span className={`${TAG} flex-shrink-0`}>{ASPECT_LABELS[t.aspectRatio]}</span>
+                  </span>
                   <button
-                    onClick={() => toggleFeedToAI(a.id, a.feedToAI)}
-                    aria-pressed={a.feedToAI}
-                    aria-label={`Feed ${a.name} to AI`}
-                    title={a.feedToAI ? 'Fed to AI — click to disable' : 'Not fed to AI — click to enable'}
-                    className={`transition-colors ${a.feedToAI ? 'text-primary dark:text-primary-light' : 'text-light-text-muted dark:text-dark-text-muted'}`}
+                    type="button"
+                    onClick={() => deleteTemplate(t.id)}
+                    aria-label={`Delete template ${t.name}`}
+                    title="Delete"
+                    className={`${ICON_BUTTON} hover:text-status-failed ${FOCUS}`}
                   >
-                    {a.feedToAI ? <ToggleRight size={18} /> : <ToggleLeft size={18} />}
+                    <Trash2 {...ICON} />
                   </button>
-                  <Button variant="ghost" size="sm" onClick={() => deleteArtifact(a.id)}>
-                    <Trash2 size={13} />
-                  </Button>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-      </GlassPanel>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        {/* Brand Voice Prompt */}
+        <section className={SECTION}>
+          <SectionHeader numeral="v." title="Brand Voice Prompt" />
+          <PromptSection kitId={kit.id} prompts={kit.prompts} onRefresh={onRefresh} />
+        </section>
+
+        {/* Artifacts */}
+        <section className={SECTION}>
+          <SectionHeader
+            numeral="vi."
+            title="Artifacts"
+            action={
+              <>
+                <input
+                  ref={artifactRef}
+                  type="file"
+                  accept="image/*,.pdf,.docx,.txt,.md,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,text/markdown"
+                  className="hidden"
+                  onChange={handleArtifactUpload}
+                />
+                <Button variant="ghost" size="sm" onClick={() => artifactRef.current?.click()}>
+                  <Upload {...ICON} /> Upload
+                </Button>
+              </>
+            }
+          />
+          {kit.artifacts.length === 0 ? (
+            <span className="text-ui-sm text-fg-muted">No artifacts uploaded</span>
+          ) : (
+            <ul className="border-t border-line-subtle">
+              {kit.artifacts.map(a => (
+                <li key={a.id} className="flex items-center justify-between gap-3 border-b border-line-subtle py-1.5">
+                  <div className="min-w-0">
+                    <span className="break-words text-ui-sm text-fg">{a.name}</span>
+                    <span className="ml-2 text-ui-2xs uppercase tracking-[0.1em] text-fg-muted">{a.type}</span>
+                  </div>
+                  <div className="flex flex-shrink-0 items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => toggleFeedToAI(a.id, a.feedToAI)}
+                      aria-pressed={a.feedToAI}
+                      aria-label={`Feed ${a.name} to AI`}
+                      title={a.feedToAI ? 'Fed to AI — click to disable' : 'Not fed to AI — click to enable'}
+                      className={`${TOGGLE_BUTTON} ${FOCUS} ${a.feedToAI ? 'text-accent' : 'text-fg-muted hover:text-fg'}`}
+                    >
+                      {a.feedToAI ? <ToggleRight size={18} strokeWidth={1.4} /> : <ToggleLeft size={18} strokeWidth={1.4} />}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => deleteArtifact(a.id)}
+                      aria-label={`Delete artifact ${a.name}`}
+                      title="Delete"
+                      className={`${ICON_BUTTON} hover:text-status-failed ${FOCUS}`}
+                    >
+                      <Trash2 {...ICON} />
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      </div>
 
       <BrandKitAssistantPanel
         kitId={kit.id}
@@ -523,6 +570,6 @@ export function KitDetail({ kit, onRefresh }: KitDetailProps) {
         onClose={() => setAssistantOpen(false)}
         onApplied={() => { setAssistantOpen(false); onRefresh() }}
       />
-    </div>
+    </section>
   )
 }

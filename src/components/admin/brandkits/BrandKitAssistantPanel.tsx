@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button'
 import { Drawer } from '@/components/ui/Modal'
 import { apiFetch } from '@/lib/apiFetch'
 import { ColorEditor } from './ColorEditor'
+import { COMPACT_FIELD, FOCUS, ICON, ICON_BUTTON, SCROLL_FOCUS, SMALL_CAPS, TAG } from './folio'
 
 // F5 — conversational brand-kit extraction from reference images. Mirrors the
 // campaign BriefingAssistantPanel: chat grounded on the kit's feedToAI reference
@@ -58,6 +59,7 @@ interface BrandKitAssistantPanelProps {
 
 export function BrandKitAssistantPanel({ kitId, open, onClose, onApplied }: BrandKitAssistantPanelProps) {
   const endRef = useRef<HTMLDivElement>(null)
+  const voiceId = React.useId()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
@@ -188,11 +190,11 @@ export function BrandKitAssistantPanel({ kitId, open, onClose, onApplied }: Bran
 
   return (
     <Drawer open={open} onClose={onClose} title="Extract brand from references">
-      <div className="flex flex-col h-full">
+      <div className="flex h-full flex-col">
         {/* Documents */}
-        <div className="px-5 py-4 border-b border-light-border dark:border-dark-border space-y-2">
-          <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold uppercase tracking-widest text-light-text-muted dark:text-dark-text-muted">
+        <div className="space-y-2 border-b border-line-subtle px-5 py-4">
+          <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+            <p className={`${SMALL_CAPS} text-fg-muted`}>
               Source documents &amp; images ({docs.length}/5)
             </p>
             <Button
@@ -201,7 +203,7 @@ export function BrandKitAssistantPanel({ kitId, open, onClose, onApplied }: Bran
               disabled={uploading || docs.length >= 5}
               onClick={() => fileInputRef.current?.click()}
             >
-              {uploading ? <Loader2 size={13} className="animate-spin" /> : <Paperclip size={13} />}
+              {uploading ? <Loader2 {...ICON} className="animate-spin" /> : <Paperclip {...ICON} />}
               {uploading ? 'Uploading…' : 'Add document'}
             </Button>
             <input
@@ -216,26 +218,27 @@ export function BrandKitAssistantPanel({ kitId, open, onClose, onApplied }: Bran
             />
           </div>
           {docs.length === 0 ? (
-            <p className="text-xs text-light-text-muted dark:text-dark-text-muted">
+            <p className="text-ui-xs text-fg-muted">
               Hand in brand guidelines, past posts, or your logo (PDF, DOCX, TXT, MD, PNG, JPG —
               max 10MB each). They ground this chat only — never the post generator.
             </p>
           ) : (
-            <ul className="space-y-1">
+            <ul className="border-t border-line-subtle">
               {docs.map(doc => (
-                <li key={doc.id} className="flex items-center gap-2 text-sm text-light-text dark:text-dark-text">
-                  <FileText size={14} className="text-light-text-muted dark:text-dark-text-muted flex-shrink-0" />
-                  <span className="truncate flex-1" title={doc.name}>{doc.name}</span>
-                  <span className="text-xs text-light-text-muted dark:text-dark-text-muted whitespace-nowrap">
+                <li key={doc.id} className="flex items-center gap-2 border-b border-line-subtle py-1 text-ui-sm text-fg">
+                  <FileText {...ICON} aria-hidden className="flex-shrink-0 text-fg-muted" />
+                  <span className="min-w-0 flex-1 truncate" title={doc.name}>{doc.name}</span>
+                  <span className="whitespace-nowrap text-ui-xs text-fg-muted">
                     {formatSize(doc.sizeBytes)}
                     {doc.truncated && ' · truncated'}
                   </span>
                   <button
+                    type="button"
                     aria-label={`Delete ${doc.name}`}
                     onClick={() => deleteDoc(doc)}
-                    className="p-1 rounded text-light-text-muted dark:text-dark-text-muted hover:text-red-500 transition-colors"
+                    className={`${ICON_BUTTON} hover:text-status-failed ${FOCUS}`}
                   >
-                    <Trash2 size={13} />
+                    <Trash2 {...ICON} />
                   </button>
                 </li>
               ))}
@@ -243,75 +246,95 @@ export function BrandKitAssistantPanel({ kitId, open, onClose, onApplied }: Bran
           )}
         </div>
 
-        {/* Chat */}
-        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
+        {/* The conversation (§8.14's log vocabulary): ruled rows, newest last.
+            It scrolls inside its own box, so once it has turns the box is a
+            focusable, labelled region (WCAG 2.1.1, the T7 rule). */}
+        <div
+          className={`flex-1 overflow-y-auto px-5 py-4 ${SCROLL_FOCUS}`}
+          {...(messages.length > 0 ? { role: 'region', 'aria-label': 'Conversation', tabIndex: 0 } : {})}
+        >
           {messages.length === 0 && (
-            <p className="text-sm text-light-text-muted dark:text-dark-text-muted">
+            <p className="text-ui-sm text-fg-muted">
               Add references above (brand guidelines, past posts, your logo) — or upload
-              images in the Artifacts section marked <span className="font-medium">feed to AI</span> —
+              images in the Artifacts section marked <span className="font-medium text-fg">feed to AI</span> —
               then ask me to extract the brand voice and style. I&apos;ll propose a voice,
               palette, and font guesses you can review and apply.
             </p>
           )}
-          {messages.map((m, i) => (
-            <div key={i} className={m.role === 'user' ? 'flex justify-end' : 'flex justify-start'}>
-              <div
-                className={
-                  m.role === 'user'
-                    ? 'max-w-[85%] rounded-xl px-3 py-2 text-sm bg-primary/10 dark:bg-primary-light/10 text-light-text dark:text-dark-text whitespace-pre-wrap'
-                    : 'max-w-[85%] rounded-xl px-3 py-2 text-sm glass-input text-light-text dark:text-dark-text whitespace-pre-wrap'
-                }
-              >
-                {m.content}
-              </div>
-            </div>
-          ))}
+          {messages.length > 0 && (
+            <ol className="border-t border-line-subtle">
+              {messages.map((m, i) => (
+                <li key={i} className="border-b border-line-subtle py-3">
+                  <p className={`${SMALL_CAPS} mb-1 text-fg-muted`}>
+                    {m.role === 'user' ? 'You' : 'Assistant'}
+                  </p>
+                  <p
+                    className={
+                      m.role === 'user'
+                        ? "whitespace-pre-wrap break-words font-display text-ui-base italic leading-snug text-fg [font-variation-settings:'opsz'_24]"
+                        : 'whitespace-pre-wrap break-words text-ui-sm leading-relaxed text-fg'
+                    }
+                  >
+                    {m.content}
+                  </p>
+                </li>
+              ))}
+            </ol>
+          )}
           {pending && (
-            <div className="flex items-center gap-2 text-sm text-light-text-muted dark:text-dark-text-muted">
-              <Loader2 size={14} className="animate-spin" />
+            <div className="mt-3 flex items-center gap-2 text-ui-sm text-fg-muted">
+              <Loader2 {...ICON} className="animate-spin" aria-hidden />
               Studying the references — this can take up to a minute…
             </div>
           )}
           <div ref={endRef} />
         </div>
 
-        {/* Suggestion review + apply */}
+        {/* Suggestion review + apply. It scrolls inside its own box, so it is
+            a focusable, labelled region (the T7 rule). The proposed palette is
+            kit data: its swatches show the sampled colours as they are. */}
         {hasSuggestion && (
-          <div className="px-5 py-4 border-t border-light-border dark:border-dark-border bg-primary/[0.03] dark:bg-primary-light/[0.03] max-h-[22rem] overflow-y-auto space-y-3">
+          <div
+            tabIndex={0}
+            role="region"
+            aria-label="Proposed brand"
+            className={`max-h-[22rem] flex-shrink-0 space-y-3 overflow-y-auto border-t-2 border-fg bg-surface px-5 py-4 ${SCROLL_FOCUS}`}
+          >
             <div className="flex items-center gap-2">
-              <Sparkles size={15} className="text-primary dark:text-primary-light" />
-              <p className="text-xs font-semibold uppercase tracking-widest text-light-text-muted dark:text-dark-text-muted">
+              <Sparkles {...ICON} aria-hidden className="flex-shrink-0 text-accent" />
+              <p className={`${SMALL_CAPS} text-fg-muted`}>
                 Proposed brand — review &amp; edit, then apply
               </p>
             </div>
 
             <div>
-              <label className="text-xs font-medium text-light-text-muted dark:text-dark-text-muted">Brand voice</label>
+              <label htmlFor={voiceId} className={`${SMALL_CAPS} text-fg-muted`}>Brand voice</label>
               <textarea
+                id={voiceId}
                 value={voice}
                 onChange={e => setVoice(e.target.value)}
                 rows={4}
-                className="mt-1 glass-input rounded-xl px-3 py-2 text-sm w-full text-light-text dark:text-dark-text resize-y"
+                className={`${COMPACT_FIELD} mt-1.5 w-full resize-y leading-relaxed`}
               />
             </div>
 
             <div>
-              <label className="text-xs font-medium text-light-text-muted dark:text-dark-text-muted">
+              <p className={`${SMALL_CAPS} text-fg-muted`}>
                 Color palette (sampled — replaces the current palette)
-              </label>
-              <div className="mt-1">
+              </p>
+              <div className="mt-1.5">
                 <ColorEditor colors={colors} onChange={setColors} />
               </div>
             </div>
 
             {fonts.length > 0 && (
               <div>
-                <label className="text-xs font-medium text-light-text-muted dark:text-dark-text-muted">
+                <p className={`${SMALL_CAPS} text-fg-muted`}>
                   Font guesses (not applied — add manually with a font file if correct)
-                </label>
-                <div className="mt-1 flex flex-wrap gap-1.5">
+                </p>
+                <div className="mt-1.5 flex flex-wrap gap-1.5">
                   {fonts.map(f => (
-                    <span key={f} className="px-2 py-1 rounded-lg text-xs bg-primary/5 dark:bg-primary-light/5 text-light-text dark:text-dark-text">
+                    <span key={f} className={TAG}>
                       {f}
                     </span>
                   ))}
@@ -320,14 +343,14 @@ export function BrandKitAssistantPanel({ kitId, open, onClose, onApplied }: Bran
             )}
 
             {style && (
-              <p className="text-xs text-light-text-muted dark:text-dark-text-muted">
-                <span className="font-medium">Style:</span> {style}
+              <p className="break-words text-ui-xs text-fg-muted">
+                <span className="font-semibold text-fg">Style:</span> {style}
               </p>
             )}
 
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <Button size="sm" onClick={apply} disabled={applying || (!voice.trim() && colors.length === 0)}>
-                {applying ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
+                {applying ? <Loader2 {...ICON} className="animate-spin" /> : <Check {...ICON} />}
                 Apply voice + colors
               </Button>
               <Button variant="ghost" size="sm" onClick={() => setHasSuggestion(false)} disabled={applying}>
@@ -337,17 +360,26 @@ export function BrandKitAssistantPanel({ kitId, open, onClose, onApplied }: Bran
           </div>
         )}
 
-        {/* Input */}
-        <form onSubmit={send} className="px-5 py-4 border-t border-light-border dark:border-dark-border flex gap-2">
-          <input
-            value={input}
-            onChange={e => setInput(e.target.value)}
-            placeholder="e.g. Extract the brand voice and style from these references"
-            className="glass-input rounded-xl px-3 py-2 text-sm flex-1 text-light-text dark:text-dark-text focus:outline-none"
-          />
-          <Button type="submit" size="sm" disabled={!input.trim() || pending} aria-label="Send">
-            <Send size={14} />
-          </Button>
+        {/* The prompt (§8.3, §8.14): a display-italic field with the ink Send
+            button attached; the wrapper shows the focus outline. */}
+        <form onSubmit={send} className="flex-shrink-0 border-t border-line-subtle px-5 py-4">
+          <div className="flex rounded-ui-sm border border-line bg-surface-raised focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-focus">
+            <input
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              placeholder="e.g. Extract the brand voice and style from these references"
+              className="min-w-0 flex-1 bg-transparent px-3.5 py-2.5 font-display text-ui-base italic text-fg [font-variation-settings:'opsz'_24] placeholder:text-fg-muted focus:outline-none"
+            />
+            <button
+              type="submit"
+              disabled={!input.trim() || pending}
+              aria-label="Send"
+              className="inline-flex flex-shrink-0 items-center gap-2 whitespace-nowrap border-l border-line bg-fg px-4 font-text text-ui-sm font-semibold text-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Send
+              {pending ? <Loader2 {...ICON} className="animate-spin" aria-hidden /> : <Send {...ICON} aria-hidden />}
+            </button>
+          </div>
         </form>
       </div>
     </Drawer>

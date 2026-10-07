@@ -2,6 +2,9 @@
 
 import React, { useEffect, useRef, useState } from 'react'
 import { GOOGLE_FONTS, googleFontsUrl } from './googleFonts'
+import { fieldClasses, fieldEdge } from '@/components/ui/Input'
+import { cn } from '@/lib/utils'
+import { FOCUS } from './folio'
 
 // ─── Font Editor ─────────────────────────────────────────────────────────────
 // Includes an inline Google Fonts combobox (search + keyboard nav) — there is
@@ -76,12 +79,13 @@ export function FontEditor({ fonts, onChange }: FontEditorProps) {
     <div className="space-y-2">
       <div className="flex flex-wrap gap-2">
         {fonts.map(f => (
-          <div key={f.name} className="flex items-center gap-1.5 glass-input rounded-lg px-2 py-1">
-            <span className="text-sm text-light-text dark:text-dark-text">{f.name}</span>
+          <div key={f.name} className="flex max-w-full items-center gap-1.5 rounded-ui-sm border border-line-subtle bg-surface py-0.5 pl-2 pr-0.5">
+            <span className="min-w-0 break-words text-ui-sm text-fg">{f.name}</span>
             <button
+              type="button"
               onClick={() => onChange(fonts.filter(x => x.name !== f.name))}
               aria-label={`Remove font ${f.name}`}
-              className="text-light-text-muted dark:text-dark-text-muted hover:text-red-500 ml-1"
+              className={`inline-flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-ui-sm text-fg-muted transition-colors duration-fast ease-standard hover:text-status-failed ${FOCUS}`}
             >×</button>
           </div>
         ))}
@@ -98,14 +102,14 @@ export function FontEditor({ fonts, onChange }: FontEditorProps) {
           aria-autocomplete="list"
           aria-activedescendant={expanded ? `${listboxId}-option-${highlighted}` : undefined}
           placeholder="Search Google Fonts…"
-          className="glass-input rounded-xl px-3 py-2 text-sm w-full text-light-text dark:text-dark-text"
+          className={cn(fieldClasses, fieldEdge())}
         />
         {expanded && (
           <ul
             id={listboxId}
             role="listbox"
             aria-label="Google Fonts matches"
-            className="absolute z-20 mt-1 w-full glass-panel rounded-xl border border-white/10 shadow-lg max-h-48 overflow-y-auto"
+            className="surface-raised absolute z-20 mt-1 max-h-48 w-full overflow-y-auto py-1.5"
           >
             {visible.map((name, i) => (
               <li
@@ -118,8 +122,8 @@ export function FontEditor({ fonts, onChange }: FontEditorProps) {
                   tabIndex={-1}
                   onMouseDown={e => { e.preventDefault(); add(name) }}
                   onMouseEnter={() => setHighlighted(i)}
-                  className={`w-full text-left px-3 py-2 text-sm text-light-text dark:text-dark-text transition-colors ${
-                    i === highlighted ? 'bg-primary/10 dark:bg-primary-light/10' : ''
+                  className={`w-full px-3.5 py-[7px] text-left font-text text-ui-sm text-fg transition-colors duration-fast ease-standard ${
+                    i === highlighted ? 'bg-canvas' : ''
                   }`}
                 >
                   {name}

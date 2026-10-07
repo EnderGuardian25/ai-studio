@@ -3,6 +3,7 @@
 import React, { useState } from 'react'
 import { Button } from '@/components/ui/Button'
 import { ColorSwatch } from './shared'
+import { COMPACT_FIELD, FOCUS } from './folio'
 
 // ─── Color Palette Editor ─────────────────────────────────────────────────────
 
@@ -24,24 +25,25 @@ export function ColorEditor({ colors, onChange }: ColorEditorProps) {
     <div className="space-y-2">
       <div className="flex flex-wrap gap-2">
         {colors.map(c => (
-          <div key={c} className="flex items-center gap-1.5 glass-input rounded-lg px-2 py-1">
+          <div key={c} className="flex items-center gap-1.5 rounded-ui-sm border border-line-subtle bg-surface py-0.5 pl-1.5 pr-0.5">
             <ColorSwatch color={c} />
-            <span className="font-mono text-xs text-light-text dark:text-dark-text">{c}</span>
+            <span className="font-mono text-ui-xs text-fg">{c}</span>
             <button
+              type="button"
               onClick={() => onChange(colors.filter(x => x !== c))}
               aria-label={`Remove color ${c}`}
-              className="text-light-text-muted dark:text-dark-text-muted hover:text-red-500 ml-1"
+              className={`inline-flex h-6 w-6 items-center justify-center rounded-ui-sm text-fg-muted transition-colors duration-fast ease-standard hover:text-status-failed ${FOCUS}`}
             >×</button>
           </div>
         ))}
       </div>
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         <input
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && add()}
           placeholder="#1A2B3C"
-          className="glass-input rounded-xl px-3 py-2 text-sm w-36 text-light-text dark:text-dark-text"
+          className={`${COMPACT_FIELD} w-36`}
         />
         <Button variant="secondary" size="sm" onClick={add}>Add</Button>
       </div>

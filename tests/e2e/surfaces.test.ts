@@ -13,7 +13,7 @@ import { loginAs, waitForDraft, type ApiClient } from '../helpers/api'
 //          (login, choose-team and the shell at 375 px), AC-17 (visible focus
 //          on the first three stops of login and the shell), the "Studio"
 //          wordmark, the theme toggle, and the Create post button's motion.
-//   T7–T10, the screen groups: AC-12 (375 px, no horizontal scroll), AC-17
+//   T7–T11, the screen groups: AC-12 (375 px, no horizontal scroll), AC-17
 //          (visible focus on a screen's first three stops) and FR-12 (each
 //          screen's controls, by role and name).
 
@@ -948,6 +948,209 @@ test.describe('Campaigns and projects (T10)', () => {
     await expect(drawer).toBeHidden()
     await expect(page.locator('textarea')).toHaveValue(/Mock campaign briefing draft/)
   })
+})
+
+// ── Brand kits (T11: AC-12, AC-17, FR-12) ────────────────────────────────────
+
+// A kit with colours, fonts, two voice-prompt versions, a logo, a template, a
+// reference-doc artifact and an assistant source document, made through the API.
+async function mintBrandKitFixture(api: ApiClient) {
+  const stamp = `${Date.now()}`
+  const kit = await (
+    await api.post('/api/admin/brandkits', {
+      name: `T11 Kit ${stamp}`,
+      colors: ['#0b6e4f', '#f2c14e'],
+      fonts: [{ name: 'DM Sans', url: 'https://fonts.googleapis.com/css2?family=DM+Sans' }],
+    })
+  ).json()
+  for (const content of ['T11 voice v1', 'T11 voice v2, the active one']) {
+    expect((await api.post(`/api/admin/brandkits/${kit.id}/prompts`, { content })).status()).toBe(201)
+  }
+  const logo = await api.multipart(`/api/admin/brandkits/${kit.id}/artifacts`, {
+    file: { name: 't11-logo.png', mimeType: 'image/png', buffer: ONE_PX_PNG },
+    type: 'LOGO',
+    name: `t11-logo-${stamp}`,
+    feedToAI: 'true',
+  })
+  expect(logo.ok()).toBe(true)
+  const doc = await api.multipart(`/api/admin/brandkits/${kit.id}/artifacts`, {
+    file: { name: `t11-guide-${stamp}.txt`, mimeType: 'text/plain', buffer: Buffer.from('T11 guidelines') },
+    type: 'REFERENCE_DOC',
+    name: `t11-guide-${stamp}.txt`,
+    feedToAI: 'false',
+  })
+  expect(doc.ok()).toBe(true)
+  const template = await api.post(`/api/admin/brandkits/${kit.id}/templates`, {
+    name: `T11 template ${stamp}`,
+    htmlTemplate: '<!DOCTYPE html><html><body>{{headline}}</body></html>',
+    aspectRatio: 'SQUARE',
+  })
+  expect(template.ok()).toBe(true)
+  const source = await api.multipart(`/api/admin/brandkits/${kit.id}/documents`, {
+    file: { name: `t11-brand-book-${stamp}.txt`, mimeType: 'text/plain', buffer: Buffer.from('T11 brand book') },
+  })
+  expect(source.ok()).toBe(true)
+  return { kit, stamp }
+}
+
+// The kit list's row button. Its name starts with the kit's name (the swatch
+// titles follow it), and "Delete brand kit …" must not match.
+function kitRow(page: Page, name: string): Locator {
+  return page.getByRole('button', { name: new RegExp(`^${name}`) })
+}
+
+async function openKit(page: Page, name: string) {
+  await page.goto('/admin/brandkits')
+  await expect(page.getByRole('heading', { name: 'Brand Kits', level: 1 })).toBeVisible()
+  await kitRow(page, name).click()
+  await expect(page.getByRole('heading', { name, level: 2 })).toBeVisible()
+}
+
+test.describe('Brand kits (T11)', () => {
+  let api: ApiClient
+  // Every kit a case mints is deleted after it, so repeated runs don't grow
+  // the kit list (which would also shift which kit sorts first).
+  const minted: string[] = []
+  const mint = async () => {
+    const fixture = await mintBrandKitFixture(api)
+    minted.push(fixture.kit.id)
+    return fixture
+  }
+  test.beforeEach(async ({ request }) => {
+    api = await loginAs(request, ADMIN_EMAIL, ADMIN_PASSWORD)
+  })
+  test.afterEach(async () => {
+    for (const id of minted.splice(0)) await api.del(`/api/admin/brandkits/${id}`)
+    await api.dispose()
+  })
+
+  test('AC-17: the brand kits page, with a kit open, shows a visible focus indicator on its first three stops', async ({ page }) => {
+    const { kit } = await mint()
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await pageLogin(page)
+    await openKit(page, kit.name)
+    // Add Kit, then the first kit row's select and delete buttons (which kit
+    // is first depends on the test DB's data).
+    const stops = await tabThreeFromMain(page)
+    expect(stops[0]).toBe('Add Kit')
+    expect(stops[2]).toMatch(/^Delete brand kit /)
+    expect(stops).toHaveLength(3)
+  })
+
+  test('AC-12 + FR-12: at 375px a kit keeps its controls, with history, the editors, a template form, the assistant and the Add kit modal', async ({ page }) => {
+    test.skip(!MOCKED(), 'needs MOCK_AI for the brand-kit assistant')
+    const { kit, stamp } = await mint()
+    await page.setViewportSize({ width: 375, height: 812 })
+    await pageLogin(page)
+    await openKit(page, kit.name)
+
+    const kitPanel = page.getByRole('region', { name: kit.name, exact: true })
+    // The kit's header and its numbered sections.
+    for (const name of ['Extract from references', 'Set default', 'Edit']) {
+      await expect(kitPanel.getByRole('button', { name, exact: true })).toBeVisible()
+    }
+    for (const name of ['Color Palette', 'Logos', 'Fonts', 'HTML Templates', 'Brand Voice Prompt', 'Artifacts']) {
+      await expect(kitPanel.getByRole('heading', { name, level: 3 })).toBeVisible()
+    }
+    await expect(page.getByRole('button', { name: `Delete brand kit ${kit.name}`, exact: true })).toBeVisible()
+    // Logos, templates and artifacts.
+    for (const name of ['Add logo', 'From image', 'Upload']) {
+      await expect(kitPanel.getByRole('button', { name })).toBeVisible()
+    }
+    await expect(kitPanel.getByRole('button', { name: 'Add', exact: true })).toBeVisible()
+    await expect(kitPanel.getByRole('textbox', { name: 'Logo label' })).toHaveValue(`t11-logo-${stamp}`)
+    await expect(kitPanel.getByRole('button', { name: 'Primary', exact: true })).toHaveAttribute('aria-pressed', 'true')
+    await expect(kitPanel.getByRole('button', { name: `Delete logo t11-logo-${stamp}` })).toBeVisible()
+    await expect(kitPanel.getByRole('button', { name: `Delete template T11 template ${stamp}` })).toBeVisible()
+    await expect(kitPanel.getByRole('button', { name: `Feed t11-guide-${stamp}.txt to AI` })).toHaveAttribute('aria-pressed', 'false')
+    await expect(kitPanel.getByRole('button', { name: `Delete artifact t11-guide-${stamp}.txt` })).toBeVisible()
+    // The voice prompt.
+    await expect(kitPanel.getByText('T11 voice v2, the active one')).toBeVisible()
+    await expect(kitPanel.getByRole('button', { name: 'Improve with AI' })).toBeVisible()
+    await expect(kitPanel.getByRole('button', { name: 'Write manually' })).toBeVisible()
+    await expectNoHorizontalScroll(page, 'kit detail at 375px')
+
+    // Prompt history: two version rows, Restore on the inactive one.
+    await kitPanel.getByRole('tab', { name: 'History' }).click()
+    const history = kitPanel.getByRole('region', { name: 'Prompt history' })
+    await expect(history.getByRole('listitem')).toHaveCount(2)
+    await expect(history.getByRole('button', { name: 'Restore' })).toHaveCount(1)
+    await expectNoHorizontalScroll(page, 'prompt history at 375px')
+    await kitPanel.getByRole('tab', { name: 'New Version' }).click()
+    await expect(kitPanel.getByPlaceholder('Write your brand voice prompt…')).toBeVisible()
+    await expect(kitPanel.getByRole('button', { name: 'Save as new version' })).toBeDisabled()
+    await kitPanel.getByRole('tab', { name: 'Active' }).click()
+
+    // Edit: the name field, the colour and font editors, the font combobox open.
+    await kitPanel.getByRole('button', { name: 'Edit', exact: true }).click()
+    await expect(kitPanel.getByRole('textbox', { name: 'Kit name' })).toHaveValue(kit.name)
+    await expect(kitPanel.getByRole('button', { name: 'Remove color #0b6e4f' })).toBeVisible()
+    await expect(kitPanel.getByRole('button', { name: 'Remove font DM Sans' })).toBeVisible()
+    await kitPanel.getByRole('combobox').fill('Ro')
+    await expect(kitPanel.getByRole('listbox', { name: 'Google Fonts matches' })).toBeVisible()
+    await expectNoHorizontalScroll(page, 'kit edit mode at 375px')
+    await kitPanel.getByRole('combobox').press('Escape')
+    await expect(kitPanel.getByRole('button', { name: 'Save', exact: true })).toBeVisible()
+    await kitPanel.getByRole('button', { name: 'Cancel', exact: true }).click()
+
+    // The template form: name, the size choices, the HTML field.
+    await kitPanel.getByRole('button', { name: 'Add', exact: true }).click()
+    await expect(kitPanel.getByRole('textbox', { name: 'Template name' })).toBeVisible()
+    const sizes = kitPanel.getByRole('group', { name: 'Size' }).getByRole('button')
+    await expect(sizes.first()).toHaveAttribute('aria-pressed', 'true')
+    await expect(kitPanel.getByRole('button', { name: 'Save template' })).toBeDisabled()
+    await expectNoHorizontalScroll(page, 'template form at 375px')
+    await kitPanel.getByRole('button', { name: 'Cancel', exact: true }).click()
+
+    // The assistant: its source document, then a proposal to review and apply.
+    await page.getByRole('button', { name: 'Extract from references' }).click()
+    const drawer = page.getByRole('dialog', { name: 'Extract brand from references' })
+    await expect(drawer.getByRole('button', { name: 'Add document' })).toBeVisible()
+    await expect(drawer.getByRole('button', { name: `Delete t11-brand-book-${stamp}.txt` })).toBeVisible()
+    await expect(drawer.getByRole('button', { name: 'Send' })).toBeDisabled()
+    const ask = drawer.getByPlaceholder('e.g. Extract the brand voice and style from these references')
+    await ask.fill('Extract the brand voice and style from these references')
+    await ask.press('Enter')
+    const proposal = drawer.getByRole('region', { name: 'Proposed brand' })
+    await expect(proposal).toBeVisible({ timeout: 30_000 })
+    await expect(proposal.getByRole('textbox', { name: 'Brand voice' })).not.toHaveValue('')
+    await expect(proposal.getByRole('button', { name: /^Remove color / }).first()).toBeVisible()
+    await expect(proposal.getByRole('button', { name: 'Dismiss' })).toBeVisible()
+    await expectNoHorizontalScroll(page, 'assistant with a proposal at 375px')
+    await proposal.getByRole('button', { name: 'Apply voice + colors' }).click()
+    await expect(drawer).toBeHidden()
+
+    // The Add kit modal.
+    await page.getByRole('button', { name: 'Add Kit' }).click()
+    const modal = page.getByRole('dialog', { name: 'New Brand Kit' })
+    await expect(modal.getByRole('textbox', { name: 'Name' })).toBeVisible()
+    await expect(modal.getByRole('button', { name: 'Create' })).toBeDisabled()
+    await expectNoHorizontalScroll(page, 'Add kit modal at 375px')
+    await modal.getByRole('button', { name: 'Cancel' }).click()
+    await expect(modal).toBeHidden()
+  })
+
+  for (const theme of THEMES) {
+    test(`a kit's colour swatches show the kit's own colour, not a token (${theme})`, async ({ page }) => {
+      const { kit } = await mint()
+      await storeTheme(page, theme)
+      await page.setViewportSize({ width: 1440, height: 900 })
+      await pageLogin(page)
+      await openKit(page, kit.name)
+      await expectTheme(page, theme)
+      for (const [hex, rgb] of [['#0b6e4f', 'rgb(11, 110, 79)'], ['#f2c14e', 'rgb(242, 193, 78)']]) {
+        // One in the kit's list row, one in the open kit's palette.
+        const swatches = [
+          kitRow(page, kit.name).locator(`span[title="${hex}"]`),
+          page.getByRole('region', { name: kit.name, exact: true }).locator(`span[title="${hex}"]`),
+        ]
+        for (const swatch of swatches) {
+          await expect(swatch).toHaveCount(1)
+          await expect(swatch).toHaveCSS('background-color', rgb)
+        }
+      }
+    })
+  }
 })
 
 // ── AC-18 / NFR-03: reduced motion ───────────────────────────────────────────

@@ -177,7 +177,7 @@ There are 13 tasks in 7 waves. All the work lands on `v2`.
     - **Covers:** FR-11 (group 4), FR-12.
     - **ACs:** AC-12, AC-13, AC-17.
 
-- [ ] `T11` — Restyle the brand kits admin
+- [x] `T11` — Restyle the brand kits admin
   - Files: `src/app/(app)/admin/brandkits/page.tsx`, `src/components/admin/brandkits/*`
   - Estimate: medium
   - Kind: impl

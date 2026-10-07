@@ -5,7 +5,10 @@ import { toast } from 'sonner'
 import { Sparkles, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { SegmentedToggle } from '@/components/ui/SegmentedToggle'
+import { fieldClasses, fieldEdge } from '@/components/ui/Input'
 import { apiFetch } from '@/lib/apiFetch'
+import { cn } from '@/lib/utils'
+import { COMPACT_FIELD, ICON, SCROLL_FOCUS, SMALL_CAPS } from './folio'
 import type { BrandKitPrompt as Prompt } from '@/lib/api-types'
 
 // ─── Prompt Section ───────────────────────────────────────────────────────────
@@ -76,7 +79,7 @@ export function PromptSection({ kitId, prompts, onRefresh }: PromptSectionProps)
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       <SegmentedToggle
         options={[
           { value: 'active', label: 'Active' },
@@ -90,28 +93,28 @@ export function PromptSection({ kitId, prompts, onRefresh }: PromptSectionProps)
       {view === 'active' && (
         <div className="space-y-3">
           {active ? (
-            <div className="glass-input rounded-xl p-3 text-sm text-light-text dark:text-dark-text whitespace-pre-wrap leading-relaxed">
+            <div className="surface whitespace-pre-wrap break-words px-4 py-3 text-ui-sm leading-relaxed text-fg">
               {active.content}
             </div>
           ) : (
-            <p className="text-sm text-light-text-muted dark:text-dark-text-muted">No active prompt. Generate one below.</p>
+            <p className="text-ui-sm text-fg-muted">No active prompt. Generate one below.</p>
           )}
-          <div className="flex gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {active ? (
               <Button variant="secondary" size="sm" onClick={improve} disabled={loading}>
-                <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
+                <RefreshCw {...ICON} className={loading ? 'animate-spin' : ''} />
                 {loading ? 'Improving…' : 'Improve with AI'}
               </Button>
             ) : (
-              <div className="flex gap-2 w-full">
+              <div className="flex w-full flex-wrap gap-2">
                 <input
                   value={description}
                   onChange={e => setDescription(e.target.value)}
                   placeholder="Describe your brand in a few sentences…"
-                  className="glass-input rounded-xl px-3 py-2 text-sm flex-1 text-light-text dark:text-dark-text"
+                  className={`${COMPACT_FIELD} min-w-0 flex-1 basis-56`}
                 />
                 <Button variant="secondary" size="sm" onClick={generate} disabled={loading || !description.trim()}>
-                  <Sparkles size={13} />
+                  <Sparkles {...ICON} />
                   {loading ? 'Generating…' : 'Generate'}
                 </Button>
               </div>
@@ -124,40 +127,53 @@ export function PromptSection({ kitId, prompts, onRefresh }: PromptSectionProps)
       )}
 
       {view === 'history' && (
-        <div className="space-y-2 max-h-64 overflow-y-auto">
-          {prompts.length === 0 && (
-            <p className="text-sm text-light-text-muted dark:text-dark-text-muted">No versions yet.</p>
-          )}
-          {prompts.map(p => (
-            <div key={p.id} className="glass-input rounded-xl p-3 flex items-start justify-between gap-3">
-              <div>
-                <span className="font-mono text-xs text-light-text-muted dark:text-dark-text-muted">v{p.version}</span>
-                {p.isActive && (
-                  <span className="ml-2 text-xs bg-primary/10 dark:bg-primary-light/10 text-primary dark:text-primary-light px-1.5 py-0.5 rounded-full">active</span>
-                )}
-                <p className="text-xs text-light-text dark:text-dark-text mt-1 line-clamp-2">{p.content}</p>
-              </div>
-              {!p.isActive && (
-                <Button variant="ghost" size="sm" onClick={() => activate(p.id)}>Restore</Button>
-              )}
-            </div>
-          ))}
-        </div>
+        prompts.length === 0 ? (
+          <p className="text-ui-sm text-fg-muted">No versions yet.</p>
+        ) : (
+          // Ruled version rows (§8.13's vocabulary). The list scrolls inside
+          // its own box once it is long, so the box is a focusable, labelled
+          // region (WCAG 2.1.1, the T7 rule).
+          <div
+            tabIndex={0}
+            role="region"
+            aria-label="Prompt history"
+            className={`max-h-64 overflow-y-auto border-t border-line-subtle ${SCROLL_FOCUS}`}
+          >
+            <ul>
+              {prompts.map(p => (
+                <li key={p.id} className="flex items-start justify-between gap-3 border-b border-line-subtle py-2.5">
+                  <div className="min-w-0">
+                    <div className="flex items-baseline gap-2">
+                      <span className="font-display text-ui-base font-medium text-fg">v{p.version}</span>
+                      {p.isActive && <span className={`${SMALL_CAPS} text-accent`}>active</span>}
+                    </div>
+                    <p className="mt-0.5 line-clamp-2 break-words text-ui-xs text-fg-muted" title={p.content}>
+                      {p.content}
+                    </p>
+                  </div>
+                  {!p.isActive && (
+                    <Button variant="ghost" size="sm" onClick={() => activate(p.id)}>Restore</Button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )
       )}
 
       {view === 'new' && (
         <div className="space-y-3">
           {aiDraft && (
-            <p className="text-xs text-light-text-muted dark:text-dark-text-muted">AI-generated draft — review and edit before saving.</p>
+            <p className="text-ui-xs text-fg-muted">AI-generated draft — review and edit before saving.</p>
           )}
           <textarea
             value={draft}
             onChange={e => setDraft(e.target.value)}
             rows={8}
             placeholder="Write your brand voice prompt…"
-            className="glass-input rounded-xl px-3 py-2.5 text-sm w-full text-light-text dark:text-dark-text resize-none"
+            className={cn(fieldClasses, fieldEdge(), 'resize-none leading-relaxed')}
           />
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button size="sm" onClick={saveVersion} disabled={!draft.trim()}>Save as new version</Button>
             <Button variant="ghost" size="sm" onClick={() => { setDraft(''); setAiDraft(''); setView('active') }}>Cancel</Button>
           </div>
