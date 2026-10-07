@@ -13,7 +13,8 @@ import {
   X,
 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
-import { GlassInput } from '@/components/ui/GlassInput'
+import { Input, fieldClasses, fieldEdge, fieldErrorClasses, fieldLabelClasses } from '@/components/ui/Input'
+import { NOTICE } from '@/components/drafts/folio'
 import type { ElementEditKind } from '@/lib/drafts/inlineEdit'
 import {
   cssColorToHex,
@@ -75,8 +76,8 @@ interface ElementEditPanelProps {
   onUseWholeDocument: () => void
 }
 
-const LABEL = 'text-sm font-medium text-light-text dark:text-dark-text'
-const MUTED = 'text-xs text-light-text-muted dark:text-dark-text-muted'
+const LABEL = fieldLabelClasses
+const MUTED = 'text-ui-xs text-fg-muted'
 
 // Focus the element matching `selector` inside `root` once `disabled` is false,
 // at most once per mount. A disabled target falls back to `fallback`.
@@ -114,7 +115,7 @@ export function ElementEditPanel({
   return (
     <aside
       aria-label="Element editor"
-      className="flex flex-col gap-4 rounded-xl glass-popover p-4 overflow-y-auto"
+      className="surface flex flex-col gap-4 overflow-y-auto p-4"
     >
       {notice && (
         <NoticeBanner notice={notice} onCheckAgain={onCheckAgain} onUseWholeDocument={onUseWholeDocument} />
@@ -151,10 +152,8 @@ function EmptyState({
   useFocusWhenEnabled(root, focusStart ? '[data-focus-id="start"]' : null, null, disabled)
   return (
     <div ref={root} className="flex flex-col items-center gap-2 py-8 text-center">
-      <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 dark:bg-primary-light/10 text-primary dark:text-primary-light">
-        <MousePointerClick size={18} />
-      </span>
-      <p className="text-sm font-medium text-light-text dark:text-dark-text">Select an element</p>
+      <MousePointerClick size={18} strokeWidth={1.4} className="text-fg-muted" aria-hidden />
+      <p className="font-display text-ui-lg font-medium text-fg">Select an element</p>
       <p className={MUTED}>
         Click any part of the design to change its text, colour or size. Each change saves as a new
         revision. With the keyboard, start from the whole design and move with Parent, Child,
@@ -179,7 +178,7 @@ function NoticeBanner({
   return (
     <div
       role="alert"
-      className="flex flex-col gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-900 dark:text-amber-200"
+      className={`${NOTICE} flex flex-col gap-2 bg-status-scheduled/10 text-ui-xs text-status-scheduled`}
     >
       <p className="flex items-start gap-2">
         <AlertTriangle size={14} className="mt-0.5 shrink-0" aria-hidden />
@@ -250,12 +249,12 @@ function SelectionFields({
             tabIndex={-1}
             data-focus-id="heading"
             aria-live="polite"
-            className="flex min-w-0 items-center gap-2 text-sm font-semibold text-light-text dark:text-dark-text focus:outline-none"
+            className="flex min-w-0 items-center gap-2 font-display text-ui-lg font-medium text-fg focus:outline-none"
           >
             Selected
             <span
               data-testid="element-tag"
-              className="rounded-full border border-primary/20 dark:border-primary-light/25 bg-primary/10 dark:bg-primary-light/10 px-2 py-0.5 font-mono text-xs font-medium text-primary dark:text-primary-light"
+              className="rounded-ui-sm border border-line px-2 py-0.5 font-mono text-ui-xs font-normal text-fg"
             >
               &lt;{selection.tag}&gt;
             </span>
@@ -293,7 +292,7 @@ function SelectionFields({
             onChange={(e) => setText(e.target.value)}
             rows={3}
             disabled={disabled}
-            className="glass-input w-full resize-y rounded-xl px-3 py-2 text-sm text-light-text dark:text-dark-text focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+            className={`${fieldClasses} ${fieldEdge()} resize-y text-ui-sm`}
           />
           <FieldError message={errorFor('text')} />
           <ApplyButton
@@ -345,9 +344,9 @@ function SelectionFields({
 }
 
 // A checkerboard for "no colour" (transparent, or not a colour the picker can
-// show). It reads in both themes.
+// show), drawn in the theme's own paper and rule colours, so it reads in both.
 const NONE_SWATCH: React.CSSProperties = {
-  backgroundImage: 'repeating-conic-gradient(#cbd5e1 0% 25%, #ffffff 0% 50%)',
+  backgroundImage: 'repeating-conic-gradient(rgb(var(--line-subtle)) 0% 25%, rgb(var(--surface-2)) 0% 50%)',
   backgroundSize: '8px 8px',
 }
 
@@ -380,11 +379,11 @@ function ColorField({
       </label>
       <div className="flex items-center gap-2">
         <span
-          className="relative flex h-9 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-light-border dark:border-dark-border focus-within:ring-2 focus-within:ring-primary/50 dark:focus-within:ring-primary-light/50"
+          className="relative flex h-9 w-10 shrink-0 items-center justify-center overflow-hidden rounded-ui-sm border border-line focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-focus"
           style={hex ? { backgroundColor: hex } : NONE_SWATCH}
         >
           {!hex && (
-            <span aria-hidden className="font-mono text-[9px] font-semibold text-slate-600">
+            <span aria-hidden className="font-text text-ui-2xs font-semibold text-fg">
               none
             </span>
           )}
@@ -398,7 +397,7 @@ function ColorField({
           />
         </span>
         <div className="min-w-0 flex-1">
-          <GlassInput
+          <Input
             id={id}
             value={value}
             onChange={(e) => setValue(e.target.value)}
@@ -440,7 +439,7 @@ function SizeField({
       <label htmlFor="element-fontSize" className={LABEL}>
         Font size
       </label>
-      <GlassInput
+      <Input
         id="element-fontSize"
         value={value}
         onChange={(e) => setValue(e.target.value)}
@@ -497,7 +496,7 @@ function ApplyButton({
 function FieldError({ message }: { message: string | undefined }) {
   if (!message) return null
   return (
-    <p role="alert" className="text-xs text-red-600 dark:text-red-400">
+    <p role="alert" className={fieldErrorClasses}>
       {message}
     </p>
   )

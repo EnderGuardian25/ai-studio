@@ -596,7 +596,7 @@ export function InlineEditModal({
     >
       <div className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="text-xs text-light-text-muted dark:text-dark-text-muted max-w-2xl">
+          <p className="max-w-2xl text-ui-sm text-fg-muted">
             {elementMode ? (
               <>
                 Click an element to select it, then change its text, colour or size. Each change
@@ -605,7 +605,7 @@ export function InlineEditModal({
             ) : (
               <>
                 Click any text to edit it in place, or hover an image and choose{' '}
-                <strong className="font-semibold text-light-text dark:text-dark-text">Replace photo</strong>{' '}
+                <strong className="font-semibold text-fg">Replace photo</strong>{' '}
                 to swap it. Changes save as a new revision.
               </>
             )}
@@ -618,11 +618,13 @@ export function InlineEditModal({
               can be without overflowing. */}
           <div
             ref={stageRef}
-            className="flex items-center justify-center overflow-hidden rounded-xl bg-black/[0.04] dark:bg-white/[0.04] ring-1 ring-inset ring-light-border dark:ring-dark-border p-4"
+            className="flex items-center justify-center overflow-hidden rounded-ui-sm border border-line-subtle bg-canvas p-4"
             style={{ height: 'min(74vh, 820px)' }}
           >
+            {/* The post's own canvas: square-cornered, no shadow, never
+                token-styled; white only until the post paints over it. */}
             <div
-              className="relative overflow-hidden rounded-lg bg-white shadow-xl"
+              className="relative overflow-hidden bg-white" // ui-exception: the post-preview frame (DESIGN_SYSTEM.md §11), behind the rendered post
               style={{ width: width * scale, height: height * scale }}
               data-editor-ready={editorReady ? 'true' : 'false'}
             >
@@ -644,7 +646,7 @@ export function InlineEditModal({
               {hoverBox && (
                 <div
                   aria-hidden
-                  className="pointer-events-none absolute rounded-sm border border-dashed border-primary/70 dark:border-primary-light/70"
+                  className="pointer-events-none absolute border border-dashed border-accent"
                   style={hoverBox}
                 />
               )}
@@ -652,7 +654,7 @@ export function InlineEditModal({
                 <div
                   aria-hidden
                   data-testid="element-highlight"
-                  className="pointer-events-none absolute rounded-sm ring-2 ring-primary dark:ring-primary-light bg-primary/10 dark:bg-primary-light/10"
+                  className="pointer-events-none absolute bg-accent/10 ring-2 ring-accent"
                   style={selectedBox}
                 />
               )}
@@ -660,22 +662,22 @@ export function InlineEditModal({
                   the document on it is the stored one and is wired. */}
               {(!editorReady || syncFailed) && (
                 <div
-                  className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-white/60 dark:bg-black/50"
+                  className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-canvas/70"
                   role="status"
                   aria-live="polite"
                 >
                   {syncFailed ? (
-                    <>
-                      <p className="text-sm font-medium text-light-text dark:text-dark-text">
+                    <div className="surface-raised flex flex-col items-center gap-3 p-4 text-center">
+                      <p className="text-ui-sm font-medium text-fg">
                         Couldn&apos;t load the latest version of this design.
                       </p>
                       <Button variant="secondary" size="sm" onClick={() => void syncWithServer()}>
                         Try again
                       </Button>
-                    </>
+                    </div>
                   ) : (
                     <>
-                      <Loader2 size={20} className="animate-spin text-primary dark:text-primary-light" aria-hidden />
+                      <Loader2 size={20} strokeWidth={1.4} className="animate-spin text-fg-muted" aria-hidden />
                       <span className="sr-only">Loading the latest version</span>
                     </>
                   )}

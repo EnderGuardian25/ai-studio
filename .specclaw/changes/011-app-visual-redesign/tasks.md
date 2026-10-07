@@ -155,7 +155,7 @@ There are 13 tasks in 7 waves. All the work lands on `v2`.
 
 ### Wave 6 — The remaining screens
 
-- [ ] `T9` — Restyle draft review and refine
+- [x] `T9` — Restyle draft review and refine
   - Files: `src/app/(app)/drafts/[id]/page.tsx`, `src/components/drafts/*`
   - Estimate: large
   - Kind: impl

@@ -4,6 +4,7 @@ import { AlertTriangle, Loader2, ImageDown } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import type { DraftNotApplied } from '@/lib/api-types'
 import { formatDateTime } from '@/lib/format'
+import { ICON, NOTICE } from '@/components/drafts/folio'
 
 export interface NotAppliedCardProps {
   notApplied: DraftNotApplied
@@ -37,37 +38,36 @@ export interface NotAppliedCardProps {
 // holds — there is simply nothing offered to adopt in that case).
 export function NotAppliedCard({ notApplied, onAdopt, adopting, disabled }: NotAppliedCardProps) {
   return (
-    <div
-      role="alert"
-      className="mb-3 rounded-xl border border-red-300 dark:border-red-700/50 bg-red-50 dark:bg-red-900/20 p-3 animate-fade-in"
-    >
+    <div role="alert" className={`${NOTICE} mb-4 animate-fade-in bg-status-failed/10 text-status-failed`}>
       <div className="flex items-start gap-2">
-        <AlertTriangle size={16} className="text-red-600 dark:text-red-400 mt-0.5 flex-shrink-0" />
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-red-800 dark:text-red-300">
+        <AlertTriangle {...ICON} className="mt-0.5 flex-shrink-0" aria-hidden />
+        <div className="min-w-0 flex-1">
+          <p className="break-words font-semibold">
             Couldn&rsquo;t apply &ldquo;{notApplied.instruction}&rdquo;
           </p>
-          <p className="text-xs text-red-700 dark:text-red-400/90 mt-1">{notApplied.reason}</p>
+          <p className="mt-1 text-ui-xs text-fg">{notApplied.reason}</p>
 
+          {/* The rejected render is a post: shown as rendered, framed only by
+              a hairline 3 px out, like a contact-sheet frame (§8.12). */}
           {notApplied.previewUrl && (
-            <div className="mt-2 max-w-[180px] rounded-lg overflow-hidden border border-red-200 dark:border-red-800/60">
+            <div className="mt-3 max-w-[180px] outline outline-1 outline-offset-[3px] outline-line-subtle">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={notApplied.previewUrl}
                 alt="What the model produced — not applied to your design"
-                className="w-full h-auto block"
+                className="block h-auto w-full"
               />
             </div>
           )}
 
-          <p className="text-[11px] text-red-600/80 dark:text-red-400/70 mt-1.5">
+          <p className="mt-2 text-ui-xs">
             Rejected {formatDateTime(notApplied.rejectedAt)} — your design was left unchanged.
           </p>
 
           {notApplied.previewUrl && onAdopt && (
             <div className="mt-2">
               <Button size="sm" variant="secondary" onClick={onAdopt} disabled={disabled}>
-                {adopting ? <Loader2 size={13} className="animate-spin" /> : <ImageDown size={13} />}
+                {adopting ? <Loader2 {...ICON} className="animate-spin" /> : <ImageDown {...ICON} />}
                 Use anyway
               </Button>
             </div>

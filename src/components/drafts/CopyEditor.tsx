@@ -4,7 +4,8 @@ import React, { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { Loader2, Check, Sparkles, Undo2, AlertTriangle } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
-import { GlassPanel } from '@/components/ui/GlassPanel'
+import { SectionHead } from '@/components/drafts/SectionHead'
+import { ICON, SECTION } from '@/components/drafts/folio'
 import { apiFetch } from '@/lib/apiFetch'
 import { channelLabel, channelCopyLimit } from '@/lib/channels'
 import { useUndoableAction } from '@/lib/hooks/useUndoableAction'
@@ -136,51 +137,46 @@ export function CopyEditor({ draft, onSaved, onActionStarted }: CopyEditorProps)
   const busy = regenerating || undoAction.undoing
 
   return (
-    <GlassPanel className="p-4">
-      <div className="flex items-center justify-between mb-3 gap-2">
-        <h3 className="text-xs font-semibold uppercase tracking-widest text-light-text-muted dark:text-dark-text-muted">
-          Copy
-        </h3>
-        <div className="flex items-center gap-2">
-          <span className="text-xs flex items-center gap-1.5">
-            {copyActionPending ? (
-              <span className="text-light-text-muted dark:text-dark-text-muted flex items-center gap-1">
-                <Loader2 size={12} className="animate-spin" /> Regenerating…
-              </span>
-            ) : saving ? (
-              <span className="text-light-text-muted dark:text-dark-text-muted flex items-center gap-1">
-                <Loader2 size={12} className="animate-spin" /> Saving…
-              </span>
-            ) : saved ? (
-              <span className="text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-                <Check size={12} /> Saved
-              </span>
-            ) : (
-              <span className="text-amber-600 dark:text-amber-400">Unsaved changes</span>
-            )}
+    <section className={SECTION}>
+      <SectionHead numeral="i." title="Copy">
+        {copyActionPending ? (
+          <span className="flex items-center gap-1.5 text-fg-muted">
+            <Loader2 {...ICON} className="animate-spin" aria-hidden /> Regenerating…
           </span>
-          {undoAction.snapshot !== null && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={undoAction.undo}
-              disabled={busy || anyActionPending}
-              title="Restore the previous copy"
-            >
-              {undoAction.undoing ? <Loader2 size={12} className="animate-spin" /> : <Undo2 size={12} />} Undo
-            </Button>
-          )}
-          <Button variant="secondary" size="sm" onClick={regenerate} disabled={busy || anyActionPending}>
-            {regenerating ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />} Regenerate
+        ) : saving ? (
+          <span className="flex items-center gap-1.5 text-fg-muted">
+            <Loader2 {...ICON} className="animate-spin" aria-hidden /> Saving…
+          </span>
+        ) : saved ? (
+          <span className="flex items-center gap-1.5 font-semibold text-status-published">
+            <Check {...ICON} aria-hidden /> Saved
+          </span>
+        ) : (
+          <span className="font-semibold text-status-scheduled">Unsaved changes</span>
+        )}
+        {undoAction.snapshot !== null && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={undoAction.undo}
+            disabled={busy || anyActionPending}
+            title="Restore the previous copy"
+          >
+            {undoAction.undoing ? <Loader2 {...ICON} className="animate-spin" /> : <Undo2 {...ICON} />} Undo
           </Button>
-        </div>
-      </div>
+        )}
+        <Button variant="ghost" size="sm" onClick={regenerate} disabled={busy || anyActionPending}>
+          {regenerating ? <Loader2 {...ICON} className="animate-spin" /> : <Sparkles {...ICON} />} Regenerate
+        </Button>
+      </SectionHead>
       {regenError && (
-        <p className="mb-2 text-xs text-red-500 flex items-start gap-1.5">
-          <AlertTriangle size={13} className="flex-shrink-0 mt-0.5" />
+        <p className="mb-2 flex items-start gap-1.5 text-ui-xs text-status-failed">
+          <AlertTriangle {...ICON} className="mt-0.5 flex-shrink-0" aria-hidden />
           <span className="line-clamp-3">{regenError}</span>
         </p>
       )}
+      {/* The ruled caption field (§8.3): a 1 px --line-subtle rule every 26 px,
+          scrolling with the text. Only the caption is ruled. */}
       <textarea
         value={value}
         onChange={(e) => {
@@ -189,21 +185,24 @@ export function CopyEditor({ draft, onSaved, onActionStarted }: CopyEditorProps)
         }}
         onBlur={save}
         disabled={busy}
-        rows={8}
-        className={`glass-input rounded-xl px-3 py-2.5 text-sm w-full text-light-text dark:text-dark-text resize-y leading-relaxed disabled:opacity-60 ${
-          copyActionPending ? 'animate-pulse' : ''
-        }`}
+        rows={10}
+        className={[
+          'block w-full resize-y rounded-ui-sm border border-line bg-surface-raised px-4 py-1',
+          'font-text text-ui-sm leading-[26px] text-fg placeholder:text-fg-muted',
+          '[background-image:repeating-linear-gradient(to_bottom,transparent_0,transparent_25px,rgb(var(--line-subtle))_25px,rgb(var(--line-subtle))_26px)]',
+          '[background-attachment:local] [background-position:0_4px]',
+          'transition-[border-color,box-shadow] duration-fast ease-standard',
+          'focus:outline-none focus:border-focus focus:ring-1 focus:ring-focus',
+          'disabled:cursor-not-allowed disabled:opacity-60',
+          copyActionPending ? 'animate-pulse' : '',
+        ].join(' ')}
         placeholder="Post copy…"
       />
-      <div className="flex justify-end mt-1.5">
-        <span
-          className={`text-xs font-mono ${
-            over ? 'text-red-500' : 'text-light-text-muted dark:text-dark-text-muted'
-          }`}
-        >
+      <div className="mt-2 flex justify-end">
+        <span className={`text-ui-xs ${over ? 'font-semibold text-status-failed' : 'text-fg-muted'}`}>
           {value.length} / {limit} ({channel})
         </span>
       </div>
-    </GlassPanel>
+    </section>
   )
 }

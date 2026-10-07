@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { ImageOff } from 'lucide-react'
 import type { BackgroundSkipped } from '@/lib/drafts/backgroundNotice'
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser'
+import { FOCUS, ICON, NOTICE } from '@/components/drafts/folio'
 
 export interface BackgroundNoticeProps {
   skipped: BackgroundSkipped
@@ -27,22 +28,24 @@ export function BackgroundNotice({ skipped }: BackgroundNoticeProps) {
         ? { href: '/team', label: 'Open Team settings' }
         : { href: '/settings', label: 'Open Settings' }
 
+  // Amber stays amber: Folio's warning colour is --status-scheduled (§3.2), as
+  // a notice on its own 10 % tint (the pair §3.3 checks).
   return (
     <div
       role="status"
       data-testid="background-notice"
       data-reason={skipped.reason}
-      className="mt-3 rounded-xl border border-amber-300 dark:border-amber-700/50 bg-amber-50 dark:bg-amber-900/20 p-3"
+      className={`${NOTICE} mt-4 bg-status-scheduled/10 text-status-scheduled`}
     >
       <div className="flex items-start gap-2">
-        <ImageOff size={16} className="text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" aria-hidden="true" />
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-amber-800 dark:text-amber-300">No AI background</p>
-          <p className="text-xs text-amber-700 dark:text-amber-400/90 mt-1">{skipped.message}</p>
+        <ImageOff {...ICON} className="mt-0.5 flex-shrink-0" aria-hidden="true" />
+        <div className="min-w-0 flex-1">
+          <p className="font-semibold">No AI background</p>
+          <p className="mt-1 text-ui-xs text-fg">{skipped.message}</p>
           {link && (
             <Link
               href={link.href}
-              className="inline-block mt-1.5 text-xs font-medium text-amber-800 dark:text-amber-300 underline underline-offset-2 hover:text-amber-900 dark:hover:text-amber-200"
+              className={`mt-1.5 inline-block text-ui-xs font-semibold underline decoration-current underline-offset-4 ${FOCUS}`}
             >
               {link.label}
             </Link>

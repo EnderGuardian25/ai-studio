@@ -1,10 +1,11 @@
 'use client'
 
 import React, { useEffect, useRef, useState } from 'react'
-import { Send, Loader2, AlertTriangle, Check } from 'lucide-react'
+import { Send as SendIcon, Loader2, AlertTriangle, Check } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/Button'
-import { GlassPanel } from '@/components/ui/GlassPanel'
+import { SectionHead } from '@/components/drafts/SectionHead'
+import { FOCUS, ICON, NOTICE, SECTION, SMALL_CAPS } from '@/components/drafts/folio'
 import { NotAppliedCard } from '@/components/drafts/NotAppliedCard'
 import { apiFetch } from '@/lib/apiFetch'
 import type { DraftAction, DraftNotApplied } from '@/lib/api-types'
@@ -203,49 +204,71 @@ export function RefinementPanel({
   const busy = running || pendingAction !== null || awaitingResolution || adopting
 
   return (
-    <GlassPanel className="p-4 flex flex-col">
-      <h3 className="text-xs font-semibold uppercase tracking-widest text-light-text-muted dark:text-dark-text-muted mb-3">
-        Refine Design
-      </h3>
+    <section className={SECTION}>
+      <SectionHead numeral="ii." title="Refine Design">
+        {messages.length > 0 && (
+          <span className="text-fg-muted">
+            {messages.length} {messages.length === 1 ? 'request' : 'requests'}
+          </span>
+        )}
+      </SectionHead>
 
-      <div ref={listRef} className="space-y-2 max-h-72 overflow-y-auto mb-3">
-        {messages.length === 0 && (
-          <p className="text-sm text-light-text-muted dark:text-dark-text-muted">
+      {/* The refine log (§8.14): ruled rows, newest last. It scrolls inside its
+          own box once it is long, so the box is a focusable, labelled region
+          (WCAG 2.1.1, the T7 rule). */}
+      <div
+        ref={listRef}
+        className="mb-4 max-h-72 overflow-y-auto focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus"
+        {...(messages.length > 0 ? { role: 'region', 'aria-label': 'Refine requests', tabIndex: 0 } : {})}
+      >
+        {messages.length === 0 ? (
+          <p className="text-ui-sm text-fg-muted">
             Describe a change in natural language and the design agent will apply it.
           </p>
+        ) : (
+          <ol>
+            {messages.map((m, i) => (
+              <li
+                key={m.id}
+                className="grid grid-cols-[40px_minmax(0,1fr)] gap-3 border-b border-line-subtle py-2.5"
+              >
+                <span aria-hidden className="font-display text-ui-base italic text-fg-muted">
+                  № {i + 1}
+                </span>
+                <div className="min-w-0">
+                  <p className="break-words text-ui-base leading-snug text-fg">{m.instruction}</p>
+                  <div className="mt-0.5 flex items-center gap-1.5 text-ui-xs">
+                    {m.status === 'pending' && (
+                      <span className="flex items-center gap-1.5 text-fg-muted">
+                        <Loader2 {...ICON} className="animate-spin" aria-hidden /> Applying…
+                      </span>
+                    )}
+                    {m.status === 'applied' && (
+                      <span className={`flex items-center gap-1 text-status-published ${SMALL_CAPS}`}>
+                        <Check {...ICON} aria-hidden /> Applied
+                      </span>
+                    )}
+                    {m.status === 'conflict' && (
+                      <span className={`flex items-center gap-1 text-status-scheduled ${SMALL_CAPS}`}>
+                        <AlertTriangle {...ICON} aria-hidden /> Brand conflict
+                      </span>
+                    )}
+                    {m.status === 'not-applied' && (
+                      <span className={`flex items-center gap-1 text-status-scheduled ${SMALL_CAPS}`} title={m.detail}>
+                        <AlertTriangle {...ICON} aria-hidden /> Not applied
+                      </span>
+                    )}
+                    {m.status === 'error' && (
+                      <span className="break-words text-status-failed" title={m.detail}>
+                        Failed: {m.detail}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ol>
         )}
-        {messages.map((m) => (
-          <div key={m.id} className="glass-input rounded-xl px-3 py-2">
-            <p className="text-sm text-light-text dark:text-dark-text">{m.instruction}</p>
-            <div className="mt-1 text-xs flex items-center gap-1.5">
-              {m.status === 'pending' && (
-                <span className="text-light-text-muted dark:text-dark-text-muted flex items-center gap-1">
-                  <Loader2 size={11} className="animate-spin" /> Applying…
-                </span>
-              )}
-              {m.status === 'applied' && (
-                <span className="text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-                  <Check size={11} /> Applied
-                </span>
-              )}
-              {m.status === 'conflict' && (
-                <span className="text-amber-600 dark:text-amber-400 flex items-center gap-1">
-                  <AlertTriangle size={11} /> Brand conflict
-                </span>
-              )}
-              {m.status === 'not-applied' && (
-                <span className="text-red-600 dark:text-red-400 flex items-center gap-1" title={m.detail}>
-                  <AlertTriangle size={11} /> Not applied
-                </span>
-              )}
-              {m.status === 'error' && (
-                <span className="text-red-500" title={m.detail}>
-                  Failed: {m.detail}
-                </span>
-              )}
-            </div>
-          </div>
-        ))}
       </div>
 
       {/* FR-14/AC-18 hard failure — driven directly by the polled `notApplied`
@@ -256,16 +279,15 @@ export function RefinementPanel({
       )}
 
       {conflictCard && (
-        <div className="mb-3 rounded-xl border border-amber-300 dark:border-amber-700/50 bg-amber-50 dark:bg-amber-900/20 p-3 animate-fade-in">
+        <div className={`${NOTICE} mb-4 animate-fade-in bg-status-scheduled/10 text-status-scheduled`}>
           <div className="flex items-start gap-2">
-            <AlertTriangle size={16} className="text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
-            <div className="flex-1">
-              <p className="text-sm font-medium text-amber-800 dark:text-amber-300">
-                This change conflicts with the brand kit
-              </p>
-              <p className="text-xs text-amber-700 dark:text-amber-400/90 mt-1">{conflictCard.explanation}</p>
-              <div className="flex gap-2 mt-3">
+            <AlertTriangle {...ICON} className="mt-0.5 flex-shrink-0" aria-hidden />
+            <div className="min-w-0 flex-1">
+              <p className="font-semibold">This change conflicts with the brand kit</p>
+              <p className="mt-1 text-ui-xs text-fg">{conflictCard.explanation}</p>
+              <div className="mt-3 flex flex-wrap gap-2">
                 <Button
+                  variant="secondary"
                   size="sm"
                   onClick={() => send(conflictCard.instruction, conflictCard.conflictId)}
                   disabled={busy}
@@ -281,21 +303,26 @@ export function RefinementPanel({
         </div>
       )}
 
-      <div className="flex flex-wrap gap-1.5 mb-3">
+      {/* Suggestions (§8.14): text buttons with a dotted underline. */}
+      <div className="mb-3.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-ui-sm">
+        <span className="text-fg-muted">Try:</span>
         {SUGGESTIONS.map((s) => (
           <button
             key={s}
+            type="button"
             onClick={() => setInput(s)}
             disabled={busy}
-            className="text-xs px-2.5 py-1 rounded-lg bg-primary/5 dark:bg-primary-light/5 text-primary dark:text-primary-light hover:bg-primary/10 dark:hover:bg-primary-light/10 transition-colors disabled:opacity-50"
+            className={`border-b border-dotted border-line text-fg transition-colors duration-fast ease-standard enabled:hover:border-fg disabled:cursor-not-allowed disabled:opacity-50 ${FOCUS}`}
           >
             {s}
           </button>
         ))}
       </div>
 
+      {/* The prompt (§8.3, §8.14): a display-italic field with the ink Send
+          button attached; the wrapper shows the focus outline. */}
       <form
-        className="flex gap-2"
+        className="flex rounded-ui-sm border border-line bg-surface-raised focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-focus"
         onSubmit={(e) => {
           e.preventDefault()
           if (!busy) send(input)
@@ -306,16 +333,21 @@ export function RefinementPanel({
           onChange={(e) => setInput(e.target.value)}
           disabled={busy}
           placeholder="e.g. Make the logo larger…"
-          className="glass-input rounded-xl px-3 py-2 text-sm flex-1 text-light-text dark:text-dark-text"
+          className="min-w-0 flex-1 bg-transparent px-3.5 py-2.5 font-display text-ui-base italic text-fg [font-variation-settings:'opsz'_24] placeholder:text-fg-muted focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
         />
-        <Button type="submit" size="sm" disabled={busy || !input.trim()}>
+        <button
+          type="submit"
+          disabled={busy || !input.trim()}
+          className="inline-flex flex-shrink-0 items-center gap-2 whitespace-nowrap border-l border-line bg-fg px-4 font-text text-ui-sm font-semibold text-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          Send
           {running || pendingAction === 'REFINE' ? (
-            <Loader2 size={14} className="animate-spin" />
+            <Loader2 {...ICON} className="animate-spin" aria-hidden />
           ) : (
-            <Send size={14} />
+            <SendIcon {...ICON} aria-hidden />
           )}
-        </Button>
+        </button>
       </form>
-    </GlassPanel>
+    </section>
   )
 }

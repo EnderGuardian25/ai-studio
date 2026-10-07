@@ -86,7 +86,12 @@ async function expectOpaque(locator: Locator, what: string) {
 let cached: { id: string; topic: string } | null = null
 async function exportedDraft(api: ApiClient): Promise<{ id: string; topic: string }> {
   if (cached) return cached
-  const topic = `surfaces-${Date.now()}`
+  cached = await mintExportedDraft(api, `surfaces-${Date.now()}`)
+  return cached
+}
+
+// A fresh EXPORTED Path B draft, for a case that changes it (T9).
+async function mintExportedDraft(api: ApiClient, topic: string): Promise<{ id: string; topic: string }> {
   const kit = await (
     await api.post('/api/admin/brandkits', { name: `Surfaces Kit ${topic}`, colors: ['#8c4812'] })
   ).json()
@@ -109,8 +114,7 @@ async function exportedDraft(api: ApiClient): Promise<{ id: string; topic: strin
   const { draftId } = await res.json()
   const draft = await waitForDraft(api, draftId)
   expect(draft.status).toBe('EXPORTED')
-  cached = { id: draftId, topic }
-  return cached
+  return { id: draftId, topic }
 }
 
 // Make the campaign create fail, so each submit toasts its error without
@@ -642,6 +646,122 @@ test.describe('Brief wizard (T8)', () => {
     // The stepper jumps back to a done step (its label is sr-only below sm).
     await page.getByRole('button', { name: 'Campaign', exact: true }).click()
     await expect(page.getByRole('heading', { name: 'Select Campaign' })).toBeVisible()
+  })
+})
+
+// ── Draft review (T9: AC-12, AC-17, FR-12) ───────────────────────────────────
+
+test.describe('Draft review (T9)', () => {
+  let api: ApiClient
+  test.beforeEach(async ({ request }) => {
+    api = await loginAs(request, ADMIN_EMAIL, ADMIN_PASSWORD)
+  })
+  test.afterEach(async () => {
+    await api.dispose()
+  })
+
+  test('AC-17: the draft page shows a visible focus indicator on its first three stops', async ({ page }) => {
+    test.skip(!MOCKED(), 'needs MOCK_AI + MOCK_PUPPETEER to mint a draft')
+    const draft = await exportedDraft(api)
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await pageLogin(page)
+    await page.goto(`/drafts/${draft.id}`)
+    await expect(page.getByRole('heading', { name: draft.topic, level: 1 })).toBeVisible({ timeout: 20_000 })
+    // The back link, the post (opens the lightbox), then the action bar. The
+    // one version is the current one, so it is not a button.
+    expect(await tabThreeFromMain(page)).toEqual(['Library', 'View full screen', 'Regenerate design'])
+  })
+
+  test('AC-12 + FR-12: at 375px every control is there, with refine, versions and the inline editor open', async ({ page }) => {
+    test.skip(!MOCKED(), 'needs MOCK_AI + MOCK_PUPPETEER to mint and refine a draft')
+    const draft = await mintExportedDraft(api, `surfaces-t9-${Date.now()}`)
+    await page.setViewportSize({ width: 375, height: 812 })
+    await pageLogin(page)
+    await page.goto(`/drafts/${draft.id}`)
+    const fullScreen = page.getByRole('button', { name: 'View full screen', exact: true })
+    await expect(fullScreen).toBeVisible({ timeout: 20_000 })
+    await expectNoHorizontalScroll(page, 'draft page at 375px')
+
+    // FR-12: every control the page had, by role and name.
+    await expect(page.getByRole('link', { name: 'Library' }).first()).toBeVisible()
+    const regenDesign = page.getByRole('button', { name: 'Regenerate design' })
+    for (const name of ['Regenerate design', 'Edit inline', 'Re-export', 'Regenerate']) {
+      await expect(page.getByRole('button', { name, exact: true })).toBeVisible()
+    }
+    await expect(page.getByRole('button', { name: /^publish$/i })).toBeVisible()
+    await expect(page.getByPlaceholder('Post copy…')).toBeVisible()
+    for (const name of ['Make the background darker', 'Move the headline to top', 'Increase font size']) {
+      await expect(page.getByRole('button', { name, exact: true })).toBeVisible()
+    }
+    const ask = page.getByPlaceholder('e.g. Make the logo larger…')
+    await expect(ask).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Send' })).toBeDisabled()
+
+    // A refine: the log gains an applied row, and v1 becomes a switchable frame.
+    await ask.fill('Make the background darker')
+    await ask.press('Enter')
+    const log = page.getByRole('region', { name: 'Refine requests' })
+    await expect(log.getByText('Applied', { exact: true })).toBeVisible({ timeout: 20_000 })
+    await expect(page.getByRole('button', { name: 'Switch to v1' })).toBeVisible({ timeout: 20_000 })
+    await expectNoHorizontalScroll(page, 'draft page with the refine log at 375px')
+
+    // Regenerate design: its Undo now sits beside the versions.
+    await regenDesign.click()
+    await expect(page.getByRole('button', { name: 'Undo', exact: true })).toBeVisible()
+    await expect(regenDesign).toBeEnabled({ timeout: 20_000 })
+    await expect(page.getByRole('button', { name: 'Switch to v2' })).toBeVisible({ timeout: 20_000 })
+    await expectNoHorizontalScroll(page, 'draft page with versions and Undo at 375px')
+
+    // Version switching still works from the contact sheet.
+    await page.getByRole('button', { name: 'Switch to v1' }).click()
+    await expect(page.locator('[aria-current="true"]')).toContainText('v1', { timeout: 20_000 })
+
+    // The inline editor, in both modes.
+    await page.getByRole('button', { name: 'Edit inline' }).click()
+    const dialog = page.getByRole('dialog', { name: 'Edit inline' })
+    await expect(dialog.locator('[data-editor-ready="true"]')).toBeAttached({ timeout: 20_000 })
+    await expectNoHorizontalScroll(page, 'inline editor at 375px')
+    await dialog.getByRole('tab', { name: 'Single element' }).click()
+    await expect(dialog.getByRole('button', { name: 'Select the whole design' })).toBeVisible()
+    await expectNoHorizontalScroll(page, 'inline editor, single element, at 375px')
+    await page.keyboard.press('Escape')
+    await expect(dialog).toBeHidden()
+  })
+
+  test('the post on the proof plate is shown as rendered: no filter, transform, rounding or crop', async ({ page }) => {
+    test.skip(!MOCKED(), 'needs MOCK_AI + MOCK_PUPPETEER to mint a draft')
+    const draft = await exportedDraft(api)
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await pageLogin(page)
+    await page.goto(`/drafts/${draft.id}`)
+    const img = page.locator(`img[alt="${draft.topic}"]`)
+    await expect(img).toBeVisible({ timeout: 20_000 })
+    await img.hover()
+    const read = () =>
+      img.evaluate((el) => {
+        const cs = getComputedStyle(el)
+        const frame = getComputedStyle(el.parentElement as HTMLElement)
+        return {
+          filter: cs.filter,
+          transform: cs.transform,
+          opacity: cs.opacity,
+          mixBlend: cs.mixBlendMode,
+          radius: cs.borderRadius,
+          fit: cs.objectFit,
+          frameRadius: frame.borderRadius,
+          frameFilter: frame.filter,
+        }
+      })
+    await expect.poll(read).toEqual({
+      filter: 'none',
+      transform: 'none',
+      opacity: '1',
+      mixBlend: 'normal',
+      radius: '0px',
+      fit: 'contain',
+      frameRadius: '0px',
+      frameFilter: 'none',
+    })
   })
 })
 
