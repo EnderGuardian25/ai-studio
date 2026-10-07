@@ -536,6 +536,115 @@ test.describe('Dashboard and library (T7)', () => {
   })
 })
 
+// ── Brief wizard (T8: AC-12, AC-17, FR-12) ───────────────────────────────────
+
+// A 1×1 PNG for the Images step's upload row.
+const ONE_PX_PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg==',
+  'base64',
+)
+
+async function briefDraftIds(api: ApiClient): Promise<string[]> {
+  const body = await (await api.get('/api/brief-drafts')).json()
+  return (body.drafts ?? []).map((d: { id: string }) => d.id)
+}
+
+test.describe('Brief wizard (T8)', () => {
+  let api: ApiClient
+  let before: Set<string>
+  test.beforeEach(async ({ request }) => {
+    api = await loginAs(request, ADMIN_EMAIL, ADMIN_PASSWORD)
+    before = new Set(await briefDraftIds(api))
+  })
+  // The walk below autosaves an unfinished brief; discard it, so the per-user
+  // brief-draft cap that §P tests never sees this suite's rows.
+  test.afterEach(async () => {
+    for (const id of await briefDraftIds(api)) {
+      if (!before.has(id)) await api.del(`/api/brief-drafts/${id}`)
+    }
+    await api.dispose()
+  })
+
+  test('AC-17: the wizard shows a visible focus indicator on its first three stops', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await pageLogin(page)
+    await page.goto('/brief')
+    await expect(page.getByRole('heading', { name: 'New Brief', level: 1 })).toBeVisible()
+    // The stepper's first three steps (numeral + label); the current one is announced.
+    expect(await tabThreeFromMain(page)).toEqual(['1Campaign', '2Size & Design', '3Content'])
+    await expect(page.locator('[aria-current="step"]')).toHaveCount(1)
+    await expect(page.locator('[aria-current="step"]')).toHaveText(/Campaign/)
+  })
+
+  test('AC-12 + FR-12: every step at 375px keeps its controls and never scrolls sideways', async ({ page }) => {
+    test.skip(!MOCKED(), 'needs MOCK_AI for the Enhance with AI before/after')
+    await page.setViewportSize({ width: 375, height: 812 })
+    await pageLogin(page)
+    await page.goto('/brief')
+    const cont = page.getByRole('button', { name: /continue/i })
+
+    // Step 1 — Campaign
+    await expect(page.getByRole('heading', { name: 'Select Campaign' })).toBeVisible()
+    await expect(page.getByRole('button', { name: /No campaign \(Uncategorized\)/ })).toHaveAttribute('aria-pressed', 'true')
+    await expect(page.getByRole('button', { name: 'Back' })).toBeDisabled()
+    await expectNoHorizontalScroll(page, 'brief: campaign step at 375px')
+    await cont.click()
+
+    // Step 2 — Size & Design, the template picker, then Path B's reference picker
+    await expect(page.getByRole('heading', { name: 'Size & Design' })).toBeVisible()
+    for (const name of [/^1:1/, /^4:5/, /^9:16/, /Path A — Template/, /Path B — Freeform/]) {
+      await expect(page.getByRole('button', { name })).toBeVisible()
+    }
+    const kit = page.getByRole('combobox')
+    if ((await kit.inputValue()) === '') {
+      const values = await kit.locator('option').evaluateAll((os) => (os as HTMLOptionElement[]).map((o) => o.value).filter(Boolean))
+      await kit.selectOption(values[0])
+    }
+    await expect(page.getByText('Template', { exact: true })).toBeVisible()
+    await expectNoHorizontalScroll(page, 'brief: size & design (Path A) at 375px')
+    await page.getByRole('button', { name: /Path B — Freeform/ }).click()
+    await expect(page.getByRole('button', { name: 'No reference' })).toHaveAttribute('aria-pressed', 'true')
+    await expectNoHorizontalScroll(page, 'brief: size & design (Path B) at 375px')
+    await cont.click()
+
+    // Step 3 — Content, with the Enhance with AI before/after
+    await expect(page.getByRole('heading', { name: 'Brief & Copy Direction' })).toBeVisible()
+    await page.getByPlaceholder('e.g. Q3 product launch').fill(`T8 wizard ${Date.now()}`)
+    await page.locator('textarea').fill('Announce the restyled brief wizard with a short call to action.')
+    await expect(page.getByRole('combobox', { name: 'Goal' })).toBeVisible()
+    await expect(page.getByRole('combobox', { name: 'Tone' })).toBeVisible()
+    await page.getByRole('button', { name: 'Enhance with AI' }).click()
+    await expect(page.getByRole('region', { name: 'AI suggestion' })).toBeVisible({ timeout: 30_000 })
+    await expect(page.getByRole('region', { name: 'Before' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Accept suggestion' })).toBeVisible()
+    await expectNoHorizontalScroll(page, 'brief: content step (Enhance before/after) at 375px')
+    await page.getByRole('button', { name: 'Discard', exact: true }).click()
+    await expect(page.locator('textarea')).toBeVisible()
+    await cont.click()
+
+    // Step 4 — Images, with one uploaded row
+    await expect(page.getByRole('heading', { name: /Images/ })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Add image' })).toBeVisible()
+    await page.locator('input[type=file]').setInputFiles({ name: 't8-1px.png', mimeType: 'image/png', buffer: ONE_PX_PNG })
+    await expect(page.getByRole('button', { name: 'Remove image' })).toBeVisible({ timeout: 20_000 })
+    await page.getByRole('button', { name: 'Embed' }).click()
+    await expect(page.getByRole('button', { name: 'Style ref' })).toBeVisible()
+    await expectNoHorizontalScroll(page, 'brief: images step at 375px')
+    await cont.click()
+
+    // Step 5 — Review
+    await expect(page.getByRole('heading', { name: 'Review & Generate' })).toBeVisible()
+    await expect(page.getByRole('term')).toHaveCount(10)
+    await expect(page.getByRole('definition').filter({ hasText: '1 image (0 embed, 1 reference)' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Generate Post' })).toBeVisible()
+    await expectNoHorizontalScroll(page, 'brief: review step at 375px')
+
+    // The stepper jumps back to a done step (its label is sr-only below sm).
+    await page.getByRole('button', { name: 'Campaign', exact: true }).click()
+    await expect(page.getByRole('heading', { name: 'Select Campaign' })).toBeVisible()
+  })
+})
+
 // ── AC-18 / NFR-03: reduced motion ───────────────────────────────────────────
 
 // Computed animation-duration in ms (the first of a comma list).

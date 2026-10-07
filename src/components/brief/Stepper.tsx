@@ -3,8 +3,15 @@
 import React from 'react'
 import { Check } from 'lucide-react'
 import { STEPS } from './constants'
+import { FOCUS } from './cardCls'
 
 // ─── Stepper ─────────────────────────────────────────────────────────────────
+// Folio (DESIGN_SYSTEM.md §5.2, §6): one ruled column per step. The rule on top
+// is --accent for the current step, --fg for a done one and --line-subtle ahead;
+// beneath it the numeral (a check once done) and the label in small caps. The
+// state is never colour alone: the current step carries aria-current="step",
+// a done step its check. Below sm the label is sr-only, not removed, so a done
+// step (whose numeral became a check) still has a name.
 
 interface StepperProps {
   step: number
@@ -13,47 +20,42 @@ interface StepperProps {
 
 export function Stepper({ step, onJump }: StepperProps) {
   return (
-    <div className="flex items-center gap-1 mb-8">
+    <ol className="grid grid-cols-5 gap-2 mb-10">
       {STEPS.map((label, i) => {
         const done = i < step
         const active = i === step
         return (
-          <React.Fragment key={label}>
+          <li key={label} className="min-w-0">
             <button
               type="button"
               onClick={() => done && onJump(i)}
+              aria-current={active ? 'step' : undefined}
               className={[
-                'flex items-center gap-1.5 text-xs font-semibold transition-colors',
+                'w-full text-left border-t-2 pt-2.5 pb-1 font-text',
+                'transition-colors duration-fast ease-standard',
+                FOCUS,
                 active
-                  ? 'text-primary dark:text-primary-light'
+                  ? 'border-accent text-fg'
                   : done
-                    ? 'text-primary/70 dark:text-primary-light/70 cursor-pointer'
-                    : 'text-light-text-muted dark:text-dark-text-muted',
+                    ? 'border-fg text-fg cursor-pointer hover:text-accent'
+                    : 'border-line-subtle text-fg-muted cursor-default',
               ].join(' ')}
             >
               <span
                 className={[
-                  'w-5 h-5 rounded-full flex items-center justify-center text-[0.6rem] flex-shrink-0 border',
-                  active || done
-                    ? 'bg-primary/15 dark:bg-primary-light/20 text-primary dark:text-primary-light border-primary/30 dark:border-primary-light/30'
-                    : 'bg-white/30 dark:bg-white/5 text-light-text-muted dark:text-dark-text-muted border-white/40 dark:border-white/10',
+                  'flex h-5 items-center font-display italic text-ui-base leading-none',
+                  active ? 'text-accent' : '',
                 ].join(' ')}
               >
-                {done ? <Check size={11} /> : i + 1}
+                {done ? <Check size={15} strokeWidth={2} aria-hidden className="text-accent" /> : i + 1}
               </span>
-              <span className="hidden sm:inline">{label}</span>
+              <span className="sr-only sm:not-sr-only sm:block mt-1.5 text-ui-2xs font-semibold uppercase tracking-[0.14em] leading-snug">
+                {label}
+              </span>
             </button>
-            {i < STEPS.length - 1 && (
-              <div
-                className={[
-                  'flex-1 h-px mx-1',
-                  done ? 'bg-primary/30 dark:bg-primary-light/30' : 'bg-white/30 dark:bg-white/10',
-                ].join(' ')}
-              />
-            )}
-          </React.Fragment>
+          </li>
         )
       })}
-    </div>
+    </ol>
   )
 }

@@ -141,7 +141,7 @@ There are 13 tasks in 7 waves. All the work lands on `v2`.
     - **Post thumbnails are never token-styled.**
     - **`PublishDialog` is shared with 010.** Keep its props stable.
 
-- [ ] `T8` — Restyle the brief wizard
+- [x] `T8` — Restyle the brief wizard
   - Files: `src/app/(app)/brief/page.tsx`, `src/components/brief/*`
   - Estimate: medium
   - Kind: impl

@@ -6,8 +6,16 @@ import { Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Select } from '@/components/ui/Select'
 import { apiFetch } from '@/lib/apiFetch'
+import { fieldClasses, fieldEdge } from '@/components/ui/Input'
+import { cn } from '@/lib/utils'
 import { FieldLabel } from './FieldLabel'
+import { StepHead } from './StepHead'
+import { SMALL_CAPS } from './cardCls'
 import { GOAL_OPTIONS, TONE_OPTIONS } from './constants'
+
+// The scroll containers' focus ring is inset, so their own overflow can't clip it.
+const SCROLL_FOCUS =
+  'focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus'
 
 // ─── Step 2 — Content ────────────────────────────────────────────────────────
 
@@ -55,10 +63,9 @@ export function ContentStep({ topic, setTopic, prompt, setPrompt, goal, setGoal,
 
   return (
     <div>
-      <h2 className="text-base font-bold text-light-text dark:text-dark-text mb-1">Brief &amp; Copy Direction</h2>
-      <p className="text-sm text-light-text-muted dark:text-dark-text-muted mb-6">
+      <StepHead index={2} title={<>Brief &amp; Copy Direction</>}>
         Give the post a short topic, tell Claude what it&apos;s about, then pick a goal and tone.
-      </p>
+      </StepHead>
 
       <FieldLabel>Topic</FieldLabel>
       <input
@@ -68,30 +75,41 @@ export function ContentStep({ topic, setTopic, prompt, setPrompt, goal, setGoal,
         placeholder="e.g. Q3 product launch"
         maxLength={120}
         autoFocus
-        className="glass-input w-full rounded-xl px-4 py-3 text-sm text-light-text dark:text-dark-text placeholder:text-light-text-muted dark:placeholder:text-dark-text-muted focus:outline-none"
+        className={cn(fieldClasses, fieldEdge())}
       />
-      <div className="mt-1.5 mb-4 text-xs text-light-text-muted dark:text-dark-text-muted">
+      <div className="mt-2 mb-6 text-ui-xs text-fg-muted">
         A short title — it names this post in the library.
       </div>
 
       <FieldLabel>Brief</FieldLabel>
       {enhanceResult ? (
-        <div className="space-y-3 mb-5">
+        <div className="space-y-4 mb-6">
           {enhanceResult.original.trim() && (
             <div>
-              <p className="text-xs font-medium text-light-text-muted dark:text-dark-text-muted mb-1">Before</p>
-              <div className="glass-input rounded-xl p-3 text-sm text-light-text-muted dark:text-dark-text-muted whitespace-pre-wrap leading-relaxed max-h-40 overflow-y-auto">
+              <p className={`${SMALL_CAPS} mb-1.5`}>Before</p>
+              {/* A scroll container: focusable and labelled so the keyboard can scroll it. */}
+              <div
+                tabIndex={0}
+                role="region"
+                aria-label="Before"
+                className={`surface px-4 py-3 text-ui-sm text-fg-muted whitespace-pre-wrap leading-relaxed max-h-40 overflow-y-auto ${SCROLL_FOCUS}`}
+              >
                 {enhanceResult.original}
               </div>
             </div>
           )}
           <div>
-            <p className="text-xs font-medium text-primary dark:text-primary-light mb-1">AI suggestion</p>
-            <div className="glass-input rounded-xl p-3 text-sm text-light-text dark:text-dark-text whitespace-pre-wrap leading-relaxed max-h-64 overflow-y-auto">
+            <p className="text-ui-2xs font-semibold uppercase tracking-[0.14em] text-accent mb-1.5">AI suggestion</p>
+            <div
+              tabIndex={0}
+              role="region"
+              aria-label="AI suggestion"
+              className={`rounded-ui-sm border border-fg bg-surface-raised px-4 py-3 text-ui-sm text-fg whitespace-pre-wrap leading-relaxed max-h-64 overflow-y-auto ${SCROLL_FOCUS}`}
+            >
               {enhanceResult.draft}
             </div>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button size="sm" onClick={() => { setPrompt(enhanceResult.draft); setEnhanceResult(null) }}>
               Accept suggestion
             </Button>
@@ -107,22 +125,22 @@ export function ContentStep({ topic, setTopic, prompt, setPrompt, goal, setGoal,
             onChange={e => setPrompt(e.target.value)}
             placeholder="e.g. Announce our Q3 product launch with excitement. Highlight that it saves the marketing team hours on post creation. Include a CTA to try it."
             rows={6}
-            className="glass-input w-full rounded-xl px-4 py-3 text-sm text-light-text dark:text-dark-text placeholder:text-light-text-muted dark:placeholder:text-dark-text-muted resize-none focus:outline-none"
+            className={cn(fieldClasses, fieldEdge(), 'resize-none leading-relaxed')}
           />
-          <div className="mt-1.5 flex items-start justify-between gap-3">
+          <div className="mt-2 flex items-start justify-between gap-3">
             <Button
               variant="secondary"
               size="sm"
               onClick={enhance}
               disabled={enhancing || (!topic.trim() && !prompt.trim())}
             >
-              <Sparkles size={13} /> {enhancing ? 'Enhancing…' : 'Enhance with AI'}
+              <Sparkles size={15} strokeWidth={1.4} /> {enhancing ? 'Enhancing…' : 'Enhance with AI'}
             </Button>
-            <div className="text-right text-xs text-light-text-muted dark:text-dark-text-muted pt-1">
+            <div className="text-right text-ui-xs text-fg-muted pt-1.5">
               {prompt.length} chars{prompt.trim().length > 0 && prompt.trim().length <= 10 ? ' — add a little more detail' : ''}
             </div>
           </div>
-          <div className="mt-1.5 mb-5 text-xs text-light-text-muted dark:text-dark-text-muted">
+          <div className="mt-2 mb-6 text-ui-xs text-fg-muted">
             {enhancing
               ? 'Rewriting with the brand voice and campaign context — this can take up to a minute.'
               : 'Rewrites the brief with AI, grounded in the brand voice and campaign briefing. Works from just the topic too.'}
@@ -130,7 +148,7 @@ export function ContentStep({ topic, setTopic, prompt, setPrompt, goal, setGoal,
         </>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-6 border-t border-line-subtle">
         <Select label="Goal" options={GOAL_OPTIONS} value={goal} onChange={e => setGoal(e.target.value)} />
         <Select label="Tone" options={TONE_OPTIONS} value={tone} onChange={e => setTone(e.target.value)} />
       </div>

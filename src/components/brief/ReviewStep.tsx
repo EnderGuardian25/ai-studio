@@ -6,7 +6,9 @@ import type { AspectRatio } from '@prisma/client'
 import { ASPECT_LABELS, dimensionsLabel } from '@/lib/aspectRatio'
 import type { Campaign, TemplateSummary, BrandKitSummary } from '@/lib/api-types'
 import type { DesignMode, UploadedImage } from './types'
-import { ReviewRow } from './ReviewRow'
+import { ReviewRow, type ReviewRowProps } from './ReviewRow'
+import { NOTICE } from './cardCls'
+import { StepHead } from './StepHead'
 
 // ─── Step 4 — Review ─────────────────────────────────────────────────────────
 
@@ -45,61 +47,64 @@ export function ReviewStep({
   error,
   submitting,
 }: ReviewStepProps) {
+  // The summary is a plain list of rows: a new field (008's model selection,
+  // for one) is one more entry, in the order it should read.
+  const rows: ReviewRowProps[] = [
+    { label: 'Topic', value: topic || '—' },
+    { label: 'Campaign', value: selectedCampaign?.name ?? 'Uncategorized' },
+    { label: 'Brand kit', value: selectedBrandKit?.name ?? '—' },
+    { label: 'Size', value: `${ASPECT_LABELS[aspectRatio]} · ${dimensionsLabel(aspectRatio)} px` },
+    { label: 'Path', value: `Path ${designMode === 'TEMPLATE' ? 'A — Template fill' : 'B — Freeform design'}` },
+    {
+      label: 'Template',
+      value:
+        designMode === 'TEMPLATE'
+          ? selectedTemplate?.name ?? 'None'
+          : selectedRefTemplate
+            ? `Style ref: ${selectedRefTemplate.name}`
+            : 'None',
+    },
+    { label: 'Goal', value: goal, capitalize: true },
+    { label: 'Tone', value: tone, capitalize: true },
+    {
+      label: 'Images',
+      value:
+        images.length > 0
+          ? `${images.length} image${images.length > 1 ? 's' : ''} (${images.filter(i => i.intent === 'embed').length} embed, ${images.filter(i => i.intent === 'reference').length} reference)`
+          : 'None',
+    },
+    { label: 'Prompt', value: prompt || '—' },
+  ]
+
   return (
     <div>
-      <h2 className="text-base font-bold text-light-text dark:text-dark-text mb-1">Review &amp; Generate</h2>
-      <p className="text-sm text-light-text-muted dark:text-dark-text-muted mb-5">
+      <StepHead index={4} title={<>Review &amp; Generate</>}>
         Check your brief before sending it to Claude.
-      </p>
+      </StepHead>
 
-      <div className="space-y-0">
-        <ReviewRow label="Topic" value={topic || '—'} />
-        <ReviewRow label="Campaign" value={selectedCampaign?.name ?? 'Uncategorized'} />
-        <ReviewRow label="Brand kit" value={selectedBrandKit?.name ?? '—'} />
-        <ReviewRow label="Size" value={`${ASPECT_LABELS[aspectRatio]} · ${dimensionsLabel(aspectRatio)} px`} />
-        <ReviewRow label="Path" value={`Path ${designMode === 'TEMPLATE' ? 'A — Template fill' : 'B — Freeform design'}`} />
-        <ReviewRow
-          label="Template"
-          value={
-            designMode === 'TEMPLATE'
-              ? selectedTemplate?.name ?? 'None'
-              : selectedRefTemplate
-                ? `Style ref: ${selectedRefTemplate.name}`
-                : 'None'
-          }
-        />
-        <ReviewRow label="Goal" value={goal} capitalize />
-        <ReviewRow label="Tone" value={tone} capitalize />
-        <ReviewRow
-          label="Images"
-          value={
-            images.length > 0
-              ? `${images.length} image${images.length > 1 ? 's' : ''} (${images.filter(i => i.intent === 'embed').length} embed, ${images.filter(i => i.intent === 'reference').length} reference)`
-              : 'None'
-          }
-        />
-        <div className="flex items-start gap-4 py-2.5">
-          <span className="text-xs font-bold tracking-wider uppercase text-light-text-muted dark:text-dark-text-muted w-24 flex-shrink-0 pt-0.5">Prompt</span>
-          <span className="text-sm text-light-text dark:text-dark-text leading-relaxed">{prompt || '—'}</span>
-        </div>
-      </div>
+      {/* Ruled rows, opened by the 2 px --fg rule (DESIGN_SYSTEM.md §8.15) */}
+      <dl className="border-t-2 border-fg">
+        {rows.map(row => (
+          <ReviewRow key={row.label} {...row} />
+        ))}
+      </dl>
 
       {providersLoaded && !copyProviderReady && (
-        <div className="mt-4 rounded-xl px-4 py-3 text-sm text-amber-700 dark:text-amber-300 bg-amber-500/10 border border-amber-500/20">
+        <div className={`${NOTICE} mt-6 bg-status-scheduled/10 text-status-scheduled`}>
           No copy provider is configured, and the server is not in CLI mode. An admin must add a
           COPY provider in AI Providers before generating.
         </div>
       )}
 
       {error && (
-        <div className="mt-4 rounded-xl px-4 py-3 text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700/40">
+        <div className={`${NOTICE} mt-6 bg-status-failed/10 text-status-failed`}>
           {error}
         </div>
       )}
 
       {submitting && (
-        <div className="mt-4 rounded-xl px-4 py-3 text-sm text-primary dark:text-primary-light bg-primary/8 dark:bg-primary-light/10 border border-primary/20 dark:border-primary-light/20 flex items-center gap-2">
-          <Loader2 size={15} className="animate-spin" /> Generating your post — this can take up to a minute…
+        <div className={`${NOTICE} mt-6 bg-status-exported/10 text-status-exported flex items-center gap-2`}>
+          <Loader2 size={15} strokeWidth={1.4} className="animate-spin" /> Generating your post — this can take up to a minute…
         </div>
       )}
     </div>
