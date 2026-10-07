@@ -117,7 +117,7 @@ There are 13 tasks in 7 waves. All the work lands on `v2`.
 
 ### Wave 5 — App shell and the first screens
 
-- [ ] `T6` — App shell restyle, plus login and choose-team
+- [x] `T6` — App shell restyle, plus login and choose-team
   - Files: `src/components/layout/AppShell.tsx`, `src/components/layout/TeamSwitcher.tsx`, `src/components/layout/CreatePostButton.tsx`, `src/components/theme/ThemeToggle.tsx`, `src/components/Logo.tsx`, `public/BistecStudioLogo.png` (deleted), `src/app/(auth)/login/page.tsx`, `src/app/(app)/choose-team/page.tsx`, `tests/e2e/surfaces.test.ts`
   - Estimate: medium
   - Kind: impl

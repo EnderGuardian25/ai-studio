@@ -3,11 +3,10 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useQueryClient } from '@tanstack/react-query'
-import { Users } from 'lucide-react'
+import { ArrowRight } from 'lucide-react'
 import { toast } from 'sonner'
 import { apiFetch } from '@/lib/apiFetch'
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser'
-import { GlassPanel } from '@/components/ui/GlassPanel'
 import { cn } from '@/lib/utils'
 
 // Reached when /api/me reports teamChoiceRequired (AppShell redirects here).
@@ -44,48 +43,53 @@ export default function ChooseTeamPage() {
     }
   }
 
+  // Folio (DESIGN_SYSTEM.md §6): a display title and a muted line, then the
+  // teams as ruled rows under a 2 px --fg rule, not cards. Each row is a
+  // button named by its team (plus "Switching…" while it is picked).
   return (
-    <div className="min-h-[60vh] flex items-center justify-center">
-      <GlassPanel className="w-full max-w-md p-8 space-y-6">
-        <div className="flex flex-col items-center text-center gap-2">
-          <div className="w-12 h-12 rounded-full bg-primary/10 dark:bg-primary-light/10 flex items-center justify-center">
-            <Users size={22} className="text-primary dark:text-primary-light" />
-          </div>
-          <h1 className="text-lg font-semibold text-light-text dark:text-dark-text">Choose a team</h1>
-          <p className="text-sm text-light-text-muted dark:text-dark-text-muted">
-            Pick which team you want to work in. You can switch again later from the sidebar.
-          </p>
-        </div>
+    <div className="mx-auto w-full max-w-md py-6 md:py-12 font-text text-fg">
+      <h1 className="font-display font-normal text-ui-xl md:text-ui-2xl leading-[1.04] tracking-[-0.025em] [font-variation-settings:'opsz'_144]">
+        Choose a team
+      </h1>
+      <p className="mt-3 text-ui-base text-fg-muted">
+        Pick which team you want to work in. You can switch again later from the sidebar.
+      </p>
 
-        {teams.length === 0 ? (
-          <p className="text-sm text-light-text-muted dark:text-dark-text-muted text-center py-4">
-            You aren&apos;t a member of any team yet — ask a super admin to add you to one.
-          </p>
-        ) : (
-          <div className="flex flex-col gap-2">
-            {teams.map(team => (
+      {teams.length === 0 ? (
+        <p className="mt-8 pt-6 border-t-2 border-fg text-ui-sm text-fg-muted">
+          You aren&apos;t a member of any team yet — ask a super admin to add you to one.
+        </p>
+      ) : (
+        <ul className="mt-8 border-t-2 border-fg">
+          {teams.map(team => (
+            <li key={team.id} className="border-b border-line-subtle">
               <button
-                key={team.id}
+                type="button"
                 onClick={() => pick(team.id)}
                 disabled={pickingId !== null}
                 className={cn(
-                  'flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-left',
-                  'border border-light-text/10 dark:border-white/10',
-                  'text-light-text dark:text-dark-text',
-                  'hover:bg-primary/5 dark:hover:bg-primary-light/5 transition-all duration-150',
+                  'group flex w-full items-center gap-3 px-1 py-3.5 text-left',
+                  'transition-colors duration-fast ease-standard hover:bg-surface',
+                  'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus',
                   'disabled:opacity-50 disabled:cursor-not-allowed',
                 )}
               >
-                <Users size={18} className="flex-shrink-0 text-light-text-muted dark:text-dark-text-muted" />
-                <span className="truncate flex-1">{team.name}</span>
-                {pickingId === team.id && (
-                  <span className="text-xs text-light-text-muted dark:text-dark-text-muted">Switching…</span>
+                <span className="truncate flex-1 font-display text-ui-lg font-medium">{team.name}</span>
+                {pickingId === team.id ? (
+                  <span className="text-ui-xs text-fg-muted">Switching…</span>
+                ) : (
+                  <ArrowRight
+                    size={15}
+                    strokeWidth={1.4}
+                    aria-hidden="true"
+                    className="flex-shrink-0 text-fg-muted group-hover:text-fg"
+                  />
                 )}
               </button>
-            ))}
-          </div>
-        )}
-      </GlassPanel>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   )
 }

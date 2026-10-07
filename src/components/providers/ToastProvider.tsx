@@ -15,11 +15,12 @@ export function ToastProvider() {
   return (
     <Toaster
       position="bottom-right"
-      // Lift the stack clear of the floating Create post button (56px tall,
-      // 24px from the bottom edge) with a 16px gap. Sonner goes full-width at
-      // <=600px, so the mobile offset needs the same bottom clearance.
-      offset={{ bottom: 96, right: 24 }}
-      mobileOffset={{ bottom: 96 }}
+      // Lift the stack clear of the floating Create post button (48px tall,
+      // 28px from the bottom edge) with a 16px gap (DESIGN_SYSTEM.md §8.9).
+      // Sonner goes full-width at <=600px, so the mobile offset needs the same
+      // bottom clearance.
+      offset={{ bottom: 92, right: 28 }}
+      mobileOffset={{ bottom: 92 }}
       closeButton
       style={{ '--width': '340px' } as React.CSSProperties}
       toastOptions={{

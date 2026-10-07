@@ -16,3 +16,7 @@
 {"ev":"stop","span":"W3","at":"2026-10-07T15:06:44Z","ts":1791385604,"status":"ok"}
 {"ev":"start","span":"W4","kind":"wave","label":"wave 4","at":"2026-10-07T15:07:28Z","ts":1791385648}
 {"ev":"start","span":"T5","kind":"task","label":"Rebuild ui primitives on tokens; opaque surfaces; surfaces E2E","parent":"W4","model":"opus","attempt":"1","at":"2026-10-07T15:07:28Z","ts":1791385648}
+{"ev":"stop","span":"T5","at":"2026-10-07T15:40:32Z","ts":1791387632,"status":"ok"}
+{"ev":"stop","span":"W4","at":"2026-10-07T15:40:32Z","ts":1791387632,"status":"ok"}
+{"ev":"start","span":"W5","kind":"wave","label":"wave 5","at":"2026-10-07T15:41:58Z","ts":1791387718}
+{"ev":"start","span":"T6","kind":"task","label":"App shell restyle, plus login and choose-team","parent":"W5","model":"opus","attempt":"1","at":"2026-10-07T15:41:58Z","ts":1791387718}

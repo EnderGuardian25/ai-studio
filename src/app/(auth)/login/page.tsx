@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { authClient } from "@/lib/auth-client"
-import { GlassPanel, GlassInput, Button } from "@/components/ui"
+import { Input, Button } from "@/components/ui"
 import { Logo } from "@/components/Logo"
 
 export default function LoginPage() {
@@ -34,15 +34,16 @@ export default function LoginPage() {
     router.refresh()
   }
 
+  // Folio (DESIGN_SYSTEM.md §2, §6): no box, structure from type and rules.
+  // The "Studio" wordmark at display size, a muted line, then a 2 px --fg rule
+  // opening the form.
   return (
-    <main className="min-h-screen flex items-center justify-center bg-light-background dark:bg-dark-background">
-      <GlassPanel className="w-full max-w-sm p-8 space-y-6">
-        <div className="flex flex-col items-center text-center">
-          <Logo height={48} />
-          <p className="text-sm text-light-text-muted dark:text-dark-text-muted mt-3">Sign in to continue</p>
-        </div>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <GlassInput
+    <main className="min-h-screen flex items-center justify-center bg-canvas text-fg font-text px-4 py-12">
+      <div className="w-full max-w-sm">
+        <Logo size="2xl" />
+        <p className="mt-3 text-ui-sm text-fg-muted">Sign in to continue</p>
+        <form onSubmit={handleSubmit} className="mt-8 pt-6 border-t-2 border-fg space-y-4">
+          <Input
             type="text"
             placeholder="Username"
             value={username}
@@ -50,7 +51,7 @@ export default function LoginPage() {
             required
             autoComplete="username"
           />
-          <GlassInput
+          <Input
             type="password"
             placeholder="Password"
             value={password}
@@ -59,13 +60,13 @@ export default function LoginPage() {
             autoComplete="current-password"
           />
           {error && (
-            <p className="text-sm text-red-400">{error}</p>
+            <p className="text-ui-sm text-status-failed">{error}</p>
           )}
           <Button type="submit" className="w-full" disabled={loading}>
             {loading ? "Signing in…" : "Sign in"}
           </Button>
         </form>
-      </GlassPanel>
+      </div>
     </main>
   )
 }

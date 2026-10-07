@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { useQueryClient } from '@tanstack/react-query'
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu'
-import { Check, ChevronsUpDown, Users } from 'lucide-react'
+import { Check, ChevronsUpDown } from 'lucide-react'
 import { toast } from 'sonner'
 import { apiFetch } from '@/lib/apiFetch'
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser'
@@ -15,7 +15,7 @@ import { cn } from '@/lib/utils'
 // Multi-team users (currently only super admins, who see every team) get a
 // Radix dropdown to switch the active-team cookie without leaving the page.
 export function TeamSwitcher() {
-  const { teams, activeTeamId } = useCurrentUser()
+  const { teams, activeTeamId, teamRole, isSuperAdmin } = useCurrentUser()
   const queryClient = useQueryClient()
   const router = useRouter()
   const pathname = usePathname()
@@ -58,63 +58,74 @@ export function TeamSwitcher() {
     }
   }
 
+
+  // Folio (DESIGN_SYSTEM.md §8.6): the team name in the display face over the
+  // viewer's role, with a 1 px --line-subtle rule beneath. No icon on the
+  // static label; the switcher shows an up-down icon.
+  const roleLabel = !activeTeam
+    ? null
+    : isSuperAdmin
+      ? 'Super admin'
+      : teamRole === 'ADMIN'
+        ? 'Team admin'
+        : teamRole === 'EDITOR'
+          ? 'Editor'
+          : null
+  const block = 'mx-5 mb-[22px] pb-4 border-b border-line-subtle font-text text-fg'
+  const name = (
+    <span className="min-w-0">
+      <span className="block truncate font-display text-ui-base font-medium leading-tight [font-variation-settings:'opsz'_24]">
+        {label}
+      </span>
+      {roleLabel && <span className="block text-ui-xs text-fg-muted">{roleLabel}</span>}
+    </span>
+  )
+
   if (teams.length === 1) {
-    return (
-      <div className="flex items-center gap-3 px-3 py-2.5 mb-3 rounded-xl text-sm font-medium text-light-text dark:text-dark-text border border-light-text/10 dark:border-white/10">
-        <Users size={18} className="flex-shrink-0 text-light-text-muted dark:text-dark-text-muted" />
-        <span className="truncate">{label}</span>
-      </div>
-    )
+    return <div className={block}>{name}</div>
   }
 
   return (
     <DropdownMenu.Root>
       <DropdownMenu.Trigger asChild>
         <button
+          type="button"
           disabled={switching}
           aria-label="Switch team"
           className={cn(
-            'flex items-center gap-3 px-3 py-2.5 mb-3 rounded-xl text-sm font-medium w-full',
-            'transition-all duration-150 text-light-text dark:text-dark-text',
-            'border border-light-text/10 dark:border-white/10',
-            'hover:bg-primary/5 dark:hover:bg-primary-light/5',
+            block,
+            'grid w-[calc(100%-40px)] grid-cols-[1fr_auto] items-end gap-2 text-left',
+            'rounded-ui-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus',
             'disabled:opacity-50 disabled:cursor-not-allowed',
           )}
         >
-          <Users size={18} className="flex-shrink-0 text-light-text-muted dark:text-dark-text-muted" />
-          <span className="truncate flex-1 text-left">{label}</span>
-          <ChevronsUpDown size={14} className="flex-shrink-0 text-light-text-muted dark:text-dark-text-muted" />
+          {name}
+          <ChevronsUpDown size={15} strokeWidth={1.4} aria-hidden="true" className="mb-0.5 text-fg-muted" />
         </button>
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>
+        {/* .surface-raised: opaque menu (FR-08) with the §8.7 item styles;
+            under reduced motion globals.css swaps the drop for a 150 ms fade. */}
         <DropdownMenu.Content
           align="start"
           sideOffset={6}
-          className={cn(
-            'z-50 min-w-56 max-w-72',
-            'glass-popover rounded-xl p-1.5',
-            'data-[state=open]:animate-fade-in',
-          )}
+          className="surface-raised z-50 min-w-56 max-w-72 py-1.5 animate-drop"
         >
           {teams.map(team => (
             <DropdownMenu.Item
               key={team.id}
               onSelect={() => selectTeam(team.id)}
               className={cn(
-                'flex items-center gap-2 px-3 py-2 rounded-lg text-sm cursor-pointer outline-none',
-                'text-light-text dark:text-dark-text',
-                'hover:bg-primary/10 dark:hover:bg-primary-light/10',
-                'focus:bg-primary/10 dark:focus:bg-primary-light/10',
+                'flex items-center gap-2.5 px-3.5 py-[7px] cursor-pointer outline-none',
+                'font-text text-ui-sm text-fg',
+                'data-[highlighted]:bg-canvas',
               )}
             >
               <Check
-                size={14}
-                className={cn(
-                  'flex-shrink-0',
-                  team.id === activeTeamId
-                    ? 'opacity-100 text-primary dark:text-primary-light'
-                    : 'opacity-0',
-                )}
+                size={15}
+                strokeWidth={1.4}
+                aria-hidden="true"
+                className={cn('flex-shrink-0 text-accent', team.id === activeTeamId ? 'opacity-100' : 'opacity-0')}
               />
               <span className="truncate">{team.name}</span>
             </DropdownMenu.Item>

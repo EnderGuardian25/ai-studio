@@ -8,6 +8,11 @@ import { loginAs, waitForDraft, type ApiClient } from '../helpers/api'
 //          animation is 150 ms or less; menus and toasts fade.
 //   AC-19 (NFR-04, NFR-05): an OS-dark first visit paints dark from the
 //          start, and no request in this suite goes to a font or icon CDN.
+//   T6, the shell group: AC-11 (the 375 px sidebar opens, traps focus,
+//          reaches every link and closes; no horizontal scroll), AC-12
+//          (login, choose-team and the shell at 375 px), AC-17 (visible focus
+//          on the first three stops of login and the shell), the "Studio"
+//          wordmark, the theme toggle, and the Create post button's motion.
 
 const ADMIN_EMAIL = 'admin@bisteccare.lk'
 const ADMIN_PASSWORD = 'BistecStudio2026!'
@@ -240,6 +245,165 @@ for (const theme of THEMES) {
   })
 }
 
+// ── The shell, login and choose-team (T6: AC-11, AC-12, AC-17) ───────────────
+
+// AC-11 / AC-12: the page never scrolls sideways.
+async function expectNoHorizontalScroll(page: Page, what: string) {
+  const { sw, cw } = await page.evaluate(() => ({
+    sw: document.documentElement.scrollWidth,
+    cw: document.documentElement.clientWidth,
+  }))
+  expect(sw, `${what}: scrollWidth ${sw} > clientWidth ${cw}`).toBeLessThanOrEqual(cw)
+}
+
+// AC-17: Tab from the top of the page three times. Each stop is a
+// :focus-visible element that draws an outline or a ring (box-shadow). Polled,
+// because a ring can transition in. Returns a short label per stop.
+async function tabThreeWithVisibleFocus(page: Page): Promise<string[]> {
+  const stops: string[] = []
+  for (let i = 0; i < 3; i++) {
+    await page.keyboard.press('Tab')
+    await expect
+      .poll(() =>
+        page.evaluate(() => {
+          const el = document.activeElement as HTMLElement | null
+          if (!el || el === document.body) return 'nothing focused'
+          const cs = getComputedStyle(el)
+          const outline = cs.outlineStyle !== 'none' && parseFloat(cs.outlineWidth) > 0
+          const ring = cs.boxShadow !== 'none'
+          if (!el.matches(':focus-visible')) return 'not :focus-visible'
+          return outline || ring ? 'visible' : 'no indicator'
+        }),
+      )
+      .toBe('visible')
+    stops.push(
+      await page.evaluate(() => {
+        const el = document.activeElement as HTMLElement
+        return (el.getAttribute('aria-label') ?? el.getAttribute('placeholder') ?? el.textContent ?? '').trim()
+      }),
+    )
+  }
+  return stops
+}
+
+test.describe('Shell, login and choose-team (T6)', () => {
+  test('AC-11: at 375px the mobile sidebar opens, traps focus, reaches every link and closes', async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 812 })
+    await pageLogin(page)
+    await expectNoHorizontalScroll(page, 'dashboard at 375px')
+
+    const open = page.getByRole('button', { name: 'Open sidebar' })
+    await open.click()
+    const nav = page.getByRole('dialog', { name: 'Navigation' })
+    await expect(nav).toBeVisible()
+    await expectNoHorizontalScroll(page, 'sidebar open at 375px')
+
+    const links = nav.getByRole('link')
+    const hrefs = await links.evaluateAll((els) => els.map((e) => e.getAttribute('href') ?? ''))
+    expect(hrefs.length).toBeGreaterThan(0)
+    for (let i = 0; i < hrefs.length; i++) await expect(links.nth(i)).toBeVisible()
+
+    // Tab past the end of the panel: focus wraps inside it (the trap) and
+    // lands on every link on the way.
+    const reached = new Set<string>()
+    for (let i = 0; i < hrefs.length + 8; i++) {
+      await page.keyboard.press('Tab')
+      const at = await page.evaluate(() => {
+        const el = document.activeElement
+        return { inside: !!el?.closest('[role="dialog"]'), href: el?.getAttribute('href') ?? null }
+      })
+      expect(at.inside, 'focus stays inside the open sidebar').toBe(true)
+      if (at.href) reached.add(at.href)
+    }
+    expect([...reached].sort()).toEqual([...hrefs].sort())
+
+    await page.keyboard.press('Escape')
+    await expect(nav).toBeHidden()
+
+    await open.click()
+    await expect(nav).toBeVisible()
+    await nav.getByRole('button', { name: 'Close sidebar' }).click()
+    await expect(nav).toBeHidden()
+  })
+
+  test('AC-12: login, choose-team and the shell load at 375px with no horizontal scroll', async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 812 })
+    await page.goto('/login')
+    await expect(page.getByRole('button', { name: 'Sign in' })).toBeVisible()
+    await expectNoHorizontalScroll(page, 'login at 375px')
+
+    await pageLogin(page)
+    await expectNoHorizontalScroll(page, 'dashboard at 375px')
+    await page.goto('/choose-team')
+    await expect(page.getByRole('heading', { name: 'Choose a team' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Bistec' })).toBeVisible()
+    await expectNoHorizontalScroll(page, 'choose-team at 375px')
+  })
+
+  test('AC-17: login shows a visible focus indicator on its first three stops', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await page.goto('/login')
+    await expect(page.getByRole('button', { name: 'Sign in' })).toBeVisible()
+    expect(await tabThreeWithVisibleFocus(page)).toEqual(['Username', 'Password', 'Sign in'])
+  })
+
+  test('AC-17: the shell shows a visible focus indicator on its first three stops', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await pageLogin(page)
+    await page.goto('/choose-team')
+    await expect(page.getByRole('button', { name: 'Bistec' })).toBeVisible()
+    // The header's theme toggle (two buttons, named by their visible text),
+    // then the sidebar's team switcher.
+    const stops = await tabThreeWithVisibleFocus(page)
+    expect(stops).toEqual(['Light', 'Dark', 'Switch team'])
+  })
+
+  test('the "Studio" wordmark is the logo, typeset in the display face', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await page.goto('/login')
+    await expect(page.getByRole('img', { name: 'Studio' })).toHaveText('Studio')
+    await pageLogin(page)
+    const logo = page.getByRole('banner').getByRole('img', { name: 'Studio' })
+    await expect(logo).toHaveText('Studio')
+    const style = await logo.evaluate((el) => {
+      const cs = getComputedStyle(el)
+      return { family: cs.fontFamily, style: cs.fontStyle, image: cs.backgroundImage }
+    })
+    expect(style.family).toMatch(/Fraunces/i)
+    expect(style.style).toBe('italic')
+    expect(style.image).toBe('none')
+  })
+
+  test('the theme toggle switches the theme and its pressed state follows', async ({ page }) => {
+    await storeTheme(page, 'light')
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await pageLogin(page)
+    await expectTheme(page, 'light')
+    const group = page.getByRole('group', { name: 'Theme' })
+    const light = group.getByRole('button', { name: 'Light', exact: true })
+    const dark = group.getByRole('button', { name: 'Dark', exact: true })
+    await expect(light).toHaveAttribute('aria-pressed', 'true')
+    await expect(dark).toHaveAttribute('aria-pressed', 'false')
+    // Pressing the current theme is a no-op.
+    await light.click()
+    await expectTheme(page, 'light')
+    await dark.click()
+    await expectTheme(page, 'dark')
+    await expect(dark).toHaveAttribute('aria-pressed', 'true')
+    await expect(light).toHaveAttribute('aria-pressed', 'false')
+  })
+
+  test('the Create post button lifts 1px on hover', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await pageLogin(page)
+    const fab = page.getByTestId('create-post-fab')
+    await fab.hover()
+    await expect
+      .poll(() => fab.evaluate((el) => getComputedStyle(el).transform))
+      .toBe('matrix(1, 0, 0, 1, -1, -1)')
+  })
+})
+
 // ── AC-18 / NFR-03: reduced motion ───────────────────────────────────────────
 
 // Computed animation-duration in ms (the first of a comma list).
@@ -260,14 +424,20 @@ test.describe('AC-18 reduced motion', () => {
     await page.getByRole('button', { name: 'Add team' }).click()
     const dialog = page.getByRole('dialog', { name: 'Add team' })
     await expect(dialog).toBeVisible()
-    // The 1 ms reduced-motion transition applies to every property: let it
-    // settle before reading the geometry and computed style.
-    await page.waitForTimeout(300)
-    const box = await dialog.boundingBox()
+    // The 1 ms reduced-motion transition applies to every property, so poll
+    // the geometry until it settles: the modal's centre is within 2 px of the
+    // viewport's on both axes.
     const vp = page.viewportSize()!
-    expect(box).not.toBeNull()
-    expect(Math.abs(box!.x + box!.width / 2 - vp.width / 2)).toBeLessThanOrEqual(2)
-    expect(Math.abs(box!.y + box!.height / 2 - vp.height / 2)).toBeLessThanOrEqual(2)
+    await expect
+      .poll(async () => {
+        const box = await dialog.boundingBox()
+        if (!box) return Number.POSITIVE_INFINITY
+        return Math.max(
+          Math.abs(box.x + box.width / 2 - vp.width / 2),
+          Math.abs(box.y + box.height / 2 - vp.height / 2),
+        )
+      })
+      .toBeLessThanOrEqual(2)
     const duration = await dialog.evaluate((el) => getComputedStyle(el).animationDuration)
     expect(durationMs(duration)).toBeLessThanOrEqual(150)
     await page.keyboard.press('Escape')
@@ -295,6 +465,14 @@ test.describe('AC-18 reduced motion', () => {
     })
     expect(toastAnim.name).toBe('fade')
     expect(durationMs(toastAnim.duration)).toBe(150)
+  })
+
+  test('the Create post button does not move on hover (shell)', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await pageLogin(page)
+    const fab = page.getByTestId('create-post-fab')
+    await fab.hover()
+    await expect.poll(() => fab.evaluate((el) => getComputedStyle(el).transform)).toBe('none')
   })
 })
 
