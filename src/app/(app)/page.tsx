@@ -1,14 +1,9 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import {
-  FileCheck2,
-  Send,
-  Megaphone,
-  Cpu,
   FilePlus2,
   BookOpen,
   Palette,
-  Activity,
   Users,
 } from 'lucide-react'
 import { prisma } from '@/lib/prisma'
@@ -16,7 +11,7 @@ import { listBriefDrafts } from '@/lib/brief/briefDrafts'
 import { resolveTeamForServerComponent } from '@/lib/authz/serverTeam'
 import { draftVisibilityWhere, postVisibilityWhere } from '@/lib/authz/visibility'
 import type { TeamAuthedUser } from '@/lib/api/handler'
-import { GlassPanel } from '@/components/ui/GlassPanel'
+import { Panel } from '@/components/ui/Panel'
 import { RecentDraftsCard } from '@/components/dashboard/RecentDraftsCard'
 import { channelLabel as sharedChannelLabel } from '@/lib/channels'
 import { relativeTime } from '@/lib/format'
@@ -124,28 +119,29 @@ async function getDashboardData(user: TeamAuthedUser) {
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
-function KpiCard({
-  label,
-  value,
-  icon,
-}: {
-  label: string
-  value: number
-  icon: React.ReactNode
-}) {
+// Folio page head and section heads (DESIGN_SYSTEM.md §5.2, §6): an eyebrow,
+// a display title stepping down to --text-xl below md, and section heads in
+// the display face. Structure comes from rules, not boxes.
+const EYEBROW = 'text-ui-2xs font-semibold uppercase tracking-[0.14em] text-fg-muted'
+const PAGE_TITLE =
+  "mt-2 font-display font-normal text-ui-xl md:text-ui-2xl leading-[1.04] tracking-[-0.025em] [font-variation-settings:'opsz'_144]"
+const SECTION_HEAD =
+  "font-display text-ui-xl font-medium leading-tight tracking-[-0.01em] [font-variation-settings:'opsz'_48]"
+
+// A KPI: a small-caps label over a display numeral, on a ruled row (no box).
+function KpiCard({ label, value }: { label: string; value: number }) {
   return (
-    <GlassPanel className="p-5">
-      <div className="flex items-center justify-between">
-        <span className="text-xs font-medium uppercase tracking-wide text-light-text-muted dark:text-dark-text-muted">
-          {label}
-        </span>
-        <span className="text-primary dark:text-primary-light">{icon}</span>
+    <div className="border-b border-line-subtle py-4">
+      <div className={EYEBROW}>{label}</div>
+      <div className="mt-2 font-display text-ui-2xl font-normal leading-none tabular-nums [font-variation-settings:'opsz'_144]">
+        {value}
       </div>
-      <div className="mt-3 text-3xl font-bold text-light-text dark:text-dark-text">{value}</div>
-    </GlassPanel>
+    </div>
   )
 }
 
+// A quick action: a link drawn as Folio's Outline button (§8.2). The floating
+// Create post button is the view's one primary, so these stay outline.
 function QuickAction({
   href,
   label,
@@ -158,9 +154,9 @@ function QuickAction({
   return (
     <Link
       href={href}
-      className="glass-input flex items-center gap-2.5 rounded-xl px-4 py-3 text-sm font-medium text-light-text dark:text-dark-text transition-all duration-150 hover:border-primary/40 hover:bg-primary/5 dark:hover:border-primary-light/40 dark:hover:bg-primary-light/5"
+      className="inline-flex h-9 items-center gap-2 whitespace-nowrap rounded-ui-md border border-line px-3.5 text-ui-sm font-semibold text-fg transition-[border-color] duration-fast ease-standard hover:border-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
     >
-      <span className="text-primary dark:text-primary-light">{icon}</span>
+      {icon}
       {label}
     </Link>
   )
@@ -177,15 +173,15 @@ export default async function DashboardPage() {
 
   if (!resolution || resolution.team.kind === 'no-team') {
     return (
-      <GlassPanel className="mx-auto mt-12 max-w-md p-8 text-center">
-        <Users size={28} className="mx-auto mb-3 text-light-text-muted dark:text-dark-text-muted" />
-        <h2 className="text-lg font-semibold text-light-text dark:text-dark-text">
+      <Panel className="mx-auto mt-12 max-w-md p-8 text-center">
+        <Users size={28} strokeWidth={1.4} className="mx-auto mb-3 text-fg-muted" />
+        <h2 className="font-display text-ui-lg font-medium text-fg">
           You&rsquo;re not in a team yet
         </h2>
-        <p className="mt-2 text-sm text-light-text-muted dark:text-dark-text-muted">
+        <p className="mt-2 text-ui-sm text-fg-muted">
           Ask a super admin to add you to a team before you can create or view posts.
         </p>
-      </GlassPanel>
+      </Panel>
     )
   }
 
@@ -199,32 +195,37 @@ export default async function DashboardPage() {
 
   return (
     <>
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-light-text dark:text-dark-text">Dashboard</h1>
-        <p className="mt-0.5 text-sm text-light-text-muted dark:text-dark-text-muted">
+      <div className="mb-8">
+        <div className={EYEBROW}>Overview</div>
+        <h1 className={PAGE_TITLE}>Dashboard</h1>
+        <p className="mt-3 text-ui-sm text-fg-muted">
           At-a-glance status across drafts, posts, and campaigns.
         </p>
       </div>
 
-      {/* KPI summary */}
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <KpiCard label="Drafts Ready" value={data.draftsReady} icon={<FileCheck2 size={18} />} />
-        <KpiCard label="Posts Published" value={data.postsPublished} icon={<Send size={18} />} />
-        <KpiCard label="Active Campaigns" value={data.activeCampaigns} icon={<Megaphone size={18} />} />
-        <KpiCard label="AI Providers" value={data.aiProviders} icon={<Cpu size={18} />} />
+      {/* KPI summary: a 2 px --fg rule opens the block; ruled cells, no boxes */}
+      <div className="grid grid-cols-2 gap-x-6 border-t-2 border-fg lg:grid-cols-4">
+        <KpiCard label="Drafts Ready" value={data.draftsReady} />
+        <KpiCard label="Posts Published" value={data.postsPublished} />
+        <KpiCard label="Active Campaigns" value={data.activeCampaigns} />
+        <KpiCard label="AI Providers" value={data.aiProviders} />
       </div>
 
       {/* Quick actions */}
-      <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <QuickAction href="/brief" label="Create Post" icon={<FilePlus2 size={18} />} />
-        <QuickAction href="/library" label="View Library" icon={<BookOpen size={18} />} />
-        <QuickAction href="/admin/brandkits" label="Manage Brand Kits" icon={<Palette size={18} />} />
+      <div className="mt-6 flex flex-wrap gap-2">
+        <QuickAction href="/brief" label="Create Post" icon={<FilePlus2 size={15} strokeWidth={1.4} />} />
+        <QuickAction href="/library" label="View Library" icon={<BookOpen size={15} strokeWidth={1.4} />} />
+        <QuickAction
+          href="/admin/brandkits"
+          label="Manage Brand Kits"
+          icon={<Palette size={15} strokeWidth={1.4} />}
+        />
       </div>
 
-      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-3">
+      <div className="mt-12 grid grid-cols-1 gap-x-12 gap-y-12 lg:grid-cols-3">
         {/* Recent drafts — collapsed 8 / expandable to the full fetched list */}
         <RecentDraftsCard
-          className="p-5 lg:col-span-2"
+          className="min-w-0 lg:col-span-2"
           unfinished={data.unfinishedBriefs.map(u => ({
             id: u.id,
             topic: u.topic,
@@ -246,32 +247,24 @@ export default async function DashboardPage() {
         />
 
         {/* Activity feed */}
-        <GlassPanel className="p-5">
-          <div className="mb-4 flex items-center gap-2">
-            <Activity size={16} className="text-primary dark:text-primary-light" />
-            <h2 className="text-sm font-semibold text-light-text dark:text-dark-text">Activity</h2>
-          </div>
+        <div className="min-w-0">
+          <h2 className={`${SECTION_HEAD} pb-2.5`}>Activity</h2>
 
           {data.events.length === 0 ? (
-            <p className="py-8 text-center text-sm text-light-text-muted dark:text-dark-text-muted">
+            <p className="border-t-2 border-fg py-8 text-center text-ui-sm text-fg-muted">
               No recent activity.
             </p>
           ) : (
-            <ul className="space-y-3">
+            <ul className="border-t-2 border-fg">
               {data.events.map(e => (
-                <li key={e.id} className="flex items-start gap-2.5">
-                  <span className="mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-primary/60 dark:bg-primary-light/60" />
-                  <div className="min-w-0">
-                    <p className="truncate text-sm text-light-text dark:text-dark-text">{e.text}</p>
-                    <p className="text-xs text-light-text-muted dark:text-dark-text-muted">
-                      {relativeTime(e.at)}
-                    </p>
-                  </div>
+                <li key={e.id} className="min-w-0 border-b border-line-subtle py-2.5">
+                  <p className="truncate text-ui-sm text-fg">{e.text}</p>
+                  <p className="text-ui-xs text-fg-muted">{relativeTime(e.at)}</p>
                 </li>
               ))}
             </ul>
           )}
-        </GlassPanel>
+        </div>
       </div>
     </>
   )

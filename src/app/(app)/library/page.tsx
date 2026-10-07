@@ -6,7 +6,7 @@ import { Search } from 'lucide-react'
 import { toast } from 'sonner'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { Button } from '@/components/ui/Button'
-import { GlassPanel } from '@/components/ui/GlassPanel'
+import { fieldClasses, fieldEdge } from '@/components/ui/Input'
 import { SegmentedToggle } from '@/components/ui/SegmentedToggle'
 import { QueryError } from '@/components/ui/QueryError'
 import { PostCard } from '@/components/library/PostCard'
@@ -39,19 +39,28 @@ const PAGE_SIZE = 20
 
 // ── Skeleton loader ───────────────────────────────────────────────────────────
 
+// The shape of a library tile (PostCard): a thumbnail, a title, a meta line
+// and the action row. No card box (DESIGN_SYSTEM.md §8.12).
 function SkeletonCard() {
   return (
-    <GlassPanel className="flex flex-col overflow-hidden animate-pulse">
-      <div className="aspect-square w-full bg-light-border/40 dark:bg-dark-border/40" />
-      <div className="p-3 flex flex-col gap-2">
-        <div className="h-4 rounded bg-light-border/60 dark:bg-dark-border/60 w-3/4" />
-        <div className="h-3 rounded bg-light-border/40 dark:bg-dark-border/40 w-1/2" />
-        <div className="h-3 rounded bg-light-border/30 dark:bg-dark-border/30 w-1/3" />
-        <div className="h-7 rounded-lg bg-light-border/40 dark:bg-dark-border/40 mt-1" />
+    <div className="flex flex-col animate-pulse">
+      <div className="aspect-square w-full bg-surface outline outline-1 outline-offset-[3px] outline-line-subtle" />
+      <div className="pt-4 flex flex-col gap-2">
+        <div className="h-4 rounded-ui-sm bg-line-subtle w-3/4" />
+        <div className="h-3 rounded-ui-sm bg-line-subtle w-1/2" />
+        <div className="h-[30px] rounded-ui-md bg-line-subtle w-1/2 mt-1" />
       </div>
-    </GlassPanel>
+    </div>
   )
 }
+
+// Folio page head (DESIGN_SYSTEM.md §5.2, §6).
+const EYEBROW = 'text-ui-2xs font-semibold uppercase tracking-[0.14em] text-fg-muted'
+const PAGE_TITLE =
+  "mt-2 font-display font-normal text-ui-xl md:text-ui-2xl leading-[1.04] tracking-[-0.025em] [font-variation-settings:'opsz'_144]"
+
+// Tiles: a contact sheet with room between frames for the 3 px outline offset.
+const GRID = 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-10'
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
@@ -140,44 +149,42 @@ export default function LibraryPage() {
   return (
     <>
       {/* Page header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8">
         <div>
-          <h1 className="text-2xl font-bold text-light-text dark:text-dark-text">Library</h1>
-          <p className="text-sm text-light-text-muted dark:text-dark-text-muted mt-0.5">
+          <div className={EYEBROW}>Posts</div>
+          <h1 className={PAGE_TITLE}>Library</h1>
+          <p className="mt-3 text-ui-sm text-fg-muted">
             All exported drafts and published posts.
           </p>
         </div>
-        <div className="relative w-full sm:w-64">
+        <div className="relative w-full sm:w-72">
           <Search
-            size={14}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-light-text-muted dark:text-dark-text-muted pointer-events-none"
+            size={15}
+            strokeWidth={1.4}
+            className="absolute left-3.5 top-1/2 -translate-y-1/2 text-fg-muted pointer-events-none"
           />
           <input
             type="search"
             placeholder="Search by topic…"
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
-            className={cn(
-              'glass-input w-full rounded-xl pl-8 pr-3 py-2 text-sm',
-              'text-light-text dark:text-dark-text',
-              'placeholder:text-light-text-muted dark:placeholder:text-dark-text-muted',
-              'focus:outline-none'
-            )}
+            className={cn(fieldClasses, fieldEdge(), 'pl-10')}
           />
         </div>
       </div>
 
-      {/* Status tabs */}
-      <SegmentedToggle
-        options={STATUS_TABS.map(({ label, value }) => ({ value, label }))}
-        value={activeStatus}
-        onChange={(v) => setActiveStatus(v as StatusFilter)}
-        className="mb-5"
-      />
+      {/* Status tabs, over the 2 px --fg rule that opens the sheet */}
+      <div className="pb-4 mb-8 border-b-2 border-fg">
+        <SegmentedToggle
+          options={STATUS_TABS.map(({ label, value }) => ({ value, label }))}
+          value={activeStatus}
+          onChange={(v) => setActiveStatus(v as StatusFilter)}
+        />
+      </div>
 
       {/* Grid */}
       {isPending ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className={GRID}>
           {Array.from({ length: 6 }).map((_, i) => (
             <SkeletonCard key={i} />
           ))}
@@ -185,14 +192,10 @@ export default function LibraryPage() {
       ) : isError ? (
         <QueryError error={error} onRetry={() => refetch()} />
       ) : drafts.length === 0 ? (
-        <GlassPanel className="p-12 text-center">
-          <p className="text-sm text-light-text-muted dark:text-dark-text-muted">
-            No posts found.
-          </p>
-        </GlassPanel>
+        <p className="py-12 text-center text-ui-sm text-fg-muted">No posts found.</p>
       ) : (
         <>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className={GRID}>
             {drafts.map((draft) => (
               <PostCard
                 key={draft.id}
@@ -211,7 +214,7 @@ export default function LibraryPage() {
 
           {/* Load more */}
           {hasNextPage && (
-            <div className="mt-6 flex justify-center">
+            <div className="mt-10 flex justify-center">
               <Button
                 variant="secondary"
                 size="sm"

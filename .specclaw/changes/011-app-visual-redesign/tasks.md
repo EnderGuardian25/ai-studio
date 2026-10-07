@@ -130,7 +130,7 @@ There are 13 tasks in 7 waves. All the work lands on `v2`.
     - **The button moves onto tokens** (`bg-accent text-accent-fg`, `.surface-raised` shadow).
     - **Remove** the `style={{ background: 'var(--background)' }}` inline read in favour of `bg-canvas`.
 
-- [ ] `T7` — Restyle the dashboard and library
+- [x] `T7` — Restyle the dashboard and library
   - Files: `src/app/(app)/page.tsx`, `src/components/dashboard/RecentDraftsCard.tsx`, `src/app/(app)/library/page.tsx`, `src/components/library/PostCard.tsx`, `src/components/library/PublishDialog.tsx`, `src/components/library/PublishHistoryDrawer.tsx`
   - Estimate: medium
   - Kind: impl

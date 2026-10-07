@@ -192,3 +192,20 @@ AC-16 needed a real OAuth token, so T6 sat in_progress for days; the auto-mode c
 Plan secret-gated ACs as explicit operator steps with a ready-to-paste '! ...' command that writes a temp env file, runs the check and deletes it
 
 ---
+
+## [L12] design_gap — T5 needed AppShell.tsx (sidebar class) to meet its own AC...
+
+**When:** 2026-10-07 15:40 UTC
+**Category:** design_gap
+**Priority:** low
+**Status:** pending
+
+### Detail
+
+T5 needed AppShell.tsx (sidebar class) to meet its own AC-09: the sidebar used in-flow .glass-panel, which the source fix deliberately left translucent
+
+### Action
+
+When an AC covers a surface, check which class that surface uses before assigning the file list
+
+---

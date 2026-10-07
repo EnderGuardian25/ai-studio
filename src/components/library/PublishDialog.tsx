@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react'
 import { Modal } from '@/components/ui/Modal'
-import { GlassInput } from '@/components/ui/GlassInput'
+import { Input, fieldLabelClasses, fieldErrorClasses } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
 import { apiFetch } from '@/lib/apiFetch'
 import { CHANNEL_VALUES, channelLabel } from '@/lib/channels'
@@ -104,30 +104,28 @@ export function PublishDialog({ draftId, onClose, onSuccess }: PublishDialogProp
       }
     >
         {/* Channel checkboxes */}
-        <p className="text-sm font-medium text-light-text dark:text-dark-text mb-2">
-          Channels
-        </p>
-        <div className="flex gap-3 mb-4">
+        <p className={`${fieldLabelClasses} mb-2`}>Channels</p>
+        <div className="flex flex-wrap gap-x-6 gap-y-2 pb-5 mb-5 border-b border-line-subtle">
           {CHANNELS.map((ch) => {
             const outcome = outcomes[ch]
             return (
               <label
                 key={ch}
-                className="flex items-center gap-2 cursor-pointer text-sm text-light-text dark:text-dark-text"
+                className="flex items-center gap-2 cursor-pointer text-ui-base text-fg"
               >
                 <input
                   type="checkbox"
                   checked={checkedChannels.includes(ch)}
                   onChange={() => toggleChannel(ch)}
                   disabled={outcome?.ok === true}
-                  className="accent-primary dark:accent-primary-light"
+                  className="h-4 w-4 accent-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
                 />
                 {channelLabel(ch)}
                 {outcome?.ok === true && (
-                  <span className="text-xs text-emerald-600 dark:text-emerald-400">✓ published</span>
+                  <span className="text-ui-xs font-semibold text-status-published">✓ published</span>
                 )}
                 {outcome && !outcome.ok && (
-                  <span className="text-xs text-red-600 dark:text-red-400" title={outcome.message}>
+                  <span className="text-ui-xs font-semibold text-status-failed" title={outcome.message}>
                     ✕ failed
                   </span>
                 )}
@@ -138,19 +136,19 @@ export function PublishDialog({ draftId, onClose, onSuccess }: PublishDialogProp
 
         {/* Scheduled at */}
         <div>
-          <GlassInput
+          <Input
             label="Schedule for (optional)"
             type="datetime-local"
             value={scheduledAt}
             onChange={(e) => setScheduledAt(e.target.value)}
           />
-          <p className="text-xs text-light-text-muted dark:text-dark-text-muted mt-1">
+          <p className="text-ui-xs text-fg-muted mt-1.5">
             Leave blank to publish immediately.
           </p>
         </div>
 
         {error && (
-          <p className="text-xs text-red-600 dark:text-red-400 mt-3">{error}</p>
+          <p className={`${fieldErrorClasses} mt-3`}>{error}</p>
         )}
     </Modal>
   )

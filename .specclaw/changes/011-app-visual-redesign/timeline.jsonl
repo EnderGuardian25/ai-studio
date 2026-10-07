@@ -20,3 +20,5 @@
 {"ev":"stop","span":"W4","at":"2026-10-07T15:40:32Z","ts":1791387632,"status":"ok"}
 {"ev":"start","span":"W5","kind":"wave","label":"wave 5","at":"2026-10-07T15:41:58Z","ts":1791387718}
 {"ev":"start","span":"T6","kind":"task","label":"App shell restyle, plus login and choose-team","parent":"W5","model":"opus","attempt":"1","at":"2026-10-07T15:41:58Z","ts":1791387718}
+{"ev":"stop","span":"T6","at":"2026-10-07T16:10:52Z","ts":1791389452,"status":"ok"}
+{"ev":"start","span":"T7","kind":"task","label":"Restyle the dashboard and library","parent":"W5","model":"opus","attempt":"1","at":"2026-10-07T16:11:27Z","ts":1791389487}

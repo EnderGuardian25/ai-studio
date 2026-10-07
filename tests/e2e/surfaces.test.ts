@@ -269,7 +269,11 @@ async function tabThreeWithVisibleFocus(page: Page): Promise<string[]> {
           const el = document.activeElement as HTMLElement | null
           if (!el || el === document.body) return 'nothing focused'
           const cs = getComputedStyle(el)
-          const outline = cs.outlineStyle !== 'none' && parseFloat(cs.outlineWidth) > 0
+          // Tailwind's outline-none is `2px solid transparent`: an outline only
+          // counts when its colour is not fully transparent (T7).
+          const c = cs.outlineColor
+          const transparent = c === 'transparent' || /^rgba\(.*[,/]\s*0\)$/.test(c)
+          const outline = cs.outlineStyle !== 'none' && parseFloat(cs.outlineWidth) > 0 && !transparent
           const ring = cs.boxShadow !== 'none'
           if (!el.matches(':focus-visible')) return 'not :focus-visible'
           return outline || ring ? 'visible' : 'no indicator'
@@ -401,6 +405,134 @@ test.describe('Shell, login and choose-team (T6)', () => {
     await expect
       .poll(() => fab.evaluate((el) => getComputedStyle(el).transform))
       .toBe('matrix(1, 0, 0, 1, -1, -1)')
+  })
+})
+
+// ── Dashboard and library (T7: AC-12, AC-17, FR-12) ──────────────────────────
+
+// AC-17 on a screen: start focus at <main> (made focusable for the test only),
+// so the next Tab lands on the screen's first interactive element, past the
+// shell's stops that T6 already covers.
+async function tabThreeFromMain(page: Page): Promise<string[]> {
+  await page.locator('main').evaluate((el) => {
+    el.setAttribute('tabindex', '-1')
+    ;(el as HTMLElement).focus()
+  })
+  return tabThreeWithVisibleFocus(page)
+}
+
+// Filter the library down to one tile by topic (the search is debounced).
+async function filterLibraryTo(page: Page, topic: string) {
+  await page.getByPlaceholder('Search by topic…').fill(topic)
+  await expect(page.getByRole('button', { name: 'History', exact: true })).toHaveCount(1, { timeout: 20_000 })
+  await expect(page.locator(`img[alt="${topic}"]`)).toBeVisible()
+}
+
+test.describe('Dashboard and library (T7)', () => {
+  let api: ApiClient
+  test.beforeEach(async ({ request }) => {
+    api = await loginAs(request, ADMIN_EMAIL, ADMIN_PASSWORD)
+  })
+  test.afterEach(async () => {
+    await api.dispose()
+  })
+
+  test('AC-17: the dashboard shows a visible focus indicator on its first three stops', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await pageLogin(page)
+    await expect(page.getByRole('heading', { name: 'Dashboard', level: 1 })).toBeVisible()
+    expect(await tabThreeFromMain(page)).toEqual(['Create Post', 'View Library', 'Manage Brand Kits'])
+  })
+
+  test('AC-17: the library shows a visible focus indicator on its first three stops', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await pageLogin(page)
+    await page.goto('/library')
+    await expect(page.getByRole('heading', { name: 'Library', level: 1 })).toBeVisible()
+    expect(await tabThreeFromMain(page)).toEqual(['Search by topic…', 'All', 'Ready'])
+  })
+
+  test('AC-12: dashboard (Recent Drafts expanded), library, publish dialog and history drawer at 375px', async ({ page }) => {
+    test.skip(!MOCKED(), 'needs MOCK_AI + MOCK_PUPPETEER to mint a draft')
+    const draft = await exportedDraft(api)
+    await page.setViewportSize({ width: 375, height: 812 })
+    await pageLogin(page)
+
+    // The Recent Drafts table scrolls inside its own container; the page never
+    // does. (The admin has at least the draft above, so the table renders.)
+    await expect(page.getByRole('heading', { name: 'Recent Drafts' })).toBeVisible()
+    await expect(page.getByRole('table')).toBeVisible()
+    const expand = page.getByRole('button', { name: 'Expand' })
+    if (await expand.isVisible()) await expand.click()
+    await expectNoHorizontalScroll(page, 'dashboard (Recent Drafts expanded) at 375px')
+    // The table is wider than the viewport, so its scroll container must be
+    // keyboard-reachable (WCAG 2.1.1): a focusable, labelled region that scrolls.
+    const region = page.getByRole('region', { name: 'Recent drafts' })
+    await region.focus()
+    await expect(region).toBeFocused()
+    expect(await region.evaluate((el) => el.scrollWidth > el.clientWidth)).toBe(true)
+    await page.keyboard.press('ArrowRight')
+    await expect.poll(() => region.evaluate((el) => el.scrollLeft)).toBeGreaterThan(0)
+
+    await page.goto('/library')
+    await filterLibraryTo(page, draft.topic)
+    await expectNoHorizontalScroll(page, 'library at 375px')
+
+    // FR-12: every tile control is still there, by role and name.
+    await expect(page.getByRole('link', { name: draft.topic })).toBeVisible()
+    await expect(page.getByRole('button', { name: `View ${draft.topic} full screen` })).toBeAttached()
+    await expect(page.getByRole('button', { name: `Delete ${draft.topic}` })).toBeVisible()
+
+    await page.getByRole('button', { name: 'Publish', exact: true }).click()
+    const publish = page.getByRole('dialog', { name: 'Publish Post' })
+    await expect(publish).toBeVisible()
+    await expect(publish.getByRole('checkbox')).not.toHaveCount(0)
+    await expect(publish.getByRole('button', { name: 'Confirm' })).toBeVisible()
+    await expectNoHorizontalScroll(page, 'publish dialog at 375px')
+    await publish.getByRole('button', { name: 'Cancel' }).click()
+    await expect(publish).toBeHidden()
+
+    await page.getByRole('button', { name: 'History', exact: true }).click()
+    const history = page.getByRole('dialog', { name: 'Publish History' })
+    await expect(history).toBeVisible()
+    await expect(history.getByText('No publish history yet.')).toBeVisible()
+    await expectNoHorizontalScroll(page, 'history drawer at 375px')
+    await history.getByRole('button', { name: 'Close' }).click()
+    await expect(history).toBeHidden()
+  })
+
+  test('library thumbnails are shown as rendered: no filter, transform, rounding or hover scale', async ({ page }) => {
+    test.skip(!MOCKED(), 'needs MOCK_AI + MOCK_PUPPETEER to mint a draft')
+    const draft = await exportedDraft(api)
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await pageLogin(page)
+    await page.goto('/library')
+    await filterLibraryTo(page, draft.topic)
+    const img = page.locator(`img[alt="${draft.topic}"]`)
+    await img.hover()
+    const read = () =>
+      img.evaluate((el) => {
+        const cs = getComputedStyle(el)
+        const frame = getComputedStyle(el.parentElement as HTMLElement)
+        return {
+          filter: cs.filter,
+          transform: cs.transform,
+          opacity: cs.opacity,
+          mixBlend: cs.mixBlendMode,
+          radius: cs.borderRadius,
+          frameRadius: frame.borderRadius,
+          frameFilter: frame.filter,
+        }
+      })
+    await expect.poll(read).toEqual({
+      filter: 'none',
+      transform: 'none',
+      opacity: '1',
+      mixBlend: 'normal',
+      radius: '0px',
+      frameRadius: '0px',
+      frameFilter: 'none',
+    })
   })
 })
 
