@@ -2,14 +2,28 @@
 
 This repo contains planning documents for **bistec-studio**, an internal marketing post generation tool for the Bistec marketing team.
 
-## ✅ Outstanding work — START HERE (updated 2026-10-03)
+## ✅ Outstanding work — START HERE (updated 2026-10-07)
 
-- **⏸️ 2026-10-03 — PICK UP HERE. 004 is done (verify PARTIAL, Phase 0 only). 005 is built: 9/10 tasks, with T6 waiting on one operator check.** Full detail: [`docs/handoff.md`](docs/handoff.md) top section.
+- **⏸️ 2026-10-07 — PICK UP HERE. 005 is done and verified PASS. 011 (app visual redesign) is planned, and wave 1 is built. The build is paused at its operator gate: the user picks a design direction.** Full detail: [`docs/handoff.md`](docs/handoff.md) top section.
   - **Next, in order:**
-    1. **The user runs AC-16 (005 T6).** In their own editor they put `CLAUDE_CODE_OAUTH_TOKEN=<token>` into an env file outside the repo, then run `docker run --rm --env-file <file> --entrypoint node bistec-studio:t6 scripts/cli-sandbox-check.mjs`, expecting 3/3 PASS. **Claude never handles the token.** On another machine, `docker build -t bistec-studio:t6 .` first.
-    2. **Mark T6 complete,** then `/specclaw:verify` 005 with a full clean mock E2E. The inputs are [`.specclaw/changes/005-provider-flexibility-onboarding/verify-notes.md`](.specclaw/changes/005-provider-flexibility-onboarding/verify-notes.md).
-    3. **PR #42 merges only on the user's go-ahead.** On 2026-10-01 the user said "not yet". Then merge `main` into `v2`, re-check 005 AC-17 under node:22, and close 004's Phase 0 ACs.
-    4. **Then the next change,** per [`.specclaw/ROADMAP.md`](.specclaw/ROADMAP.md).
+    1. **Get the user's pick: A Graphite, B Folio or C Instrument,** plus any changes they want.
+       - Comparison page: https://claude.ai/artifact/XijAC8pAQRkmGErC5QYmB5 (private). The local copy is [`docs/ui-reference/direction-studies/pick.html`](docs/ui-reference/direction-studies/pick.html). The full studies sit beside it, each with its token block and contrast tables.
+    2. **Resume `/specclaw:build 011-app-visual-redesign`,** subagent-driven: one implementer subagent per task, then a `specclaw:code-reviewer`, then the orchestrator commits. Run tasks one at a time.
+       - Next is **T3**: record the pick; `git mv` Frozen Light to `docs/ui-reference/archive/frozen-light/`; write the new `DESIGN_SYSTEM.md`.
+       - Then T4 (tokens), T5 (primitives, opaque surfaces), T6 (shell), T7–T12 (screens), T13 (cleanup).
+       - Every task that touches `src/` ends with a full clean mock E2E run.
+       - The T2 report's carry-over notes (`--line-subtle`, reduced-motion timing, amber `scheduled`, regrouped controls) are in the handoff.
+    3. **PR #42 merges only on the user's go-ahead** ("not yet", 2026-10-01). Then merge `main` into `v2`, re-check 005 AC-17 under node:22 and re-run AC-16 on a rebuilt image, and close 004's Phase 0 ACs.
+    4. **🔴 The user should revoke the OAuth token pasted into chat on 2026-10-06** and make a new one with `claude setup-token`.
+  - **005 verify: PASS, 25/25** ([`verify-report.md`](.specclaw/changes/005-provider-flexibility-onboarding/verify-report.md)).
+    - AC-16 passed 3/3 in the operator run.
+    - Mock E2E 261/3/0/0, after one doc-wording fix (`f0fc1af7`).
+    - **Follow-ups:** recheck AC-17 under node:22; empty `bistec-cli-*` temp dirs; a Gemini live call; make the setup-guide path a link.
+  - **011** ([`.specclaw/changes/011-app-visual-redesign/`](.specclaw/changes/011-app-visual-redesign/): spec with 14 FR / 8 NFR / 20 AC, design, 13 tasks in 7 waves, reports, reviews).
+    - **Decisions (2026-10-06):** a neutral tool UI with no BISTEC brand cues; three studies, from which the user picks alone; the theme follows the OS. Assumptions A1–A4 are in `spec.md`.
+    - **T1** Create post button (`3203673c`; E2E 265/3/0/0). Carry-over: its white-on-blue is about 4.1:1, which T6 fixes.
+    - **T2** studies (`bb6828c5`).
+  - **The 2026-10-03 status below is superseded for 005, but its 004 and ops details still stand:**
   - **004:** 24/24 plus a final review fix wave (F1–F3).
     - [`verify-report.md`](.specclaw/changes/004-design-instruction-fidelity/verify-report.md): Phases 1–3 pass 29/29, and every known limit is stated there.
     - **Rulings:** a requested image swap always fails closed; the text-reduction lexicon prefers triggering; the settle guards key on the action, not the claim (a claim token is a follow-up).
@@ -25,7 +39,7 @@ This repo contains planning documents for **bistec-studio**, an internal marketi
   - **🔴 Urgent ops for the Coolify administrator, unchanged:** swap prod MinIO to `pgsty/silo` (`docs/minio-silo-migration.md`; CVE-2026-40344), and rotate `COOLIFY_API_TOKEN` (`deploy` + `read`, made by an Admin/Owner; prove it with a direct POST).
   - **Gates at `v2` head:**
     - unit 1593/1593, lint 0 errors, build passes;
-    - last full clean mock E2E 251/3/0/0, at 005 Wave 1;
+    - last full clean mock E2E 265/3/0/0, at 011 T1 (2026-10-06);
     - render 15/15.
   - **Migrations on `v2` not yet on `main`:**
     - `20260927120000_draft_font_set`;
@@ -331,6 +345,9 @@ Stack: Next.js 14, TypeScript, Prisma, PostgreSQL, MinIO, better-auth (self-host
 Before building or modifying any page, read the design system:
 
 - **[`docs/ui-reference/DESIGN_SYSTEM.md`](docs/ui-reference/DESIGN_SYSTEM.md)** — the design system for bistec-studio. Read this before writing any component or page. Also reference [`docs/ui-reference/screen-dark.png`](docs/ui-reference/screen-dark.png) and [`docs/ui-reference/screen-light.png`](docs/ui-reference/screen-light.png) for visual reference, and [`docs/ui-reference/synthetix-original-reference.html`](docs/ui-reference/synthetix-original-reference.html) for the source HTML reference.
+- **⚠️ Being replaced by 011 (2026-10-07).** That document is still Frozen Light, and it stays authoritative until 011 T3 writes the new one from the user's pick, after which Frozen Light moves to `docs/ui-reference/archive/frozen-light/`.
+  - The three candidate directions are in [`docs/ui-reference/direction-studies/`](docs/ui-reference/direction-studies/): `pick.html` is the comparison page, and `study-*.html` are the full studies with token blocks.
+  - New UI built before T4 lands should follow Frozen Light.
 
 ### Architecture & technical design
 
@@ -351,7 +368,7 @@ Before writing any backend code, API routes, Prisma models, or provider logic, r
 
 ### Specification & planning
 
-- **[`.specclaw/ROADMAP.md`](.specclaw/ROADMAP.md)** — changes 004–012 (004 built and verified PARTIAL, Phase 0 only; 005 built 9/10; 006–012 proposals): recommended order, hard/soft dependencies, and which change owns what where they overlap. **Read before planning or building any of them.** Each change's `proposal.md` is the source of truth for its own scope.
+- **[`.specclaw/ROADMAP.md`](.specclaw/ROADMAP.md)** — changes 004–012 (004 built and verified PARTIAL, Phase 0 only; 005 built and verified PASS; 011 planned, wave 1 built, waiting on the direction pick; 006–010 and 012 proposals): recommended order, hard/soft dependencies, and which change owns what where they overlap. **Read before planning or building any of them.** Each change's `proposal.md` is the source of truth for its own scope.
 - **[`docs/coolify-token-rotation.md`](docs/coolify-token-rotation.md)** — ops handoff for the dead Coolify deploy token (merges don't deploy until it's rotated).
 - **[`docs/handoff.md`](docs/handoff.md)** — session handoff with current decisions, Path A/B design descriptions, AGUI spec, provider registration flow, v2 interoperability target, and the latest code-review remediation summary
 - **[`.specclaw/changes/001-marketing-post-studio-v1/spec.md`](.specclaw/changes/001-marketing-post-studio-v1/spec.md)** — full functional requirements (FR-01 through FR-33) and non-functional requirements

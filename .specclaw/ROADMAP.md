@@ -16,7 +16,7 @@ This file sequences the open changes. Each change's own `proposal.md` is the sou
 | 008 | [Model selection](changes/008-model-selection/)                                   | Choose Haiku / Sonnet / Opus per caption, design, refine and assistant chat                 | medium       | 📋 proposal (new)                          |
 | 009 | [Hero imagery](changes/009-hero-image-design/)                                    | Image model makes the hero subject, not wallpaper; layout archetypes; reference images      | large        | 📋 proposal (new)                          |
 | 010 | [WhatsApp Channel posting](changes/010-whatsapp-channel-posting/)                 | WhatsApp as a channel, with assisted handoff (Meta has no official Channel posting API)     | medium       | 📋 proposal (new)                          |
-| 011 | [App visual redesign](changes/011-app-visual-redesign/)                           | New visual direction; opaque surfaces; floating bottom-right **Create post** button         | large        | 🗂️ approved 2026-10-06 — planning          |
+| 011 | [App visual redesign](changes/011-app-visual-redesign/)                           | New visual direction; opaque surfaces; floating bottom-right **Create post** button         | large        | 🔨 wave 1 built (T1–T2) — awaiting pick    |
 | 012 | [Per-channel captions](changes/012-per-channel-captions/)                         | Instagram / LinkedIn / WhatsApp captions, each published to its own channel; copy → caption | medium       | 📋 proposal (new)                          |
 
 ## Hard dependencies

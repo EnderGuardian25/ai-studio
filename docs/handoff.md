@@ -1,13 +1,78 @@
 # bistec-studio — Session Handoff
 
-**Date:** 2026-10-03 (latest: 004 finished and verified PARTIAL, Phase 0 only; 005 planned and built, 9/10, waiting on one operator check). Previous: 2026-09-28 (build session — 004 Waves 1–3 built, MinIO → silo, PR #42 + draft PR #43). Before that: 2026-09-23 (later, later the same day: proposal **012** per-channel captions + copy→caption rename, a floating **Create post** button folded into 011, and a launch-video legibility pass. Before that: planning session — proposals 008–011 + roadmap, 004 re-planned to 24 tasks incl. Phase 0, and the deploy pipeline found broken: Coolify 401 since 2026-09-15). Previous: 2026-07-28 (copy-edit status clobber fix).
+**Date:** 2026-10-07 (latest: 005 finished and verified **PASS**; 011 planned and wave 1 built; **waiting on the user's direction pick**). Previous: 2026-10-03 (004 finished and verified PARTIAL, Phase 0 only; 005 built 9/10, waiting on one operator check). Before that: 2026-09-28 (build session — 004 Waves 1–3 built, MinIO → silo, PR #42 + draft PR #43). Before that: 2026-09-23 (later, later the same day: proposal **012** per-channel captions + copy→caption rename, a floating **Create post** button folded into 011, and a launch-video legibility pass. Before that: planning session — proposals 008–011 + roadmap, 004 re-planned to 24 tasks incl. Phase 0, and the deploy pipeline found broken: Coolify 401 since 2026-09-15). Previous: 2026-07-28 (copy-edit status clobber fix).
 **Repo:** https://github.com/bistec-oss/studio (formerly `bistec-oss/designer`)
 **Branch:** work continues on **`v2`** (pushed; all 004–012 work lands here, merged to `main` in one go on go-ahead). `main` = `09a38b71`; prod runs `9ea4c045` (deploys broken since 2026-09-15). Open: **PR #42** (004 Phase 0 + MinIO→silo, to `main`) and **draft PR #43** (`v2` CI only — never merge).
 **Production:** `https://studio.bistecglobal.com`
 
 ---
 
-## ⏸️ 2026-10-03 — PICK UP HERE
+## ⏸️ 2026-10-07 — PICK UP HERE
+
+**005 is done and verified PASS.** **011 (app visual redesign) is planned, and wave 1 is built.** The build is paused at its one operator gate: **the user picks one of three design directions.** Everything is pushed to `v2`. Nothing is merged to `main`, and prod is unchanged.
+
+### Do this next, in order
+
+1. **Get the direction pick from the user: A Graphite, B Folio or C Instrument.** They may add changes, for example "B, but keep sidebar icons".
+   - **Comparison page:** https://claude.ai/artifact/XijAC8pAQRkmGErC5QYmB5. It is private to its owner. A local copy is `docs/ui-reference/direction-studies/pick.html`; open it in a browser.
+   - **Full studies:** `docs/ui-reference/direction-studies/study-{a-graphite,b-folio,c-instrument}.html`. Each opens with the exact `:root` / `.dark` token block that T4 copies into `globals.css`, plus its contrast tables. `index.html` in the same folder shows all three side by side in iframes.
+2. **Resume `/specclaw:build 011-app-visual-redesign`** (subagent-driven: one implementer subagent per task, then a `specclaw:code-reviewer` subagent, then the orchestrator commits). The next task is **T3**:
+   - record the pick, with its date, in `proposal.md` → Decisions;
+   - `git mv` Frozen Light into `docs/ui-reference/archive/frozen-light/`;
+   - write the new `docs/ui-reference/DESIGN_SYSTEM.md` from the chosen study.
+
+   Then come T4 (tokens), T5 (primitives and opaque surfaces), T6 (shell), T7–T12 (screens) and T13 (cleanup). Run them **one at a time**, because lint-staged stashes. Every task that touches `src/` ends with a full clean mock E2E run.
+
+3. **PR #42 merges only on the user's go-ahead** (unchanged since 2026-10-01). After it merges, merge `main` into `v2`, re-check 005 AC-17 under node:22, re-run the AC-16 script against a rebuilt image, and close 004's Phase 0 ACs.
+
+### What happened on 2026-10-06 and 2026-10-07
+
+- **005 AC-16 passed 3/3** in the operator run: real token, temporary env file deleted afterwards, image `bistec-studio:t6` with CLI 2.1.287. T6 was marked complete (`9cb80ad1`), and the build was finalized with green gates.
+  - **🔴 The user pasted that OAuth token into the chat**, so it is in the session transcript. **The user should revoke it** and make a new one with `claude setup-token`.
+  - The auto-mode classifier blocks Claude from writing a token to a file and running docker with it. The working pattern is a ready-to-paste `! …` command that writes a temp env file, runs the check and deletes the file. This is logged as a 005 learning.
+- **005 verify: PASS, 25/25 ACs** (`e4e8e78e`, `.specclaw/changes/005-provider-flexibility-onboarding/verify-report.md`).
+  - The first E2E run failed once: the AC-23 stale-wording guard caught the 2026-10-03 handoff quoting "shared server credential". `f0fc1af7` reworded that line.
+  - The clean re-run had **261 passed, 3 skipped, 0 failed, 0 flaky**. The skips are TC-REG-H11a/b/c, and TC-GEN-05 now runs.
+  - **Open follow-ups, none of them failures:** recheck AC-17 after node:22 lands on `v2`; unit runs leave empty `bistec-cli-*` temp dirs; Gemini needs one live call; the card guide names `docs/claude-account-setup.md` as plain text, not a link.
+- **011 approved and planned** (`e398a589`). The user's decisions, recorded in `proposal.md` → Decisions:
+  - **a neutral tool UI**, with no BISTEC brand cues; each team's brand kit is the only brand on screen;
+  - **three studies, from which the user picks alone**;
+  - **the theme follows the OS**.
+
+  The planner's assumptions A1–A4 are in `spec.md`; the user did not veto them:
+  - no pixel-diff tests, with screenshots for review instead;
+  - the button shows icon + label at `md` and wider, and the icon only below that;
+  - it always starts a fresh brief;
+  - every screen works at 375 px with no horizontal scroll.
+
+  The plan is 14 FR, 8 NFR, 20 AC and 13 tasks in 7 waves.
+
+- **011 wave 1 built and pushed:**
+  - **T1 Create post button** (`3203673c`): bottom-right on every `(app)` page except `/brief`, with toasts offset above it (Sonner `offset`/`mobileOffset` 96 px). New `tests/e2e/create-post-button.test.ts`. Full E2E: 265 passed, 3 skipped, 0 failed. The review gave NOTE (5 notes, none blocking). **Carry-over for T6:** white on `#0284c7` is about 4.1:1, below AA; the button moves onto AA tokens in the shell task.
+  - **T2 three direction studies** (`bb6828c5`). All 180 contrast checks pass; all floating surfaces are opaque.
+    - **A Graphite:** warm greys, an ink accent, floating opaque islands, Plus Jakarta Sans, today's two-column layout.
+    - **B Folio:** cream paper and espresso ink, a sienna accent, Fraunces over Instrument Sans, rules instead of boxes, the post as a proof with crop marks.
+    - **C Instrument:** true neutrals, a violet accent, Geist and Geist Mono, a dense three-pane workbench.
+  - **The comparison page and screenshots are in docs** (this session's last commit): `docs/ui-reference/direction-studies/pick.html` and `shots/`.
+
+### Notes T3 onwards must honour (from the T2 report)
+
+- **A new token, `--line-subtle`,** is for decorative dividers, so `--line` can carry the 3:1 contrast needed for control edges. T4's token and contrast tests must include it.
+- **The design §4 reduced-motion rule** (1 ms on `*`) also makes every property transition for 1 ms. T5's computed-style E2E checks should wait briefly before reading.
+- **No study uses blue,** so `status-scheduled` moves from sky to amber or ochre in all three. In C, `exported` shares the accent hue.
+- **Every study regroups some controls:** Export and Edit inline move into a More menu, and Undo sits by the versions. FR-12 still requires every control to stay present and reachable. C's three panes need a 375 px plan (a bottom sheet for the inspector).
+- **The studies load Google Fonts for preview only.** The app self-hosts the chosen families through `next/font` (NFR-05).
+- **`scratchpad/contrast.mjs` from T2 isn't in the repo.** T4 rebuilds the contrast test as `tests/unit/contrast.test.ts`.
+
+### State and gates at `v2` head
+
+- **Gates:** unit **1593/1593**, lint 0 errors (the 7 known warnings), build passes. The last full clean mock E2E was **265/3/0/0**, at T1. Render harness 15/15 at its last run (011 has not touched generated posts).
+- **No new migrations since 2026-10-03.** The four migrations on `v2` but not on `main` are listed in CLAUDE.md.
+- **Open PRs are unchanged:** #42 merges on go-ahead only; draft #43 must never be merged.
+
+---
+
+## ⏸️ 2026-10-03 — superseded by 2026-10-07 above (kept for history)
 
 **004 is done** (24/24, verify **PARTIAL**, solely because Phase 0 is still on unmerged PR #42). **005 is built** (9 of 10 tasks; **T6 waits on one operator check**, AC-16). Everything is pushed to `v2`. Nothing is merged to `main`, and prod is unchanged.
 
