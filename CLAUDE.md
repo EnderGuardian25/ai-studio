@@ -4,6 +4,23 @@ This repo contains planning documents for **bistec-studio**, an internal marketi
 
 ## ✅ Outstanding work — START HERE (updated 2026-10-07)
 
+- **🍴 2026-10-07 — THIS REPO IS NOW THE FORK `EnderGuardian25/ai-studio` (public). Read this before any git, `gh`, CI or deploy step.** Full detail: [`docs/handoff.md`](docs/handoff.md) → "moved to the fork".
+  - **The user's decision:** company development stops. All `v2` work (004, 005, 011 and the 006–010/012 proposals) continues here. **The company repo `bistec-oss/studio` is left exactly as it is.** Never push, open PRs, close PRs (draft #43 included) or delete branches there.
+  - **Remotes:**
+    - `origin` = the fork. Push here; `main` and `v2` track it, and **`v2` is the fork's default branch**.
+    - `company` = `bistec-oss/studio`, **fetch-only**. Its push URL is deliberately `DISABLED-company-repo-is-read-only`; never "repair" it.
+    - `gh repo set-default` = `EnderGuardian25/ai-studio`. In a fork, `gh pr create` and `/specclaw:pr` otherwise default the PR base to the **company** repo. If `gh` ever proposes `bistec-oss/studio`, stop.
+  - **GitHub Actions are OFF on the fork** (2026-10-07). `docker-publish.yml` still redeploys the **company's** Coolify and polls the company's `/api/health`, and `e2e.yml` doesn't trigger on `v2`.
+    - **Next code change, proposed first:** guard or remove the deploy job (`if: github.repository == 'bistec-oss/studio'`), add `v2` to the E2E triggers, then re-enable Actions with `gh api -X PUT repos/EnderGuardian25/ai-studio/actions/permissions -F enabled=true`.
+    - **Never** give the fork a `COOLIFY_API_TOKEN`. Until CI is back, run the gates locally.
+  - **The repo is public.**
+    - The 2026-10-07 audit found no real credential in the tree or in `v2` history, and everything was already public on the company repo.
+    - **Never commit** secrets, `.env*` (except `.env.example`), prod IDs, customer data or tokens. Test fixtures use obvious fakes (`FAKE`, `AAAA…`).
+    - `BistecStudio2026!` is the test-only seed password; it is never used outside a `*_test` DB.
+  - **Company prod (`studio.bistecglobal.com`) is not ours.** The Coolify, MinIO → silo prod swap, B4, team-token and prod-test items further down are **company history and reference**, not to-dos. The fork has no deploy target yet.
+  - **PR #42 was merged into company `main` on 2026-09-28** (`671ad6e9` = fork `main`). Every "merge #42 only on go-ahead" note below is stale. **To do in the fork:** merge `main` into `v2`, recheck 005 AC-17 under node:22, re-run AC-16 against a rebuilt image, and close 004's Phase 0 ACs.
+  - **Branch rule (kept):** `v2` is the integration branch. Fork `main` moves only on the user's go-ahead.
+
 - **⏸️ 2026-10-07 — PICK UP HERE. 005 is done and verified PASS. 011 (app visual redesign) is planned, and wave 1 is built. The build is paused at its operator gate: the user picks a design direction.** Full detail: [`docs/handoff.md`](docs/handoff.md) top section.
   - **Next, in order:**
     1. **Get the user's pick: A Graphite, B Folio or C Instrument,** plus any changes they want.
@@ -13,7 +30,7 @@ This repo contains planning documents for **bistec-studio**, an internal marketi
        - Then T4 (tokens), T5 (primitives, opaque surfaces), T6 (shell), T7–T12 (screens), T13 (cleanup).
        - Every task that touches `src/` ends with a full clean mock E2E run.
        - The T2 report's carry-over notes (`--line-subtle`, reduced-motion timing, amber `scheduled`, regrouped controls) are in the handoff.
-    3. **PR #42 merges only on the user's go-ahead** ("not yet", 2026-10-01). Then merge `main` into `v2`, re-check 005 AC-17 under node:22 and re-run AC-16 on a rebuilt image, and close 004's Phase 0 ACs.
+    3. ~~PR #42 merges only on the user's go-ahead.~~ **Superseded by the fork entry above:** #42 was merged on 2026-09-28. Merge fork `main` into `v2`, then recheck AC-17 and AC-16 and close Phase 0.
     4. **🔴 The user should revoke the OAuth token pasted into chat on 2026-10-06** and make a new one with `claude setup-token`.
   - **005 verify: PASS, 25/25** ([`verify-report.md`](.specclaw/changes/005-provider-flexibility-onboarding/verify-report.md)).
     - AC-16 passed 3/3 in the operator run.
@@ -33,10 +50,8 @@ This repo contains planning documents for **bistec-studio**, an internal marketi
     - **Gemini:** mock-only by user decision.
     - **Onboarding:** `docs/claude-account-setup.md` (native installer primary) and an in-app guide.
     - **Item 2 (COPY route) stays deferred to 008.**
-  - **Open PRs:**
-    - **#42** `fix/ci-deploy-pipeline` → `main` (004 Phase 0 + MinIO → silo). Merge **only on go-ahead**.
-    - **#43** `v2` → `main` is a **DRAFT that must never be merged**. It exists only for CI on `v2`.
-  - **🔴 Urgent ops for the Coolify administrator, unchanged:** swap prod MinIO to `pgsty/silo` (`docs/minio-silo-migration.md`; CVE-2026-40344), and rotate `COOLIFY_API_TOKEN` (`deploy` + `read`, made by an Admin/Owner; prove it with a direct POST).
+  - **Open PRs (company repo, not ours since the fork):** #42 is **merged** (2026-09-28). Draft #43 `v2` → `main` is left open on the company repo and is never touched or merged.
+  - **Company ops, handed to the company's Coolify administrator and not fork to-dos:** swap prod MinIO to `pgsty/silo` (`docs/minio-silo-migration.md`; CVE-2026-40344), and rotate `COOLIFY_API_TOKEN`.
   - **Gates at `v2` head:**
     - unit 1593/1593, lint 0 errors, build passes;
     - last full clean mock E2E 265/3/0/0, at 011 T1 (2026-10-06);

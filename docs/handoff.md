@@ -1,9 +1,62 @@
 # bistec-studio — Session Handoff
 
 **Date:** 2026-10-07 (latest: 005 finished and verified **PASS**; 011 planned and wave 1 built; **waiting on the user's direction pick**). Previous: 2026-10-03 (004 finished and verified PARTIAL, Phase 0 only; 005 built 9/10, waiting on one operator check). Before that: 2026-09-28 (build session — 004 Waves 1–3 built, MinIO → silo, PR #42 + draft PR #43). Before that: 2026-09-23 (later, later the same day: proposal **012** per-channel captions + copy→caption rename, a floating **Create post** button folded into 011, and a launch-video legibility pass. Before that: planning session — proposals 008–011 + roadmap, 004 re-planned to 24 tasks incl. Phase 0, and the deploy pipeline found broken: Coolify 401 since 2026-09-15). Previous: 2026-07-28 (copy-edit status clobber fix).
-**Repo:** https://github.com/bistec-oss/studio (formerly `bistec-oss/designer`)
-**Branch:** work continues on **`v2`** (pushed; all 004–012 work lands here, merged to `main` in one go on go-ahead). `main` = `09a38b71`; prod runs `9ea4c045` (deploys broken since 2026-09-15). Open: **PR #42** (004 Phase 0 + MinIO→silo, to `main`) and **draft PR #43** (`v2` CI only — never merge).
-**Production:** `https://studio.bistecglobal.com`
+**Repo (since 2026-10-07):** https://github.com/EnderGuardian25/ai-studio — a public GitHub **fork** of the company repo `bistec-oss/studio`. All development continues here. The company repo is left as it is and receives nothing from this work. See the 2026-10-07 fork section below.
+**Branch:** work continues on **`v2`**, the fork's default branch. Fork `main` = `671ad6e9`, the company `main` at fork time.
+**Production:** none for the fork. `https://studio.bistecglobal.com` is the **company's** prod. It runs company `main` and is not ours to deploy.
+
+---
+
+## 🍴 2026-10-07 — moved to the fork `EnderGuardian25/ai-studio` (read before any git, CI or deploy step)
+
+**Decision (the user, 2026-10-07):** development of the company repo stops. Everything on `v2` (004, 005, 011 and the 006–010/012 proposals) continues in the user's own public fork, **`EnderGuardian25/ai-studio`**. **The company repo `bistec-oss/studio` is left exactly as it is:** no pushes, PRs, branch deletes or PR closes there, draft PR #43 included.
+
+### How this checkout is wired
+
+| Remote    | URL                                                | Use                                                                                                                                   |
+| --------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `origin`  | `https://github.com/EnderGuardian25/ai-studio.git` | **The fork. Push here.** `main` and `v2` track it.                                                                                    |
+| `company` | `https://github.com/bistec-oss/studio.git`         | **Fetch only.** The push URL is set to `DISABLED-company-repo-is-read-only`, so `git push company …` fails by design. Don't "fix" it. |
+
+- `gh repo set-default` is **`EnderGuardian25/ai-studio`**. Without it, `gh pr create`, and so `/specclaw:pr`, in a fork defaults to **the company repo** as the PR base. If `gh` ever proposes `bistec-oss/studio` as the base, stop.
+- specclaw `github.repo` is empty and auto-detects from `origin`, so it already points at the fork. GitHub sync stays off.
+- **The other worktree,** `../designer-ci` (`fix/ci-deploy-pipeline`, already merged as PR #42), shares this repo's git config, so the same remotes apply to it. It can be removed with `git worktree remove ../designer-ci`.
+- **Setting up a new machine:** `git clone https://github.com/EnderGuardian25/ai-studio.git`, then run `git remote add company https://github.com/bistec-oss/studio.git`, `git remote set-url --push company DISABLED-company-repo-is-read-only` and `gh repo set-default EnderGuardian25/ai-studio`.
+
+### Leak audit before going public (2026-10-07)
+
+- **Nothing new was exposed.** Every commit on `v2` and `main` was already pushed to `bistec-oss/studio`, which is **public**, before the fork was made. The fork adds no content the company repo didn't already publish.
+- **No real credential exists in the tree or in `v2` history.** The scan looked for Anthropic `sk-ant-oat/api`, OpenAI `sk-proj`, GitHub `ghp_/gho_/github_pat_`, AWS `AKIA`, Google `AIza`, `bstk_`, Slack `xox*` and private-key blocks. Every hit is a prefix in docs or validation regexes, or a fake test value (`FAKE`, `AAAA…`). The only env file ever committed is `.env.example`, which holds placeholders and the local-dev `minioadmin`/`bistec` defaults.
+- **Test-only credentials in the repo, which are fine:**
+  - `BistecStudio2026!` is the fixed **test** seed password. `seed-admin.mjs` uses it only for `NODE_ENV=test`, `SEED_FIXED_CREDENTIALS=true` or a `*_test` database. A real deploy gets a random password printed once.
+  - The CI E2E job's `ci-test-secret-…` and `0123…` keys.
+- **Company operational detail is in the tracked docs and stays public,** as it already is on the company repo: the prod hostname, Coolify resource UUIDs, prod team and kit IDs, the Hearts Academy contact block, the prod findings docs and the prompt-injection review. Removing these from the fork's tip would not unpublish them, because fork networks share history. **Never add new secrets, prod IDs or customer data to the fork.**
+- **Untracked and gitignored files never reach the fork:** `.env`, `.env.test`, `brag-output/`, the specclaw `logs/` and `.lock/`.
+- 🔴 **Still open, and unrelated to the fork:** the OAuth token pasted into chat on 2026-10-06 lives in the session transcript, not the repo. Revoke it and make a new one with `claude setup-token`.
+
+### CI on the fork: Actions are OFF until the workflows are changed
+
+`gh api -X PUT repos/EnderGuardian25/ai-studio/actions/permissions -F enabled=false` was run on 2026-10-07. Both workflows still assume the company repo:
+
+- **`docker-publish.yml`** (push to `main`) builds and pushes `ghcr.io/<repo>` (here, `ghcr.io/enderguardian25/ai-studio`). It then **calls the company's Coolify** (`coolify.bistecglobal.com`, the company's two resource UUIDs) and polls the company's `/api/health`. With no `COOLIFY_API_TOKEN` it can only fail red. It must never be given one.
+- **`e2e.yml`** runs only on PRs and pushes to `main`. Draft PR #43 existed only to get CI on `v2`; the fork needs `v2` in its triggers instead.
+
+**Next step (a specclaw change, so propose it first):** remove or guard the deploy job with `if: github.repository == 'bistec-oss/studio'`, and add `v2` to `e2e.yml`'s triggers. Then turn Actions back on with `-F enabled=true`. Until then, **gates are run locally** (unit, lint, build, mock E2E), exactly as before.
+
+### What changed in the open items
+
+- **PR #42 was already merged** into company `main` on 2026-09-28 (`671ad6e9`). The "merges only on go-ahead" notes were stale. Fork `main` = `671ad6e9`.
+- **Still to do, now inside the fork:** merge `main` into `v2`, which brings 004 Phase 0: `/api/health`, Node 22, the CI hardening and MinIO → silo. Then recheck 005 AC-17 under node:22, re-run AC-16 against a rebuilt image, and close 004's Phase 0 ACs. Expect conflicts in `.github/workflows/docker-publish.yml`, so do the CI change above right after.
+- **No longer ours, so don't act on them from here:**
+  - draft PR #43 (left open on the company repo, as it is);
+  - the Coolify token rotation;
+  - the MinIO → silo **prod** swap (CVE-2026-40344);
+  - B4 (scheduler) and the team Claude tokens **on company prod**;
+  - the prod test-data wipe.
+
+  These belong to the company's Coolify admin. The runbooks (`docs/coolify-token-rotation.md`, `docs/minio-silo-migration.md`, `docs/scheduler-b4-diagnosis-2026-08-03.md`) stay in the tree for reference.
+
+- **The "`v2` merges to `main` in one go" rule is kept for the fork:** `v2` is the integration branch, and fork `main` moves only on the user's go-ahead. It no longer deploys anything. Once the fork has its own deploy target, write that rule here.
 
 ---
 
@@ -23,7 +76,7 @@
 
    Then come T4 (tokens), T5 (primitives and opaque surfaces), T6 (shell), T7–T12 (screens) and T13 (cleanup). Run them **one at a time**, because lint-staged stashes. Every task that touches `src/` ends with a full clean mock E2E run.
 
-3. **PR #42 merges only on the user's go-ahead** (unchanged since 2026-10-01). After it merges, merge `main` into `v2`, re-check 005 AC-17 under node:22, re-run the AC-16 script against a rebuilt image, and close 004's Phase 0 ACs.
+3. ~~PR #42 merges only on the user's go-ahead.~~ **Superseded by the fork section above.** PR #42 was already merged on 2026-09-28. Merge fork `main` into `v2`, then do the AC-17, AC-16 and Phase 0 close-out there.
 
 ### What happened on 2026-10-06 and 2026-10-07
 
@@ -68,7 +121,7 @@
 
 - **Gates:** unit **1593/1593**, lint 0 errors (the 7 known warnings), build passes. The last full clean mock E2E was **265/3/0/0**, at T1. Render harness 15/15 at its last run (011 has not touched generated posts).
 - **No new migrations since 2026-10-03.** The four migrations on `v2` but not on `main` are listed in CLAUDE.md.
-- **Open PRs are unchanged:** #42 merges on go-ahead only; draft #43 must never be merged.
+- **Open PRs:** none on the fork. On the company repo, #42 is merged and draft #43 is left open as it is. Neither is ours to touch now (see the fork section).
 
 ---
 
