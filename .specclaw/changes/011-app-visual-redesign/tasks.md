@@ -63,7 +63,7 @@ There are 13 tasks in 7 waves. All the work lands on `v2`.
 
 ### Wave 2 — The pick and the design-system document
 
-- [ ] `T3` — Record the pick; new `DESIGN_SYSTEM.md`; archive Frozen Light
+- [x] `T3` — Record the pick; new `DESIGN_SYSTEM.md`; archive Frozen Light
   - Files: `docs/ui-reference/DESIGN_SYSTEM.md`, `docs/ui-reference/archive/frozen-light/` (moved: `DESIGN_SYSTEM.md`, `screen-dark.png`, `screen-light.png`, `synthetix-original-reference.html`), `.specclaw/changes/011-app-visual-redesign/proposal.md`
   - Estimate: medium
   - Kind: docs
@@ -118,12 +118,13 @@ There are 13 tasks in 7 waves. All the work lands on `v2`.
 ### Wave 5 — App shell and the first screens
 
 - [ ] `T6` — App shell restyle, plus login and choose-team
-  - Files: `src/components/layout/AppShell.tsx`, `src/components/layout/TeamSwitcher.tsx`, `src/components/layout/CreatePostButton.tsx`, `src/components/theme/ThemeToggle.tsx`, `src/components/Logo.tsx` (only if the direction changes it), `src/app/(auth)/login/page.tsx`, `src/app/(app)/choose-team/page.tsx`, `tests/e2e/surfaces.test.ts`
+  - Files: `src/components/layout/AppShell.tsx`, `src/components/layout/TeamSwitcher.tsx`, `src/components/layout/CreatePostButton.tsx`, `src/components/theme/ThemeToggle.tsx`, `src/components/Logo.tsx`, `public/BistecStudioLogo.png` (deleted), `src/app/(auth)/login/page.tsx`, `src/app/(app)/choose-team/page.tsx`, `tests/e2e/surfaces.test.ts`
   - Estimate: medium
   - Kind: impl
   - Depends: T5
   - Notes:
     - **Covers:** FR-10, FR-11 (group 7), A4.
+    - **Logo (user decision, 2026-10-07):** the Bistec Studio logo is not used. `Logo.tsx` renders the Folio study's typeset **"Studio"** wordmark as is: the display font, italic, `opsz` 72, in the ink token, with no `dark:invert` and the accessible name "Studio". Delete `public/BistecStudioLogo.png` once nothing references it. This supersedes spec.md's "Dark-mode logo" note.
     - **ACs:** AC-11, AC-12 (shell group), AC-13, AC-17 (shell).
     - **Keep** the sidebar sections, role-gating, the Radix mobile overlay and every `aria-label`.
     - **The button moves onto tokens** (`bg-accent text-accent-fg`, `.surface-raised` shadow).

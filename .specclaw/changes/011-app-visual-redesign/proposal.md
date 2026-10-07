@@ -87,6 +87,8 @@ The fixed header sits above scrolling content at 60–75% opacity, so text scrol
 - **Three direction studies, applied to the draft review page. The user picks one alone.**
 - **The default theme follows the OS preference.** Light and dark both stay mandatory.
 - **Approved for planning on 2026-10-06.**
+- **2026-10-07 (user): Direction B, Folio.** Picked alone, from A Graphite, B Folio and C Instrument (`docs/ui-reference/direction-studies/pick.html`), with no changes to the study. `study-b-folio.html` is now the source for the new `docs/ui-reference/DESIGN_SYSTEM.md`; Frozen Light is archived at `docs/ui-reference/archive/frozen-light/`.
+- **2026-10-07 (user): the logo is the typeset "Studio" wordmark from the Folio study** (Fraunces italic, in the ink colour, accessible name "Studio"). `public/BistecStudioLogo.png` is not used. The user: _"The font Folio already has that says Studio is already nice, so leave as is."_ Implemented in T6, which rewrites `Logo.tsx` and removes the PNG. This supersedes `spec.md`'s "Dark-mode logo" edge case.
 
 ## Open Questions
 
