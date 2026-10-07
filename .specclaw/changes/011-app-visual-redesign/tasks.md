@@ -102,7 +102,7 @@ There are 13 tasks in 7 waves. All the work lands on `v2`.
 
 ### Wave 4 — Primitives and the opaque surface model
 
-- [ ] `T5` — Rebuild `src/components/ui/*` on tokens; opaque fixed and floating surfaces; surfaces E2E
+- [x] `T5` — Rebuild `src/components/ui/*` on tokens; opaque fixed and floating surfaces; surfaces E2E
   - Files: `src/app/globals.css` (surface classes; `.glass` and `.glass-popover` made opaque), `src/components/ui/*` (`Panel.tsx` and `Input.tsx` new, from the `Glass*` files, plus aliases in `index.ts`), `src/components/providers/ToastProvider.tsx`, `tests/e2e/surfaces.test.ts` (new)
   - Estimate: large
   - Kind: impl

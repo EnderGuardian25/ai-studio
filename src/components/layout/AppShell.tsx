@@ -105,8 +105,10 @@ function Sidebar({ onClose }: { onClose?: () => void }) {
     }
   }
 
+  // .surface: opaque (011 T5, FR-08), because the sidebar is fixed over
+  // scrolling content. T6 restyles the shell.
   return (
-    <aside className="glass-panel flex flex-col h-full w-64 p-4 gap-1 rounded-none">
+    <aside className="surface flex flex-col h-full w-64 p-4 gap-1 rounded-none">
       {onClose && (
         <div className="flex items-center justify-end mb-2 px-1">
           <button

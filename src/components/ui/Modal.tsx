@@ -12,13 +12,22 @@ function Overlay({ className }: { className?: string }) {
   return (
     <Dialog.Overlay
       className={cn(
-        'fixed inset-0 z-50 bg-black/50',
+        // The scrim (DESIGN_SYSTEM.md §4.2): the one translucent layer, with
+        // nothing legible or interactive on it, and no backdrop blur.
+        'fixed inset-0 z-50 bg-scrim/50',
         'data-[state=open]:animate-fade-in',
         className,
       )}
     />
   )
 }
+
+// The header's close (X) button, shared by Modal and Drawer.
+const CLOSE_BUTTON = cn(
+  'p-1 -m-1 rounded-ui-sm flex-shrink-0 text-fg-muted hover:text-fg',
+  'transition-colors duration-fast ease-standard',
+  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus',
+)
 
 interface BaseProps {
   open: boolean
@@ -71,7 +80,7 @@ export function Modal({
             // Never taller than the viewport: header/footer stay pinned and the
             // body scrolls, so tall forms remain fully usable on short screens.
             'max-h-[calc(100dvh-2rem)] flex flex-col',
-            'glass-panel rounded-xl p-6',
+            'surface-overlay p-6 font-text text-ui-base text-fg',
             // animate-modal-in, NOT animate-scale-in: the keyframes must carry
             // the centering translate or the animation wipes it (see globals.css).
             'animate-modal-in',
@@ -81,13 +90,13 @@ export function Modal({
         >
           {!hideHeader && (
             <div className="flex items-start justify-between gap-4 mb-4 flex-shrink-0">
-              <Dialog.Title className="text-lg font-semibold text-light-text dark:text-dark-text">
+              <Dialog.Title className="font-display text-ui-xl font-medium leading-tight text-fg">
                 {title}
               </Dialog.Title>
               <Dialog.Close asChild>
                 <button
                   aria-label="Close"
-                  className="text-light-text-muted dark:text-dark-text-muted hover:text-light-text dark:hover:text-dark-text transition-colors flex-shrink-0"
+                  className={CLOSE_BUTTON}
                 >
                   <X size={18} />
                 </button>
@@ -121,11 +130,11 @@ export function Drawer({
   return (
     <Dialog.Root open={open} onOpenChange={(next) => { if (!next) onClose() }}>
       <Dialog.Portal>
-        <Overlay className="backdrop-blur-sm" />
+        <Overlay />
         <Dialog.Content
           className={cn(
             'fixed right-0 top-0 z-50 h-full w-full max-w-md',
-            'glass-panel rounded-none border-l',
+            'surface-overlay rounded-none font-text text-ui-base text-fg',
             'flex flex-col',
             'data-[state=open]:animate-slide-in',
             'focus:outline-none',
@@ -133,14 +142,14 @@ export function Drawer({
           )}
         >
           {!hideHeader && (
-            <div className="flex items-center justify-between px-5 py-4 border-b border-light-border dark:border-dark-border flex-shrink-0">
-              <Dialog.Title className="text-base font-semibold text-light-text dark:text-dark-text">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-line-subtle flex-shrink-0">
+              <Dialog.Title className="font-display text-ui-lg font-medium text-fg">
                 {title}
               </Dialog.Title>
               <Dialog.Close asChild>
                 <button
                   aria-label="Close"
-                  className="p-1.5 rounded-lg text-light-text-muted dark:text-dark-text-muted hover:bg-primary/10 transition-colors"
+                  className={CLOSE_BUTTON}
                 >
                   <X size={16} />
                 </button>
@@ -150,7 +159,7 @@ export function Drawer({
           {hideHeader && <Dialog.Title className="sr-only">{title}</Dialog.Title>}
           <div className="flex-1 overflow-y-auto">{children}</div>
           {footer && (
-            <div className="flex gap-2 justify-end px-5 py-4 border-t border-light-border dark:border-dark-border flex-shrink-0">
+            <div className="flex gap-2 justify-end px-5 py-4 border-t border-line-subtle flex-shrink-0">
               {footer}
             </div>
           )}

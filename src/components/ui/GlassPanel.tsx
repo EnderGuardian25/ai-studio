@@ -1,18 +1,3 @@
-import React from 'react'
-import { cn } from '@/lib/utils'
-
-interface GlassPanelProps extends React.HTMLAttributes<HTMLDivElement> {
-  children?: React.ReactNode
-  className?: string
-}
-
-export function GlassPanel({ className, children, ...props }: GlassPanelProps) {
-  return (
-    <div
-      className={cn('glass-panel rounded-xl', className)}
-      {...props}
-    >
-      {children}
-    </div>
-  )
-}
+// Legacy import path, kept so existing `@/components/ui/GlassPanel` imports
+// compile until the cleanup (011 FR-13). New code imports Panel.
+export { Panel as GlassPanel } from './Panel'

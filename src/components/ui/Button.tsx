@@ -1,7 +1,10 @@
 import React from 'react'
 import { cn } from '@/lib/utils'
 
-type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger'
+// Folio buttons (DESIGN_SYSTEM.md §8.2). The variant names predate Folio and
+// stay, so callers compile unchanged: `secondary` is Folio's Outline button and
+// `ghost` its Text button. `ink` is the refine Send button.
+type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'ink'
 type ButtonSize    = 'sm' | 'md' | 'lg'
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
@@ -10,41 +13,31 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const variantClasses: Record<ButtonVariant, string> = {
-  primary: [
-    // Light mode: solid ice-blue CTA
-    'bg-primary text-white border border-primary/80',
-    'hover:bg-primary-hover active:bg-primary-active',
-    // Dark mode: ghost-fill with primary-light
-    'dark:bg-primary-light/20 dark:text-primary-light dark:border-primary-light/30',
-    'dark:hover:bg-primary-light/30 dark:active:bg-primary-light/40',
-  ].join(' '),
-
+  primary: 'bg-accent text-accent-fg border border-accent enabled:hover:shadow-raised',
   secondary: [
-    'glass-input',
-    'text-light-text dark:text-dark-text',
-    'hover:border-primary/40 dark:hover:border-primary-light/40',
-    'hover:bg-primary/5 dark:hover:bg-primary-light/5',
+    'bg-transparent text-fg border border-line enabled:hover:border-fg',
+    // an open menu button
+    'aria-expanded:border-fg aria-expanded:bg-surface-raised',
   ].join(' '),
-
-  ghost: [
-    'bg-transparent border border-transparent',
-    'text-light-text-muted dark:text-dark-text-muted',
-    'hover:bg-primary/5 dark:hover:bg-primary-light/5',
-    'hover:text-primary dark:hover:text-primary-light',
-  ].join(' '),
-
-  danger: [
-    'bg-red-600 text-white border border-red-600/80',
-    'hover:bg-red-700 active:bg-red-800',
-    'dark:bg-red-500/20 dark:text-red-400 dark:border-red-500/30',
-    'dark:hover:bg-red-500/30 dark:active:bg-red-500/40',
-  ].join(' '),
+  ghost: 'bg-transparent text-fg border border-transparent underline decoration-line underline-offset-4',
+  danger: 'bg-transparent text-status-failed border border-status-failed',
+  ink: 'bg-fg text-canvas border border-fg',
 }
 
+// One class per property and size: `cn` is a plain join (no tailwind-merge),
+// so two competing paddings would be settled by CSS source order.
 const sizeClasses: Record<ButtonSize, string> = {
-  sm:  'px-3 py-1.5 text-xs  rounded-lg  gap-1.5',
-  md:  'px-4 py-2   text-sm  rounded-xl  gap-2',
-  lg:  'px-5 py-2.5 text-base rounded-xl gap-2.5',
+  sm: 'h-[30px] text-ui-xs',
+  md: 'h-9 text-ui-sm',
+  lg: 'h-10 text-ui-base',
+}
+
+function paddingFor(variant: ButtonVariant, size: ButtonSize): string {
+  if (variant === 'ghost') return 'px-1.5'
+  if (size === 'sm') return 'px-2.5'
+  if (variant === 'primary') return 'px-5'
+  if (variant === 'ink') return 'px-4'
+  return 'px-3.5'
 }
 
 export function Button({
@@ -58,12 +51,14 @@ export function Button({
   return (
     <button
       className={cn(
-        'inline-flex items-center justify-center font-medium',
-        'transition-all duration-150',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 dark:focus-visible:ring-primary-light/50',
+        'inline-flex items-center justify-center gap-2 whitespace-nowrap',
+        'font-text font-semibold rounded-ui-md',
+        'transition-[background-color,border-color,color,box-shadow] duration-fast ease-standard',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-canvas',
         'disabled:opacity-50 disabled:cursor-not-allowed',
         variantClasses[variant],
         sizeClasses[size],
+        paddingFor(variant, size),
         className,
       )}
       disabled={disabled}

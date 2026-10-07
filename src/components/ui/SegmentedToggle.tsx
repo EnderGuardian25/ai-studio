@@ -15,6 +15,9 @@ interface SegmentedToggleProps {
   className?: string
 }
 
+// Folio segmented toggle (DESIGN_SYSTEM.md §8.4): a --line outline, and the
+// selected segment in ink (--fg fill, --canvas text). The focus ring is inset,
+// because the outline's overflow-hidden would clip an outer one.
 export function SegmentedToggle({
   options,
   value,
@@ -25,8 +28,8 @@ export function SegmentedToggle({
     <div
       role="tablist"
       className={cn(
-        'inline-flex items-center gap-0.5 p-1',
-        'glass-panel rounded-xl',
+        'inline-flex items-center overflow-hidden',
+        'border border-line rounded-ui-md',
         className,
       )}
     >
@@ -39,21 +42,10 @@ export function SegmentedToggle({
             aria-selected={isActive}
             onClick={() => onChange(opt.value)}
             className={cn(
-              'px-3 py-1.5 rounded-lg text-sm font-medium transition-all duration-150',
-              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 dark:focus-visible:ring-primary-light/50',
-              isActive
-                ? [
-                    'bg-primary/10 dark:bg-primary-light/15',
-                    'text-primary dark:text-primary-light',
-                    'border border-primary/20 dark:border-primary-light/25',
-                    'shadow-sm',
-                  ].join(' ')
-                : [
-                    'text-light-text-muted dark:text-dark-text-muted',
-                    'hover:text-light-text dark:hover:text-dark-text',
-                    'hover:bg-primary/5 dark:hover:bg-primary-light/5',
-                    'border border-transparent',
-                  ].join(' '),
+              'px-2.5 py-1.5 font-text text-ui-xs font-semibold',
+              'transition-colors duration-fast ease-standard',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus',
+              isActive ? 'bg-fg text-canvas' : 'text-fg-muted hover:text-fg',
             )}
           >
             {opt.label}

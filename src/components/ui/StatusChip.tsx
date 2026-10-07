@@ -20,91 +20,23 @@ interface StatusChipProps {
   className?: string
 }
 
-// Colors come from the status-* tokens in tailwind.config.ts (single source of
-// truth): DEFAULT drives the light theme, the `dark` shade drives dark mode.
-// Tailwind can't build class names from template strings, so each status spells
-// its utilities out.
+// Folio status chip (DESIGN_SYSTEM.md §8.5): text in the status colour, a fill
+// of the same colour at 0.10 (in both themes — the --status-* vars switch, and
+// tests/unit/contrast.test.ts measures the text at 0.10), and a 1 px inset ring
+// in currentColor. The label is always present: status is never colour alone.
+// Tailwind can't build class names from template strings, so each status
+// spells its utilities out.
 const statusConfig: Record<PostStatus, { label: string; classes: string }> = {
-  draft: {
-    label: 'Draft',
-    classes: [
-      'bg-status-draft/10 dark:bg-status-draft-dark/15',
-      'text-status-draft dark:text-status-draft-dark',
-      'border border-status-draft/25 dark:border-status-draft-dark/30',
-    ].join(' '),
-  },
-  exported: {
-    label: 'Exported',
-    classes: [
-      'bg-status-exported/10 dark:bg-status-exported-dark/15',
-      'text-status-exported dark:text-status-exported-dark',
-      'border border-status-exported/25 dark:border-status-exported-dark/30',
-    ].join(' '),
-  },
-  scheduled: {
-    label: 'Scheduled',
-    classes: [
-      'bg-status-scheduled/10 dark:bg-status-scheduled-dark/15',
-      'text-status-scheduled dark:text-status-scheduled-dark',
-      'border border-status-scheduled/25 dark:border-status-scheduled-dark/30',
-    ].join(' '),
-  },
-  published: {
-    label: 'Published',
-    classes: [
-      'bg-status-published/10 dark:bg-status-published-dark/15',
-      'text-status-published dark:text-status-published-dark',
-      'border border-status-published/25 dark:border-status-published-dark/30',
-    ].join(' '),
-  },
-  failed: {
-    label: 'Failed',
-    classes: [
-      'bg-status-failed/10 dark:bg-status-failed-dark/15',
-      'text-status-failed dark:text-status-failed-dark',
-      'border border-status-failed/25 dark:border-status-failed-dark/30',
-    ].join(' '),
-  },
-  queued: {
-    label: 'Queued',
-    classes: [
-      'bg-status-scheduled/10 dark:bg-status-scheduled-dark/15',
-      'text-status-scheduled dark:text-status-scheduled-dark',
-      'border border-status-scheduled/25 dark:border-status-scheduled-dark/30',
-    ].join(' '),
-  },
-  generating: {
-    label: 'Generating',
-    classes: [
-      'bg-status-exported/10 dark:bg-status-exported-dark/15',
-      'text-status-exported dark:text-status-exported-dark',
-      'border border-status-exported/25 dark:border-status-exported-dark/30',
-    ].join(' '),
-  },
-  generated: {
-    label: 'Generated',
-    classes: [
-      'bg-status-published/10 dark:bg-status-published-dark/15',
-      'text-status-published dark:text-status-published-dark',
-      'border border-status-published/25 dark:border-status-published-dark/30',
-    ].join(' '),
-  },
-  cancelled: {
-    label: 'Cancelled',
-    classes: [
-      'bg-status-draft/10 dark:bg-status-draft-dark/15',
-      'text-status-draft dark:text-status-draft-dark',
-      'border border-status-draft/25 dark:border-status-draft-dark/30',
-    ].join(' '),
-  },
-  unfinished: {
-    label: 'Unfinished',
-    classes: [
-      'bg-status-scheduled/10 dark:bg-status-scheduled-dark/15',
-      'text-status-scheduled dark:text-status-scheduled-dark',
-      'border border-status-scheduled/25 dark:border-status-scheduled-dark/30',
-    ].join(' '),
-  },
+  draft: { label: 'Draft', classes: 'bg-status-draft/10 text-status-draft' },
+  exported: { label: 'Exported', classes: 'bg-status-exported/10 text-status-exported' },
+  scheduled: { label: 'Scheduled', classes: 'bg-status-scheduled/10 text-status-scheduled' },
+  published: { label: 'Published', classes: 'bg-status-published/10 text-status-published' },
+  failed: { label: 'Failed', classes: 'bg-status-failed/10 text-status-failed' },
+  queued: { label: 'Queued', classes: 'bg-status-scheduled/10 text-status-scheduled' },
+  generating: { label: 'Generating', classes: 'bg-status-exported/10 text-status-exported' },
+  generated: { label: 'Generated', classes: 'bg-status-published/10 text-status-published' },
+  cancelled: { label: 'Cancelled', classes: 'bg-status-draft/10 text-status-draft' },
+  unfinished: { label: 'Unfinished', classes: 'bg-status-scheduled/10 text-status-scheduled' },
 }
 
 export function StatusChip({ status, className }: StatusChipProps) {
@@ -113,8 +45,9 @@ export function StatusChip({ status, className }: StatusChipProps) {
   return (
     <span
       className={cn(
-        'inline-flex items-center px-2 py-0.5',
-        'rounded-full text-xs font-mono font-medium',
+        'inline-flex items-center h-[22px] px-2 rounded-ui-sm',
+        'font-text text-ui-2xs font-semibold uppercase tracking-[0.14em]',
+        'shadow-[inset_0_0_0_1px_currentColor]',
         config.classes,
         className,
       )}

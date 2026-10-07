@@ -132,18 +132,41 @@
   }
 }
 
-/* ─── Glassmorphism utilities (verbatim from DESIGN_SYSTEM.md §5) ─── */
+/* ─── Folio surface classes (change 011, DESIGN_SYSTEM.md §4.1) ───
+   The only way a primitive gets a surface. Opaque (alpha 1), no
+   backdrop-filter (FR-08). background-COLOR, never the `background`
+   shorthand, which would erase a background-image set beside it. */
 @layer components {
-  /* nav bars, top app bar */
-  .glass {
-    background: rgba(255, 255, 255, 0.75);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid rgba(15, 23, 42, 0.1);
+  /* in-flow panels */
+  .surface {
+    background-color: rgb(var(--surface-1));
+    border: 1px solid rgb(var(--line-subtle));
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-panel);
   }
-  .dark .glass {
-    background: rgba(15, 23, 42, 0.6);
-    border: 1px solid rgba(255, 255, 255, 0.05);
+  /* dropdown menus, popovers */
+  .surface-raised {
+    background-color: rgb(var(--surface-2));
+    border: 1px solid rgb(var(--fg));
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-raised);
+  }
+  /* modals, confirm dialogs, the lightbox chrome, toasts (at radius-md) */
+  .surface-overlay {
+    background-color: rgb(var(--surface-2));
+    border: 1px solid rgb(var(--fg));
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-overlay);
+  }
+}
+
+/* ─── Legacy glass utilities (Frozen Light; removed in 011 T13) ─── */
+@layer components {
+  /* nav bars, top app bar. Opaque since 011 T5: the fixed header floats over
+     scrolling content, so FR-08 closes it here, at the source. */
+  .glass {
+    background-color: rgb(var(--surface-1));
+    border: 1px solid rgb(var(--line-subtle));
   }
 
   /* cards, content panels */
@@ -160,20 +183,12 @@
     box-shadow: 0 4px 30px rgba(0, 0, 0, 0.2);
   }
 
-  /* Floating menus/popovers (portaled over arbitrary content): near-opaque —
-     the .glass-panel 60%/50% alpha is fine for in-flow panels over the page
-     backdrop but lets underlying text bleed through a floating menu. */
+  /* Floating menus/popovers (portaled over arbitrary content). Opaque since
+     011 T5 (FR-08): the same values as .surface-raised. */
   .glass-popover {
-    background: rgba(255, 255, 255, 0.95);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    border: 1px solid rgba(15, 23, 42, 0.08);
-    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
-  }
-  .dark .glass-popover {
-    background: rgba(15, 23, 42, 0.96);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.45);
+    background-color: rgb(var(--surface-2));
+    border: 1px solid rgb(var(--fg));
+    box-shadow: var(--shadow-raised);
   }
 
   /* inputs, selects, textareas.
@@ -304,6 +319,28 @@
 .animate-slide-in {
   animation: slideInRight 0.25s ease both;
 }
+/* Folio entrance (DESIGN_SYSTEM.md §7.2): a fade plus a 3 px drop, never a
+   scale. Not for transform-centred elements (see modalIn above). */
+@keyframes drop {
+  from {
+    opacity: 0;
+    transform: translateY(-3px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.animate-drop {
+  animation: drop var(--dur-base) var(--ease-standard) both;
+}
+
+/* Toasts (011 T5): Sonner runs `unstyled`, which also drops the rule that
+   hides the content of the toasts stacked behind the front one. Without it,
+   a taller back toast's text would show below the front toast. */
+[data-sonner-toast][data-expanded='false'][data-front='false'] > * {
+  opacity: 0;
+}
 
 /* ─── Reduced motion (NFR-03, DESIGN_SYSTEM.md §7.3) ───
    Shorten every animation and transition instead of removing them: an
@@ -330,8 +367,15 @@
     animation-duration: 2s !important;
     animation-iteration-count: infinite !important;
   }
-  /* menus and toasts swap their drop for this 150 ms opacity-only fade
-     (`animation: fade 150ms linear both !important`, wired in 011 T5) */
+  /* Menus and toasts swap their entrance for a 150 ms opacity-only fade.
+     These selectors outrank `*`, so 150 ms wins over the 1 ms above; the
+     toast selector also outranks Sonner's own reduced-motion rule, which
+     switches every toast animation off. */
+  .surface-raised,
+  .glass-popover,
+  [data-sonner-toaster] [data-sonner-toast] {
+    animation: fade 150ms linear both !important;
+  }
   @keyframes fade {
     from {
       opacity: 0;

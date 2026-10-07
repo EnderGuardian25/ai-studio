@@ -1,6 +1,7 @@
 import React from 'react'
 import { ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { fieldClasses, fieldEdge, fieldErrorClasses, fieldLabelClasses } from './Input'
 
 interface SelectOption {
   value: string
@@ -28,28 +29,21 @@ export function Select({
   return (
     <div className="flex flex-col gap-1.5">
       {label && (
-        <label
-          htmlFor={selectId}
-          className="text-sm font-medium text-light-text dark:text-dark-text"
-        >
+        <label htmlFor={selectId} className={fieldLabelClasses}>
           {label}
         </label>
       )}
       {/* The chevron is a real positioned element, not a background-image:
           bg-image utilities are one `background` shorthand away from being
-          wiped (happened once via .glass-input), and Tailwind arbitrary
+          wiped (happened once via a legacy input class), and Tailwind arbitrary
           values silently drop URLs containing spaces. */}
       <div className="relative">
         <select
           id={selectId}
           className={cn(
-            'glass-input',
-            'w-full rounded-xl px-3 py-2 text-sm',
-            'text-light-text dark:text-dark-text',
-            'focus:outline-none',
-            'appearance-none pr-8',
-            'disabled:opacity-50 disabled:cursor-not-allowed',
-            error && 'border-red-500',
+            fieldClasses,
+            'appearance-none pr-9',
+            fieldEdge(error),
             className,
           )}
           {...props}
@@ -63,12 +57,10 @@ export function Select({
         <ChevronDown
           size={14}
           aria-hidden
-          className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-light-text-muted dark:text-dark-text-muted"
+          className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-fg-muted"
         />
       </div>
-      {error && (
-        <p className="text-xs text-red-500 dark:text-red-400">{error}</p>
-      )}
+      {error && <p className={fieldErrorClasses}>{error}</p>}
     </div>
   )
 }
