@@ -6,8 +6,11 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Sparkles, MessageSquareText } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { SegmentedToggle } from '@/components/ui/SegmentedToggle'
-import { GlassPanel } from '@/components/ui/GlassPanel'
+import { fieldClasses, fieldEdge } from '@/components/ui/Input'
 import { apiFetch } from '@/lib/apiFetch'
+import { cn } from '@/lib/utils'
+import { SectionHead } from '@/components/campaigns/SectionHead'
+import { ICON, SCROLL_FOCUS, SMALL_CAPS } from '@/components/campaigns/folio'
 import { BriefingAssistantPanel } from '@/components/campaigns/BriefingAssistantPanel'
 import type { CampaignBriefing } from '@/lib/api-types'
 
@@ -98,32 +101,34 @@ export function CampaignBriefingSection({ campaignId, isTeamAdmin }: CampaignBri
     }
   }
 
+  // The read-only briefing text (Active, and the editor's view for editors).
+  const activeBlock = active ? (
+    <div className="surface whitespace-pre-wrap break-words px-4 py-3 text-ui-sm leading-relaxed text-fg">
+      {active.content}
+    </div>
+  ) : (
+    <p className="text-ui-sm text-fg-muted">
+      No briefing yet — posts under this campaign use only the brand voice.
+    </p>
+  )
+
   return (
-    <GlassPanel className="p-4">
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-xs font-semibold uppercase tracking-widest text-light-text-muted dark:text-dark-text-muted">
-          Campaign Briefing
-        </h3>
-        <div className="flex items-center gap-2">
-          {isTeamAdmin && (
-            <Button variant="ghost" size="sm" onClick={() => setAssistantOpen(true)}>
-              <MessageSquareText size={13} /> Draft with AI
-            </Button>
-          )}
-          {active && (
-            <span className="font-mono text-xs text-light-text-muted dark:text-dark-text-muted">
-              v{active.version}
-            </span>
-          )}
-        </div>
-      </div>
-      <p className="text-xs text-light-text-muted dark:text-dark-text-muted mb-3">
+    <section className="pb-8 pt-[22px]">
+      <SectionHead numeral="i." title="Campaign Briefing">
+        {isTeamAdmin && (
+          <Button variant="ghost" size="sm" onClick={() => setAssistantOpen(true)}>
+            <MessageSquareText {...ICON} /> Draft with AI
+          </Button>
+        )}
+        {active && <span className="text-fg-muted">v{active.version}</span>}
+      </SectionHead>
+      <p className="mb-4 text-ui-sm text-fg-muted">
         Shared context for every post generated under this campaign — injected into copy and
         design prompts alongside the brand voice.
       </p>
 
       {isTeamAdmin ? (
-        <div className="space-y-3">
+        <div className="space-y-4">
           <SegmentedToggle
             options={[
               { value: 'active', label: 'Active' },
@@ -136,15 +141,7 @@ export function CampaignBriefingSection({ campaignId, isTeamAdmin }: CampaignBri
 
           {view === 'active' && (
             <div className="space-y-3">
-              {active ? (
-                <div className="glass-input rounded-xl p-3 text-sm text-light-text dark:text-dark-text whitespace-pre-wrap leading-relaxed">
-                  {active.content}
-                </div>
-              ) : (
-                <p className="text-sm text-light-text-muted dark:text-dark-text-muted">
-                  No briefing yet — posts under this campaign use only the brand voice.
-                </p>
-              )}
+              {activeBlock}
               <Button
                 variant="ghost"
                 size="sm"
@@ -156,46 +153,69 @@ export function CampaignBriefingSection({ campaignId, isTeamAdmin }: CampaignBri
           )}
 
           {view === 'history' && (
-            <div className="space-y-2 max-h-64 overflow-y-auto">
-              {briefings.length === 0 && (
-                <p className="text-sm text-light-text-muted dark:text-dark-text-muted">No versions yet.</p>
-              )}
-              {briefings.map(b => (
-                <div key={b.id} className="glass-input rounded-xl p-3 flex items-start justify-between gap-3">
-                  <div>
-                    <span className="font-mono text-xs text-light-text-muted dark:text-dark-text-muted">v{b.version}</span>
-                    {b.isActive && (
-                      <span className="ml-2 text-xs bg-primary/10 dark:bg-primary-light/10 text-primary dark:text-primary-light px-1.5 py-0.5 rounded-full">active</span>
-                    )}
-                    <p className="text-xs text-light-text dark:text-dark-text mt-1 line-clamp-2">{b.content}</p>
-                  </div>
-                  {!b.isActive && (
-                    <Button variant="ghost" size="sm" onClick={() => activate(b.id)}>Restore</Button>
-                  )}
-                </div>
-              ))}
-            </div>
+            briefings.length === 0 ? (
+              <p className="text-ui-sm text-fg-muted">No versions yet.</p>
+            ) : (
+              // Ruled version rows (§8.13's vocabulary). The list scrolls inside
+              // its own box once it is long, so the box is a focusable,
+              // labelled region (WCAG 2.1.1, the T7 rule).
+              <div
+                tabIndex={0}
+                role="region"
+                aria-label="Briefing history"
+                className={`max-h-64 overflow-y-auto border-t border-line-subtle ${SCROLL_FOCUS}`}
+              >
+                <ul>
+                  {briefings.map(b => (
+                    <li key={b.id} className="flex items-start justify-between gap-3 border-b border-line-subtle py-2.5">
+                      <div className="min-w-0">
+                        <div className="flex items-baseline gap-2">
+                          <span className="font-display text-ui-base font-medium text-fg">v{b.version}</span>
+                          {b.isActive && <span className={`${SMALL_CAPS} text-accent`}>active</span>}
+                        </div>
+                        <p className="mt-0.5 line-clamp-2 break-words text-ui-xs text-fg-muted" title={b.content}>
+                          {b.content}
+                        </p>
+                      </div>
+                      {!b.isActive && (
+                        <Button variant="ghost" size="sm" onClick={() => activate(b.id)}>Restore</Button>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )
           )}
 
           {view === 'new' && (
             <div className="space-y-3">
               {enhanceResult ? (
-                <div className="space-y-3">
+                <div className="space-y-4">
                   {enhanceResult.original.trim() && (
                     <div>
-                      <p className="text-xs font-medium text-light-text-muted dark:text-dark-text-muted mb-1">Before</p>
-                      <div className="glass-input rounded-xl p-3 text-sm text-light-text-muted dark:text-dark-text-muted whitespace-pre-wrap leading-relaxed max-h-40 overflow-y-auto">
+                      <p className={`${SMALL_CAPS} mb-1.5 text-fg-muted`}>Before</p>
+                      <div
+                        tabIndex={0}
+                        role="region"
+                        aria-label="Before"
+                        className={`surface max-h-40 overflow-y-auto whitespace-pre-wrap break-words px-4 py-3 text-ui-sm leading-relaxed text-fg-muted ${SCROLL_FOCUS}`}
+                      >
                         {enhanceResult.original}
                       </div>
                     </div>
                   )}
                   <div>
-                    <p className="text-xs font-medium text-primary dark:text-primary-light mb-1">AI suggestion</p>
-                    <div className="glass-input rounded-xl p-3 text-sm text-light-text dark:text-dark-text whitespace-pre-wrap leading-relaxed max-h-64 overflow-y-auto">
+                    <p className={`${SMALL_CAPS} mb-1.5 text-accent`}>AI suggestion</p>
+                    <div
+                      tabIndex={0}
+                      role="region"
+                      aria-label="AI suggestion"
+                      className={`max-h-64 overflow-y-auto whitespace-pre-wrap break-words rounded-ui-sm border border-fg bg-surface-raised px-4 py-3 text-ui-sm leading-relaxed text-fg ${SCROLL_FOCUS}`}
+                    >
                       {enhanceResult.draft}
                     </div>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
                     <Button size="sm" onClick={() => { setDraft(enhanceResult.draft); setEnhanceResult(null) }}>
                       Accept suggestion
                     </Button>
@@ -211,21 +231,21 @@ export function CampaignBriefingSection({ campaignId, isTeamAdmin }: CampaignBri
                     onChange={e => setDraft(e.target.value)}
                     rows={8}
                     placeholder="Audience, key messages, themes, do's and don'ts for this campaign…"
-                    className="glass-input rounded-xl px-3 py-2.5 text-sm w-full text-light-text dark:text-dark-text resize-none"
+                    className={cn(fieldClasses, fieldEdge(), 'resize-none leading-relaxed')}
                   />
-                  <div className="flex gap-2 flex-wrap">
+                  <div className="flex flex-wrap gap-2">
                     <Button size="sm" onClick={saveVersion} disabled={!draft.trim() || saving}>
                       {saving ? 'Saving…' : 'Save as new version'}
                     </Button>
                     <Button variant="secondary" size="sm" onClick={enhance} disabled={enhancing}>
-                      <Sparkles size={13} /> {enhancing ? 'Enhancing…' : 'Enhance with AI'}
+                      <Sparkles {...ICON} /> {enhancing ? 'Enhancing…' : 'Enhance with AI'}
                     </Button>
                     <Button variant="ghost" size="sm" onClick={() => { setDraft(''); setEnhanceResult(null); setView('active') }}>
                       Cancel
                     </Button>
                   </div>
                   {enhancing && (
-                    <p className="text-xs text-light-text-muted dark:text-dark-text-muted">
+                    <p className="text-ui-xs text-fg-muted">
                       Rewriting with brand voice and campaign documents — this can take up to a minute.
                     </p>
                   )}
@@ -234,14 +254,8 @@ export function CampaignBriefingSection({ campaignId, isTeamAdmin }: CampaignBri
             </div>
           )}
         </div>
-      ) : active ? (
-        <div className="glass-input rounded-xl p-3 text-sm text-light-text dark:text-dark-text whitespace-pre-wrap leading-relaxed">
-          {active.content}
-        </div>
       ) : (
-        <p className="text-sm text-light-text-muted dark:text-dark-text-muted">
-          No briefing yet — posts under this campaign use only the brand voice.
-        </p>
+        activeBlock
       )}
 
       {isTeamAdmin && (
@@ -252,6 +266,6 @@ export function CampaignBriefingSection({ campaignId, isTeamAdmin }: CampaignBri
           onApply={applyAssistantDraft}
         />
       )}
-    </GlassPanel>
+    </section>
   )
 }

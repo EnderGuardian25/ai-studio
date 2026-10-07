@@ -168,7 +168,7 @@ There are 13 tasks in 7 waves. All the work lands on `v2`.
     - **The post preview frame is a `ui-exception`.**
     - **Shared with 012** (the caption area) and 008 (the refine panel). Keep the components separable.
 
-- [ ] `T10` — Restyle campaigns, projects and the queue
+- [x] `T10` — Restyle campaigns, projects and the queue
   - Files: `src/app/(app)/campaigns/page.tsx`, `src/app/(app)/campaigns/[id]/page.tsx`, `src/app/(app)/projects/page.tsx`, `src/app/(app)/projects/[id]/page.tsx`, `src/components/campaigns/*`
   - Estimate: medium
   - Kind: impl

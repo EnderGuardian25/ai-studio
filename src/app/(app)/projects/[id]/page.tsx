@@ -5,12 +5,23 @@ import { useParams, useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import Link from 'next/link'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Megaphone, Loader2 } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Megaphone, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
-import { GlassPanel } from '@/components/ui/GlassPanel'
 import { Select } from '@/components/ui/Select'
 import { apiFetch } from '@/lib/apiFetch'
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser'
+import {
+  ASIDE_BLOCK,
+  ASIDE_HEAD,
+  CRUMB_CURRENT,
+  CRUMB_LINK,
+  FOCUS,
+  ICON,
+  ICON_SM,
+  PAGE_TITLE,
+  SECTION_HEAD,
+  SECTION_NUMERAL,
+} from '@/components/campaigns/folio'
 import type { ProjectDetail, BrandKitSummary } from '@/lib/api-types'
 
 export default function ProjectDetailPage() {
@@ -55,60 +66,66 @@ export default function ProjectDetailPage() {
   }
 
   if (projectQuery.isLoading || projectQuery.isError || !project) {
-    return <div className="text-sm text-light-text-muted dark:text-dark-text-muted py-8">Loading…</div>
+    return <p className="py-8 text-ui-sm text-fg-muted">Loading…</p>
   }
 
   const activeCampaigns = project.campaigns.filter(c => !c.campaign.isDeleted)
 
   return (
     <>
-      <div className="flex items-center gap-3 mb-6">
-        <Button variant="ghost" size="sm" onClick={() => router.push('/projects')}>
-          <ArrowLeft size={14} /> Projects
-        </Button>
-        <span className="text-light-text-muted dark:text-dark-text-muted">/</span>
-        <h1 className="text-2xl font-bold text-light-text dark:text-dark-text">{project.name}</h1>
-      </div>
+      {/* Breadcrumb (DESIGN_SYSTEM.md §8.6), then the page title. */}
+      <nav aria-label="Breadcrumb" className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-ui-sm text-fg-muted">
+        <button type="button" onClick={() => router.push('/projects')} className={`${CRUMB_LINK} ${FOCUS}`}>
+          <ArrowLeft {...ICON} /> Projects
+        </button>
+        <span aria-hidden>/</span>
+        <span aria-current="page" className={CRUMB_CURRENT}>{project.name}</span>
+      </nav>
+      <h1 className={`mb-10 break-words ${PAGE_TITLE}`}>{project.name}</h1>
 
-      <div className="grid gap-4 lg:grid-cols-[1fr_280px]">
+      <div className="grid grid-cols-1 gap-x-12 gap-y-10 lg:grid-cols-[minmax(0,1fr)_280px]">
         {/* Campaigns list */}
-        <div>
-          <h2 className="text-sm font-semibold uppercase tracking-widest text-light-text-muted dark:text-dark-text-muted mb-3">
-            Campaigns ({activeCampaigns.length})
-          </h2>
+        <section className="min-w-0">
+          <div className="flex items-baseline gap-x-3.5 pb-2.5">
+            <span aria-hidden className={SECTION_NUMERAL}>i.</span>
+            <h2 className={SECTION_HEAD}>Campaigns ({activeCampaigns.length})</h2>
+          </div>
           {activeCampaigns.length === 0 ? (
-            <GlassPanel className="p-6 text-center">
-              <Megaphone size={28} className="mx-auto mb-2 text-light-text-muted dark:text-dark-text-muted" />
-              <p className="text-sm text-light-text-muted dark:text-dark-text-muted">No campaigns in this project.</p>
+            <div className="border-t-2 border-fg py-10 text-center">
+              <Megaphone size={28} strokeWidth={1.4} aria-hidden className="mx-auto mb-2 text-fg-muted" />
+              <p className="text-ui-sm text-fg-muted">No campaigns in this project.</p>
               <Link href="/campaigns">
                 <Button variant="ghost" size="sm" className="mt-2">Go to Campaigns</Button>
               </Link>
-            </GlassPanel>
-          ) : (
-            <div className="space-y-2">
-              {activeCampaigns.map(({ campaign }) => (
-                <Link key={campaign.id} href={`/campaigns/${campaign.id}`}>
-                  <GlassPanel className="p-4 flex items-center justify-between hover:bg-primary/5 dark:hover:bg-primary-light/5 transition-colors cursor-pointer">
-                    <span className="text-sm font-medium text-light-text dark:text-dark-text">{campaign.name}</span>
-                    <ArrowLeft size={14} className="rotate-180 text-light-text-muted dark:text-dark-text-muted" />
-                  </GlassPanel>
-                </Link>
-              ))}
             </div>
+          ) : (
+            <ul className="border-t-2 border-fg">
+              {activeCampaigns.map(({ campaign }) => (
+                <li key={campaign.id} className="border-b border-line-subtle">
+                  <Link
+                    href={`/campaigns/${campaign.id}`}
+                    className={`group flex items-center justify-between gap-3 py-3.5 ${FOCUS}`}
+                  >
+                    <span className="min-w-0 break-words font-display text-ui-lg font-medium leading-snug text-fg transition-colors duration-fast ease-standard group-hover:text-accent">
+                      {campaign.name}
+                    </span>
+                    <ArrowRight {...ICON} aria-hidden className="flex-shrink-0 text-fg-muted transition-colors duration-fast ease-standard group-hover:text-fg" />
+                  </Link>
+                </li>
+              ))}
+            </ul>
           )}
-        </div>
+        </section>
 
         {/* Project meta */}
-        <div className="space-y-3">
-          <GlassPanel className="p-4">
-            <h3 className="text-xs font-semibold uppercase tracking-widest text-light-text-muted dark:text-dark-text-muted mb-3">
-              Details
-            </h3>
-            <dl className="space-y-2 text-sm">
+        <aside className="min-w-0 border-t-2 border-fg">
+          <section className={ASIDE_BLOCK}>
+            <h2 className={ASIDE_HEAD}>Details</h2>
+            <dl className="space-y-3 text-ui-sm">
               <div>
-                <dt className="text-light-text-muted dark:text-dark-text-muted flex items-center gap-1.5">
+                <dt className="flex items-center gap-1.5 text-ui-xs text-fg-muted">
                   Default brand kit
-                  {savingKit && <Loader2 size={11} className="animate-spin" />}
+                  {savingKit && <Loader2 {...ICON_SM} className="animate-spin" aria-hidden />}
                 </dt>
                 {isTeamAdmin ? (
                   <dd className="mt-1">
@@ -123,20 +140,20 @@ export default function ProjectDetailPage() {
                     />
                   </dd>
                 ) : (
-                  <dd className="text-light-text dark:text-dark-text font-medium">
+                  <dd className="font-medium text-fg">
                     {project.defaultBrandKit?.name ?? '—'}
                   </dd>
                 )}
               </div>
               <div>
-                <dt className="text-light-text-muted dark:text-dark-text-muted">Default tone</dt>
-                <dd className="text-light-text dark:text-dark-text font-medium capitalize">
+                <dt className="text-ui-xs text-fg-muted">Default tone</dt>
+                <dd className="font-medium capitalize text-fg">
                   {project.defaultTone ?? '—'}
                 </dd>
               </div>
             </dl>
-          </GlassPanel>
-        </div>
+          </section>
+        </aside>
       </div>
     </>
   )

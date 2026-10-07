@@ -6,11 +6,20 @@ import { toast } from 'sonner'
 import Link from 'next/link'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, Loader2 } from 'lucide-react'
-import { Button } from '@/components/ui/Button'
-import { GlassPanel } from '@/components/ui/GlassPanel'
 import { Select } from '@/components/ui/Select'
 import { apiFetch } from '@/lib/apiFetch'
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser'
+import {
+  ASIDE_BLOCK,
+  ASIDE_HEAD,
+  CRUMB_CURRENT,
+  CRUMB_LINK,
+  FOCUS,
+  ICON,
+  ICON_SM,
+  PAGE_TITLE,
+  TEXT_LINK,
+} from '@/components/campaigns/folio'
 import { CampaignBriefingSection } from '@/components/campaigns/CampaignBriefingSection'
 import { ScheduledQueueSection } from '@/components/campaigns/ScheduledQueueSection'
 import type { Campaign, BrandKitSummary, ProjectSummary, ResolvedBrandKitResponse } from '@/lib/api-types'
@@ -100,39 +109,39 @@ export default function CampaignDetailPage() {
   }
 
   if (campaignQuery.isLoading || campaignQuery.isError || !campaign) {
-    return <div className="text-sm text-light-text-muted dark:text-dark-text-muted py-8">Loading…</div>
+    return <p className="py-8 text-ui-sm text-fg-muted">Loading…</p>
   }
 
   const parentProject = campaign.projects[0]?.project ?? null
 
   return (
     <>
-      <div className="flex items-center gap-3 mb-6 flex-wrap">
+      {/* Breadcrumb (DESIGN_SYSTEM.md §8.6): Projects / <project> / <campaign>
+          under a project, Campaigns / <campaign> when standalone. */}
+      <nav aria-label="Breadcrumb" className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-ui-sm text-fg-muted">
         {parentProject ? (
           <>
-            <Button variant="ghost" size="sm" onClick={() => router.push('/projects')}>
-              <ArrowLeft size={14} /> Projects
-            </Button>
-            <span className="text-light-text-muted dark:text-dark-text-muted">/</span>
-            <Link
-              href={`/projects/${parentProject.id}`}
-              className="text-sm font-medium text-light-text-muted dark:text-dark-text-muted hover:text-primary dark:hover:text-primary-light transition-colors"
-            >
+            <button type="button" onClick={() => router.push('/projects')} className={`${CRUMB_LINK} ${FOCUS}`}>
+              <ArrowLeft {...ICON} /> Projects
+            </button>
+            <span aria-hidden>/</span>
+            <Link href={`/projects/${parentProject.id}`} className={`${CRUMB_LINK} min-w-0 break-words ${FOCUS}`}>
               {parentProject.name}
             </Link>
           </>
         ) : (
-          <Button variant="ghost" size="sm" onClick={() => router.push('/campaigns')}>
-            <ArrowLeft size={14} /> Campaigns
-          </Button>
+          <button type="button" onClick={() => router.push('/campaigns')} className={`${CRUMB_LINK} ${FOCUS}`}>
+            <ArrowLeft {...ICON} /> Campaigns
+          </button>
         )}
-        <span className="text-light-text-muted dark:text-dark-text-muted">/</span>
-        <h1 className="text-2xl font-bold text-light-text dark:text-dark-text">{campaign.name}</h1>
-      </div>
+        <span aria-hidden>/</span>
+        <span aria-current="page" className={CRUMB_CURRENT}>{campaign.name}</span>
+      </nav>
+      <h1 className={`mb-10 break-words ${PAGE_TITLE}`}>{campaign.name}</h1>
 
-      <div className="grid gap-4 lg:grid-cols-[1fr_280px]">
-        {/* Stats */}
-        <div className="space-y-4">
+      <div className="grid grid-cols-1 gap-x-12 gap-y-10 lg:grid-cols-[minmax(0,1fr)_280px]">
+        {/* The briefing and the queue, numbered sections ruled apart (§8.14). */}
+        <div className="min-w-0 divide-y divide-line-subtle border-t-2 border-fg">
           <CampaignBriefingSection campaignId={params.id} isTeamAdmin={isTeamAdmin} />
 
           <ScheduledQueueSection
@@ -140,79 +149,41 @@ export default function CampaignDetailPage() {
             resolvedKitId={resolved?.kit?.id ?? null}
             isTeamAdmin={isTeamAdmin}
           />
-
-          <GlassPanel className="p-4">
-            <h3 className="text-xs font-semibold uppercase tracking-widest text-light-text-muted dark:text-dark-text-muted mb-3">
-              Briefs ({campaign._count.briefs})
-            </h3>
-            {campaign._count.briefs === 0 ? (
-              <p className="text-sm text-light-text-muted dark:text-dark-text-muted">
-                No briefs created under this campaign yet.
-              </p>
-            ) : (
-              <p className="text-sm text-light-text-muted dark:text-dark-text-muted">
-                {campaign._count.briefs} brief{campaign._count.briefs !== 1 ? 's' : ''} in this campaign.
-              </p>
-            )}
-          </GlassPanel>
-
-          {campaign.projects.length > 0 && (
-            <GlassPanel className="p-4">
-              <h3 className="text-xs font-semibold uppercase tracking-widest text-light-text-muted dark:text-dark-text-muted mb-3">
-                Projects
-              </h3>
-              <div className="flex flex-wrap gap-2">
-                {campaign.projects.map(({ project }) => (
-                  <Link
-                    key={project.id}
-                    href={`/projects/${project.id}`}
-                    className="text-sm text-primary dark:text-primary-light hover:underline"
-                  >
-                    {project.name}
-                  </Link>
-                ))}
-              </div>
-            </GlassPanel>
-          )}
         </div>
 
-        {/* Brand kit + meta */}
-        <div className="space-y-3">
+        {/* Brand kit, details, briefs and projects: ruled blocks in the aside. */}
+        <aside className="min-w-0 border-t-2 border-fg">
           {resolved?.kit && (
-            <GlassPanel className="p-4">
-              <h3 className="text-xs font-semibold uppercase tracking-widest text-light-text-muted dark:text-dark-text-muted mb-3">
-                Brand Kit
-              </h3>
-              <p className="text-sm font-medium text-light-text dark:text-dark-text">{resolved.kit.name}</p>
+            <section className={ASIDE_BLOCK}>
+              <h2 className={ASIDE_HEAD}>Brand Kit</h2>
+              <p className="break-words text-ui-sm font-medium text-fg">{resolved.kit.name}</p>
               {resolved.source && (
-                <p className="text-xs text-light-text-muted dark:text-dark-text-muted mt-0.5">
+                <p className="mt-0.5 text-ui-xs text-fg-muted">
                   {SOURCE_LABEL[resolved.source]}
                 </p>
               )}
               {resolved.kit.colors.length > 0 && (
-                <div className="flex gap-1.5 mt-2 flex-wrap">
+                <div className="mt-2.5 flex flex-wrap gap-1.5">
                   {resolved.kit.colors.map(c => (
                     <span
                       key={c}
-                      className="inline-block w-5 h-5 rounded-md border border-black/10 dark:border-white/10"
-                      style={{ background: c }}
+                      className="inline-block h-5 w-5 rounded-ui-sm border border-line"
+                      style={{ backgroundColor: c }} // ui-exception: brand-kit swatch, the kit's own colour from data
                       title={c}
                     />
                   ))}
                 </div>
               )}
-            </GlassPanel>
+            </section>
           )}
 
-          <GlassPanel className="p-4">
-            <h3 className="text-xs font-semibold uppercase tracking-widest text-light-text-muted dark:text-dark-text-muted mb-3">
-              Details
-            </h3>
-            <dl className="space-y-2 text-sm">
+          <section className={ASIDE_BLOCK}>
+            <h2 className={ASIDE_HEAD}>Details</h2>
+            <dl className="space-y-3 text-ui-sm">
               <div>
-                <dt className="text-light-text-muted dark:text-dark-text-muted flex items-center gap-1.5">
+                <dt className="flex items-center gap-1.5 text-ui-xs text-fg-muted">
                   Project
-                  {savingProject && <Loader2 size={11} className="animate-spin" />}
+                  {savingProject && <Loader2 {...ICON_SM} className="animate-spin" aria-hidden />}
                 </dt>
                 {isTeamAdmin ? (
                   <dd className="mt-1">
@@ -227,21 +198,21 @@ export default function CampaignDetailPage() {
                     />
                   </dd>
                 ) : (
-                  <dd className="text-light-text dark:text-dark-text font-medium">
+                  <dd className="font-medium text-fg">
                     {campaign.projects[0]?.project.name ?? 'Standalone'}
                   </dd>
                 )}
               </div>
               <div>
-                <dt className="text-light-text-muted dark:text-dark-text-muted">Default tone</dt>
-                <dd className="text-light-text dark:text-dark-text font-medium capitalize">
+                <dt className="text-ui-xs text-fg-muted">Default tone</dt>
+                <dd className="font-medium capitalize text-fg">
                   {campaign.defaultTone ?? '—'}
                 </dd>
               </div>
               <div>
-                <dt className="text-light-text-muted dark:text-dark-text-muted flex items-center gap-1.5">
+                <dt className="flex items-center gap-1.5 text-ui-xs text-fg-muted">
                   Brand kit override
-                  {savingKit && <Loader2 size={11} className="animate-spin" />}
+                  {savingKit && <Loader2 {...ICON_SM} className="animate-spin" aria-hidden />}
                 </dt>
                 {isTeamAdmin ? (
                   <dd className="mt-1">
@@ -256,14 +227,44 @@ export default function CampaignDetailPage() {
                     />
                   </dd>
                 ) : (
-                  <dd className="text-light-text dark:text-dark-text font-medium">
+                  <dd className="font-medium text-fg">
                     {campaign.brandKit?.name ?? '—'}
                   </dd>
                 )}
               </div>
             </dl>
-          </GlassPanel>
-        </div>
+          </section>
+
+          <section className={ASIDE_BLOCK}>
+            <h2 className={ASIDE_HEAD}>Briefs ({campaign._count.briefs})</h2>
+            {campaign._count.briefs === 0 ? (
+              <p className="text-ui-sm text-fg-muted">
+                No briefs created under this campaign yet.
+              </p>
+            ) : (
+              <p className="text-ui-sm text-fg-muted">
+                {campaign._count.briefs} brief{campaign._count.briefs !== 1 ? 's' : ''} in this campaign.
+              </p>
+            )}
+          </section>
+
+          {campaign.projects.length > 0 && (
+            <section className={ASIDE_BLOCK}>
+              <h2 className={ASIDE_HEAD}>Projects</h2>
+              <div className="flex flex-wrap gap-x-3 gap-y-1 text-ui-sm">
+                {campaign.projects.map(({ project }) => (
+                  <Link
+                    key={project.id}
+                    href={`/projects/${project.id}`}
+                    className={`rounded-ui-sm break-words ${TEXT_LINK} ${FOCUS}`}
+                  >
+                    {project.name}
+                  </Link>
+                ))}
+              </div>
+            </section>
+          )}
+        </aside>
       </div>
     </>
   )

@@ -4,14 +4,26 @@ import React, { useState } from 'react'
 import Link from 'next/link'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Plus, Trash2, RotateCcw, Megaphone, FolderOpen, Palette, MessageCircle } from 'lucide-react'
+import { Plus, Trash2, RotateCcw, Megaphone, Palette, MessageCircle } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
-import { GlassPanel } from '@/components/ui/GlassPanel'
-import { GlassInput } from '@/components/ui/GlassInput'
+import { Panel } from '@/components/ui/Panel'
+import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { QueryError } from '@/components/ui/QueryError'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { apiFetch } from '@/lib/apiFetch'
+import {
+  EYEBROW,
+  FOCUS,
+  ICON,
+  ICON_BUTTON,
+  ICON_SM,
+  PAGE_LEAD,
+  PAGE_TITLE,
+  ROW_TITLE,
+  SECTION_HEAD,
+  TAG,
+} from '@/components/campaigns/folio'
 import type { Campaign, BrandKitSummary, ProjectSummary, ProjectRef } from '@/lib/api-types'
 
 export default function CampaignsPage() {
@@ -119,34 +131,41 @@ export default function CampaignsPage() {
 
   return (
     <>
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-light-text dark:text-dark-text">Campaigns</h1>
-          <p className="text-sm text-light-text-muted dark:text-dark-text-muted mt-0.5">
-            Group posts by campaign and assign a brand kit override.
-          </p>
+      {/* Page head (DESIGN_SYSTEM.md §6): an eyebrow, the display title, a lead. */}
+      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div className="min-w-0">
+          <div className={EYEBROW}>Organize</div>
+          <h1 className={`mt-2 ${PAGE_TITLE}`}>Campaigns</h1>
+          <p className={PAGE_LEAD}>Group posts by campaign and assign a brand kit override.</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button variant="ghost" size="sm" onClick={() => setShowDeleted(v => !v)}>
             {showDeleted ? 'Show active' : 'Show deleted'}
           </Button>
-          <Button onClick={() => setCreating(v => !v)}>
-            <Plus size={16} /> New Campaign
+          {/* One accent primary per view: while the form is open its Create is
+              the primary, and this toggle shows as an open Outline button. */}
+          <Button
+            variant={creating ? 'secondary' : 'primary'}
+            aria-expanded={creating}
+            onClick={() => setCreating(v => !v)}
+          >
+            <Plus {...ICON} /> New Campaign
           </Button>
         </div>
       </div>
 
       {creating && (
-        <GlassPanel className="p-4 mb-4 animate-fade-in">
-          <form onSubmit={create} className="flex flex-col sm:flex-row gap-3 sm:items-end">
-            <GlassInput
-              label="Campaign name"
-              value={newName}
-              onChange={e => setNewName(e.target.value)}
-              placeholder="e.g. Summer Product Launch"
-              className="flex-1"
-              autoFocus
-            />
+        <Panel className="mb-8 animate-fade-in p-4">
+          <form onSubmit={create} className="flex flex-col gap-3 sm:flex-row sm:items-end">
+            <div className="min-w-0 flex-1">
+              <Input
+                label="Campaign name"
+                value={newName}
+                onChange={e => setNewName(e.target.value)}
+                placeholder="e.g. Summer Product Launch"
+                autoFocus
+              />
+            </div>
             <div className="sm:w-52">
               <Select
                 label="Project"
@@ -168,11 +187,11 @@ export default function CampaignsPage() {
               <Button variant="ghost" type="button" onClick={() => { setCreating(false); setNewName(''); setNewBrandKitId(''); setNewProjectId('') }}>Cancel</Button>
             </div>
           </form>
-        </GlassPanel>
+        </Panel>
       )}
 
       {loading && (
-        <div className="text-sm text-light-text-muted dark:text-dark-text-muted py-8 text-center">Loading…</div>
+        <p className="py-8 text-center text-ui-sm text-fg-muted">Loading…</p>
       )}
 
       {isError && (
@@ -180,82 +199,79 @@ export default function CampaignsPage() {
       )}
 
       {!loading && !isError && visible.length === 0 && (
-        <GlassPanel className="p-8 text-center">
-          <Megaphone size={32} className="mx-auto mb-3 text-light-text-muted dark:text-dark-text-muted" />
-          <p className="text-sm text-light-text-muted dark:text-dark-text-muted">
+        <div className="border-t-2 border-fg py-12 text-center">
+          <Megaphone size={28} strokeWidth={1.4} aria-hidden className="mx-auto mb-3 text-fg-muted" />
+          <p className="text-ui-sm text-fg-muted">
             {showDeleted ? 'No deleted campaigns.' : 'No campaigns yet.'}
           </p>
-        </GlassPanel>
+        </div>
       )}
 
       {!isError && (
-        <div className="space-y-6">
+        <div className="space-y-12">
           {groups.map(group => (
             <section key={group.project?.id ?? 'standalone'}>
-              <div className="flex items-center gap-2 mb-3">
-                <FolderOpen size={15} className="text-light-text-muted dark:text-dark-text-muted" />
-                {group.project ? (
-                  <Link
-                    href={`/projects/${group.project.id}`}
-                    className="text-sm font-semibold uppercase tracking-widest text-light-text dark:text-dark-text hover:text-primary dark:hover:text-primary-light transition-colors"
-                  >
-                    {group.project.name}
-                  </Link>
-                ) : (
-                  <span className="text-sm font-semibold uppercase tracking-widest text-light-text-muted dark:text-dark-text-muted">
-                    Standalone
-                  </span>
-                )}
-                <span className="text-xs text-light-text-muted dark:text-dark-text-muted">
+              {/* The group head: the project's name as a section head, its count on the right. */}
+              <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 pb-2.5">
+                <h2 className={`min-w-0 break-words ${SECTION_HEAD}`}>
+                  {group.project ? (
+                    <Link
+                      href={`/projects/${group.project.id}`}
+                      className={`rounded-ui-sm text-fg transition-colors duration-fast ease-standard hover:text-accent ${FOCUS}`}
+                    >
+                      {group.project.name}
+                    </Link>
+                  ) : (
+                    <span className="text-fg-muted">Standalone</span>
+                  )}
+                </h2>
+                <span className="ml-auto text-ui-xs text-fg-muted">
                   {group.campaigns.length} campaign{group.campaigns.length !== 1 ? 's' : ''}
                 </span>
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {/* Campaigns as ruled rows, not cards (§6), two columns on wide screens. */}
+              <ul className="grid grid-cols-1 border-t-2 border-fg lg:grid-cols-2 lg:gap-x-12">
                 {group.campaigns.map(campaign => (
-                  <GlassPanel key={campaign.id} className="p-4 flex flex-col gap-3">
-                    <div className="flex items-start justify-between gap-2">
-                      <Link
-                        href={`/campaigns/${campaign.id}`}
-                        className="text-base font-semibold text-light-text dark:text-dark-text hover:text-primary dark:hover:text-primary-light transition-colors"
-                      >
+                  <li key={campaign.id} className="flex min-w-0 items-start gap-3 border-b border-line-subtle py-3.5">
+                    <div className="min-w-0 flex-1">
+                      <Link href={`/campaigns/${campaign.id}`} className={`rounded-ui-sm ${ROW_TITLE} ${FOCUS}`}>
                         {campaign.name}
                       </Link>
-                      {campaign.isDeleted ? (
-                        <Button variant="ghost" size="sm" onClick={() => restore(campaign.id)}>
-                          <RotateCcw size={13} /> Restore
-                        </Button>
-                      ) : (
-                        <Button variant="ghost" size="sm" onClick={() => softDelete(campaign.id)}>
-                          <Trash2 size={13} />
-                        </Button>
-                      )}
+                      <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-ui-xs text-fg-muted">
+                        <span>{campaign._count.briefs} brief{campaign._count.briefs !== 1 ? 's' : ''}</span>
+                        {campaign.brandKit && (
+                          <span title={`Brand kit: ${campaign.brandKit.name}`} className={TAG}>
+                            <Palette {...ICON_SM} aria-hidden className="flex-shrink-0 text-fg-muted" />
+                            <span className="truncate">{campaign.brandKit.name}</span>
+                          </span>
+                        )}
+                        {campaign.defaultTone && (
+                          <span title="Default tone" className={`${TAG} capitalize`}>
+                            <MessageCircle {...ICON_SM} aria-hidden className="flex-shrink-0 text-fg-muted" />
+                            <span className="truncate">{campaign.defaultTone}</span>
+                          </span>
+                        )}
+                      </div>
                     </div>
-
-                    <div className="flex flex-wrap gap-2 text-xs text-light-text-muted dark:text-dark-text-muted">
-                      <span>{campaign._count.briefs} brief{campaign._count.briefs !== 1 ? 's' : ''}</span>
-                      {campaign.brandKit && (
-                        <span
-                          title="Brand kit"
-                          className="inline-flex items-center gap-1 bg-primary/8 dark:bg-primary-light/8 text-primary dark:text-primary-light px-2 py-0.5 rounded-full"
-                        >
-                          <Palette size={11} />
-                          {campaign.brandKit.name}
-                        </span>
-                      )}
-                      {campaign.defaultTone && (
-                        <span
-                          title="Default tone"
-                          className="inline-flex items-center gap-1 bg-primary/5 dark:bg-primary-light/5 px-2 py-0.5 rounded-full capitalize"
-                        >
-                          <MessageCircle size={11} />
-                          {campaign.defaultTone}
-                        </span>
-                      )}
-                    </div>
-                  </GlassPanel>
+                    {campaign.isDeleted ? (
+                      <Button variant="ghost" size="sm" onClick={() => restore(campaign.id)}>
+                        <RotateCcw {...ICON} /> Restore
+                      </Button>
+                    ) : (
+                      <button
+                        type="button"
+                        aria-label={`Delete ${campaign.name}`}
+                        title="Delete"
+                        onClick={() => softDelete(campaign.id)}
+                        className={`${ICON_BUTTON} hover:text-status-failed ${FOCUS}`}
+                      >
+                        <Trash2 {...ICON} />
+                      </button>
+                    )}
+                  </li>
                 ))}
-              </div>
+              </ul>
             </section>
           ))}
         </div>

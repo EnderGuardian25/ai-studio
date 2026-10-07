@@ -3,11 +3,12 @@
 import React, { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Modal } from '@/components/ui/Modal'
-import { GlassInput } from '@/components/ui/GlassInput'
+import { Input, fieldClasses, fieldEdge, fieldErrorClasses, fieldLabelClasses } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
 import { Select } from '@/components/ui/Select'
 import { SegmentedToggle } from '@/components/ui/SegmentedToggle'
 import { apiFetch } from '@/lib/apiFetch'
+import { cn } from '@/lib/utils'
 import { CHANNEL_VALUES, channelLabel } from '@/lib/channels'
 import type { AspectRatio, Channel } from '@prisma/client'
 import type { ScheduledGeneration, PostGenerationAction } from '@/lib/api-types'
@@ -140,8 +141,8 @@ export function QueueEntryModal({ campaignId, resolvedKitId, isTeamAdmin, entry,
         </>
       }
     >
-      <div className="space-y-4">
-        <GlassInput
+      <div className="space-y-5">
+        <Input
           label="Topic"
           value={topic}
           onChange={e => setTopic(e.target.value)}
@@ -149,7 +150,7 @@ export function QueueEntryModal({ campaignId, resolvedKitId, isTeamAdmin, entry,
         />
 
         <div>
-          <label className="text-sm font-medium text-light-text dark:text-dark-text block mb-1">
+          <label className={`${fieldLabelClasses} mb-1.5 block`}>
             Post specifics
           </label>
           <textarea
@@ -157,25 +158,25 @@ export function QueueEntryModal({ campaignId, resolvedKitId, isTeamAdmin, entry,
             onChange={e => setDescription(e.target.value)}
             rows={3}
             placeholder="What this specific post should say — the campaign briefing carries the rest."
-            className="glass-input rounded-xl px-3 py-2.5 text-sm w-full text-light-text dark:text-dark-text resize-none"
+            className={cn(fieldClasses, fieldEdge(), 'resize-none leading-relaxed')}
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <GlassInput label="Goal" value={goal} onChange={e => setGoal(e.target.value)} placeholder="e.g. Awareness" />
-          <GlassInput label="Tone" value={tone} onChange={e => setTone(e.target.value)} placeholder="e.g. professional" />
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <Input label="Goal" value={goal} onChange={e => setGoal(e.target.value)} placeholder="e.g. Awareness" />
+          <Input label="Tone" value={tone} onChange={e => setTone(e.target.value)} placeholder="e.g. professional" />
         </div>
 
         <div>
-          <p className="text-sm font-medium text-light-text dark:text-dark-text mb-2">Channels</p>
-          <div className="flex gap-3">
+          <p className={`${fieldLabelClasses} mb-2`}>Channels</p>
+          <div className="flex flex-wrap gap-x-5 gap-y-2">
             {CHANNEL_VALUES.map(ch => (
-              <label key={ch} className="flex items-center gap-2 cursor-pointer text-sm text-light-text dark:text-dark-text">
+              <label key={ch} className="flex cursor-pointer items-center gap-2 text-ui-sm text-fg">
                 <input
                   type="checkbox"
                   checked={channels.includes(ch)}
                   onChange={() => toggleChannel(ch)}
-                  className="accent-primary dark:accent-primary-light"
+                  className="accent-accent"
                 />
                 {channelLabel(ch)}
               </label>
@@ -183,9 +184,9 @@ export function QueueEntryModal({ campaignId, resolvedKitId, isTeamAdmin, entry,
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
-            <p className="text-sm font-medium text-light-text dark:text-dark-text mb-2">Size</p>
+            <p className={`${fieldLabelClasses} mb-2`}>Size</p>
             <SegmentedToggle
               options={[
                 { value: 'SQUARE', label: '1:1' },
@@ -197,7 +198,7 @@ export function QueueEntryModal({ campaignId, resolvedKitId, isTeamAdmin, entry,
             />
           </div>
           <div>
-            <p className="text-sm font-medium text-light-text dark:text-dark-text mb-2">Design</p>
+            <p className={`${fieldLabelClasses} mb-2`}>Design</p>
             <SegmentedToggle
               options={[
                 { value: 'GENERATE', label: 'Freeform' },
@@ -211,7 +212,7 @@ export function QueueEntryModal({ campaignId, resolvedKitId, isTeamAdmin, entry,
 
         {designMode === 'TEMPLATE' && (
           <div>
-            <label className="text-sm font-medium text-light-text dark:text-dark-text block mb-1">Template</label>
+            <label className={`${fieldLabelClasses} mb-1.5 block`}>Template</label>
             <Select
               options={[
                 { value: '', label: sizeTemplates.length ? 'Select a template…' : 'No templates for this size' },
@@ -223,7 +224,7 @@ export function QueueEntryModal({ campaignId, resolvedKitId, isTeamAdmin, entry,
           </div>
         )}
 
-        <GlassInput
+        <Input
           label="Generate at"
           type="datetime-local"
           value={generateAt}
@@ -231,14 +232,14 @@ export function QueueEntryModal({ campaignId, resolvedKitId, isTeamAdmin, entry,
         />
 
         <div>
-          <p className="text-sm font-medium text-light-text dark:text-dark-text mb-2">After generation</p>
-          <div className="space-y-2">
+          <p className={`${fieldLabelClasses} mb-2`}>After generation</p>
+          <div className="space-y-2.5">
             {ACTION_OPTIONS.map(opt => {
               const disabled = !isTeamAdmin && opt.value !== 'HOLD'
               return (
                 <label
                   key={opt.value}
-                  className={`flex items-start gap-2 text-sm ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'} text-light-text dark:text-dark-text`}
+                  className={`flex items-start gap-2 text-ui-sm text-fg ${disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
                 >
                   <input
                     type="radio"
@@ -246,25 +247,25 @@ export function QueueEntryModal({ campaignId, resolvedKitId, isTeamAdmin, entry,
                     checked={postAction === opt.value}
                     onChange={() => setPostAction(opt.value)}
                     disabled={disabled}
-                    className="mt-0.5 accent-primary dark:accent-primary-light"
+                    className="mt-1 accent-accent"
                   />
                   <span>
                     {opt.label}
-                    <span className="block text-xs text-light-text-muted dark:text-dark-text-muted">{opt.hint}</span>
+                    <span className="block text-ui-xs text-fg-muted">{opt.hint}</span>
                   </span>
                 </label>
               )
             })}
           </div>
           {!isTeamAdmin && (
-            <p className="text-xs text-light-text-muted dark:text-dark-text-muted mt-1">
+            <p className="mt-1.5 text-ui-xs text-fg-muted">
               Auto-publish requires admin.
             </p>
           )}
         </div>
 
         {postAction === 'SCHEDULE_PUBLISH' && (
-          <GlassInput
+          <Input
             label="Publish at"
             type="datetime-local"
             value={publishAt}
@@ -272,7 +273,7 @@ export function QueueEntryModal({ campaignId, resolvedKitId, isTeamAdmin, entry,
           />
         )}
 
-        {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
+        {error && <p className={fieldErrorClasses}>{error}</p>}
       </div>
     </Modal>
   )

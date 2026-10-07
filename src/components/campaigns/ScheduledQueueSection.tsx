@@ -6,13 +6,14 @@ import { toast } from 'sonner'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Plus, Pencil, XCircle, RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
-import { GlassPanel } from '@/components/ui/GlassPanel'
 import { StatusChip } from '@/components/ui/StatusChip'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { apiFetch } from '@/lib/apiFetch'
 import { ASPECT_LABELS } from '@/lib/aspectRatio'
 import { channelLabel } from '@/lib/channels'
 import { QueueEntryModal } from './QueueEntryModal'
+import { SectionHead } from './SectionHead'
+import { FOCUS, ICON, ICON_BUTTON, SCROLL_FOCUS, TABLE_HEAD_ROW, TEXT_LINK } from './folio'
 import type { ScheduledGeneration, GenerationStatus } from '@/lib/api-types'
 
 // Planned-posts queue under a campaign: table of scheduled generations with
@@ -88,40 +89,48 @@ export function ScheduledQueueSection({ campaignId, resolvedKitId, isTeamAdmin }
   }
 
   return (
-    <GlassPanel className="p-4">
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-xs font-semibold uppercase tracking-widest text-light-text-muted dark:text-dark-text-muted">
-          Planned Posts ({entries.length})
-        </h3>
-        <Button size="sm" onClick={() => setModal({ open: true })}>
-          <Plus size={13} /> Plan a post
+    <section className="pb-8 pt-[22px]">
+      <SectionHead numeral="ii." title={`Planned Posts (${entries.length})`}>
+        {/* Outline, not primary: the briefing's Save is the view's one primary. */}
+        <Button variant="secondary" size="sm" onClick={() => setModal({ open: true })}>
+          <Plus {...ICON} /> Plan a post
         </Button>
-      </div>
+      </SectionHead>
 
       {entries.length === 0 ? (
-        <p className="text-sm text-light-text-muted dark:text-dark-text-muted">
+        <p className="text-ui-sm text-fg-muted">
           No planned posts. Plan one and the scheduler will generate it automatically at its time
           — using the campaign briefing plus the post&apos;s specifics.
         </p>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+        // A Folio data table (§8.15). It scrolls inside its own container at
+        // narrow widths, so the container is a focusable, labelled region
+        // (WCAG 2.1.1) with an inset focus ring that the overflow can't clip.
+        // `relative` makes it the containing block of the sr-only Actions
+        // header, which would otherwise widen the page at 375 px.
+        <div
+          tabIndex={0}
+          role="region"
+          aria-label="Planned posts"
+          className={`relative overflow-x-auto border-t-2 border-fg ${SCROLL_FOCUS}`}
+        >
+          <table className="w-full min-w-[720px] text-ui-sm">
             <thead>
-              <tr className="text-left text-xs text-light-text-muted dark:text-dark-text-muted">
-                <th className="py-2 pr-3 font-medium">Topic</th>
-                <th className="py-2 pr-3 font-medium">Generate at</th>
-                <th className="py-2 pr-3 font-medium">Channels</th>
-                <th className="py-2 pr-3 font-medium">After generation</th>
-                <th className="py-2 pr-3 font-medium">Status</th>
-                <th className="py-2 font-medium sr-only">Actions</th>
+              <tr className={TABLE_HEAD_ROW}>
+                <th scope="col" className="py-2 pr-3 font-semibold">Topic</th>
+                <th scope="col" className="py-2 pr-3 font-semibold">Generate at</th>
+                <th scope="col" className="py-2 pr-3 font-semibold">Channels</th>
+                <th scope="col" className="py-2 pr-3 font-semibold">After generation</th>
+                <th scope="col" className="py-2 pr-3 font-semibold">Status</th>
+                <th scope="col" className="py-2 font-semibold sr-only">Actions</th>
               </tr>
             </thead>
             <tbody>
               {entries.map(entry => (
-                <tr key={entry.id} className="border-t border-light-border/50 dark:border-dark-border/50 align-top">
+                <tr key={entry.id} className="border-b border-line-subtle align-top">
                   <td className="py-2.5 pr-3">
-                    <p className="font-medium text-light-text dark:text-dark-text">{entry.topic}</p>
-                    <p className="text-xs text-light-text-muted dark:text-dark-text-muted">
+                    <p className="break-words font-medium text-fg">{entry.topic}</p>
+                    <p className="text-ui-xs text-fg-muted">
                       {entry.designMode === 'TEMPLATE'
                         ? `Template: ${entry.template?.name ?? '—'}`
                         : 'Freeform'}
@@ -129,21 +138,21 @@ export function ScheduledQueueSection({ campaignId, resolvedKitId, isTeamAdmin }
                       {ASPECT_LABELS[entry.aspectRatio].split(' ')[0]}
                     </p>
                     {entry.status === 'FAILED' && entry.errorReason && (
-                      <p className="text-xs text-red-600 dark:text-red-400 mt-0.5" title={entry.errorReason}>
+                      <p className="mt-0.5 text-ui-xs text-status-failed" title={entry.errorReason}>
                         {entry.errorReason.length > 80 ? `${entry.errorReason.slice(0, 80)}…` : entry.errorReason}
                       </p>
                     )}
                   </td>
-                  <td className="py-2.5 pr-3 font-mono text-xs text-light-text dark:text-dark-text whitespace-nowrap">
+                  <td className="whitespace-nowrap py-2.5 pr-3 text-ui-xs text-fg">
                     {formatDateTime(entry.generateAt)}
                   </td>
-                  <td className="py-2.5 pr-3 text-xs text-light-text dark:text-dark-text">
+                  <td className="py-2.5 pr-3 text-ui-xs text-fg">
                     {entry.channels.map(channelLabel).join(', ')}
                   </td>
-                  <td className="py-2.5 pr-3 text-xs text-light-text dark:text-dark-text">
+                  <td className="py-2.5 pr-3 text-ui-xs text-fg">
                     {ACTION_LABEL[entry.postAction]}
                     {entry.postAction === 'SCHEDULE_PUBLISH' && (
-                      <span className="block font-mono text-light-text-muted dark:text-dark-text-muted">
+                      <span className="block whitespace-nowrap text-fg-muted">
                         {formatDateTime(entry.publishAt)}
                       </span>
                     )}
@@ -151,34 +160,46 @@ export function ScheduledQueueSection({ campaignId, resolvedKitId, isTeamAdmin }
                   <td className="py-2.5 pr-3">
                     <StatusChip status={CHIP[entry.status]} />
                     {entry.retryCount > 0 && entry.status === 'PENDING' && (
-                      <span className="block text-xs text-light-text-muted dark:text-dark-text-muted mt-0.5">
+                      <span className="mt-0.5 block text-ui-xs text-fg-muted">
                         retry {entry.retryCount}
                       </span>
                     )}
                   </td>
-                  <td className="py-2.5 whitespace-nowrap">
-                    <div className="flex gap-1 justify-end">
+                  <td className="whitespace-nowrap py-1.5">
+                    <div className="flex items-center justify-end gap-1">
                       {entry.status === 'COMPLETED' && entry.draftId && (
                         <Link
                           href={`/drafts/${entry.draftId}`}
-                          className="text-xs text-primary dark:text-primary-light hover:underline self-center"
+                          className={`rounded-ui-sm text-ui-xs font-semibold ${TEXT_LINK} ${FOCUS}`}
                         >
                           Open draft
                         </Link>
                       )}
                       {entry.status === 'PENDING' && (
                         <>
-                          <Button variant="ghost" size="sm" onClick={() => setModal({ open: true, entry })} aria-label="Edit">
-                            <Pencil size={13} />
-                          </Button>
-                          <Button variant="ghost" size="sm" onClick={() => cancelEntry(entry)} aria-label="Cancel">
-                            <XCircle size={13} />
-                          </Button>
+                          <button
+                            type="button"
+                            onClick={() => setModal({ open: true, entry })}
+                            aria-label="Edit"
+                            title="Edit"
+                            className={`${ICON_BUTTON} hover:text-fg ${FOCUS}`}
+                          >
+                            <Pencil {...ICON} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => cancelEntry(entry)}
+                            aria-label="Cancel"
+                            title="Cancel"
+                            className={`${ICON_BUTTON} hover:text-status-failed ${FOCUS}`}
+                          >
+                            <XCircle {...ICON} />
+                          </button>
                         </>
                       )}
                       {(entry.status === 'FAILED' || entry.status === 'CANCELLED') && (
                         <Button variant="ghost" size="sm" onClick={() => rerunEntry(entry)} aria-label="Re-run">
-                          <RotateCcw size={13} /> Re-run
+                          <RotateCcw {...ICON} /> Re-run
                         </Button>
                       )}
                     </div>
@@ -203,6 +224,6 @@ export function ScheduledQueueSection({ campaignId, resolvedKitId, isTeamAdmin }
           }}
         />
       )}
-    </GlassPanel>
+    </section>
   )
 }

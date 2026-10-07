@@ -13,6 +13,9 @@ import { loginAs, waitForDraft, type ApiClient } from '../helpers/api'
 //          (login, choose-team and the shell at 375 px), AC-17 (visible focus
 //          on the first three stops of login and the shell), the "Studio"
 //          wordmark, the theme toggle, and the Create post button's motion.
+//   T7–T10, the screen groups: AC-12 (375 px, no horizontal scroll), AC-17
+//          (visible focus on a screen's first three stops) and FR-12 (each
+//          screen's controls, by role and name).
 
 const ADMIN_EMAIL = 'admin@bisteccare.lk'
 const ADMIN_PASSWORD = 'BistecStudio2026!'
@@ -762,6 +765,188 @@ test.describe('Draft review (T9)', () => {
       frameRadius: '0px',
       frameFilter: 'none',
     })
+  })
+})
+
+// ── Campaigns and projects (T10: AC-12, AC-17, FR-12) ────────────────────────
+
+// A project, a campaign under it with two briefing versions, and two queue
+// entries (one PENDING, one CANCELLED), made through the API.
+async function mintCampaignFixture(api: ApiClient) {
+  const stamp = `${Date.now()}`
+  const project = await (await api.post('/api/projects', { name: `T10 Project ${stamp}` })).json()
+  const camp = await (
+    await api.post('/api/campaigns', { name: `T10 Campaign ${stamp}`, projectId: project.id })
+  ).json()
+  for (const content of ['T10 briefing v1', 'T10 briefing v2, the active one']) {
+    expect((await api.post(`/api/campaigns/${camp.id}/briefing`, { content })).status()).toBe(201)
+  }
+  const entry = (topic: string) => ({
+    topic,
+    goal: 'Awareness',
+    tone: 'professional',
+    channels: ['INSTAGRAM', 'LINKEDIN'],
+    designMode: 'GENERATE',
+    generateAt: new Date(Date.now() + 7 * 24 * 3600_000).toISOString(),
+    postAction: 'HOLD',
+  })
+  const pending = await api.post(`/api/campaigns/${camp.id}/queue`, entry(`T10 pending ${stamp}`))
+  expect(pending.status()).toBe(201)
+  const cancelled = await (await api.post(`/api/campaigns/${camp.id}/queue`, entry(`T10 cancelled ${stamp}`))).json()
+  expect((await api.del(`/api/campaigns/${camp.id}/queue/${cancelled.id}`)).status()).toBe(204)
+  return { project, camp }
+}
+
+test.describe('Campaigns and projects (T10)', () => {
+  let api: ApiClient
+  test.beforeEach(async ({ request }) => {
+    api = await loginAs(request, ADMIN_EMAIL, ADMIN_PASSWORD)
+  })
+  test.afterEach(async () => {
+    await api.dispose()
+  })
+
+  test('AC-17: the campaigns list shows a visible focus indicator on its first three stops', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await pageLogin(page)
+    await page.goto('/campaigns')
+    await expect(page.getByRole('heading', { name: 'Campaigns', level: 1 })).toBeVisible()
+    await expect(page.getByText('Loading…')).toHaveCount(0)
+    await expect(page.getByRole('heading', { level: 2 }).first()).toBeVisible()
+    // The two header actions, then the first group's project link or campaign
+    // link (which one depends on the test DB's data).
+    const stops = await tabThreeFromMain(page)
+    expect(stops.slice(0, 2)).toEqual(['Show deleted', 'New Campaign'])
+    expect(stops).toHaveLength(3)
+  })
+
+  test('AC-17: a campaign detail shows a visible focus indicator on its first three stops', async ({ page }) => {
+    const camp = await (await api.post('/api/campaigns', { name: `T10 Standalone ${Date.now()}` })).json()
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await pageLogin(page)
+    await page.goto(`/campaigns/${camp.id}`)
+    await expect(page.getByRole('heading', { name: camp.name, level: 1 })).toBeVisible()
+    // The breadcrumb's back button, the briefing's Draft with AI, its first tab.
+    expect(await tabThreeFromMain(page)).toEqual(['Campaigns', 'Draft with AI', 'Active'])
+  })
+
+  test('AC-12 + FR-12: campaigns and projects lists at 375px keep their controls and never scroll sideways', async ({ page }) => {
+    const { project, camp } = await mintCampaignFixture(api)
+    await page.setViewportSize({ width: 375, height: 812 })
+    await pageLogin(page)
+
+    await page.goto('/campaigns')
+    await expect(page.getByRole('link', { name: camp.name })).toBeVisible()
+    await expect(page.getByRole('link', { name: project.name })).toBeVisible()
+    await expect(page.getByRole('button', { name: `Delete ${camp.name}` })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Show deleted' })).toBeVisible()
+    await page.getByRole('button', { name: 'New Campaign' }).click()
+    await expect(page.getByRole('button', { name: 'New Campaign' })).toHaveAttribute('aria-expanded', 'true')
+    await expect(page.getByRole('textbox', { name: 'Campaign name' })).toBeVisible()
+    await expect(page.getByRole('combobox', { name: 'Project' })).toBeVisible()
+    await expect(page.getByRole('combobox', { name: 'Brand kit' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Create', exact: true })).toBeDisabled()
+    await expect(page.getByRole('button', { name: 'Cancel', exact: true })).toBeVisible()
+    await expectNoHorizontalScroll(page, 'campaigns list (create form open) at 375px')
+
+    await page.goto('/projects')
+    await expect(page.getByRole('heading', { name: 'Projects', level: 1 })).toBeVisible()
+    await expect(page.getByRole('link', { name: project.name })).toBeVisible()
+    await expect(page.getByRole('button', { name: `Delete ${project.name}` })).toBeVisible()
+    await page.getByRole('button', { name: 'New Project' }).click()
+    await expect(page.getByRole('textbox', { name: 'Project name' })).toBeVisible()
+    await expect(page.getByRole('combobox', { name: 'Default brand kit' })).toBeVisible()
+    await expectNoHorizontalScroll(page, 'projects list (create form open) at 375px')
+
+    await page.goto(`/projects/${project.id}`)
+    await expect(page.getByRole('heading', { name: project.name, level: 1 })).toBeVisible()
+    await expect(page.getByRole('navigation', { name: 'Breadcrumb' }).getByRole('button', { name: 'Projects' })).toBeVisible()
+    await expect(page.getByRole('link', { name: camp.name })).toBeVisible()
+    await expect(page.getByRole('combobox')).toHaveCount(1)
+    await expectNoHorizontalScroll(page, 'project detail at 375px')
+  })
+
+  test('AC-12 + FR-12: a campaign detail at 375px, with history, Enhance, the queue, its modal and the assistant', async ({ page }) => {
+    test.skip(!MOCKED(), 'needs MOCK_AI for Enhance and the briefing assistant')
+    const { project, camp } = await mintCampaignFixture(api)
+    await page.setViewportSize({ width: 375, height: 812 })
+    await pageLogin(page)
+    await page.goto(`/campaigns/${camp.id}`)
+    await expect(page.getByRole('heading', { name: camp.name, level: 1 })).toBeVisible()
+
+    // The breadcrumb: Projects / <project> / <campaign>.
+    const crumbs = page.getByRole('navigation', { name: 'Breadcrumb' })
+    await expect(crumbs.getByRole('button', { name: 'Projects' })).toBeVisible()
+    await expect(crumbs.getByRole('link', { name: project.name })).toBeVisible()
+    await expect(crumbs.locator('[aria-current="page"]')).toHaveText(camp.name)
+
+    // The briefing and the queue, with the aside's two selects.
+    await expect(page.getByRole('heading', { name: 'Campaign Briefing', level: 2 })).toBeVisible()
+    await expect(page.getByText('T10 briefing v2, the active one')).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Planned Posts (2)', level: 2 })).toBeVisible()
+    await expect(page.getByRole('combobox')).toHaveCount(2)
+    const queue = page.getByRole('region', { name: 'Planned posts' })
+    await expect(queue.getByRole('button', { name: 'Edit' })).toHaveCount(1)
+    await expect(queue.getByRole('button', { name: 'Cancel' })).toHaveCount(1)
+    await expect(queue.getByRole('button', { name: 'Re-run' })).toHaveCount(1)
+    await expectNoHorizontalScroll(page, 'campaign detail at 375px')
+    // The table is wider than the viewport: its region scrolls by keyboard.
+    await queue.focus()
+    await expect(queue).toBeFocused()
+    expect(await queue.evaluate((el) => el.scrollWidth > el.clientWidth)).toBe(true)
+    await page.keyboard.press('ArrowRight')
+    await expect.poll(() => queue.evaluate((el) => el.scrollLeft)).toBeGreaterThan(0)
+
+    // History: the version rows, with Restore on the inactive one.
+    await page.getByRole('tab', { name: 'History' }).click()
+    const history = page.getByRole('region', { name: 'Briefing history' })
+    await expect(history.getByRole('listitem')).toHaveCount(2)
+    await expect(history.getByRole('button', { name: 'Restore' })).toHaveCount(1)
+    await expectNoHorizontalScroll(page, 'briefing history at 375px')
+
+    // New Version, then Enhance with AI's before/after.
+    await page.getByRole('tab', { name: 'Active' }).click()
+    await page.getByRole('button', { name: 'Edit as new version' }).click()
+    await expect(page.getByRole('button', { name: 'Save as new version' })).toBeEnabled()
+    await page.getByRole('button', { name: 'Enhance with AI' }).click()
+    await expect(page.getByRole('region', { name: 'AI suggestion' })).toBeVisible({ timeout: 30_000 })
+    await expect(page.getByRole('region', { name: 'Before' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Accept suggestion' })).toBeVisible()
+    await expectNoHorizontalScroll(page, 'briefing Enhance before/after at 375px')
+    await page.getByRole('button', { name: 'Discard', exact: true }).click()
+
+    // The queue entry modal.
+    await page.getByRole('button', { name: 'Plan a post' }).click()
+    const modal = page.getByRole('dialog', { name: 'Plan a post' })
+    await expect(modal.getByRole('textbox', { name: 'Topic' })).toBeVisible()
+    await expect(modal.getByRole('checkbox')).toHaveCount(2)
+    await expect(modal.getByRole('radio')).toHaveCount(3)
+    await expect(modal.getByRole('button', { name: 'Add to queue' })).toBeDisabled()
+    await expectNoHorizontalScroll(page, 'queue entry modal at 375px')
+    await modal.getByRole('button', { name: 'Cancel' }).click()
+    await expect(modal).toBeHidden()
+
+    // The assistant: a briefing reply with Apply, then a schedule plan.
+    await page.getByRole('button', { name: 'Draft with AI' }).click()
+    const drawer = page.getByRole('dialog', { name: 'Draft briefing with AI' })
+    await expect(drawer.getByRole('button', { name: 'Add document' })).toBeVisible()
+    const ask = drawer.getByPlaceholder('Tell the assistant about this campaign…')
+    await expect(drawer.getByRole('button', { name: 'Send' })).toBeDisabled()
+    await ask.fill('A T10 campaign for final-year students.')
+    await ask.press('Enter')
+    await expect(drawer.getByRole('button', { name: 'Apply this draft to the editor' })).toBeVisible({ timeout: 30_000 })
+    await ask.fill('Please schedule a short series of posts.')
+    await ask.press('Enter')
+    const plan = drawer.getByRole('region', { name: 'Proposed schedule' })
+    await expect(plan).toBeVisible({ timeout: 30_000 })
+    for (const name of ['Move up', 'Move down', 'Remove post']) {
+      await expect(plan.getByRole('button', { name })).toHaveCount(2)
+    }
+    await expect(plan.getByRole('button', { name: 'Schedule 2 posts' })).toBeVisible()
+    await expectNoHorizontalScroll(page, 'briefing assistant with a plan at 375px')
+    await drawer.getByRole('button', { name: 'Apply this draft to the editor' }).click()
+    await expect(drawer).toBeHidden()
+    await expect(page.locator('textarea')).toHaveValue(/Mock campaign briefing draft/)
   })
 })
 
