@@ -364,7 +364,17 @@ Under `@media (prefers-reduced-motion: reduce)`:
 *::before,
 *::after {
   animation-duration: 1ms !important;
+  animation-iteration-count: 1 !important;
   transition-duration: 1ms !important;
+}
+/* loading indicators keep moving, slowly (added in T4) */
+.animate-spin {
+  animation-duration: 1.5s !important;
+  animation-iteration-count: infinite !important;
+}
+.animate-pulse {
+  animation-duration: 2s !important;
+  animation-iteration-count: infinite !important;
 }
 /* menus and toasts keep a 150 ms opacity-only fade instead of the drop */
 @keyframes fade {
@@ -379,6 +389,10 @@ Under `@media (prefers-reduced-motion: reduce)`:
 ```
 
 - The `transition-duration` line is the study's; the `animation-duration` line is from 011 `design.md` §4. Shortening durations, rather than removing animations, keeps `modalIn`'s final frame, which carries the modal's centring (AC-18).
+- **Loops (T4).**
+  - The iteration-count cap stops infinite decorative loops from strobing at 1 ms per cycle; they settle on their end frame.
+  - Loading indicators (`animate-spin`, `animate-pulse`) are status, so they are exempt: they keep looping at 1.5 s and 2 s, so a pending state still shows as pending.
+  - A new looping loader must use one of those two classes, or add its own exemption here.
 - Menus and toasts use `animation: fade 150ms linear both !important`. Their selectors are more specific than `*`, so the 150 ms wins over the 1 ms.
 - The Create post button's hover and press transforms become `none`.
 - **Side effect, from the T2 report:** `transition-duration: 1ms` on `*` turns on a 1 ms transition for every property, because `transition-property` defaults to `all`. A computed style read right after a state change can catch an in-between value. E2E checks (AC-17, AC-18) should wait briefly before they read computed styles, or T4 can scope the rule.

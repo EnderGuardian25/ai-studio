@@ -8,3 +8,7 @@
 {"ev":"stop","span":"W1","at":"2026-10-06T17:25:42Z","ts":1791307542,"status":"ok"}
 {"ev":"start","span":"W2","kind":"wave","label":"wave 2","at":"2026-10-07T14:14:32Z","ts":1791382472}
 {"ev":"start","span":"T3","kind":"task","label":"Record the pick; new DESIGN_SYSTEM.md; archive Frozen Light","parent":"W2","model":"opus","attempt":"1","at":"2026-10-07T14:14:32Z","ts":1791382472}
+{"ev":"stop","span":"T3","at":"2026-10-07T14:26:10Z","ts":1791383170,"status":"ok"}
+{"ev":"stop","span":"W2","at":"2026-10-07T14:26:10Z","ts":1791383170,"status":"ok"}
+{"ev":"start","span":"W3","kind":"wave","label":"wave 3","at":"2026-10-07T14:27:21Z","ts":1791383241}
+{"ev":"start","span":"T4","kind":"task","label":"Semantic tokens, fonts, reduced motion, tests, capture script","parent":"W3","model":"opus","attempt":"1","at":"2026-10-07T14:27:21Z","ts":1791383241}

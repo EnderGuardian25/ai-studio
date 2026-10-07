@@ -85,7 +85,7 @@ There are 13 tasks in 7 waves. All the work lands on `v2`.
 
 ### Wave 3 — Token foundation
 
-- [ ] `T4` — Semantic tokens, fonts, reduced motion, token and contrast tests, capture script
+- [x] `T4` — Semantic tokens, fonts, reduced motion, token and contrast tests, capture script
   - Files: `src/app/globals.css`, `tailwind.config.ts`, `src/app/layout.tsx`, `tests/unit/designTokens.test.ts` (new), `tests/unit/contrast.test.ts` (new), `scripts/capture-ui.mjs` (new), `.gitignore`
   - Estimate: medium
   - Kind: impl
