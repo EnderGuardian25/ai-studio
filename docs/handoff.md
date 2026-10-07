@@ -41,7 +41,7 @@
 - **`docker-publish.yml`** (push to `main`) builds and pushes `ghcr.io/<repo>` (here, `ghcr.io/enderguardian25/ai-studio`). It then **calls the company's Coolify** (`coolify.bistecglobal.com`, the company's two resource UUIDs) and polls the company's `/api/health`. With no `COOLIFY_API_TOKEN` it can only fail red. It must never be given one.
 - **`e2e.yml`** runs only on PRs and pushes to `main`. Draft PR #43 existed only to get CI on `v2`; the fork needs `v2` in its triggers instead.
 
-**Next step (a specclaw change, so propose it first):** remove or guard the deploy job with `if: github.repository == 'bistec-oss/studio'`, and add `v2` to `e2e.yml`'s triggers. Then turn Actions back on with `-F enabled=true`. Until then, **gates are run locally** (unit, lint, build, mock E2E), exactly as before.
+**The user's timing (2026-10-07): this waits until 011 is finished.** Then draft it with `/specclaw:propose` for the user to approve; don't build it between 011 tasks. **Next step (a specclaw change, so propose it first):** remove or guard the deploy job with `if: github.repository == 'bistec-oss/studio'`, and add `v2` to `e2e.yml`'s triggers. Then turn Actions back on with `-F enabled=true`. Until then, **gates are run locally** (unit, lint, build, mock E2E), exactly as before.
 
 ### What changed in the open items
 
@@ -84,7 +84,7 @@
   - **🔴 The user pasted that OAuth token into the chat**, so it is in the session transcript. **The user should revoke it** and make a new one with `claude setup-token`.
   - The auto-mode classifier blocks Claude from writing a token to a file and running docker with it. The working pattern is a ready-to-paste `! …` command that writes a temp env file, runs the check and deletes the file. This is logged as a 005 learning.
 - **005 verify: PASS, 25/25 ACs** (`e4e8e78e`, `.specclaw/changes/005-provider-flexibility-onboarding/verify-report.md`).
-  - The first E2E run failed once: the AC-23 stale-wording guard caught the 2026-10-03 handoff quoting "shared server credential". `f0fc1af7` reworded that line.
+  - The first E2E run failed once: the AC-23 stale-wording guard caught the 2026-10-03 handoff quoting the retired credential phrase. `f0fc1af7` reworded that line. **Never quote the phrase itself in `docs/` or `src/`:** the guard `git grep`s for it, so even a line describing the guard trips it. That happened here once, at 011 T4.
   - The clean re-run had **261 passed, 3 skipped, 0 failed, 0 flaky**. The skips are TC-REG-H11a/b/c, and TC-GEN-05 now runs.
   - **Open follow-ups, none of them failures:** recheck AC-17 after node:22 lands on `v2`; unit runs leave empty `bistec-cli-*` temp dirs; Gemini needs one live call; the card guide names `docs/claude-account-setup.md` as plain text, not a link.
 - **011 approved and planned** (`e398a589`). The user's decisions, recorded in `proposal.md` → Decisions:
