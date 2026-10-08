@@ -187,7 +187,7 @@ There are 13 tasks in 7 waves. All the work lands on `v2`.
     - **ACs:** AC-12, AC-13, AC-17.
     - **Colour editor swatches, font previews and template previews show kit data.** Mark them `// ui-exception:`.
 
-- [ ] `T12` — Restyle team, settings and admin users and teams
+- [x] `T12` — Restyle team, settings and admin users and teams
   - Files: `src/app/(app)/team/page.tsx`, `src/components/team/*`, `src/app/(app)/settings/page.tsx`, `src/components/settings/*`, `src/app/(app)/admin/users/page.tsx`, `src/app/(app)/admin/teams/page.tsx`, `src/app/(app)/admin/layout.tsx`
   - Estimate: medium
   - Kind: impl

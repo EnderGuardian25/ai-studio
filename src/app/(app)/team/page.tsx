@@ -3,14 +3,31 @@
 import React, { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Plus, Trash2, ToggleLeft, ToggleRight, Star, CheckCircle, XCircle, Eye, EyeOff, ShieldAlert } from 'lucide-react'
-import { GlassPanel } from '@/components/ui/GlassPanel'
+import { Plus, Trash2, ToggleLeft, ToggleRight, Star, Eye, EyeOff } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
-import { GlassInput } from '@/components/ui/GlassInput'
+import { Input } from '@/components/ui/Input'
+import { Panel } from '@/components/ui/Panel'
 import { SegmentedToggle } from '@/components/ui/SegmentedToggle'
 import { QueryError } from '@/components/ui/QueryError'
 import { TeamClaudeTokenCard } from '@/components/team/TeamClaudeTokenCard'
 import { ApiKeysCard } from '@/components/team/ApiKeysCard'
+import {
+  BLOCK,
+  FOCUS,
+  GateNotice,
+  GROUP_HEAD,
+  ICON,
+  ICON_BUTTON,
+  ICON_SM,
+  PageHead,
+  ROW,
+  SectionHead,
+  SMALL_CAPS,
+  StatusWord,
+  SUB_HEAD,
+  TAG,
+  WARN_NOTICE,
+} from '@/components/team/folio'
 import { apiFetch } from '@/lib/apiFetch'
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser'
 import { pickServingImageProvider } from '@/providers/imageCapabilities'
@@ -24,9 +41,9 @@ import type { AdminProvider as Provider, ProviderSlot, ChannelStatus, ChannelMap
 
 // lucide-react 1.x removed brand icons — inline equivalents (stroke style
 // matches lucide so they sit naturally beside the other icons).
-function InstagramIcon({ size = 18 }: { size?: number }) {
+function InstagramIcon({ size = 15 }: { size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <rect width="20" height="20" x="2" y="2" rx="5" ry="5" />
       <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
       <line x1="17.5" x2="17.51" y1="6.5" y2="6.5" />
@@ -34,9 +51,9 @@ function InstagramIcon({ size = 18 }: { size?: number }) {
   )
 }
 
-function LinkedinIcon({ size = 18 }: { size?: number }) {
+function LinkedinIcon({ size = 15 }: { size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z" />
       <rect width="4" height="12" x="2" y="9" />
       <circle cx="4" cy="4" r="2" />
@@ -96,12 +113,13 @@ function RegisterForm({ onSuccess, allowCopySlot }: { onSuccess: () => void; all
   }
 
   return (
-    <div className="glass-panel rounded-xl p-5 space-y-4 border border-primary/20">
-      <h3 className="text-sm font-semibold text-light-text dark:text-dark-text">Register new provider</h3>
+    <Panel className="space-y-4 p-5">
+      <h3 className={SUB_HEAD}>Register new provider</h3>
 
       <div className="space-y-3">
         <div className="relative">
-          <GlassInput
+          <Input
+            className="pr-11"
             type={showKey ? 'text' : 'password'}
             placeholder={allowCopySlot ? 'API key (sk-ant-…, sk-…, or AIza… Gemini for images)' : 'Image API key (sk-… OpenAI or AIza… Gemini)'}
             value={apiKey}
@@ -112,27 +130,27 @@ function RegisterForm({ onSuccess, allowCopySlot }: { onSuccess: () => void; all
             onClick={() => setShowKey(v => !v)}
             aria-label={showKey ? 'Hide API key' : 'Show API key'}
             aria-pressed={showKey}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-light-text-muted dark:text-dark-text-muted"
+            className={`absolute right-1.5 top-1/2 -translate-y-1/2 ${ICON_BUTTON} hover:text-fg ${FOCUS}`}
           >
-            {showKey ? <EyeOff size={15} /> : <Eye size={15} />}
+            {showKey ? <EyeOff {...ICON} /> : <Eye {...ICON} />}
           </button>
         </div>
 
         {detected && (
-          <p className="text-xs text-primary dark:text-primary-light font-medium">
+          <p className="text-ui-xs font-medium text-fg">
             ✓ {DETECTED_NAMES[detected.name]} detected
             {detected.name === 'gemini' && ' — image generation only'}
           </p>
         )}
         {isUnknown && (
           <div className="space-y-2">
-            <p className="text-xs text-light-text-muted dark:text-dark-text-muted">Unknown key format — enter provider details</p>
-            <GlassInput
+            <p className="text-ui-xs text-fg-muted">Unknown key format — enter provider details</p>
+            <Input
               placeholder="Provider name (e.g. groq)"
               value={providerName}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => setProviderName(e.target.value)}
             />
-            <GlassInput
+            <Input
               placeholder="Display label (e.g. Llama 3 (Groq))"
               value={label}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => setLabel(e.target.value)}
@@ -150,19 +168,20 @@ function RegisterForm({ onSuccess, allowCopySlot }: { onSuccess: () => void; all
             onChange={v => setSlot(v as ProviderSlot)}
           />
         ) : (
-          <p className="text-xs text-light-text-muted dark:text-dark-text-muted">
+          <p className="text-ui-xs text-fg-muted">
             Registered for <span className="font-semibold">image generation</span> (an OpenAI or Gemini
             key) — the only key this team needs. Copy is generated by Claude on the OAuth chain.
           </p>
         )}
 
-        {error && <p className="text-xs text-red-500">{error}</p>}
+        {error && <p className="text-ui-xs text-status-failed">{error}</p>}
 
+        {/* The view's one accent primary, shown only while this form is open. */}
         <Button variant="primary" size="sm" onClick={register} disabled={loading || !apiKey}>
           {loading ? 'Validating…' : 'Register'}
         </Button>
       </div>
-    </div>
+    </Panel>
   )
 }
 
@@ -192,62 +211,65 @@ function ProviderCard({ provider, onRefresh }: { provider: Provider; onRefresh: 
   }
 
   return (
-    <div className="glass-panel rounded-xl p-4 flex items-start gap-4">
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="font-medium text-sm text-light-text dark:text-dark-text truncate">{provider.label}</span>
-          <span className="font-mono text-xs px-2 py-0.5 rounded-md bg-primary/10 text-primary dark:text-primary-light">
-            {provider.slot}
-          </span>
+    // A ruled row (§6): the label, its slot tag and the Default mark, the
+    // masked key beneath; quiet icon controls on the right (§8.16).
+    <li className={`${ROW} flex items-start gap-4`}>
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="min-w-0 truncate text-ui-base font-medium text-fg" title={provider.label}>{provider.label}</span>
+          <span className={TAG}>{provider.slot}</span>
           {provider.isDefault && (
-            <span className="flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400">
-              <Star size={11} /> Default
+            <span className={`flex items-center gap-1 ${SMALL_CAPS} text-accent`}>
+              <Star {...ICON_SM} fill="currentColor" aria-hidden /> Default
             </span>
           )}
         </div>
-        <p className="font-mono text-xs text-light-text-muted dark:text-dark-text-muted mt-1">
+        <p className="mt-1 font-mono text-ui-xs text-fg-muted">
           {maskKey(provider.keyPrefix)}
         </p>
       </div>
 
-      <div className="flex items-center gap-2 flex-shrink-0">
+      <div className="flex flex-shrink-0 flex-wrap items-center justify-end gap-1">
         <button
+          type="button"
           onClick={() => toggle('isEnabled', !provider.isEnabled)}
           aria-pressed={provider.isEnabled}
           aria-label={`Enable ${provider.label}`}
-          className="text-light-text-muted dark:text-dark-text-muted hover:text-primary dark:hover:text-primary-light transition-colors"
+          className={`${ICON_BUTTON} ${provider.isEnabled ? 'text-accent' : 'hover:text-fg'} ${FOCUS}`}
           title={provider.isEnabled ? 'Disable' : 'Enable'}
         >
           {provider.isEnabled
-            ? <ToggleRight size={20} className="text-primary dark:text-primary-light" />
-            : <ToggleLeft size={20} />}
+            ? <ToggleRight size={20} strokeWidth={1.4} />
+            : <ToggleLeft size={20} strokeWidth={1.4} />}
         </button>
         <button
+          type="button"
           onClick={() => toggle('isDefault', true)}
           aria-pressed={provider.isDefault}
           aria-label={`Set ${provider.label} as default`}
           disabled={starBlocked}
-          className={`transition-colors ${starBlocked ? 'opacity-40 cursor-not-allowed text-light-text-muted dark:text-dark-text-muted' : provider.isDefault ? 'text-amber-500' : 'text-light-text-muted dark:text-dark-text-muted hover:text-amber-500'}`}
+          className={`${ICON_BUTTON} ${provider.isDefault ? 'text-accent' : 'enabled:hover:text-fg'} ${FOCUS}`}
           title={starBlocked ? 'Enable this provider before making it the default' : 'Set as default'}
         >
-          <Star size={15} />
+          <Star {...ICON} fill={provider.isDefault ? 'currentColor' : 'none'} />
         </button>
         {confirming ? (
           <div className="flex gap-1">
-            <button onClick={remove} className="text-xs text-red-500 font-medium px-2 py-0.5 rounded bg-red-500/10">Confirm</button>
-            <button onClick={() => setConfirming(false)} className="text-xs text-light-text-muted dark:text-dark-text-muted px-2 py-0.5 rounded glass-input">Cancel</button>
+            <Button variant="danger" size="sm" onClick={remove}>Confirm</Button>
+            <Button variant="ghost" size="sm" onClick={() => setConfirming(false)}>Cancel</Button>
           </div>
         ) : (
           <button
+            type="button"
             onClick={() => setConfirming(true)}
             aria-label={`Remove ${provider.label}`}
-            className="text-light-text-muted dark:text-dark-text-muted hover:text-red-500 transition-colors"
+            className={`${ICON_BUTTON} hover:text-status-failed ${FOCUS}`}
           >
-            <Trash2 size={15} />
+            <Trash2 {...ICON} />
           </button>
         )}
       </div>
-    </div>
+    </li>
   )
 }
 
@@ -300,22 +322,21 @@ function ChannelRow({
   }
 
   return (
-    <div className="glass-panel rounded-xl p-5 space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <span className="text-light-text-muted dark:text-dark-text-muted">{icon}</span>
-          <span className="font-medium text-sm text-light-text dark:text-dark-text">{label}</span>
+    <li className={`${ROW} space-y-3 py-4`}>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2.5">
+          <span className="text-fg-muted">{icon}</span>
+          <span className="text-ui-base font-medium text-fg">{label}</span>
         </div>
-        <div className="flex items-center gap-2">
-          {status.connected
-            ? <span className="flex items-center gap-1.5 text-xs text-green-600 dark:text-green-400 font-medium"><CheckCircle size={13} /> Connected</span>
-            : <span className="flex items-center gap-1.5 text-xs text-light-text-muted dark:text-dark-text-muted"><XCircle size={13} /> Not connected</span>}
-        </div>
+        {status.connected
+          ? <StatusWord tone="published">Connected</StatusWord>
+          : <StatusWord tone="draft">Not connected</StatusWord>}
       </div>
 
       <div className="space-y-2">
         <div className="relative">
-          <GlassInput
+          <Input
+            className="pr-11"
             type={showToken ? 'text' : 'password'}
             placeholder={tokenPlaceholder}
             value={token}
@@ -326,29 +347,29 @@ function ChannelRow({
             onClick={() => setShowToken(v => !v)}
             aria-label={showToken ? 'Hide access token' : 'Show access token'}
             aria-pressed={showToken}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-light-text-muted dark:text-dark-text-muted"
+            className={`absolute right-1.5 top-1/2 -translate-y-1/2 ${ICON_BUTTON} hover:text-fg ${FOCUS}`}
           >
-            {showToken ? <EyeOff size={15} /> : <Eye size={15} />}
+            {showToken ? <EyeOff {...ICON} /> : <Eye {...ICON} />}
           </button>
         </div>
-        <GlassInput
+        <Input
           placeholder={metadataPlaceholder}
           value={metadata}
           onChange={(e: React.ChangeEvent<HTMLInputElement>) => setMetadata(e.target.value)}
         />
       </div>
 
-      {error && <p className="text-xs text-red-500">{error}</p>}
+      {error && <p className="text-ui-xs text-status-failed">{error}</p>}
 
-      <div className="flex gap-2">
-        <Button variant="primary" size="sm" onClick={save} disabled={loading || !token || !metadata}>
+      <div className="flex flex-wrap gap-2">
+        <Button variant="ink" size="sm" onClick={save} disabled={loading || !token || !metadata}>
           {loading ? 'Saving…' : 'Save'}
         </Button>
         {status.connected && (
           <Button variant="secondary" size="sm" onClick={revoke}>Revoke</Button>
         )}
       </div>
-    </div>
+    </li>
   )
 }
 
@@ -374,9 +395,9 @@ function ImageDefaultState({ rows, onRefresh }: { rows: Provider[]; onRefresh: (
 
   if (!serving) {
     return (
-      <div data-testid="image-default-state" data-state="none" role="status" className="rounded-xl border border-amber-300 dark:border-amber-700/50 bg-amber-50 dark:bg-amber-900/20 p-3">
-        <p className="text-sm font-medium text-amber-800 dark:text-amber-300">No image provider</p>
-        <p className="text-xs text-amber-700 dark:text-amber-400/90 mt-1">
+      <div data-testid="image-default-state" data-state="none" role="status" className={WARN_NOTICE}>
+        <p className="font-semibold">No image provider</p>
+        <p className="mt-1 text-ui-xs text-fg">
           Teammates without a personal OpenAI key get no AI backgrounds.
         </p>
       </div>
@@ -384,14 +405,14 @@ function ImageDefaultState({ rows, onRefresh }: { rows: Provider[]; onRefresh: (
   }
   if (serving.isDefault) {
     return (
-      <p data-testid="image-default-state" data-state="default" className="text-xs text-light-text-muted dark:text-dark-text-muted">
+      <p data-testid="image-default-state" data-state="default" className="text-ui-xs text-fg-muted">
         Teammates without a personal OpenAI key use this provider.
       </p>
     )
   }
   return (
-    <div data-testid="image-default-state" data-state="fallback" role="status" className="rounded-xl border border-amber-300 dark:border-amber-700/50 bg-amber-50 dark:bg-amber-900/20 p-3 flex items-center gap-3 flex-wrap">
-      <p className="flex-1 min-w-0 text-xs text-amber-800 dark:text-amber-300">
+    <div data-testid="image-default-state" data-state="fallback" role="status" className={`${WARN_NOTICE} flex flex-wrap items-center gap-3`}>
+      <p className="min-w-0 flex-1 text-ui-xs text-fg">
         No default set — teammates are using <span className="font-semibold">{serving.label}</span> (the oldest enabled image provider).
       </p>
       <Button variant="secondary" size="sm" onClick={() => makeDefault(serving.id)} disabled={busy}>
@@ -425,7 +446,7 @@ function ProvidersSection() {
   const providersBySlot = (slot: ProviderSlot) => providers.filter(p => p.slot === slot)
 
   if (providersQuery.isLoading) {
-    return <p className="text-sm text-light-text-muted dark:text-dark-text-muted">Loading…</p>
+    return <p className="text-ui-sm text-fg-muted">Loading…</p>
   }
   if (providersQuery.isError) {
     return <QueryError error={providersQuery.error} onRetry={() => providersQuery.refetch()} />
@@ -442,7 +463,7 @@ function ProvidersSection() {
   return (
     <div className="space-y-6">
       {cliMode && (
-        <p className="text-sm text-light-text-muted dark:text-dark-text-muted">
+        <p className="text-ui-sm text-fg-muted">
           This server runs Claude in CLI mode, so copy is generated on the Claude OAuth chain — a
           member&apos;s personal token, falling back to the team token. No copy provider is needed;
           the only key this team needs is an <span className="font-semibold">image</span> key for
@@ -452,23 +473,25 @@ function ProvidersSection() {
 
       {visibleSlots.map(slot => (
         <div key={slot} className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-xs font-semibold uppercase tracking-widest text-light-text-muted dark:text-dark-text-muted">
-              {slot === 'COPY' ? 'Copy (text generation)' : 'Image generation'}
-            </h3>
-          </div>
+          <h3 className={GROUP_HEAD}>
+            {slot === 'COPY' ? 'Copy (text generation)' : 'Image generation'}
+          </h3>
           {slot === 'COPY' && cliMode && (
-            <p className="text-xs text-light-text-muted dark:text-dark-text-muted italic">
+            <p className="text-ui-xs italic text-fg-muted">
               Not used in CLI mode — safe to delete.
             </p>
           )}
           {slot === 'IMAGE' && <ImageDefaultState rows={providersBySlot('IMAGE')} onRefresh={invalidateProviders} />}
           {providersBySlot(slot).length === 0 && (
-            <p className="text-sm text-light-text-muted dark:text-dark-text-muted italic">No providers registered for {slot}</p>
+            <p className="text-ui-sm italic text-fg-muted">No providers registered for {slot}</p>
           )}
-          {providersBySlot(slot).map(p => (
-            <ProviderCard key={p.id} provider={p} onRefresh={invalidateProviders} />
-          ))}
+          {providersBySlot(slot).length > 0 && (
+            <ul className="border-t border-line-subtle">
+              {providersBySlot(slot).map(p => (
+                <ProviderCard key={p.id} provider={p} onRefresh={invalidateProviders} />
+              ))}
+            </ul>
+          )}
         </div>
       ))}
 
@@ -478,8 +501,8 @@ function ProvidersSection() {
           onSuccess={() => { setShowRegister(false); invalidateProviders() }}
         />
       ) : (
-        <Button variant="secondary" onClick={() => setShowRegister(true)} className="flex items-center gap-2">
-          <Plus size={15} /> {cliMode ? 'Register image key' : 'Register Provider'}
+        <Button variant="secondary" onClick={() => setShowRegister(true)}>
+          <Plus {...ICON} /> {cliMode ? 'Register image key' : 'Register Provider'}
         </Button>
       )}
     </div>
@@ -502,21 +525,21 @@ function ChannelsSection() {
   }
 
   if (channelsQuery.isLoading) {
-    return <p className="text-sm text-light-text-muted dark:text-dark-text-muted">Loading…</p>
+    return <p className="text-ui-sm text-fg-muted">Loading…</p>
   }
   if (channelsQuery.isError) {
     return <QueryError error={channelsQuery.error} onRetry={() => channelsQuery.refetch()} />
   }
 
   return (
-    <div className="space-y-4">
+    <ul className="border-t border-line-subtle">
       <ChannelRow
         channel="INSTAGRAM"
         status={channels.INSTAGRAM}
         label="Instagram"
         tokenPlaceholder="Access token"
         metadataPlaceholder="Business Account ID"
-        icon={<InstagramIcon size={18} />}
+        icon={<InstagramIcon size={15} />}
         onRefresh={invalidateChannels}
       />
       <ChannelRow
@@ -525,10 +548,10 @@ function ChannelsSection() {
         label="LinkedIn"
         tokenPlaceholder="Access token"
         metadataPlaceholder="Organization ID"
-        icon={<LinkedinIcon size={18} />}
+        icon={<LinkedinIcon size={15} />}
         onRefresh={invalidateChannels}
       />
-    </div>
+    </ul>
   )
 }
 
@@ -541,44 +564,39 @@ export default function TeamSettingsPage() {
 
   if (!isTeamAdmin) {
     return (
-      <GlassPanel className="p-12 text-center max-w-md mx-auto mt-12">
-        <ShieldAlert size={32} className="mx-auto mb-3 text-light-text-muted dark:text-dark-text-muted" />
-        <h1 className="text-lg font-semibold text-light-text dark:text-dark-text mb-1">
-          Requires team admin
-        </h1>
-        <p className="text-sm text-light-text-muted dark:text-dark-text-muted">
-          Team settings are limited to this team&apos;s administrators.
-        </p>
-      </GlassPanel>
+      <GateNotice title="Requires team admin">
+        Team settings are limited to this team&apos;s administrators.
+      </GateNotice>
     )
   }
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-8 space-y-8">
-      <div>
-        <h1 className="text-2xl font-bold text-light-text dark:text-dark-text">Team settings</h1>
-        <p className="text-sm text-light-text-muted dark:text-dark-text-muted mt-1">
-          Providers, channels, and credentials shared by everyone on this team.
-        </p>
+    <div className="max-w-3xl">
+      <PageHead
+        eyebrow="Admin"
+        title="Team settings"
+        lead="Providers, channels, and credentials shared by everyone on this team."
+      />
+
+      <div className="flex flex-col gap-12">
+        <section>
+          <SectionHead numeral="i." title="AI Providers" />
+          <div className={BLOCK}>
+            <ProvidersSection />
+          </div>
+        </section>
+
+        <section>
+          <SectionHead numeral="ii." title="Social Channels" />
+          <div className={BLOCK}>
+            <ChannelsSection />
+          </div>
+        </section>
+
+        <TeamClaudeTokenCard numeral="iii." />
+
+        <ApiKeysCard numeral="iv." />
       </div>
-
-      <section className="space-y-3">
-        <h2 className="text-lg font-semibold text-light-text dark:text-dark-text">AI Providers</h2>
-        <ProvidersSection />
-      </section>
-
-      <section className="space-y-3">
-        <h2 className="text-lg font-semibold text-light-text dark:text-dark-text">Social Channels</h2>
-        <ChannelsSection />
-      </section>
-
-      <section>
-        <TeamClaudeTokenCard />
-      </section>
-
-      <section>
-        <ApiKeysCard />
-      </section>
     </div>
   )
 }

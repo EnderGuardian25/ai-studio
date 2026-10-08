@@ -32,3 +32,5 @@
 {"ev":"start","span":"T10","kind":"task","label":"Restyle campaigns, projects and the queue","parent":"W6","model":"opus","attempt":"1","at":"2026-10-07T19:28:38Z","ts":1791401318}
 {"ev":"stop","span":"T10","at":"2026-10-07T19:56:45Z","ts":1791403005,"status":"ok"}
 {"ev":"start","span":"T11","kind":"task","label":"Restyle the brand kits admin","parent":"W6","model":"opus","attempt":"1","at":"2026-10-07T19:57:13Z","ts":1791403033}
+{"ev":"stop","span":"T11","at":"2026-10-07T23:43:47Z","ts":1791416627,"status":"ok"}
+{"ev":"start","span":"T12","kind":"task","label":"Restyle team, settings and admin users and teams","parent":"W6","model":"opus","attempt":"1","at":"2026-10-07T23:44:20Z","ts":1791416660}

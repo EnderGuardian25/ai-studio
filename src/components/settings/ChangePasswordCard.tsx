@@ -2,10 +2,9 @@
 
 import React, { useState } from 'react'
 import { toast } from 'sonner'
-import { Lock } from 'lucide-react'
-import { GlassPanel } from '@/components/ui/GlassPanel'
-import { GlassInput } from '@/components/ui/GlassInput'
+import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
+import { BLOCK, SectionHead } from '@/components/team/folio'
 import { authClient } from '@/lib/auth-client'
 
 // Self-service password change. better-auth's base client always exposes
@@ -16,7 +15,7 @@ import { authClient } from '@/lib/auth-client'
 // deactivation flow's "sessions revoked" precedent elsewhere in the app.
 const MIN_LENGTH = 8
 
-export function ChangePasswordCard() {
+export function ChangePasswordCard({ numeral }: { numeral?: string }) {
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -61,54 +60,51 @@ export function ChangePasswordCard() {
   }
 
   return (
-    <GlassPanel className="p-6 flex flex-col gap-5">
-      <div className="flex items-center gap-3">
-        <div className="p-2.5 rounded-xl bg-primary/10 dark:bg-primary-light/10 text-primary dark:text-primary-light">
-          <Lock size={20} />
-        </div>
-        <div>
-          <h2 className="text-lg font-semibold text-light-text dark:text-dark-text">Password</h2>
-          <p className="text-sm text-light-text-muted dark:text-dark-text-muted">
-            Change your sign-in password. Other devices are signed out immediately.
-          </p>
-        </div>
-      </div>
+    <section>
+      <SectionHead numeral={numeral} title="Password" />
 
-      <form onSubmit={submit} className="flex flex-col gap-3 max-w-sm">
-        <GlassInput
-          label="Current password"
-          type="password"
-          autoComplete="current-password"
-          value={currentPassword}
-          onChange={e => setCurrentPassword(e.target.value)}
-          required
-        />
-        <GlassInput
-          label="New password"
-          type="password"
-          autoComplete="new-password"
-          value={newPassword}
-          onChange={e => setNewPassword(e.target.value)}
-          minLength={MIN_LENGTH}
-          required
-          placeholder={`At least ${MIN_LENGTH} characters`}
-        />
-        <GlassInput
-          label="Confirm new password"
-          type="password"
-          autoComplete="new-password"
-          value={confirmPassword}
-          onChange={e => setConfirmPassword(e.target.value)}
-          minLength={MIN_LENGTH}
-          required
-        />
-        {error && <p className="text-xs text-red-500 dark:text-red-400">{error}</p>}
-        <div>
-          <Button type="submit" disabled={saving || !currentPassword || !newPassword || !confirmPassword}>
-            {saving ? 'Changing…' : 'Change password'}
-          </Button>
-        </div>
-      </form>
-    </GlassPanel>
+      <div className={`${BLOCK} flex flex-col gap-5`}>
+        <p className="text-ui-sm text-fg-muted">
+          Change your sign-in password. Other devices are signed out immediately.
+        </p>
+
+        <form onSubmit={submit} className="flex max-w-sm flex-col gap-3">
+          <Input
+            label="Current password"
+            type="password"
+            autoComplete="current-password"
+            value={currentPassword}
+            onChange={e => setCurrentPassword(e.target.value)}
+            required
+          />
+          <Input
+            label="New password"
+            type="password"
+            autoComplete="new-password"
+            value={newPassword}
+            onChange={e => setNewPassword(e.target.value)}
+            minLength={MIN_LENGTH}
+            required
+            placeholder={`At least ${MIN_LENGTH} characters`}
+          />
+          <Input
+            label="Confirm new password"
+            type="password"
+            autoComplete="new-password"
+            value={confirmPassword}
+            onChange={e => setConfirmPassword(e.target.value)}
+            minLength={MIN_LENGTH}
+            required
+          />
+          {error && <p className="text-ui-xs text-status-failed">{error}</p>}
+          <div>
+            {/* The page's one accent primary (§8.2). */}
+            <Button type="submit" disabled={saving || !currentPassword || !newPassword || !confirmPassword}>
+              {saving ? 'Changing…' : 'Change password'}
+            </Button>
+          </div>
+        </form>
+      </div>
+    </section>
   )
 }

@@ -13,7 +13,7 @@ import { loginAs, waitForDraft, type ApiClient } from '../helpers/api'
 //          (login, choose-team and the shell at 375 px), AC-17 (visible focus
 //          on the first three stops of login and the shell), the "Studio"
 //          wordmark, the theme toggle, and the Create post button's motion.
-//   T7–T11, the screen groups: AC-12 (375 px, no horizontal scroll), AC-17
+//   T7–T12, the screen groups: AC-12 (375 px, no horizontal scroll), AC-17
 //          (visible focus on a screen's first three stops) and FR-12 (each
 //          screen's controls, by role and name).
 
@@ -1151,6 +1151,212 @@ test.describe('Brand kits (T11)', () => {
       }
     })
   }
+})
+
+// ── Team, settings and admin (T12: AC-12, AC-17, FR-12) ──────────────────────
+
+test.describe('Team, settings and admin (T12)', () => {
+  // API keys a case creates through the UI, revoked after it (a key can't be
+  // deleted, only revoked). The page's own request context carries the active
+  // team cookie the /api/team routes need.
+  const createdKeyLabels: string[] = []
+  test.afterEach(async ({ page }) => {
+    const labels = createdKeyLabels.splice(0)
+    if (labels.length === 0) return
+    const res = await page.request.get('/api/team/api-keys')
+    const { keys } = (await res.json()) as { keys: { id: string; label: string; revokedAt: string | null }[] }
+    for (const k of keys) {
+      if (labels.includes(k.label) && !k.revokedAt) await page.request.delete(`/api/team/api-keys/${k.id}`)
+    }
+  })
+
+  test('AC-17: /settings, /team, /admin/users and /admin/teams show a visible focus indicator on their first three stops', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await pageLogin(page)
+
+    // /settings opens on the connect guide's OS tabs (no roving tabindex, so
+    // each tab is a stop).
+    await page.goto('/settings')
+    await expect(page.getByRole('heading', { name: 'Claude account', exact: true })).toBeVisible()
+    expect(await tabThreeFromMain(page)).toEqual(['Windows', 'macOS', 'Linux'])
+
+    // /team opens on the first provider row's quiet controls; which provider
+    // is first depends on the test DB, so only the count is fixed.
+    await page.goto('/team')
+    await expect(page.getByRole('heading', { name: 'AI Providers' })).toBeVisible()
+    await expect(page.getByTestId('image-default-state')).toBeVisible()
+    expect(await tabThreeFromMain(page)).toHaveLength(3)
+
+    // /admin/users: Add user, the table's scroll region, then the first
+    // unlocked row's Reset password (your own row has no actions).
+    await page.goto('/admin/users')
+    // Wait for the rows: the region renders before the list loads.
+    await expect(page.getByRole('button', { name: 'Reset password' }).first()).toBeVisible()
+    const userStops = await tabThreeFromMain(page)
+    expect(userStops.slice(0, 2)).toEqual(['Add user', 'Users'])
+    expect(userStops[2]).toContain('Reset password')
+
+    // /admin/teams: Add team, the scroll region, then the first row's Members.
+    await page.goto('/admin/teams')
+    await expect(page.getByRole('button', { name: 'Members', exact: true }).first()).toBeVisible()
+    const teamStops = await tabThreeFromMain(page)
+    expect(teamStops.slice(0, 2)).toEqual(['Add team', 'Teams'])
+    expect(teamStops[2]).toContain('Members')
+  })
+
+  test('AC-12 + FR-12: /settings at 375px keeps its guide tabs, token fields and password form', async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 812 })
+    await pageLogin(page)
+    await page.goto('/settings')
+
+    await expect(page.getByRole('heading', { name: 'Settings', level: 1 })).toBeVisible()
+    for (const name of ['Claude account', 'OpenAI key', 'Password']) {
+      await expect(page.getByRole('heading', { name, exact: true, level: 2 })).toBeVisible()
+    }
+    const tablist = page.getByRole('tablist', { name: 'Operating system' })
+    await expect(tablist.getByRole('tab')).toHaveText(['Windows', 'macOS', 'Linux'])
+    for (const os of ['Windows', 'macOS', 'Linux']) {
+      await tablist.getByRole('tab', { name: os }).click()
+      await expect(tablist.getByRole('tab', { name: os })).toHaveAttribute('aria-selected', 'true')
+      await expect(page.getByRole('tabpanel').getByRole('button', { name: 'Copy command' }).first()).toBeVisible()
+      await expectNoHorizontalScroll(page, `settings guide (${os}) at 375px`)
+    }
+
+    const claudeForm = page.locator('form', { has: page.getByLabel('Claude OAuth token') })
+    await expect(claudeForm.getByRole('button', { name: /^(Connect|Replace)$/ })).toBeDisabled()
+    const openAiForm = page.locator('form', { has: page.getByLabel('OpenAI API key') })
+    await expect(openAiForm.getByRole('button', { name: /^(Connect|Replace)$/ })).toBeDisabled()
+    for (const name of ['Current password', 'New password', 'Confirm new password']) {
+      await expect(page.getByRole('textbox', { name, exact: true })).toBeVisible()
+    }
+    await expect(page.getByRole('button', { name: 'Change password' })).toBeDisabled()
+    await expectNoHorizontalScroll(page, 'settings at 375px')
+  })
+
+  test('AC-12 + FR-12: /team at 375px keeps providers, channels, the team token and API keys, with the register form and key modals open', async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 812 })
+    await pageLogin(page)
+    await page.goto('/team')
+
+    await expect(page.getByRole('heading', { name: 'Team settings', level: 1 })).toBeVisible()
+    for (const name of ['AI Providers', 'Social Channels', 'Team Claude account', 'API keys']) {
+      await expect(page.getByRole('heading', { name, exact: true, level: 2 })).toBeVisible()
+    }
+    await expect(page.getByRole('heading', { name: 'Image generation', level: 3 })).toBeVisible()
+    // Social channels: both rows, each with its token reveal and Save.
+    await expect(page.getByRole('button', { name: 'Show access token' })).toHaveCount(2)
+    await expect(page.getByRole('button', { name: 'Save', exact: true })).toHaveCount(2)
+    // The team token, with its guide.
+    await expect(page.getByRole('textbox', { name: 'Team Claude OAuth token' })).toBeVisible()
+    await expect(page.getByRole('tablist', { name: 'Operating system' }).getByRole('tab')).toHaveText(['Windows', 'macOS', 'Linux'])
+    await expectNoHorizontalScroll(page, 'team at 375px')
+
+    // The register form (API mode, so COPY and IMAGE are offered).
+    await page.getByRole('button', { name: 'Register Provider' }).click()
+    await expect(page.getByRole('heading', { name: 'Register new provider', level: 3 })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Show API key' })).toBeVisible()
+    await expect(page.getByRole('tab', { name: 'COPY' })).toBeVisible()
+    await expect(page.getByRole('tab', { name: 'IMAGE' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Register', exact: true })).toBeDisabled()
+    await expectNoHorizontalScroll(page, 'register form at 375px')
+
+    // Create an API key; the one-time reveal shows the plaintext and Copy.
+    const label = `T12 key ${Date.now()}`
+    await page.getByRole('button', { name: 'Create key' }).click()
+    const create = page.getByRole('dialog', { name: 'Create API key' })
+    await create.getByRole('textbox', { name: 'Label' }).fill(label)
+    await expectNoHorizontalScroll(page, 'create key modal at 375px')
+    createdKeyLabels.push(label)
+    await create.getByRole('button', { name: 'Create', exact: true }).click()
+    const reveal = page.getByRole('dialog', { name: `Key created — ${label}` })
+    await expect(reveal.locator('code')).toHaveText(/^bstk_/)
+    await expect(reveal.getByRole('button', { name: 'Copy' })).toBeVisible()
+    await expectNoHorizontalScroll(page, 'key reveal modal at 375px')
+    await reveal.getByRole('button', { name: 'Done' }).click()
+    await expect(reveal).toBeHidden()
+    // Its row: the label and a Revoke control.
+    const row = page.getByRole('listitem').filter({ hasText: label })
+    await expect(row.getByRole('button', { name: 'Revoke' })).toBeVisible()
+  })
+
+  test('AC-12 + FR-12: /admin/users at 375px keeps the table controls and its modals', async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 812 })
+    await pageLogin(page)
+    await page.goto('/admin/users')
+
+    await expect(page.getByRole('heading', { name: 'Users', level: 1 })).toBeVisible()
+    const table = page.getByRole('region', { name: 'Users' })
+    for (const name of ['Name', 'Username', 'Status', 'Created', 'Actions']) {
+      await expect(table.getByRole('columnheader', { name, exact: true })).toHaveCount(1)
+    }
+    // The seeded editor's row: a status word, Reset password and Deactivate.
+    const editorRow = table.getByRole('row').filter({ has: page.getByRole('cell', { name: 'editor', exact: true }) })
+    await expect(editorRow.getByText(/^(Active|Deactivated)$/)).toBeVisible()
+    await expect(editorRow.getByRole('button', { name: 'Reset password' })).toHaveCount(1)
+    await expect(editorRow.getByRole('button', { name: /^(Deactivate|Reactivate)$/ })).toHaveCount(1)
+    await expectNoHorizontalScroll(page, 'users at 375px')
+
+    await page.getByRole('button', { name: 'Add user' }).click()
+    const add = page.getByRole('dialog', { name: 'Add user' })
+    for (const name of ['Name', 'Username', 'Initial password']) {
+      await expect(add.getByRole('textbox', { name, exact: true })).toBeVisible()
+    }
+    await expect(add.getByRole('button', { name: 'Create user' })).toBeVisible()
+    await expectNoHorizontalScroll(page, 'add user modal at 375px')
+    await add.getByRole('button', { name: 'Cancel' }).click()
+    await expect(add).toBeHidden()
+
+    await editorRow.getByRole('button', { name: 'Reset password' }).click()
+    const reset = page.getByRole('dialog', { name: /^Reset password — / })
+    await expect(reset.getByRole('textbox', { name: 'New password' })).toBeVisible()
+    await expectNoHorizontalScroll(page, 'reset password modal at 375px')
+    await reset.getByRole('button', { name: 'Cancel' }).click()
+    await expect(reset).toBeHidden()
+  })
+
+  test('AC-12 + FR-12: /admin/teams at 375px keeps the table, membership editing and its modals', async ({ page }) => {
+    await page.setViewportSize({ width: 375, height: 812 })
+    await pageLogin(page)
+    await page.goto('/admin/teams')
+
+    await expect(page.getByRole('heading', { name: 'Teams', level: 1 })).toBeVisible()
+    const table = page.getByRole('region', { name: 'Teams' })
+    const bistec = table.getByRole('row').filter({ has: page.getByRole('cell', { name: 'Bistec', exact: true }) })
+    for (const name of ['Members', 'Rename', 'Delete']) {
+      await expect(bistec.getByRole('button', { name, exact: true })).toBeVisible()
+    }
+    await expectNoHorizontalScroll(page, 'teams at 375px')
+
+    // Membership editing.
+    const members = bistec.getByRole('button', { name: 'Members', exact: true })
+    await expect(members).toHaveAttribute('aria-expanded', 'false')
+    await members.click()
+    await expect(members).toHaveAttribute('aria-expanded', 'true')
+    await expect(page.getByRole('heading', { name: 'Members of Bistec', level: 2 })).toBeVisible()
+    await expect(page.getByRole('combobox', { name: /^Role for / }).first()).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Remove' }).first()).toBeVisible()
+    await expect(page.getByRole('combobox', { name: 'User to add' })).toBeVisible()
+    await expect(page.getByRole('combobox', { name: 'Role for new member' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Add', exact: true })).toBeDisabled()
+    await expectNoHorizontalScroll(page, 'membership panel at 375px')
+    await page.getByRole('button', { name: 'Close member panel' }).click()
+    await expect(page.getByRole('heading', { name: 'Members of Bistec' })).toBeHidden()
+
+    await bistec.getByRole('button', { name: 'Rename', exact: true }).click()
+    const rename = page.getByRole('dialog', { name: 'Rename team — Bistec' })
+    await expect(rename.getByRole('textbox', { name: 'Team name' })).toHaveValue('Bistec')
+    await expectNoHorizontalScroll(page, 'rename modal at 375px')
+    await rename.getByRole('button', { name: 'Cancel' }).click()
+    await expect(rename).toBeHidden()
+
+    await page.getByRole('button', { name: 'Add team' }).click()
+    const add = page.getByRole('dialog', { name: 'Add team' })
+    await expect(add.getByRole('textbox', { name: 'Team name' })).toBeVisible()
+    await expect(add.getByRole('button', { name: 'Create team' })).toBeDisabled()
+    await expectNoHorizontalScroll(page, 'add team modal at 375px')
+    await add.getByRole('button', { name: 'Cancel' }).click()
+    await expect(add).toBeHidden()
+  })
 })
 
 // ── AC-18 / NFR-03: reduced motion ───────────────────────────────────────────

@@ -2,15 +2,24 @@
 
 import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Plus, ShieldAlert, KeyRound, UserX, UserCheck } from 'lucide-react'
+import { Plus, KeyRound, UserX, UserCheck } from 'lucide-react'
 import { toast } from 'sonner'
 import { apiFetch } from '@/lib/apiFetch'
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser'
-import { GlassPanel } from '@/components/ui/GlassPanel'
 import { Button } from '@/components/ui/Button'
-import { GlassInput } from '@/components/ui/GlassInput'
+import { Input } from '@/components/ui/Input'
 import { Modal } from '@/components/ui/Modal'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
+import {
+  GateNotice,
+  ICON,
+  ICON_SM,
+  PageHead,
+  SCROLL_FOCUS,
+  StatusWord,
+  TABLE_HEAD_ROW,
+  TAG,
+} from '@/components/team/folio'
 
 interface ManagedUser {
   id: string
@@ -30,15 +39,9 @@ function loginLabel(u: ManagedUser): string {
 }
 
 function StatusPill({ disabled }: { disabled: boolean }) {
-  return disabled ? (
-    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-mono font-medium bg-status-failed/10 dark:bg-status-failed-dark/15 text-status-failed dark:text-status-failed-dark border border-status-failed/25 dark:border-status-failed-dark/30">
-      Deactivated
-    </span>
-  ) : (
-    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-mono font-medium bg-status-published/10 dark:bg-status-published-dark/15 text-status-published dark:text-status-published-dark border border-status-published/25 dark:border-status-published-dark/30">
-      Active
-    </span>
-  )
+  return disabled
+    ? <StatusWord tone="failed">Deactivated</StatusWord>
+    : <StatusWord tone="published">Active</StatusWord>
 }
 
 export default function AdminUsersPage() {
@@ -93,98 +96,96 @@ export default function AdminUsersPage() {
 
   if (!isSuperAdmin) {
     return (
-      <GlassPanel className="p-12 text-center max-w-md mx-auto mt-12">
-        <ShieldAlert size={32} className="mx-auto mb-3 text-light-text-muted dark:text-dark-text-muted" />
-        <h1 className="text-lg font-semibold text-light-text dark:text-dark-text mb-1">
-          Requires super admin
-        </h1>
-        <p className="text-sm text-light-text-muted dark:text-dark-text-muted">
-          User management is limited to super administrators.
-        </p>
-      </GlassPanel>
+      <GateNotice title="Requires super admin">
+        User management is limited to super administrators.
+      </GateNotice>
     )
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-semibold text-light-text dark:text-dark-text">Users</h1>
-          <p className="text-sm text-light-text-muted dark:text-dark-text-muted">
-            Create accounts and manage roles. Share initial passwords out-of-band.
-          </p>
-        </div>
+    <div className="max-w-4xl">
+      <PageHead
+        eyebrow="Admin"
+        title="Users"
+        lead="Create accounts and manage roles. Share initial passwords out-of-band."
+      >
         <Button onClick={() => setAddOpen(true)}>
-          <Plus size={14} /> Add user
+          <Plus {...ICON} /> Add user
         </Button>
-      </div>
+      </PageHead>
 
-      <GlassPanel className="p-4">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-xs text-light-text-muted dark:text-dark-text-muted">
-                <th className="py-2 pr-3 font-medium">Name</th>
-                <th className="py-2 pr-3 font-medium">Username</th>
-                <th className="py-2 pr-3 font-medium">Status</th>
-                <th className="py-2 pr-3 font-medium">Created</th>
-                <th className="py-2 font-medium sr-only">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {users.map(u => {
-                const locked = u.role === 'SUPER_ADMIN' || u.id === me?.userId
-                return (
-                  <tr key={u.id} className="border-t border-light-border/50 dark:border-dark-border/50">
-                    <td className="py-2.5 pr-3 font-medium text-light-text dark:text-dark-text">
-                      {u.name}
-                      {u.id === me?.userId && (
-                        <span className="ml-1.5 text-xs text-light-text-muted dark:text-dark-text-muted">(you)</span>
-                      )}
-                      {u.role === 'SUPER_ADMIN' && (
-                        <span className="ml-1.5 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium uppercase tracking-wide bg-primary/10 text-primary dark:bg-primary-light/15 dark:text-primary-light">
-                          Super admin
-                        </span>
-                      )}
-                    </td>
-                    <td className="py-2.5 pr-3 font-mono text-xs text-light-text dark:text-dark-text">{loginLabel(u)}</td>
-                    <td className="py-2.5 pr-3">
-                      <StatusPill disabled={u.disabled} />
-                    </td>
-                    <td className="py-2.5 pr-3 font-mono text-xs text-light-text-muted dark:text-dark-text-muted whitespace-nowrap">
-                      {new Date(u.createdAt).toLocaleDateString()}
-                    </td>
-                    <td className="py-2.5 whitespace-nowrap">
-                      {!locked && (
-                        <div className="flex gap-1 justify-end">
-                          <Button variant="ghost" size="sm" onClick={() => setResetTarget(u)}>
-                            <KeyRound size={13} /> Reset password
-                          </Button>
-                          <Button
-                            variant={u.disabled ? 'secondary' : 'danger'}
-                            size="sm"
-                            onClick={() => toggleDisabled(u)}
-                          >
-                            {u.disabled ? (
-                              <>
-                                <UserCheck size={13} /> Reactivate
-                              </>
-                            ) : (
-                              <>
-                                <UserX size={13} /> Deactivate
-                              </>
-                            )}
-                          </Button>
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-      </GlassPanel>
+      {/* A Folio data table (§8.15). It scrolls inside its own container at
+          narrow widths, so the container is a focusable, labelled region with
+          an inset focus outline. `relative` makes it the containing block of
+          the sr-only Actions header, which otherwise widened the page at
+          375 px (the pre-T5 383 px bug). */}
+      <div
+        tabIndex={0}
+        role="region"
+        aria-label="Users"
+        className={`relative overflow-x-auto border-t-2 border-fg ${SCROLL_FOCUS}`}
+      >
+        <table className="w-full min-w-[720px] text-ui-sm">
+          <thead>
+            <tr className={TABLE_HEAD_ROW}>
+              <th scope="col" className="py-2 pr-3 font-semibold">Name</th>
+              <th scope="col" className="py-2 pr-3 font-semibold">Username</th>
+              <th scope="col" className="py-2 pr-3 font-semibold">Status</th>
+              <th scope="col" className="py-2 pr-3 font-semibold">Created</th>
+              <th scope="col" className="py-2 font-semibold sr-only">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {users.map(u => {
+              const locked = u.role === 'SUPER_ADMIN' || u.id === me?.userId
+              return (
+                <tr key={u.id} className="border-b border-line-subtle align-middle">
+                  <td className="py-2.5 pr-3 font-medium text-fg">
+                    {u.name}
+                    {u.id === me?.userId && (
+                      <span className="ml-1.5 text-ui-xs font-normal text-fg-muted">(you)</span>
+                    )}
+                    {u.role === 'SUPER_ADMIN' && (
+                      <span className={`ml-1.5 whitespace-nowrap ${TAG}`}>Super admin</span>
+                    )}
+                  </td>
+                  <td className="break-all py-2.5 pr-3 text-fg">{loginLabel(u)}</td>
+                  <td className="py-2.5 pr-3">
+                    <StatusPill disabled={u.disabled} />
+                  </td>
+                  <td className="whitespace-nowrap py-2.5 pr-3 text-ui-xs text-fg-muted">
+                    {new Date(u.createdAt).toLocaleDateString()}
+                  </td>
+                  <td className="whitespace-nowrap py-1.5">
+                    {!locked && (
+                      <div className="flex justify-end gap-1">
+                        <Button variant="ghost" size="sm" onClick={() => setResetTarget(u)}>
+                          <KeyRound {...ICON_SM} /> Reset password
+                        </Button>
+                        <Button
+                          variant={u.disabled ? 'secondary' : 'danger'}
+                          size="sm"
+                          onClick={() => toggleDisabled(u)}
+                        >
+                          {u.disabled ? (
+                            <>
+                              <UserCheck {...ICON_SM} /> Reactivate
+                            </>
+                          ) : (
+                            <>
+                              <UserX {...ICON_SM} /> Deactivate
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
 
       <AddUserModal open={addOpen} onClose={() => setAddOpen(false)} onSaved={invalidate} />
       <ResetPasswordModal target={resetTarget} onClose={() => setResetTarget(null)} />
@@ -235,8 +236,8 @@ function AddUserModal({
   return (
     <Modal open={open} onClose={onClose} title="Add user">
       <form onSubmit={submit} className="space-y-3">
-        <GlassInput label="Name" value={name} onChange={e => setName(e.target.value)} required />
-        <GlassInput
+        <Input label="Name" value={name} onChange={e => setName(e.target.value)} required />
+        <Input
           label="Username"
           type="text"
           value={username}
@@ -248,7 +249,7 @@ function AddUserModal({
           required
           placeholder="e.g. jane.d"
         />
-        <GlassInput
+        <Input
           label="Initial password"
           type="text"
           value={password}
@@ -257,7 +258,7 @@ function AddUserModal({
           required
           placeholder="At least 8 characters"
         />
-        <p className="text-xs text-light-text-muted dark:text-dark-text-muted">
+        <p className="text-ui-xs text-fg-muted">
           The password is set directly — share it with the user privately and ask them to change it.
           Grant access by adding this user to a team in Teams, where you pick their per-team role
           (Admin or Editor).
@@ -308,7 +309,7 @@ function ResetPasswordModal({
   return (
     <Modal open={target !== null} onClose={onClose} title={`Reset password${target ? ` — ${target.name}` : ''}`} size="sm">
       <form onSubmit={submit} className="space-y-3">
-        <GlassInput
+        <Input
           label="New password"
           type="text"
           value={password}

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { Check, Copy } from 'lucide-react'
+import { FOCUS, ICON, ICON_BUTTON, TEXT_LINK } from '@/components/team/folio'
 
 // Step-by-step "install Claude Code and get a token" walkthrough, shared by the
 // personal (/settings) and team (/team) Claude cards. Commands mirror
@@ -78,18 +79,21 @@ function CommandLine({ command }: { command: string }) {
     }
   }
 
+  // A code line (§5.1: mono is for code only) on paper, with a hairline edge.
+  // The command wraps rather than scrolling, so nothing here needs a keyboard
+  // scroll region and nothing widens the page at 375 px.
   return (
-    <span className="mt-1.5 flex items-center gap-2 rounded-lg border border-light-border dark:border-dark-border bg-primary/5 dark:bg-primary-light/5 pl-3 pr-1 py-1">
-      <code className="flex-1 min-w-0 overflow-x-auto whitespace-nowrap font-mono text-xs text-primary dark:text-primary-light">
+    <span className="mt-1.5 flex items-center gap-2 rounded-ui-sm border border-line-subtle bg-surface-raised py-1 pl-3 pr-1">
+      <code className="min-w-0 flex-1 font-mono text-ui-xs text-fg [overflow-wrap:anywhere]">
         {command}
       </code>
       <button
         type="button"
         onClick={copy}
         aria-label="Copy command"
-        className="p-1.5 rounded-md shrink-0 text-light-text-muted dark:text-dark-text-muted hover:bg-primary/10 dark:hover:bg-primary-light/10"
+        className={`${ICON_BUTTON} hover:text-fg ${FOCUS}`}
       >
-        {copied ? <Check size={14} /> : <Copy size={14} />}
+        {copied ? <Check {...ICON} /> : <Copy {...ICON} />}
       </button>
     </span>
   )
@@ -110,7 +114,7 @@ export function ClaudeConnectGuide({ variant }: { variant: 'personal' | 'team' }
       <div
         role="tablist"
         aria-label="Operating system"
-        className="inline-flex self-start rounded-xl border border-light-border dark:border-dark-border p-0.5"
+        className="inline-flex self-start overflow-hidden rounded-ui-md border border-line"
       >
         {OS_ORDER.map((key) => {
           const selected = key === os
@@ -123,10 +127,11 @@ export function ClaudeConnectGuide({ variant }: { variant: 'personal' | 'team' }
               aria-selected={selected}
               aria-controls={`claude-guide-panel-${variant}`}
               onClick={() => setOs(key)}
-              className={`px-3 py-1 rounded-[10px] text-sm font-medium transition-colors ${
-                selected
-                  ? 'bg-primary text-white dark:bg-primary-light dark:text-dark-bg'
-                  : 'text-light-text-muted dark:text-dark-text-muted hover:bg-primary/10 dark:hover:bg-primary-light/10'
+              // §8.4: segments in --fg-muted, the selected one in ink. The
+              // focus ring is inset: the outline's overflow-hidden clips an
+              // outer one.
+              className={`px-2.5 py-1.5 font-text text-ui-xs font-semibold transition-colors duration-fast ease-standard focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus ${
+                selected ? 'bg-fg text-canvas' : 'text-fg-muted hover:text-fg'
               }`}
             >
               {OS_LABELS[key]}
@@ -140,7 +145,7 @@ export function ClaudeConnectGuide({ variant }: { variant: 'personal' | 'team' }
         id={`claude-guide-panel-${variant}`}
         aria-labelledby={`claude-guide-tab-${variant}-${os}`}
       >
-        <ol className="list-decimal list-outside pl-5 flex flex-col gap-2.5 text-sm text-light-text-muted dark:text-dark-text-muted">
+        <ol className="flex list-outside list-decimal flex-col gap-2.5 pl-5 text-ui-sm text-fg marker:text-fg-muted">
           {steps.map((step, i) => (
             <li key={i}>
               {step.text}
@@ -151,7 +156,7 @@ export function ClaudeConnectGuide({ variant }: { variant: 'personal' | 'team' }
                     href={step.note}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="font-medium text-primary dark:text-primary-light hover:underline break-all"
+                    className={`break-all rounded-ui-sm ${TEXT_LINK} ${FOCUS}`}
                   >
                     {step.note}
                   </a>
@@ -174,7 +179,7 @@ export function ClaudeConnectGuide({ variant }: { variant: 'personal' | 'team' }
         </ol>
       </div>
 
-      <p className="text-xs text-light-text-muted dark:text-dark-text-muted">
+      <p className="text-ui-xs text-fg-muted">
         Full guide: <code className="font-mono">docs/claude-account-setup.md</code> in the repository.
       </p>
     </div>
