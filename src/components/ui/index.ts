@@ -1,6 +1,6 @@
 export { Button } from './Button'
-export { Panel, Panel as GlassPanel } from './Panel'
-export { Input, Input as GlassInput } from './Input'
+export { Panel } from './Panel'
+export { Input } from './Input'
 export { Select } from './Select'
 export { SegmentedToggle } from './SegmentedToggle'
 export { StatusChip } from './StatusChip'

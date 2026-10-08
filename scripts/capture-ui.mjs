@@ -151,6 +151,10 @@ async function settle(page) {
 
 async function shoot(page, file) {
   await settle(page)
+  // `next dev` floats its own indicator over the page (bottom-left, over the
+  // sidebar's Sign out); it is never in a production build, so keep it out of
+  // the captures.
+  await page.addStyleTag({ content: 'nextjs-portal { display: none !important; }' }).catch(() => {})
   await page.screenshot({ path: join(OUT, file), fullPage: true, animations: 'disabled' })
   log(`saved ${file}`)
 }

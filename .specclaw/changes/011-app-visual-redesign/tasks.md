@@ -199,7 +199,7 @@ There are 13 tasks in 7 waves. All the work lands on `v2`.
 
 ### Wave 7 — Cleanup
 
-- [ ] `T13` — Remove the legacy tokens and glass utilities; guard test; final captures; docs
+- [x] `T13` — Remove the legacy tokens and glass utilities; guard test; final captures; docs
   - Files: `src/app/globals.css`, `tailwind.config.ts`, `src/components/ui/index.ts`, `src/components/ui/GlassInput.tsx` and `GlassPanel.tsx` (deleted), `tests/unit/uiTokenGuard.test.ts` (new), `docs/ui-reference/screen-light.png`, `docs/ui-reference/screen-dark.png`, `CLAUDE.md`, `docs/handoff.md`
   - Estimate: medium
   - Kind: refactor

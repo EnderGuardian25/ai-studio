@@ -10,26 +10,6 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // ─── Frozen Light design tokens ───
-        'light-background':    '#f1f5f9',
-        'light-surface':       '#ffffff',
-        'light-surface-hover': '#f8fafc',
-        'light-border':        '#cbd5e1',
-        'light-text':          '#0f172a',
-        'light-text-muted':    '#475569',
-
-        'dark-background':    '#020617',
-        'dark-surface':       '#0f172a',
-        'dark-surface-hover': '#1e293b',
-        'dark-border':        '#1e293b',
-        'dark-text':          '#f8fafc',
-        'dark-text-muted':    '#94a3b8',
-
-        primary:        '#0284c7',
-        'primary-light': '#7dd3fc',
-        'primary-hover': '#0369a1',
-        'primary-active':'#075985',
-
         // ─── Folio semantic colours (change 011, DESIGN_SYSTEM.md §3.4) ───
         // Each is an R G B triplet var from globals.css, switched by .dark, so
         // one class serves both themes and opacity modifiers work (bg-scrim/50).
@@ -41,15 +21,14 @@ const config: Config = {
         focus: tok('focus'),
         scrim: tok('scrim'),
 
-        // Status tokens — single source of truth for post-status colors
-        // (StatusChip consumes these). Now on the --status-* vars, which carry
-        // their own light and dark values; `dark` maps to the same var so
-        // StatusChip's dark: classes keep compiling until it migrates (T5).
-        'status-draft':      { DEFAULT: tok('status-draft'), dark: tok('status-draft') },
-        'status-exported':   { DEFAULT: tok('status-exported'), dark: tok('status-exported') },
-        'status-scheduled':  { DEFAULT: tok('status-scheduled'), dark: tok('status-scheduled') },
-        'status-published':  { DEFAULT: tok('status-published'), dark: tok('status-published') },
-        'status-failed':     { DEFAULT: tok('status-failed'), dark: tok('status-failed') },
+        // Status tokens — single source of truth for post-status colours
+        // (StatusChip consumes these). Each --status-* var carries its own
+        // light and dark values.
+        'status-draft':     tok('status-draft'),
+        'status-exported':  tok('status-exported'),
+        'status-scheduled': tok('status-scheduled'),
+        'status-published': tok('status-published'),
+        'status-failed':    tok('status-failed'),
       },
       boxShadow: {
         panel: 'var(--shadow-panel)',
@@ -57,17 +36,17 @@ const config: Config = {
         overlay: 'var(--shadow-overlay)',
       },
       fontFamily: {
-        // `sans` stays Inter until the cleanup (T13), so unmigrated screens
-        // render unchanged; migrated code opts in with font-text / font-display.
-        sans: ['var(--font-inter)', 'system-ui', 'sans-serif'],
+        // `sans` and `text` are both Instrument Sans (DESIGN_SYSTEM.md §5.1);
+        // `text` stays as the name the restyled screens already use.
+        sans: ['var(--font-sans)', 'ui-sans-serif', 'system-ui', 'sans-serif'],
         mono: ['var(--font-mono)', 'monospace'],
         display: ['var(--font-display)'],
         text: ['var(--font-sans)'],
       },
       // Folio sizes and radii under ui-* keys: Tailwind's own sm/base/xl/2xl
-      // (type) and md/lg (radius) differ from Folio's, and redefining them
-      // would restyle unmigrated screens. Spacing needs nothing (Folio's steps
-      // equal Tailwind's).
+      // (type) and md/lg (radius) differ from Folio's, and the app still uses
+      // a few of the defaults. Spacing needs nothing (Folio's steps equal
+      // Tailwind's).
       fontSize: {
         'ui-2xs': 'var(--text-2xs)',
         'ui-xs': 'var(--text-xs)',
@@ -94,10 +73,6 @@ const config: Config = {
       transitionTimingFunction: {
         standard: 'var(--ease-standard)',
         exit: 'var(--ease-exit)',
-      },
-      spacing: {
-        'appbar': '4rem',   // 64px
-        'sidebar': '16rem', // 256px
       },
       maxWidth: {
         canvas: '1440px',

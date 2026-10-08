@@ -34,3 +34,7 @@
 {"ev":"start","span":"T11","kind":"task","label":"Restyle the brand kits admin","parent":"W6","model":"opus","attempt":"1","at":"2026-10-07T19:57:13Z","ts":1791403033}
 {"ev":"stop","span":"T11","at":"2026-10-07T23:43:47Z","ts":1791416627,"status":"ok"}
 {"ev":"start","span":"T12","kind":"task","label":"Restyle team, settings and admin users and teams","parent":"W6","model":"opus","attempt":"1","at":"2026-10-07T23:44:20Z","ts":1791416660}
+{"ev":"stop","span":"T12","at":"2026-10-08T00:12:33Z","ts":1791418353,"status":"ok"}
+{"ev":"stop","span":"W6","at":"2026-10-08T00:12:34Z","ts":1791418354,"status":"ok"}
+{"ev":"start","span":"W7","kind":"wave","label":"wave 7","at":"2026-10-08T00:13:29Z","ts":1791418409}
+{"ev":"start","span":"T13","kind":"task","label":"Remove legacy tokens; guard test; final captures; docs","parent":"W7","model":"opus","attempt":"1","at":"2026-10-08T00:13:29Z","ts":1791418409}

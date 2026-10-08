@@ -25,7 +25,6 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   error?: string
 }
 
-// Formerly GlassInput; that name stays as an alias until the cleanup (FR-13).
 export function Input({
   label,
   error,

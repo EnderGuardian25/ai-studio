@@ -103,7 +103,7 @@ export function ReviewStep({
       )}
 
       {submitting && (
-        <div className={`${NOTICE} mt-6 bg-status-exported/10 text-status-exported flex items-center gap-2`}>
+        <div className={`${NOTICE} mt-6 bg-accent/10 text-accent flex items-center gap-2`}>
           <Loader2 size={15} strokeWidth={1.4} className="animate-spin" /> Generating your post — this can take up to a minute…
         </div>
       )}

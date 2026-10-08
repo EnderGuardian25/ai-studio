@@ -1,15 +1,9 @@
 import type { Metadata } from 'next'
-import { Fraunces, Inter, Instrument_Sans, JetBrains_Mono } from 'next/font/google'
+import { Fraunces, Instrument_Sans, JetBrains_Mono } from 'next/font/google'
 import { ThemeProvider, themeInitScript } from '@/components/theme/ThemeProvider'
 import { QueryProvider } from '@/components/providers/QueryProvider'
 import { ToastProvider } from '@/components/providers/ToastProvider'
 import './globals.css'
-
-const inter = Inter({
-  subsets: ['latin'],
-  variable: '--font-inter',
-  display: 'swap',
-})
 
 // Folio's code face (DESIGN_SYSTEM.md §5.1). Same family as before; only the
 // CSS variable is renamed (Tailwind `font-mono` reads it).
@@ -21,8 +15,8 @@ const jetbrainsMono = JetBrains_Mono({
 })
 
 // Folio display + text faces (change 011). Self-hosted by next/font (NFR-05).
-// Inter stays the default sans until the cleanup (T13); migrated code opts in
-// with Tailwind `font-display` / `font-text`.
+// Instrument Sans is the default sans (Tailwind `font-sans` and `font-text`);
+// Fraunces is `font-display`.
 const fraunces = Fraunces({
   subsets: ['latin'],
   style: ['normal', 'italic'],
@@ -53,7 +47,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
       </head>
       <body
-        className={`${inter.variable} ${jetbrainsMono.variable} ${fraunces.variable} ${instrumentSans.variable} font-sans`}
+        className={`${jetbrainsMono.variable} ${fraunces.variable} ${instrumentSans.variable} font-sans`}
       >
         <ThemeProvider>
           <QueryProvider>

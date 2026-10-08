@@ -2,38 +2,13 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ─── Design tokens: light (default) ─── */
-:root {
-  --background: #f1f5f9;
-  --surface: #ffffff;
-  --surface-hover: #f8fafc;
-  --border: #cbd5e1;
-  --text: #0f172a;
-  --text-muted: #475569;
-
-  --primary: #0284c7;
-  --primary-light: #7dd3fc;
-  --primary-hover: #0369a1;
-  --primary-active: #075985;
-}
-
-/* ─── Design tokens: dark ─── */
-.dark {
-  --background: #020617;
-  --surface: #0f172a;
-  --surface-hover: #1e293b;
-  --border: #1e293b;
-  --text: #f8fafc;
-  --text-muted: #94a3b8;
-}
-
 /* ─── Folio semantic tokens (change 011, docs/ui-reference/DESIGN_SYSTEM.md §3.1) ───
    Copied from the design system's token block as it stands, except its three
    --font-* lines: next/font serves the fonts under generated family names, so
    --font-display / --font-sans / --font-mono come from the next/font `variable`
    classes on <body> (src/app/layout.tsx), with the fallback stacks there.
    Colours are R G B triplets: use rgb(var(--x)) or the Tailwind names in
-   tailwind.config.ts. The Frozen Light vars above stay until the cleanup (FR-07).
+   tailwind.config.ts.
    prettier-ignore below: Prettier would print 0.10 as 0.1; the block stays
    byte-identical to the design system. */
 /* prettier-ignore */
@@ -115,20 +90,16 @@
     color-scheme: light dark;
   }
   body {
-    background-color: var(--background);
-    color: var(--text);
-    font-family: var(--font-inter), system-ui, sans-serif;
+    background-color: rgb(var(--canvas));
+    color: rgb(var(--fg));
+    font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
 
   ::selection {
-    background: rgba(2, 132, 199, 0.15);
-    color: #0f172a;
-  }
-  .dark ::selection {
-    background: rgba(125, 211, 252, 0.2);
-    color: #f8fafc;
+    background-color: rgb(var(--accent) / 0.2);
+    color: rgb(var(--fg));
   }
 }
 
@@ -160,70 +131,6 @@
   }
 }
 
-/* ─── Legacy glass utilities (Frozen Light; removed in 011 T13) ─── */
-@layer components {
-  /* nav bars, top app bar. Opaque since 011 T5: the fixed header floats over
-     scrolling content, so FR-08 closes it here, at the source. */
-  .glass {
-    background-color: rgb(var(--surface-1));
-    border: 1px solid rgb(var(--line-subtle));
-  }
-
-  /* cards, content panels */
-  .glass-panel {
-    background: rgba(255, 255, 255, 0.6);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-    border: 1px solid rgba(15, 23, 42, 0.08);
-    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.03);
-  }
-  .dark .glass-panel {
-    background: rgba(15, 23, 42, 0.5);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.2);
-  }
-
-  /* Floating menus/popovers (portaled over arbitrary content). Opaque since
-     011 T5 (FR-08): the same values as .surface-raised. */
-  .glass-popover {
-    background-color: rgb(var(--surface-2));
-    border: 1px solid rgb(var(--fg));
-    box-shadow: var(--shadow-raised);
-  }
-
-  /* inputs, selects, textareas.
-     background-COLOR, never the `background` shorthand: the shorthand resets
-     background-image, which erases the Select chevron (an inline-SVG
-     background-image utility) in dark mode and on focus. */
-  .glass-input {
-    background-color: rgba(255, 255, 255, 0.8);
-    border: 1px solid rgba(15, 23, 42, 0.15);
-    transition:
-      border-color 0.15s ease,
-      box-shadow 0.15s ease,
-      background-color 0.15s ease;
-  }
-  .glass-input:focus {
-    outline: none;
-    background-color: #ffffff;
-    border-color: #0284c7;
-    box-shadow: 0 0 0 2px rgba(2, 132, 199, 0.15);
-  }
-  .dark .glass-input {
-    background-color: rgba(15, 23, 42, 0.6);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    color: #f8fafc;
-  }
-  .dark .glass-input:focus {
-    background-color: rgba(15, 23, 42, 0.8);
-    border-color: #7dd3fc;
-    box-shadow: 0 0 0 2px rgba(125, 211, 252, 0.15);
-  }
-  .dark .glass-input::placeholder {
-    color: #94a3b8;
-  }
-}
-
 /* ─── Custom scrollbars ─── */
 ::-webkit-scrollbar {
   width: 8px;
@@ -233,30 +140,11 @@
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(15, 23, 42, 0.18);
+  background: rgb(var(--fg) / 0.18);
   border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(15, 23, 42, 0.28);
-}
-.dark ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.12);
-}
-.dark ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.2);
-}
-
-/* ─── Background glow blobs (decorative) ─── */
-.glow-blob {
-  pointer-events: none;
-  position: absolute;
-  border-radius: 9999px;
-  background: rgba(2, 132, 199, 0.08);
-  filter: blur(100px);
-  z-index: -1;
-}
-.dark .glow-blob {
-  background: rgba(125, 211, 252, 0.04);
+  background: rgb(var(--fg) / 0.28);
 }
 
 /* ─── Animations ─── */
@@ -270,20 +158,10 @@
     transform: translateY(0);
   }
 }
-@keyframes scaleIn {
-  from {
-    opacity: 0;
-    transform: scale(0.96);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
 /* Centered-modal variant: the dialog is positioned with left/top 50% plus a
    translate(-50%,-50%) class. A keyframe `transform` REPLACES the class
-   transform (and `fill: both` keeps the final frame applied forever), so plain
-   scaleIn wiped the centering translate — the modal's top-left corner landed at
+   transform (and `fill: both` keeps the final frame applied forever), so a plain
+   scale keyframe wiped the centering translate — the modal's top-left corner landed at
    the viewport center and tall dialogs bled off-screen with no way to scroll to
    them. These keyframes carry the translate through every frame. */
 @keyframes modalIn {
@@ -309,9 +187,6 @@
 
 .animate-fade-in {
   animation: fadeIn 0.3s ease both;
-}
-.animate-scale-in {
-  animation: scaleIn 0.25s ease both;
 }
 .animate-modal-in {
   animation: modalIn 0.25s ease both;
@@ -372,7 +247,6 @@
      toast selector also outranks Sonner's own reduced-motion rule, which
      switches every toast animation off. */
   .surface-raised,
-  .glass-popover,
   [data-sonner-toaster] [data-sonner-toast] {
     animation: fade 150ms linear both !important;
   }

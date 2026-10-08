@@ -277,11 +277,21 @@ async function tabThreeWithVisibleFocus(page: Page): Promise<string[]> {
           if (!el || el === document.body) return 'nothing focused'
           const cs = getComputedStyle(el)
           // Tailwind's outline-none is `2px solid transparent`: an outline only
-          // counts when its colour is not fully transparent (T7).
+          // counts when its colour is not fully transparent (T7). A ring counts
+          // on the same terms: Tailwind writes an unused ring as a transparent
+          // `0 0 0 0` box-shadow layer, so a layer counts only when its colour
+          // is not fully transparent and one of its lengths is non-zero (T13).
+          const transparent = (c: string) =>
+            c === 'transparent' || /^rgba\(.*,\s*0\)$/.test(c) || /\/\s*0\)$/.test(c)
           const c = cs.outlineColor
-          const transparent = c === 'transparent' || /^rgba\(.*[,/]\s*0\)$/.test(c)
-          const outline = cs.outlineStyle !== 'none' && parseFloat(cs.outlineWidth) > 0 && !transparent
-          const ring = cs.boxShadow !== 'none'
+          const outline = cs.outlineStyle !== 'none' && parseFloat(cs.outlineWidth) > 0 && !transparent(c)
+          const ring =
+            cs.boxShadow !== 'none' &&
+            cs.boxShadow.split(/,(?![^(]*\))/).some((layer) => {
+              const colour = layer.match(/rgba?\([^)]*\)/)?.[0] ?? 'transparent'
+              const lengths = layer.replace(/rgba?\([^)]*\)/, '').match(/-?[\d.]+px/g) ?? []
+              return !transparent(colour) && lengths.some((l) => parseFloat(l) !== 0)
+            })
           if (!el.matches(':focus-visible')) return 'not :focus-visible'
           return outline || ring ? 'visible' : 'no indicator'
         }),

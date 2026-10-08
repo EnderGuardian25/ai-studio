@@ -182,8 +182,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <ConfirmProvider>
       {/* font-text: the shell sets Folio's text face (Instrument Sans) for
-          every screen inside it (T4's font plan); an element that names
-          font-sans itself keeps Inter until T13. */}
+          every screen inside it. */}
       <div className="min-h-screen flex flex-col bg-canvas text-fg font-text">
         {/* Top app bar: opaque --surface-1 with a --line-subtle bottom rule
             (DESIGN_SYSTEM.md §4.2, §6). The logo sits 28 px in on desktop. */}

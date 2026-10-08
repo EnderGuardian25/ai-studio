@@ -360,9 +360,10 @@ Stack: Next.js 14, TypeScript, Prisma, PostgreSQL, MinIO, better-auth (self-host
 Before building or modifying any page, read the design system:
 
 - **[`docs/ui-reference/DESIGN_SYSTEM.md`](docs/ui-reference/DESIGN_SYSTEM.md)** is the design system for bistec-studio: **Folio**, picked by the user on 2026-10-07 (011 T3). Read it before writing any component or page.
-  - **Visual reference:** the Folio study, [`docs/ui-reference/direction-studies/study-b-folio.html`](docs/ui-reference/direction-studies/study-b-folio.html). It stays the reference until 011 T13 captures new app screenshots (FR-14).
-  - **Logo (user decision, 2026-10-07):** the typeset **"Studio"** wordmark from the Folio study. The Bistec Studio logo (`public/BistecStudioLogo.png`) is **not** used; 011 T6 replaces `Logo.tsx` and deletes the PNG.
-  - **The migration runs from T4 to T13.** Until a screen's task lands, that screen still renders in Frozen Light. Frozen Light, with its screenshots and the Synthetix source HTML, is archived in [`docs/ui-reference/archive/frozen-light/`](docs/ui-reference/archive/frozen-light/) for reference only. New UI follows Folio.
+  - **Visual reference:** the app itself, captured at 1440 px on the draft review page: [`docs/ui-reference/screen-light.png`](docs/ui-reference/screen-light.png) and [`docs/ui-reference/screen-dark.png`](docs/ui-reference/screen-dark.png) (011 T13). The Folio study, [`docs/ui-reference/direction-studies/study-b-folio.html`](docs/ui-reference/direction-studies/study-b-folio.html), is the source the system was drawn from.
+  - **Screenshots of every screen:** `node scripts/capture-ui.mjs --out ui-captures/<name>` against a running test server (`ui-captures/` is gitignored). A review tool, not a gate.
+  - **Logo (user decision, 2026-10-07):** the typeset **"Studio"** wordmark from the Folio study. The Bistec Studio logo is **not** used.
+  - **Every screen is on Folio (011 T4–T13).** The Frozen Light tokens, the `glass*` utilities and the `GlassInput`/`GlassPanel` names are gone, and `tests/unit/uiTokenGuard.test.ts` fails if any legacy colour utility, glass class or raw palette colour appears in `src/`; a line opts out only with `// ui-exception: <reason>` (DESIGN_SYSTEM.md §11). Frozen Light, with its screenshots and the Synthetix source HTML, is archived in [`docs/ui-reference/archive/frozen-light/`](docs/ui-reference/archive/frozen-light/) for reference only.
 
 ### Architecture & technical design
 

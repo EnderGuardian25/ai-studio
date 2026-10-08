@@ -5,14 +5,14 @@ import tailwindConfig from '../../tailwind.config'
 
 // AC-07 (011 FR-06/FR-07): the Folio semantic tokens live in globals.css, per
 // theme where they vary, and tailwind.config.ts exposes every semantic colour
-// as rgb(var(--…) / <alpha-value>). The Frozen Light tokens stay until the
-// cleanup (T13), and Tailwind's default type and radius steps are not
-// redefined before then (AC-08: unmigrated screens render unchanged).
+// as rgb(var(--…) / <alpha-value>). The Frozen Light tokens are gone since the
+// cleanup (T13, FR-13), and Tailwind's default type and radius steps are not
+// redefined.
 
 const css = readFileSync(resolve(process.cwd(), 'src/app/globals.css'), 'utf8')
 
 // Custom properties of the top-level `:root { … }` or `.dark { … }` blocks
-// (not `.dark .glass` and the like), across every such block.
+// (not `.dark ::selection` and the like), across every such block.
 function blockVars(selector: ':root' | '.dark'): Record<string, string> {
   const vars: Record<string, string> = {}
   const sel = selector === ':root' ? ':root' : '\\.dark'
@@ -107,13 +107,11 @@ describe('semantic tokens in globals.css (AC-07)', () => {
     }
   })
 
-  it('keeps the Frozen Light vars until the cleanup (FR-07)', () => {
-    for (const name of ['background', 'surface', 'surface-hover', 'border', 'text', 'text-muted']) {
-      expect(ROOT[name]).toMatch(/^#[0-9a-f]{6}$/i)
-      expect(DARK[name]).toMatch(/^#[0-9a-f]{6}$/i)
-    }
-    for (const name of ['primary', 'primary-light', 'primary-hover', 'primary-active']) {
-      expect(ROOT[name]).toMatch(/^#[0-9a-f]{6}$/i)
+  it('no longer declares the Frozen Light vars (FR-13)', () => {
+    const legacy = ['background', 'surface', 'surface-hover', 'border', 'text', 'text-muted']
+    for (const name of [...legacy, 'primary', 'primary-light', 'primary-hover', 'primary-active']) {
+      expect(ROOT[name], `:root --${name}`).toBeUndefined()
+      expect(DARK[name], `.dark --${name}`).toBeUndefined()
     }
   })
 
@@ -152,9 +150,8 @@ describe('tailwind.config.ts semantic mapping (AC-07)', () => {
     scrim: 'scrim',
   }
   for (const s of ['draft', 'exported', 'scheduled', 'published', 'failed']) {
-    // Both keys on the one var, so StatusChip's dark: classes still compile.
-    SEMANTIC[`status-${s}.DEFAULT`] = `status-${s}`
-    SEMANTIC[`status-${s}.dark`] = `status-${s}`
+    // One flat key per status: the var switches with the theme.
+    SEMANTIC[`status-${s}`] = `status-${s}`
   }
 
   it.each(Object.entries(SEMANTIC))('colors.%s → rgb(var(--%s) / <alpha-value>)', (path, token) => {
@@ -204,11 +201,11 @@ describe('tailwind.config.ts semantic mapping (AC-07)', () => {
     expect(fonts.display[0]).toBe('var(--font-display)')
     expect(fonts.text[0]).toBe('var(--font-sans)')
     expect(fonts.mono[0]).toBe('var(--font-mono)')
-    // The default sans stays Inter until the cleanup (T13).
-    expect(fonts.sans[0]).toBe('var(--font-inter)')
+    // Since the cleanup (T13) the default sans is Instrument Sans too.
+    expect(fonts.sans[0]).toBe('var(--font-sans)')
   })
 
-  it('does not redefine Tailwind default type and radius steps before the cleanup', () => {
+  it('does not redefine Tailwind default type and radius steps', () => {
     for (const key of ['xs', 'sm', 'base', 'lg', 'xl', '2xl']) {
       expect(extend.fontSize?.[key], `fontSize.${key}`).toBeUndefined()
     }
@@ -217,24 +214,8 @@ describe('tailwind.config.ts semantic mapping (AC-07)', () => {
     }
   })
 
-  it('keeps the Frozen Light colours verbatim (FR-07)', () => {
-    expect(colors).toMatchObject({
-      'light-background': '#f1f5f9',
-      'light-surface': '#ffffff',
-      'light-surface-hover': '#f8fafc',
-      'light-border': '#cbd5e1',
-      'light-text': '#0f172a',
-      'light-text-muted': '#475569',
-      'dark-background': '#020617',
-      'dark-surface': '#0f172a',
-      'dark-surface-hover': '#1e293b',
-      'dark-border': '#1e293b',
-      'dark-text': '#f8fafc',
-      'dark-text-muted': '#94a3b8',
-      primary: '#0284c7',
-      'primary-light': '#7dd3fc',
-      'primary-hover': '#0369a1',
-      'primary-active': '#075985',
-    })
+  it('no longer maps the Frozen Light colours (FR-13)', () => {
+    const legacy = Object.keys(colors).filter((k) => /^(light|dark|primary)(-|$)/.test(k))
+    expect(legacy).toEqual([])
   })
 })

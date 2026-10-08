@@ -66,10 +66,13 @@ const SUPERSEDED_MESSAGE =
 // Parent-injected editing chrome (whole-document mode only). It is kept in one
 // place so that stripEditingChrome (the pure string version) and this DOM
 // wiring stay in sync on the marker names.
+// This CSS is injected into the post's own iframe document, which the app's
+// CSS variables can't reach, so the hover/focus outlines carry the light
+// --accent value (sienna, 140 72 18) as literal rgba strings.
 const EDITOR_STYLE = `
   [contenteditable="true"]{outline:2px dashed transparent;outline-offset:1px;transition:outline-color .15s;cursor:text}
-  [contenteditable="true"]:hover{outline-color:rgba(37,99,235,.35)}
-  [contenteditable="true"]:focus{outline-color:rgba(37,99,235,.9)}
+  [contenteditable="true"]:hover{outline-color:rgba(140,72,18,.35)}
+  [contenteditable="true"]:focus{outline-color:rgba(140,72,18,.9)}
   [data-inline-edit-chrome="img-wrap"]{position:relative;display:inline-block;cursor:default}
   [data-inline-edit-chrome="img-wrap"] .inline-replace-btn{
     position:absolute;top:6px;left:6px;z-index:2;font:600 12px system-ui;
