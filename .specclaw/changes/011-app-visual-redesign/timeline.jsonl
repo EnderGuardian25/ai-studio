@@ -38,3 +38,5 @@
 {"ev":"stop","span":"W6","at":"2026-10-08T00:12:34Z","ts":1791418354,"status":"ok"}
 {"ev":"start","span":"W7","kind":"wave","label":"wave 7","at":"2026-10-08T00:13:29Z","ts":1791418409}
 {"ev":"start","span":"T13","kind":"task","label":"Remove legacy tokens; guard test; final captures; docs","parent":"W7","model":"opus","attempt":"1","at":"2026-10-08T00:13:29Z","ts":1791418409}
+{"ev":"stop","span":"T13","at":"2026-10-08T00:38:10Z","ts":1791419890,"status":"ok"}
+{"ev":"stop","span":"W7","at":"2026-10-08T00:38:10Z","ts":1791419890,"status":"ok"}

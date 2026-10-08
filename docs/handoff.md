@@ -1,9 +1,82 @@
 # bistec-studio — Session Handoff
 
-**Date:** 2026-10-07 (latest: 005 finished and verified **PASS**; 011 planned and wave 1 built; **waiting on the user's direction pick**). Previous: 2026-10-03 (004 finished and verified PARTIAL, Phase 0 only; 005 built 9/10, waiting on one operator check). Before that: 2026-09-28 (build session — 004 Waves 1–3 built, MinIO → silo, PR #42 + draft PR #43). Before that: 2026-09-23 (later, later the same day: proposal **012** per-channel captions + copy→caption rename, a floating **Create post** button folded into 011, and a launch-video legibility pass. Before that: planning session — proposals 008–011 + roadmap, 004 re-planned to 24 tasks incl. Phase 0, and the deploy pipeline found broken: Coolify 401 since 2026-09-15). Previous: 2026-07-28 (copy-edit status clobber fix).
+**Date:** 2026-10-08 (latest: **011 built 13/13 on `v2` in the fork; verify next**). Previous: 2026-10-07 (005 verified PASS; 011 planned, wave 1 built; the move to the fork). Previous: 2026-10-03 (004 finished and verified PARTIAL, Phase 0 only; 005 built 9/10, waiting on one operator check). Before that: 2026-09-28 (build session — 004 Waves 1–3 built, MinIO → silo, PR #42 + draft PR #43). Before that: 2026-09-23 (later, later the same day: proposal **012** per-channel captions + copy→caption rename, a floating **Create post** button folded into 011, and a launch-video legibility pass. Before that: planning session — proposals 008–011 + roadmap, 004 re-planned to 24 tasks incl. Phase 0, and the deploy pipeline found broken: Coolify 401 since 2026-09-15). Previous: 2026-07-28 (copy-edit status clobber fix).
 **Repo (since 2026-10-07):** https://github.com/EnderGuardian25/ai-studio — a public GitHub **fork** of the company repo `bistec-oss/studio`. All development continues here. The company repo is left as it is and receives nothing from this work. See the 2026-10-07 fork section below.
 **Branch:** work continues on **`v2`**, the fork's default branch. Fork `main` = `671ad6e9`, the company `main` at fork time.
 **Production:** none for the fork. `https://studio.bistecglobal.com` is the **company's** prod. It runs company `main` and is not ours to deploy.
+
+---
+
+## ⏸️ 2026-10-08 — PICK UP HERE: 011 is built (13/13); verify next
+
+All of 011 is on `v2` in the fork. Every screen is **Folio**. Each task followed one cycle: an implementer subagent with a written brief, then a `specclaw:code-reviewer` subagent, then the orchestrator fixed any WARNs, re-ran the gates and committed. The reports are in `.specclaw/changes/011-app-visual-redesign/reports/T*.md` and the reviews (with resolutions) in `reviews/T*.md`.
+
+### The user's decisions (2026-10-07)
+
+- **Direction B, Folio,** unchanged from the study.
+- **No Bistec Studio logo.** The logo is Folio's typeset **"Studio"** wordmark, and `public/BistecStudioLogo.png` is deleted. `public/.gitkeep` keeps `Dockerfile:105` (`COPY … /app/public`) working.
+- **No "More" menu on the draft page.** Every action stays a visible button, because a menu would change the roles the E2E drives (FR-12).
+- **The fork CI-fix proposal waits until 011 is finished,** and the user approves it.
+
+### What landed
+
+| Task | Commit     | What                                                                                                             |
+| ---- | ---------- | ---------------------------------------------------------------------------------------------------------------- |
+| T3   | `9be31d58` | Folio `DESIGN_SYSTEM.md`; Frozen Light archived                                                                  |
+| T4   | `6b2d6c87` | Tokens, `next/font`, reduced motion (loaders keep moving), token + contrast tests, `scripts/capture-ui.mjs`      |
+| T5   | `74b237e5` | Primitives on tokens; every fixed or floating surface opaque; `tests/e2e/surfaces.test.ts`                       |
+| T6   | `7fdbe38b` | Shell, login, choose-team, the wordmark; the theme toggle is two buttons with `aria-pressed`                     |
+| T7   | `d7aadf5a` | Dashboard and library                                                                                            |
+| T8   | `5b72b46d` | Brief wizard                                                                                                     |
+| T9   | `64a42d64` | Draft review: proof plate, contact sheet, copy desk                                                              |
+| T10  | `d23585ad` | Campaigns, projects, queue, briefing assistant                                                                   |
+| T11  | `14e47b88` | Brand kits admin                                                                                                 |
+| T12  | `53c78b61` | Team, settings, admin users and teams                                                                            |
+| T13  | `c37357a3` | Legacy layer removed; `uiTokenGuard` test; Instrument Sans is the default; final captures; reference screenshots |
+
+There was also one separate docs commit: `1f5a2a39`, the AC-23 wording-guard fix in this file.
+
+**Gates at `c37357a3`:**
+
+- unit **1722/1722**;
+- lint 0 errors (the 7 known warnings);
+- build passes;
+- `npm run test:render` **15/15**;
+- full clean mock E2E **312 passed / 3 skipped / 0 failed / 0 flaky**, up from 265, with 47 new cases in `surfaces.test.ts`.
+
+### Do this next, in order
+
+1. **`/specclaw:verify 011-app-visual-redesign`.**
+2. **Fork CI-fix proposal** (`/specclaw:propose`, then the user approves it): guard or remove the `docker-publish.yml` deploy job, add `v2` to `e2e.yml`, and re-enable Actions. See the fork section below.
+3. **011 follow-up proposal** (`/specclaw:propose`, then the user approves it). These items were kept out of 011 on purpose, because FR-12 froze accessible names and because they are refactors:
+   - **Accessibility naming pass:**
+     - labels for placeholder-named inputs (the /team register and channel fields, the add-colour field, the template Size and HTML/CSS fields, the brief topic and kit select);
+     - the unnamed COPY/IMAGE tablist;
+     - a visually hidden `h1` on login;
+     - `aria-disabled` on stepper steps that aren't done (this updates T8's AC-17 expectation);
+     - `aria-hidden` on swatch titles inside the kit-row name;
+     - the breadcrumb tail read twice;
+     - scroll regions focusable only when they overflow;
+     - 24 px remove targets;
+     - an On/Off word on the provider toggle.
+   - **One shared page-head / section / notice primitive** replacing the 8 local `folio.ts` copies (dashboard/library inline, `brief/cardCls.ts`, `drafts/folio.ts`, `campaigns/folio.ts`, `admin/brandkits/folio.ts`, `team/folio.tsx`). Also fold `StatusWord` into `StatusChip`.
+   - **Consistency:**
+     - align Select labels with the small-caps `FieldLabel`;
+     - align button and input heights;
+     - fix the two primaries possible in brand kits;
+     - cap the kit list's height;
+     - set `tabular-nums` on body as DESIGN_SYSTEM §5 says;
+     - extend the guard to catch `glow-blob`, `animate-scale-in`, `text-primary` and `font-inter`.
+4. **Merge fork `main` into `v2`.** This brings 004 Phase 0: Node 22, `/api/health`, CI hardening and MinIO → silo. Then recheck 005 AC-17 under node:22, re-run AC-16 on a rebuilt image and close 004's Phase 0 ACs. Expect a `docker-publish.yml` conflict, so pair it with step 2.
+
+### Follow-ups and gotchas from this build
+
+- **Refine poll race (pre-existing; logged in `.specclaw/learnings.md`):** a refine row can stay on "Applying…" when the mock refine finishes before the post-202 refetch sees `pendingAction: 'REFINE'`. It was seen once.
+- **Change 010 must update a T10 E2E assertion** that expects exactly 2 channel checkboxes in `QueueEntryModal`.
+- **Capturing screens:** run `npm run test:e2e:serve`, then `node scripts/capture-ui.mjs --out ui-captures/<name>`. The script hides Next's dev indicator. On a fresh test DB the seeded fixture draft has no MinIO export, so the script mints one.
+- **Scroll containers:** a container that scrolls on its own must be `relative` if it holds `sr-only` cells; otherwise they widen the page at 375. This happened twice. It is in DESIGN_SYSTEM §8.15.
+- **The test DB fills up** (about 200 campaigns and kits). The gate script drops and recreates it every run.
+- **Usage-limit interruptions:** they stopped two implementer subagents. Resuming the same agent with SendMessage kept its edits and context. Check `git status` and port 3001 first.
 
 ---
 

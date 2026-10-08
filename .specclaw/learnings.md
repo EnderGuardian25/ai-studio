@@ -209,3 +209,54 @@ T5 needed AppShell.tsx (sidebar class) to meet its own AC-09: the sidebar used i
 When an AC covers a surface, check which class that surface uses before assigning the file list
 
 ---
+
+## [L13] pattern — Screen tasks each copied the Folio class strings into a l...
+
+**When:** 2026-10-08 00:39 UTC
+**Category:** pattern
+**Priority:** medium
+**Status:** pending
+
+### Detail
+
+Screen tasks each copied the Folio class strings into a local folio.ts (8 copies) to stay inside their file lists
+
+### Action
+
+Plan a shared heading/section primitive in the token-foundation wave of future UI changes, not in cleanup
+
+---
+
+## [L14] design_gap — FR-12 (freeze accessible names and roles) prevented fixin...
+
+**When:** 2026-10-08 00:39 UTC
+**Category:** design_gap
+**Priority:** medium
+**Status:** pending
+
+### Detail
+
+FR-12 (freeze accessible names and roles) prevented fixing real a11y naming gaps found during the restyle (placeholder-named inputs, unnamed tablists, login h1)
+
+### Action
+
+Pair a 'preserve names' rule with an explicit naming-fix task, or allow additive labels only where tests are updated
+
+---
+
+## [L15] pattern — sr-only (absolutely positioned) cells inside an overflow-...
+
+**When:** 2026-10-08 00:39 UTC
+**Category:** pattern
+**Priority:** high
+**Status:** pending
+
+### Detail
+
+sr-only (absolutely positioned) cells inside an overflow-x-auto container widen the page unless the container is relative (found in T10, recurred in T12)
+
+### Action
+
+Default scroll containers to relative; the AC-12 375px no-horizontal-scroll check catches it
+
+---

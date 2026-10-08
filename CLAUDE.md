@@ -2,7 +2,28 @@
 
 This repo contains planning documents for **bistec-studio**, an internal marketing post generation tool for the Bistec marketing team.
 
-## ✅ Outstanding work — START HERE (updated 2026-10-07)
+## ✅ Outstanding work — START HERE (updated 2026-10-08)
+
+- **🎨 2026-10-08 — 011 (app visual redesign) is BUILT: 13/13 tasks on `v2` in the fork.** Every screen is **Folio**. Full detail: [`docs/handoff.md`](docs/handoff.md) top section.
+  - **The user's decisions:**
+    - **Direction:** B Folio (2026-10-07).
+    - **Logo:** the typeset **"Studio"** wordmark; the Bistec Studio PNG is deleted.
+    - **Draft page:** no "More" menu. Export, Edit inline and the other actions stay visible buttons.
+  - **Commits:** T3 `9be31d58` → T13 `c37357a3`, each implemented by a subagent, reviewed by `specclaw:code-reviewer` and committed by the orchestrator.
+  - **What changed:**
+    - **The legacy Frozen Light layer is gone.** `tests/unit/uiTokenGuard.test.ts` fails on any legacy class, glass utility or raw palette colour, with a `// ui-exception:` opt-out.
+    - **The default font is Instrument Sans,** with Fraunces for display and JetBrains Mono for code.
+  - **Gates at `c37357a3`:** unit 1722/1722, lint 0 errors, build, `test:render` 15/15, full clean mock E2E **312/3/0/0**. The suite grew by 47 (`tests/e2e/surfaces.test.ts`).
+  - **Next, in order:**
+    1. **`/specclaw:verify 011-app-visual-redesign`.**
+    2. **The fork CI-fix proposal.** The user approves it; they asked for it after 011. It means guarding or removing the `docker-publish.yml` deploy job, adding `v2` to `e2e.yml`, then re-enabling Actions.
+    3. **The 011 follow-up proposal, for the user to approve.** Its contents are listed in the handoff:
+       - an accessibility naming pass;
+       - one shared page-head / section primitive replacing 8 `folio.ts` copies;
+       - smaller consistency items.
+    4. **Merge fork `main` into `v2`.** This brings 004 Phase 0: Node 22, `/api/health`, CI hardening and MinIO → silo. Then recheck 005 AC-17 and AC-16.
+  - **Pre-existing bug, logged as a follow-up:** a refine row can stay on "Applying…" if the mock refine finishes before the post-202 refetch sees `pendingAction`. It was seen once.
+  - **The capture tool:** `node scripts/capture-ui.mjs --out ui-captures/<name>`, against `npm run test:e2e:serve`, captures every screen. `ui-captures/` is gitignored.
 
 - **🍴 2026-10-07 — THIS REPO IS NOW THE FORK `EnderGuardian25/ai-studio` (public). Read this before any git, `gh`, CI or deploy step.** Full detail: [`docs/handoff.md`](docs/handoff.md) → "moved to the fork".
   - **The user's decision:** company development stops. All `v2` work (004, 005, 011 and the 006–010/012 proposals) continues here. **The company repo `bistec-oss/studio` is left exactly as it is.** Never push, open PRs, close PRs (draft #43 included) or delete branches there.
