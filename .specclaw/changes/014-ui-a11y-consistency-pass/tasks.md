@@ -134,7 +134,7 @@ There are **18 tasks in 3 waves**, all on `v2`. **The full clean mock E2E runs 3
       - Briefing and Planned Posts → `SectionHead className="mb-3"` (the same `gap-y-2` row);
       - the campaigns group head and the projects/[id] head stay bespoke, with ui strings.
 
-- [ ] `T7` — Brand kits onto the primitives
+- [x] `T7` — Brand kits onto the primitives
   - Files: `src/app/(app)/admin/brandkits/page.tsx`, `src/components/admin/brandkits/folio.ts`, `shared.tsx`, `KitDetail.tsx`, `PromptSection.tsx`, `BrandKitAssistantPanel.tsx`, `ColorEditor.tsx`, `FontEditor.tsx`
   - Estimate: medium
   - Kind: refactor

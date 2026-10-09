@@ -4,7 +4,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import { GOOGLE_FONTS, googleFontsUrl } from './googleFonts'
 import { fieldClasses, fieldEdge } from '@/components/ui/Input'
 import { cn } from '@/lib/utils'
-import { FOCUS } from './folio'
+import { FOCUS } from '@/components/ui/folio'
 
 // ─── Font Editor ─────────────────────────────────────────────────────────────
 // Includes an inline Google Fonts combobox (search + keyboard nav) — there is

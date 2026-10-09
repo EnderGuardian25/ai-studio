@@ -7,12 +7,14 @@ import { Plus, Trash2, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { QueryError } from '@/components/ui/QueryError'
+import { PageHead } from '@/components/ui/PageHead'
+import { FOCUS, ICON, ICON_BUTTON } from '@/components/ui/folio'
 import { apiFetch } from '@/lib/apiFetch'
 import type { AdminBrandKitSummary, AdminBrandKitDetail } from '@/lib/api-types'
 import { AddKitModal } from '@/components/admin/brandkits/AddKitModal'
 import { KitDetail } from '@/components/admin/brandkits/KitDetail'
 import { ColorSwatch } from '@/components/admin/brandkits/shared'
-import { EYEBROW, FOCUS, ICON, ICON_BUTTON, PAGE_LEAD, PAGE_TITLE, rowCls } from '@/components/admin/brandkits/folio'
+import { rowCls } from '@/components/admin/brandkits/folio'
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
@@ -64,22 +66,19 @@ export default function BrandKitsPage() {
       {adding && <AddKitModal onClose={() => setAdding(false)} onCreated={handleCreated} />}
 
       {/* Page head (DESIGN_SYSTEM.md §6): an eyebrow, the display title, a lead. */}
-      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div className="min-w-0">
-          <div className={EYEBROW}>Admin</div>
-          <h1 className={`mt-2 ${PAGE_TITLE}`}>Brand Kits</h1>
-          <p className={PAGE_LEAD}>
-            Manage brand identities, templates, and voice prompts.
-          </p>
-        </div>
-        {/* One accent primary per view: once a kit is open, its own Save is the
-            contextual primary, and Add Kit shows as an Outline button. */}
-        <div>
+      {/* One accent primary per view: once a kit is open, its own Save is the
+          contextual primary, and Add Kit shows as an Outline button. */}
+      <PageHead
+        className="mb-8"
+        eyebrow="Admin"
+        title="Brand Kits"
+        lead="Manage brand identities, templates, and voice prompts."
+        actions={
           <Button variant={selectedId ? 'secondary' : 'primary'} onClick={() => setAdding(true)}>
             <Plus {...ICON} /> Add Kit
           </Button>
-        </div>
-      </div>
+        }
+      />
 
       <div className="grid grid-cols-1 gap-x-12 gap-y-10 lg:grid-cols-[260px_minmax(0,1fr)]">
         {/* The kit list: ruled rows under a 2 px --fg rule; the open kit is

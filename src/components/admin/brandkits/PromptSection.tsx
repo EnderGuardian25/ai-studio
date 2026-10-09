@@ -8,7 +8,7 @@ import { SegmentedToggle } from '@/components/ui/SegmentedToggle'
 import { fieldClasses, fieldEdge } from '@/components/ui/Input'
 import { apiFetch } from '@/lib/apiFetch'
 import { cn } from '@/lib/utils'
-import { COMPACT_FIELD, ICON, SCROLL_FOCUS, SMALL_CAPS } from './folio'
+import { COMPACT_FIELD, ICON, SCROLL_FOCUS, SMALL_CAPS } from '@/components/ui/folio'
 import type { BrandKitPrompt as Prompt } from '@/lib/api-types'
 
 // ─── Prompt Section ───────────────────────────────────────────────────────────

@@ -6,6 +6,8 @@ import { Plus, Pencil, Trash2, Star, Upload, ToggleLeft, ToggleRight, Sparkles, 
 import { Button } from '@/components/ui/Button'
 import { Input, fieldLabelClasses } from '@/components/ui/Input'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
+import { SectionHead } from '@/components/ui/SectionHead'
+import { COMPACT_FIELD, FOCUS, ICON, ICON_BUTTON, SECTION_HEAD, TAG } from '@/components/ui/folio'
 import { apiFetch } from '@/lib/apiFetch'
 import type { AspectRatio } from '@prisma/client'
 import { ASPECT_LABELS, ASPECT_VALUES, dimensionsLabel } from '@/lib/aspectRatio'
@@ -13,19 +15,9 @@ import type { AdminBrandKitDetail } from '@/lib/api-types'
 import { ColorEditor } from './ColorEditor'
 import { FontEditor } from './FontEditor'
 import { PromptSection } from './PromptSection'
-import { ColorSwatch, SectionHeader } from './shared'
+import { ColorSwatch } from './shared'
 import { BrandKitAssistantPanel } from './BrandKitAssistantPanel'
-import {
-  CODE_FIELD,
-  COMPACT_FIELD,
-  FOCUS,
-  ICON,
-  ICON_BUTTON,
-  KIT_TITLE,
-  TAG,
-  TITLE_FIELD,
-  optionCls,
-} from './folio'
+import { CODE_FIELD, TITLE_FIELD, optionCls } from './folio'
 
 // A kit section: ruled apart from its neighbours (§6), never boxed.
 const SECTION = 'pb-8 pt-[22px]'
@@ -247,7 +239,7 @@ export function KitDetail({ kit, onRefresh }: KitDetailProps) {
               className={TITLE_FIELD}
             />
           ) : (
-            <h2 className={`flex flex-wrap items-baseline gap-x-3 gap-y-1 ${KIT_TITLE}`}>
+            <h2 className={`flex flex-wrap items-baseline gap-x-3 gap-y-1 ${SECTION_HEAD}`}>
               <span className="min-w-0 max-w-full break-words">{kit.name}</span>
               {kit.isDefault && (
                 <span className="font-text text-ui-xs font-semibold tracking-normal text-accent">
@@ -282,7 +274,7 @@ export function KitDetail({ kit, onRefresh }: KitDetailProps) {
       <div className="divide-y divide-line-subtle border-t border-line-subtle">
         {/* Colors — each swatch shows the kit's own colour (data, not tokens). */}
         <section className={SECTION}>
-          <SectionHeader numeral="i." title="Color Palette" />
+          <SectionHead level={3} numeral="i." title="Color Palette" className="mb-3" />
           {editing ? (
             <ColorEditor colors={colors} onChange={setColors} />
           ) : (
@@ -302,24 +294,18 @@ export function KitDetail({ kit, onRefresh }: KitDetailProps) {
         {/* Logos — a contact sheet (§8.13's vocabulary): each logo is shown as
             uploaded, in a hairline frame; the primary one is framed in ink. */}
         <section className={SECTION}>
-          <SectionHeader
-            numeral="ii."
-            title="Logos"
-            action={
-              <>
-                <input
-                  ref={fileRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={handleAddLogo}
-                />
-                <Button variant="ghost" size="sm" onClick={() => fileRef.current?.click()}>
-                  <Plus {...ICON} /> Add logo
-                </Button>
-              </>
-            }
-          />
+          <SectionHead level={3} numeral="ii." title="Logos" className="mb-3">
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleAddLogo}
+            />
+            <Button variant="ghost" size="sm" onClick={() => fileRef.current?.click()}>
+              <Plus {...ICON} /> Add logo
+            </Button>
+          </SectionHead>
           {kit.artifacts.filter((a) => a.type === 'LOGO').length === 0 ? (
             <span className="text-ui-sm text-fg-muted">No logos yet.</span>
           ) : (
@@ -383,7 +369,7 @@ export function KitDetail({ kit, onRefresh }: KitDetailProps) {
 
         {/* Fonts */}
         <section className={SECTION}>
-          <SectionHeader numeral="iii." title="Fonts" />
+          <SectionHead level={3} numeral="iii." title="Fonts" className="mb-3" />
           {editing ? (
             <FontEditor fonts={fonts} onChange={setFonts} />
           ) : fonts.length === 0 ? (
@@ -401,34 +387,28 @@ export function KitDetail({ kit, onRefresh }: KitDetailProps) {
 
         {/* Templates */}
         <section className={SECTION}>
-          <SectionHeader
-            numeral="iv."
-            title="HTML Templates"
-            action={
-              <>
-                <input
-                  ref={templateImageRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={handleTemplateFromImage}
-                />
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => templateImageRef.current?.click()}
-                  disabled={templateFromImageBusy}
-                  title="Upload an image; the AI turns it into an editable template"
-                >
-                  {templateFromImageBusy ? <Loader2 {...ICON} className="animate-spin" /> : <Sparkles {...ICON} />}
-                  From image
-                </Button>
-                <Button variant="ghost" size="sm" onClick={() => setAddingTemplate(v => !v)}>
-                  <Plus {...ICON} /> Add
-                </Button>
-              </>
-            }
-          />
+          <SectionHead level={3} numeral="iv." title="HTML Templates" className="mb-3">
+            <input
+              ref={templateImageRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleTemplateFromImage}
+            />
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => templateImageRef.current?.click()}
+              disabled={templateFromImageBusy}
+              title="Upload an image; the AI turns it into an editable template"
+            >
+              {templateFromImageBusy ? <Loader2 {...ICON} className="animate-spin" /> : <Sparkles {...ICON} />}
+              From image
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => setAddingTemplate(v => !v)}>
+              <Plus {...ICON} /> Add
+            </Button>
+          </SectionHead>
           {addingTemplate && (
             <div className="surface mb-5 animate-fade-in space-y-4 p-4">
               <Input
@@ -502,30 +482,24 @@ export function KitDetail({ kit, onRefresh }: KitDetailProps) {
 
         {/* Brand Voice Prompt */}
         <section className={SECTION}>
-          <SectionHeader numeral="v." title="Brand Voice Prompt" />
+          <SectionHead level={3} numeral="v." title="Brand Voice Prompt" className="mb-3" />
           <PromptSection kitId={kit.id} prompts={kit.prompts} onRefresh={onRefresh} />
         </section>
 
         {/* Artifacts */}
         <section className={SECTION}>
-          <SectionHeader
-            numeral="vi."
-            title="Artifacts"
-            action={
-              <>
-                <input
-                  ref={artifactRef}
-                  type="file"
-                  accept="image/*,.pdf,.docx,.txt,.md,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,text/markdown"
-                  className="hidden"
-                  onChange={handleArtifactUpload}
-                />
-                <Button variant="ghost" size="sm" onClick={() => artifactRef.current?.click()}>
-                  <Upload {...ICON} /> Upload
-                </Button>
-              </>
-            }
-          />
+          <SectionHead level={3} numeral="vi." title="Artifacts" className="mb-3">
+            <input
+              ref={artifactRef}
+              type="file"
+              accept="image/*,.pdf,.docx,.txt,.md,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain,text/markdown"
+              className="hidden"
+              onChange={handleArtifactUpload}
+            />
+            <Button variant="ghost" size="sm" onClick={() => artifactRef.current?.click()}>
+              <Upload {...ICON} /> Upload
+            </Button>
+          </SectionHead>
           {kit.artifacts.length === 0 ? (
             <span className="text-ui-sm text-fg-muted">No artifacts uploaded</span>
           ) : (

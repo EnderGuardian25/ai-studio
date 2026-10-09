@@ -3,7 +3,7 @@
 import React, { useState } from 'react'
 import { Button } from '@/components/ui/Button'
 import { ColorSwatch } from './shared'
-import { COMPACT_FIELD, FOCUS } from './folio'
+import { COMPACT_FIELD, FOCUS } from '@/components/ui/folio'
 
 // ─── Color Palette Editor ─────────────────────────────────────────────────────
 

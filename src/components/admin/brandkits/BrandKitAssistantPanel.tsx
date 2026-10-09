@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/Button'
 import { Drawer } from '@/components/ui/Modal'
 import { apiFetch } from '@/lib/apiFetch'
 import { ColorEditor } from './ColorEditor'
-import { COMPACT_FIELD, FOCUS, ICON, ICON_BUTTON, SCROLL_FOCUS, SMALL_CAPS, TAG } from './folio'
+import { COMPACT_FIELD, FOCUS, ICON, ICON_BUTTON, SCROLL_FOCUS, SMALL_CAPS, TAG } from '@/components/ui/folio'
 
 // F5 — conversational brand-kit extraction from reference images. Mirrors the
 // campaign BriefingAssistantPanel: chat grounded on the kit's feedToAI reference
