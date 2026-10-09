@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/Button'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { QueryError } from '@/components/ui/QueryError'
 import { PageHead } from '@/components/ui/PageHead'
-import { FOCUS, ICON, ICON_BUTTON } from '@/components/ui/folio'
+import { FOCUS, ICON, ICON_BUTTON, SCROLL_FOCUS } from '@/components/ui/folio'
 import { apiFetch } from '@/lib/apiFetch'
 import type { AdminBrandKitSummary, AdminBrandKitDetail } from '@/lib/api-types'
 import { AddKitModal } from '@/components/admin/brandkits/AddKitModal'
@@ -82,8 +82,16 @@ export default function BrandKitsPage() {
 
       <div className="grid grid-cols-1 gap-x-12 gap-y-10 lg:grid-cols-[260px_minmax(0,1fr)]">
         {/* The kit list: ruled rows under a 2 px --fg rule; the open kit is
-            marked by a 2 px --accent bar, as the sidebar marks the current page. */}
-        <div className="min-w-0 border-t-2 border-fg">
+            marked by a 2 px --accent bar, as the sidebar marks the current page.
+            Capped at about eight rows (014 FR-09), so it scrolls inside its own
+            box: a focusable, labelled region whether or not it overflows now
+            (the static rule, FR-17). */}
+        <div
+          tabIndex={0}
+          role="region"
+          aria-label="Brand kits"
+          className={`max-h-[32rem] min-w-0 overflow-y-auto border-t-2 border-fg ${SCROLL_FOCUS}`}
+        >
           {loading && (
             <div className="px-2 py-4 text-ui-sm text-fg-muted">Loading…</div>
           )}
@@ -107,13 +115,15 @@ export default function BrandKitsPage() {
                 return (
                   // Row select is a real button (keyboard reachable); the delete
                   // button sits beside it rather than nested inside (nested
-                  // interactive elements are invalid HTML).
+                  // interactive elements are invalid HTML). It sits flush with
+                  // the list edge, so its focus outline is inset: the list's own
+                  // overflow would clip an outset one.
                   <li key={kit.id} className={rowCls(selected, 'flex items-center gap-1 pr-1')}>
                     <button
                       type="button"
                       onClick={() => setSelectedId(kit.id)}
                       aria-current={selected ? 'true' : undefined}
-                      className={`min-w-0 flex-1 cursor-pointer rounded-ui-sm py-3 pl-3 text-left ${FOCUS}`}
+                      className={`min-w-0 flex-1 cursor-pointer rounded-ui-sm py-3 pl-3 text-left ${SCROLL_FOCUS}`}
                     >
                       <span
                         className={`block truncate text-ui-sm ${selected ? 'font-semibold text-fg' : 'font-medium text-fg'}`}
@@ -122,7 +132,7 @@ export default function BrandKitsPage() {
                         {kit.name}
                       </span>
                       <span className="mt-1.5 flex items-center gap-1.5">
-                        {kit.colors.slice(0, 5).map(c => <ColorSwatch key={c} color={c} />)}
+                        {kit.colors.slice(0, 5).map(c => <ColorSwatch key={c} color={c} decorative />)}
                         {kit.isDefault && (
                           <span className="ml-1 text-ui-xs font-semibold text-accent">default</span>
                         )}

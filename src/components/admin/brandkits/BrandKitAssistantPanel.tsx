@@ -7,7 +7,8 @@ import { Button } from '@/components/ui/Button'
 import { Drawer } from '@/components/ui/Modal'
 import { apiFetch } from '@/lib/apiFetch'
 import { ColorEditor } from './ColorEditor'
-import { COMPACT_TEXTAREA, FOCUS, ICON, ICON_BUTTON, SCROLL_FOCUS, SMALL_CAPS, TAG } from '@/components/ui/folio'
+import { COMPACT_TEXTAREA, EYEBROW, FOCUS, ICON, ICON_BUTTON, SCROLL_FOCUS, TAG } from '@/components/ui/folio'
+import { FieldLabel } from '@/components/ui/FieldLabel'
 
 // F5 — conversational brand-kit extraction from reference images. Mirrors the
 // campaign BriefingAssistantPanel: chat grounded on the kit's feedToAI reference
@@ -60,6 +61,7 @@ interface BrandKitAssistantPanelProps {
 export function BrandKitAssistantPanel({ kitId, open, onClose, onApplied }: BrandKitAssistantPanelProps) {
   const endRef = useRef<HTMLDivElement>(null)
   const voiceId = React.useId()
+  const messageId = React.useId()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
@@ -194,7 +196,7 @@ export function BrandKitAssistantPanel({ kitId, open, onClose, onApplied }: Bran
         {/* Documents */}
         <div className="space-y-2 border-b border-line-subtle px-5 py-4">
           <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-            <p className={`${SMALL_CAPS} text-fg-muted`}>
+            <p className={EYEBROW}>
               Source documents &amp; images ({docs.length}/5)
             </p>
             <Button
@@ -265,7 +267,7 @@ export function BrandKitAssistantPanel({ kitId, open, onClose, onApplied }: Bran
             <ol className="border-t border-line-subtle">
               {messages.map((m, i) => (
                 <li key={i} className="border-b border-line-subtle py-3">
-                  <p className={`${SMALL_CAPS} mb-1 text-fg-muted`}>
+                  <p className={`${EYEBROW} mb-1`}>
                     {m.role === 'user' ? 'You' : 'Assistant'}
                   </p>
                   <p
@@ -302,13 +304,13 @@ export function BrandKitAssistantPanel({ kitId, open, onClose, onApplied }: Bran
           >
             <div className="flex items-center gap-2">
               <Sparkles {...ICON} aria-hidden className="flex-shrink-0 text-accent" />
-              <p className={`${SMALL_CAPS} text-fg-muted`}>
+              <p className={EYEBROW}>
                 Proposed brand — review &amp; edit, then apply
               </p>
             </div>
 
             <div>
-              <label htmlFor={voiceId} className={`${SMALL_CAPS} text-fg-muted`}>Brand voice</label>
+              <label htmlFor={voiceId} className={EYEBROW}>Brand voice</label>
               <textarea
                 id={voiceId}
                 value={voice}
@@ -319,7 +321,7 @@ export function BrandKitAssistantPanel({ kitId, open, onClose, onApplied }: Bran
             </div>
 
             <div>
-              <p className={`${SMALL_CAPS} text-fg-muted`}>
+              <p className={EYEBROW}>
                 Color palette (sampled — replaces the current palette)
               </p>
               <div className="mt-1.5">
@@ -329,7 +331,7 @@ export function BrandKitAssistantPanel({ kitId, open, onClose, onApplied }: Bran
 
             {fonts.length > 0 && (
               <div>
-                <p className={`${SMALL_CAPS} text-fg-muted`}>
+                <p className={EYEBROW}>
                   Font guesses (not applied — add manually with a font file if correct)
                 </p>
                 <div className="mt-1.5 flex flex-wrap gap-1.5">
@@ -363,8 +365,10 @@ export function BrandKitAssistantPanel({ kitId, open, onClose, onApplied }: Bran
         {/* The prompt (§8.3, §8.14): a display-italic field with the ink Send
             button attached; the wrapper shows the focus outline. */}
         <form onSubmit={send} className="flex-shrink-0 border-t border-line-subtle px-5 py-4">
+          <FieldLabel htmlFor={messageId} className="mb-1.5">Message</FieldLabel>
           <div className="flex rounded-ui-sm border border-line bg-surface-raised focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-focus">
             <input
+              id={messageId}
               value={input}
               onChange={e => setInput(e.target.value)}
               placeholder="e.g. Extract the brand voice and style from these references"

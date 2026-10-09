@@ -6,6 +6,7 @@ import { Sparkles, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { SegmentedToggle } from '@/components/ui/SegmentedToggle'
 import { fieldClasses, fieldEdge } from '@/components/ui/Input'
+import { FieldLabel } from '@/components/ui/FieldLabel'
 import { apiFetch } from '@/lib/apiFetch'
 import { cn } from '@/lib/utils'
 import { COMPACT_FIELD, ICON, SCROLL_FOCUS, SMALL_CAPS } from '@/components/ui/folio'
@@ -25,6 +26,8 @@ export function PromptSection({ kitId, prompts, onRefresh }: PromptSectionProps)
   const [description, setDescription] = useState('')
   const [loading, setLoading] = useState(false)
   const [view, setView] = useState<'active' | 'history' | 'new'>('active')
+  const descriptionId = React.useId()
+  const draftId = React.useId()
 
   const active = prompts.find(p => p.isActive)
 
@@ -106,17 +109,21 @@ export function PromptSection({ kitId, prompts, onRefresh }: PromptSectionProps)
                 {loading ? 'Improving…' : 'Improve with AI'}
               </Button>
             ) : (
-              <div className="flex w-full flex-wrap gap-2">
-                <input
-                  value={description}
-                  onChange={e => setDescription(e.target.value)}
-                  placeholder="Describe your brand in a few sentences…"
-                  className={`${COMPACT_FIELD} min-w-0 flex-1 basis-56`}
-                />
-                <Button variant="secondary" size="sm" onClick={generate} disabled={loading || !description.trim()}>
-                  <Sparkles {...ICON} />
-                  {loading ? 'Generating…' : 'Generate'}
-                </Button>
+              <div className="flex w-full flex-col gap-1.5">
+                <FieldLabel htmlFor={descriptionId}>Brand description</FieldLabel>
+                <div className="flex w-full flex-wrap gap-2">
+                  <input
+                    id={descriptionId}
+                    value={description}
+                    onChange={e => setDescription(e.target.value)}
+                    placeholder="Describe your brand in a few sentences…"
+                    className={`${COMPACT_FIELD} min-w-0 flex-1 basis-56`}
+                  />
+                  <Button variant="secondary" size="sm" onClick={generate} disabled={loading || !description.trim()}>
+                    <Sparkles {...ICON} />
+                    {loading ? 'Generating…' : 'Generate'}
+                  </Button>
+                </div>
               </div>
             )}
             <Button variant="ghost" size="sm" onClick={() => { setDraft(''); setView('new') }}>
@@ -166,15 +173,21 @@ export function PromptSection({ kitId, prompts, onRefresh }: PromptSectionProps)
           {aiDraft && (
             <p className="text-ui-xs text-fg-muted">AI-generated draft — review and edit before saving.</p>
           )}
-          <textarea
-            value={draft}
-            onChange={e => setDraft(e.target.value)}
-            rows={8}
-            placeholder="Write your brand voice prompt…"
-            className={cn(fieldClasses, fieldEdge(), 'resize-none leading-relaxed')}
-          />
+          <div className="flex flex-col gap-1.5">
+            <FieldLabel htmlFor={draftId}>Brand voice prompt</FieldLabel>
+            <textarea
+              id={draftId}
+              value={draft}
+              onChange={e => setDraft(e.target.value)}
+              rows={8}
+              placeholder="Write your brand voice prompt…"
+              className={cn(fieldClasses, fieldEdge(), 'resize-none leading-relaxed')}
+            />
+          </div>
           <div className="flex flex-wrap gap-2">
-            <Button size="sm" onClick={saveVersion} disabled={!draft.trim()}>Save as new version</Button>
+            {/* An inline-form submit: Ink, so the kit's Save stays the view's
+                one accent primary (§8.2, 014 FR-08). */}
+            <Button variant="ink" size="sm" onClick={saveVersion} disabled={!draft.trim()}>Save as new version</Button>
             <Button variant="ghost" size="sm" onClick={() => { setDraft(''); setAiDraft(''); setView('active') }}>Cancel</Button>
           </div>
         </div>

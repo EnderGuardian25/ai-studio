@@ -5,6 +5,7 @@ import { GOOGLE_FONTS, googleFontsUrl } from './googleFonts'
 import { inputClasses, fieldEdge } from '@/components/ui/Input'
 import { cn } from '@/lib/utils'
 import { FOCUS } from '@/components/ui/folio'
+import { FieldLabel } from '@/components/ui/FieldLabel'
 
 // ─── Font Editor ─────────────────────────────────────────────────────────────
 // Includes an inline Google Fonts combobox (search + keyboard nav) — there is
@@ -27,6 +28,7 @@ export function FontEditor({ fonts, onChange }: FontEditorProps) {
   const [highlighted, setHighlighted] = useState(0)
   const ref = useRef<HTMLDivElement>(null)
   const listboxId = React.useId()
+  const inputId = React.useId()
 
   const matches = query.trim()
     ? GOOGLE_FONTS.filter(f => f.toLowerCase().includes(query.toLowerCase()) && !fonts.find(x => x.name === f))
@@ -90,48 +92,54 @@ export function FontEditor({ fonts, onChange }: FontEditorProps) {
           </div>
         ))}
       </div>
-      <div ref={ref} className="relative">
-        <input
-          value={query}
-          onChange={e => { setQuery(e.target.value); setOpen(true); setHighlighted(0) }}
-          onFocus={() => setOpen(true)}
-          onKeyDown={onKeyDown}
-          role="combobox"
-          aria-expanded={expanded}
-          aria-controls={listboxId}
-          aria-autocomplete="list"
-          aria-activedescendant={expanded ? `${listboxId}-option-${highlighted}` : undefined}
-          placeholder="Search Google Fonts…"
-          className={cn(inputClasses, fieldEdge())}
-        />
-        {expanded && (
-          <ul
-            id={listboxId}
-            role="listbox"
-            aria-label="Google Fonts matches"
-            className="surface-raised absolute z-20 mt-1 max-h-48 w-full overflow-y-auto py-1.5"
-          >
-            {visible.map((name, i) => (
-              <li
-                key={name}
-                id={`${listboxId}-option-${i}`}
-                role="option"
-                aria-selected={i === highlighted}
-              >
-                <button
-                  tabIndex={-1}
-                  onMouseDown={e => { e.preventDefault(); add(name) }}
-                  onMouseEnter={() => setHighlighted(i)}
-                  className={`w-full px-3.5 py-[7px] text-left font-text text-ui-sm text-fg transition-colors duration-fast ease-standard ${
-                    i === highlighted ? 'bg-canvas' : ''
-                  }`}
+      {/* The combobox is named by a visible label (014 FR-12), outside the
+          relative wrapper that positions the listbox under the field. */}
+      <div className="flex flex-col gap-1.5">
+        <FieldLabel htmlFor={inputId}>Search Google Fonts</FieldLabel>
+        <div ref={ref} className="relative">
+          <input
+            id={inputId}
+            value={query}
+            onChange={e => { setQuery(e.target.value); setOpen(true); setHighlighted(0) }}
+            onFocus={() => setOpen(true)}
+            onKeyDown={onKeyDown}
+            role="combobox"
+            aria-expanded={expanded}
+            aria-controls={listboxId}
+            aria-autocomplete="list"
+            aria-activedescendant={expanded ? `${listboxId}-option-${highlighted}` : undefined}
+            placeholder="Search Google Fonts…"
+            className={cn(inputClasses, fieldEdge())}
+          />
+          {expanded && (
+            <ul
+              id={listboxId}
+              role="listbox"
+              aria-label="Google Fonts matches"
+              className="surface-raised absolute z-20 mt-1 max-h-48 w-full overflow-y-auto py-1.5"
+            >
+              {visible.map((name, i) => (
+                <li
+                  key={name}
+                  id={`${listboxId}-option-${i}`}
+                  role="option"
+                  aria-selected={i === highlighted}
                 >
-                  {name}
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
+                  <button
+                    tabIndex={-1}
+                    onMouseDown={e => { e.preventDefault(); add(name) }}
+                    onMouseEnter={() => setHighlighted(i)}
+                    className={`w-full px-3.5 py-[7px] text-left font-text text-ui-sm text-fg transition-colors duration-fast ease-standard ${
+                      i === highlighted ? 'bg-canvas' : ''
+                    }`}
+                  >
+                    {name}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       </div>
     </div>
   )

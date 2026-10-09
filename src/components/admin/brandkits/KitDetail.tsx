@@ -23,10 +23,11 @@ import { CODE_FIELD, TITLE_FIELD, optionCls } from './folio'
 // A kit section: ruled apart from its neighbours (§6), never boxed.
 const SECTION = 'pb-8 pt-[22px]'
 
-// The feed-to-AI switch: ICON_BUTTON's shape with its colour left to the
-// caller (--accent when on), since `cn` would not settle two text colours.
+// The feed-to-AI switch: ICON_BUTTON's shape (the --control-sm square, §6)
+// with its colour left to the caller (--accent when on), since `cn` would
+// not settle two text colours.
 const TOGGLE_BUTTON =
-  'inline-flex h-[30px] w-[30px] flex-shrink-0 items-center justify-center rounded-ui-sm transition-colors duration-fast ease-standard'
+  'inline-flex h-control-sm w-control-sm flex-shrink-0 items-center justify-center rounded-ui-sm transition-colors duration-fast ease-standard'
 
 // ─── Kit Detail Panel ─────────────────────────────────────────────────────────
 
@@ -452,8 +453,10 @@ export function KitDetail({ kit, onRefresh }: KitDetailProps) {
                   className={`${CODE_FIELD} resize-y`}
                 />
               </div>
+              {/* An inline-form submit: Ink, so the kit's Save stays the view's
+                  one accent primary (§8.2, 014 FR-08). */}
               <div className="flex flex-wrap gap-2">
-                <Button size="sm" onClick={addTemplate} disabled={!templateName.trim() || !templateHtml.trim()}>Save template</Button>
+                <Button variant="ink" size="sm" onClick={addTemplate} disabled={!templateName.trim() || !templateHtml.trim()}>Save template</Button>
                 <Button variant="ghost" size="sm" onClick={() => { setAddingTemplate(false); setTemplateName(''); setTemplateHtml(''); setTemplateRatio('SQUARE') }}>Cancel</Button>
               </div>
             </div>

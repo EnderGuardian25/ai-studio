@@ -8,6 +8,7 @@ import {
   mintCampaignFixture,
   mintExportedDraft,
   pageLogin,
+  tabThreeFromMain,
 } from '../helpers/ui'
 
 // Change 014 — accessibility naming and the consistency pass. Each wave 2 and
@@ -15,6 +16,9 @@ import {
 //   T9:  AC-05 (FR-06, one field-label style) and AC-11 (FR-12) for rows 6,
 //        14, 21 and 22; the group captions name their groups (§8.3).
 //   T10: AC-06 (FR-07, one control height per size, read from --control-*).
+//   T11: brand kits — AC-07 (FR-08, one accent primary), AC-08 (FR-09, the
+//        kit-list region), AC-11 (FR-12) for rows 12, 13, 15, 16 and 17, and
+//        AC-15's kit part (FR-16, read-once swatches).
 
 const MOCKED = () => !!(process.env.MOCK_AI && process.env.MOCK_PUPPETEER)
 
@@ -295,5 +299,151 @@ test.describe('Control heights (T10)', () => {
       // A raw single-line input on the same view (inputClasses).
       ['font search field', page.getByPlaceholder('Search Google Fonts…', { exact: true }), 'md'],
     ])
+  })
+})
+
+// ── T11: brand kits — one accent primary, the kit-list region, labels, swatches ─
+
+// Open a kit from the list and wait for its panel (a region named by the kit).
+async function openKit(page: Page, name: string): Promise<Locator> {
+  await page.goto('/admin/brandkits')
+  await expect(page.getByRole('heading', { name: 'Brand Kits', level: 1 })).toBeVisible()
+  await page
+    .getByRole('region', { name: 'Brand kits', exact: true })
+    .getByRole('button', { name: new RegExp(`^${name}`) })
+    .click()
+  await expect(page.getByRole('heading', { name, level: 2 })).toBeVisible()
+  return page.getByRole('region', { name, exact: true })
+}
+
+// The innermost section holding a kit section's h3 (the kit's own section
+// holds it too, and comes first).
+function kitSection(page: Page, title: string): Locator {
+  return page.locator('section').filter({ has: page.getByRole('heading', { name: title, level: 3 }) }).last()
+}
+
+test.describe('Brand kits (T11)', () => {
+  let api: ApiClient
+  const mintedKits: string[] = []
+  test.beforeEach(async ({ request }) => {
+    api = await loginAs(request, ADMIN_EMAIL, ADMIN_PASSWORD)
+  })
+  test.afterEach(async () => {
+    for (const id of mintedKits.splice(0)) await api.del(`/api/admin/brandkits/${id}`)
+    await api.dispose()
+  })
+  const mint = async () => {
+    const fixture = await mintBrandKitFixture(api)
+    mintedKits.push(fixture.kit.id)
+    return fixture
+  }
+
+  test('AC-07: with a kit in edit mode, the template form and New Version open, the kit Save is the only accent fill', async ({ page }) => {
+    const { kit } = await mint()
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await pageLogin(page)
+    const kitPanel = await openKit(page, kit.name)
+    await kitPanel.getByRole('button', { name: 'Edit', exact: true }).click()
+    await kitSection(page, 'HTML Templates').getByRole('button', { name: 'Add', exact: true }).click()
+    await kitPanel.getByRole('tab', { name: 'New Version' }).click()
+    const saveTemplate = kitPanel.getByRole('button', { name: 'Save template' })
+    const saveVersion = kitPanel.getByRole('button', { name: 'Save as new version' })
+    await expect(saveTemplate).toBeVisible()
+    await expect(saveVersion).toBeVisible()
+
+    // The tokens as computed colours, read off :root.
+    const { accent, fg } = await page.evaluate(() => {
+      const root = getComputedStyle(document.documentElement)
+      const rgb = (name: string) => `rgb(${root.getPropertyValue(name).trim().split(/\s+/).join(', ')})`
+      return { accent: rgb('--accent'), fg: rgb('--fg') }
+    })
+    const accentFilled = await page.locator('main button').evaluateAll(
+      (buttons, colour) =>
+        buttons
+          .filter((b) => getComputedStyle(b).backgroundColor === colour)
+          .map((b) => (b.getAttribute('aria-label') ?? b.textContent ?? '').trim()),
+      accent,
+    )
+    expect(accentFilled, 'the accent-filled buttons in main').toEqual(['Save'])
+    // The inline-form submits are Ink.
+    await expect(saveTemplate).toHaveCSS('background-color', fg)
+    await expect(saveVersion).toHaveCSS('background-color', fg)
+  })
+
+  test('AC-08: the kit list is a capped, focusable "Brand kits" region with a visible focus indicator', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await pageLogin(page)
+    await page.goto('/admin/brandkits')
+    await expect(page.getByRole('heading', { name: 'Brand Kits', level: 1 })).toBeVisible()
+    const list = page.getByRole('region', { name: 'Brand kits', exact: true })
+    await expect(list.getByRole('listitem').first()).toBeVisible()
+    await expect(list).toHaveAttribute('tabindex', '0')
+    await expect(list).toHaveCSS('max-height', '512px')
+    await expect(list).toHaveCSS('overflow-y', 'auto')
+    // With no kit open, Add Kit is the first stop and the region the second;
+    // the helper fails a stop that draws no focus indicator.
+    const stops = await tabThreeFromMain(page)
+    expect(stops.slice(0, 2)).toEqual(['Add Kit', 'Brand kits'])
+  })
+
+  test('AC-15 (kit part): a kit row is named by the kit alone; its swatches are aria-hidden and keep their titles', async ({ page }) => {
+    const { kit } = await mint()
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await pageLogin(page)
+    await page.goto('/admin/brandkits')
+    const row = page
+      .getByRole('region', { name: 'Brand kits', exact: true })
+      .getByRole('button', { name: new RegExp(`^${kit.name}( default)?$`) })
+    await expect(row).toHaveCount(1)
+    await expect(row).toHaveAccessibleName(kit.name)
+    const swatches = row.locator('span[title^="#"]')
+    await expect(swatches).toHaveCount(2)
+    for (const hex of ['#0b6e4f', '#f2c14e']) {
+      await expect(row.locator(`span[title="${hex}"]`)).toHaveAttribute('aria-hidden', 'true')
+    }
+  })
+
+  test('AC-11 rows 12, 13 and 16: the add-colour field, the font search and the voice prompt are labelled', async ({ page }) => {
+    const { kit } = await mint()
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await pageLogin(page)
+    const kitPanel = await openKit(page, kit.name)
+
+    // Row 16, on the New Version tab.
+    await kitPanel.getByRole('tab', { name: 'New Version' }).click()
+    await expectLabelled(kitPanel, 'Brand voice prompt', { tag: 'TEXTAREA', placeholder: 'Write your brand voice prompt…' })
+
+    // Rows 12 and 13, in edit mode.
+    await kitPanel.getByRole('button', { name: 'Edit', exact: true }).click()
+    await expectLabelled(kitPanel, 'Add color', { tag: 'INPUT', placeholder: '#1A2B3C' })
+    await expectLabelled(kitPanel, 'Search Google Fonts', { tag: 'INPUT', placeholder: 'Search Google Fonts…' })
+    await expect(kitPanel.getByRole('combobox', { name: 'Search Google Fonts', exact: true })).toBeVisible()
+  })
+
+  test('AC-11 rows 15 and 17: the brand description and the assistant message are labelled', async ({ page }) => {
+    // A kit with no voice prompt, so the brand description field shows.
+    const kit = await (
+      await api.post('/api/admin/brandkits', { name: `T11 Bare Kit ${Date.now()}`, colors: ['#0b6e4f'] })
+    ).json()
+    mintedKits.push(kit.id)
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await pageLogin(page)
+    const kitPanel = await openKit(page, kit.name)
+
+    // Row 15.
+    await expect(kitPanel.getByText('No active prompt. Generate one below.')).toBeVisible()
+    await expectLabelled(kitPanel, 'Brand description', {
+      tag: 'INPUT',
+      placeholder: 'Describe your brand in a few sentences…',
+    })
+
+    // Row 17, in the assistant drawer.
+    await kitPanel.getByRole('button', { name: 'Extract from references' }).click()
+    const drawer = page.getByRole('dialog', { name: 'Extract brand from references' })
+    await expect(drawer).toBeVisible()
+    await expectLabelled(drawer, 'Message', {
+      tag: 'INPUT',
+      placeholder: 'e.g. Extract the brand voice and style from these references',
+    })
   })
 })

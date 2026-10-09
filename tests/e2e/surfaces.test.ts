@@ -829,8 +829,9 @@ test.describe('Campaigns and projects (T10)', () => {
 
 // ── Brand kits (T11: AC-12, AC-17, FR-12) ────────────────────────────────────
 
-// The kit list's row button. Its name starts with the kit's name (the swatch
-// titles follow it), and "Delete brand kit …" must not match.
+// The kit list's row button. Its name is the kit's name, plus "default" on the
+// default kit: the swatches are aria-hidden since 014 T11 (FR-16), so their
+// titles no longer follow it. "Delete brand kit …" must not match.
 function kitRow(page: Page, name: string): Locator {
   return page.getByRole('button', { name: new RegExp(`^${name}`) })
 }
@@ -865,12 +866,13 @@ test.describe('Brand kits (T11)', () => {
     await page.setViewportSize({ width: 1440, height: 900 })
     await pageLogin(page)
     await openKit(page, kit.name)
-    // Add Kit, then the first kit row's select and delete buttons (which kit
-    // is first depends on the test DB's data).
-    const stops = await tabThreeFromMain(page)
-    expect(stops[0]).toBe('Add Kit')
-    expect(stops[2]).toMatch(/^Delete brand kit /)
-    expect(stops).toHaveLength(3)
+    // Add Kit, the kit list's scroll region (a stop since 014 T11, FR-09 and
+    // FR-17), then the first kit row's select button (which kit is first
+    // depends on the test DB's data).
+    const firstRow = page.getByRole('region', { name: 'Brand kits', exact: true }).getByRole('listitem').first().getByRole('button').first()
+    const firstRowText = ((await firstRow.textContent()) ?? '').trim()
+    expect(firstRowText).not.toBe('')
+    expect(await tabThreeFromMain(page)).toEqual(['Add Kit', 'Brand kits', firstRowText])
   })
 
   test('AC-12 + FR-12: at 375px a kit keeps its controls, with history, the editors, a template form, the assistant and the Add kit modal', async ({ page }) => {

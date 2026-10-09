@@ -425,6 +425,8 @@ All buttons: `display: inline-flex`, `gap: 8px`, `--text-sm` 600, `white-space: 
 | **Small** (any) | `--control-sm` | 0 10 px | `--text-xs`                                                       | —                      |
 
 - **One accent primary per view.** On the draft page it is Publish. A submit attached to a field or sitting in an inline form (the refine Send, inline add and save rows) uses **Ink**, and per-item actions in repeated lists and grids use **Outline**, so the view's one primary stays the only accent fill.
+  - **Reading (014 FR-08):** "a view" is the page's `main` content in its current state, and a modal or drawer is its own view. The floating Create post button is shell chrome, outside `main` and outside every view. "One" means **at most one** accent-filled control.
+  - **Brand kits:** the open kit's **Save** (edit mode) is the primary, and **Add Kit** is primary only while no kit is open (it turns Outline once one is). **Save template** and **Save as new version** are inline-form submits, so they are **Ink**. The assistant drawer's Apply and the Add Kit modal's Create are each the one primary of their own view.
 - **An open menu button** (`aria-expanded="true"`) takes a `--fg` border and a `--surface-2` fill.
 - **Disabled** keeps today's treatment (reduced opacity and `cursor: not-allowed`). The study draws no disabled state.
 - **The Danger variant is a T3 choice.** The study shows destructive actions only as a `--status-failed` menu item. An outline danger button keeps `--status-failed` text on a plain surface, which is higher contrast than on its 10% tint (§3.3).

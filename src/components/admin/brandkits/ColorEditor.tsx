@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react'
 import { Button } from '@/components/ui/Button'
+import { FieldLabel } from '@/components/ui/FieldLabel'
 import { ColorSwatch } from './shared'
 import { COMPACT_FIELD, FOCUS } from '@/components/ui/folio'
 
@@ -14,6 +15,7 @@ interface ColorEditorProps {
 
 export function ColorEditor({ colors, onChange }: ColorEditorProps) {
   const [input, setInput] = useState('')
+  const inputId = React.useId()
   const add = () => {
     const val = input.trim()
     if (val && /^#[0-9a-fA-F]{3,8}$/.test(val) && !colors.includes(val)) {
@@ -37,15 +39,21 @@ export function ColorEditor({ colors, onChange }: ColorEditorProps) {
           </div>
         ))}
       </div>
-      <div className="flex flex-wrap gap-2">
-        <input
-          value={input}
-          onChange={e => setInput(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && add()}
-          placeholder="#1A2B3C"
-          className={`${COMPACT_FIELD} w-36`}
-        />
-        <Button variant="secondary" size="sm" onClick={add}>Add</Button>
+      {/* The field is named by a visible label (014 FR-12); the hex
+          placeholder is an example value, not its name. */}
+      <div className="flex flex-col gap-1.5">
+        <FieldLabel htmlFor={inputId}>Add color</FieldLabel>
+        <div className="flex flex-wrap gap-2">
+          <input
+            id={inputId}
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && add()}
+            placeholder="#1A2B3C"
+            className={`${COMPACT_FIELD} w-36`}
+          />
+          <Button variant="secondary" size="sm" onClick={add}>Add</Button>
+        </div>
       </div>
     </div>
   )

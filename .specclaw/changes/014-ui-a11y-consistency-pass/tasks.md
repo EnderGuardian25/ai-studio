@@ -209,7 +209,7 @@ There are **18 tasks in 3 waves**, all on `v2`. **The full clean mock E2E runs 3
     - **Leave alone:** textareas, `CODE_FIELD`, `TITLE_FIELD`, the prompt fields and the library skeleton bar.
     - **DESIGN_SYSTEM:** §6, §8.2 and §8.3 name `--control-*` as the source.
 
-- [ ] `T11` — Brand kits: labels, the kit-list cap and region, read-once swatches, one accent primary
+- [x] `T11` — Brand kits: labels, the kit-list cap and region, read-once swatches, one accent primary
   - Files: `src/app/(app)/admin/brandkits/page.tsx`, `src/components/admin/brandkits/shared.tsx`, `ColorEditor.tsx`, `FontEditor.tsx`, `PromptSection.tsx`, `BrandKitAssistantPanel.tsx`, `KitDetail.tsx`, `tests/e2e/surfaces.test.ts`, `tests/e2e/a11y.test.ts`, `docs/ui-reference/DESIGN_SYSTEM.md`
   - Estimate: medium
   - Kind: impl

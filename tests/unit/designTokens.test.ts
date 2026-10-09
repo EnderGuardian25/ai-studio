@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { createElement as h } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
@@ -281,35 +281,61 @@ describe('control heights (014 AC-06)', () => {
     expect(ICON_BUTTON.split(/\s+/)).toContain('w-control-sm')
   })
 
-  // The AC-06 grep, kept as a guard: no control in these files writes its
-  // height as a literal. The two exclusions are not controls (FR-07): the
-  // library skeleton bar and the brief image thumbnail.
-  const FILES = [
-    'src/components/ui/Button.tsx',
-    'src/components/ui/Input.tsx',
-    'src/components/ui/Select.tsx',
-    'src/components/ui/folio.ts',
-    'src/components/layout/AppShell.tsx',
-    'src/app/(app)/page.tsx',
-    'src/app/(app)/library/page.tsx',
-    'src/components/brief/ContentStep.tsx',
-    'src/components/brief/ImagesStep.tsx',
-    'src/components/admin/brandkits/FontEditor.tsx',
-    'src/components/library/PostCard.tsx',
-    'src/components/drafts/ElementEditPanel.tsx',
-  ]
-  const LITERAL = /(?:^|[\s"'`])(?:h-9|h-10|h-\[30px\]|w-\[30px\])(?=$|[\s"'`])/
+  // The AC-06 grep, kept as a guard over every source file under src/: no
+  // control writes its height as a literal (DESIGN_SYSTEM.md §6). The two
+  // named exclusions are not controls (FR-07): the library skeleton bar and
+  // the brief image thumbnail. A line that carries `ui-exception:` is skipped
+  // (§11), which covers the draft page's expand button drawn on the post image.
+
+  // Repo-relative paths with forward slashes.
+  function sourceFiles(dir: string): string[] {
+    return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+      const path = `${dir}/${entry.name}`
+      if (entry.isDirectory()) return sourceFiles(path)
+      return /\.(ts|tsx)$/.test(entry.name) ? [path] : []
+    })
+  }
+  const FILES = sourceFiles('src')
+  const LITERAL = /(?:^|[\s"'`:])(?:h-9|h-10|h-\[30px\]|w-\[30px\])(?=$|[\s"'`])/
   const NOT_A_CONTROL = [
     /className="h-\[30px\] rounded-ui-md bg-line-subtle w-1\/2 mt-1"/, // library skeleton bar
     /<span className="w-10 h-10 rounded-ui-sm border border-line-subtle bg-surface /, // image thumbnail
   ]
 
-  it.each(FILES)('%s writes no literal control height', (file) => {
-    const hits = readFileSync(resolve(process.cwd(), file), 'utf8')
+  function literalHeights(file: string, text: string): string[] {
+    return text
       .split('\n')
       .map((line, i) => ({ line: line.trim(), n: i + 1 }))
-      .filter(({ line }) => LITERAL.test(line) && !NOT_A_CONTROL.some((re) => re.test(line)))
+      .filter(
+        ({ line }) =>
+          LITERAL.test(line) && !line.includes('ui-exception:') && !NOT_A_CONTROL.some((re) => re.test(line)),
+      )
       .map(({ line, n }) => `${file}:${n}: ${line.slice(0, 90)}`)
+  }
+
+  // A walk that found nothing would pass vacuously.
+  it('walks the whole source tree, including the FR-07 files and KitDetail', () => {
+    for (const file of [
+      'src/components/ui/Button.tsx',
+      'src/components/ui/folio.ts',
+      'src/components/layout/AppShell.tsx',
+      'src/app/(app)/library/page.tsx',
+      'src/components/admin/brandkits/KitDetail.tsx',
+    ]) {
+      expect(FILES).toContain(file)
+    }
+  })
+
+  it('flags a literal control height, and passes the two exclusions and ui-exception lines', () => {
+    expect(literalHeights('x', `const B = 'inline-flex h-[30px] w-[30px] items-center'`)).toHaveLength(1)
+    expect(literalHeights('x', `<button className="h-9 w-9">`)).toHaveLength(1)
+    expect(literalHeights('x', `<div className="h-[30px] rounded-ui-md bg-line-subtle w-1/2 mt-1" />`)).toEqual([])
+    expect(literalHeights('x', `'h-[30px] w-[30px]' // ui-exception: drawn on the post image`)).toEqual([])
+    expect(literalHeights('x', `<div className="h-control-sm w-control-sm max-h-96 h-90">`)).toEqual([])
+  })
+
+  it('no source file under src/ writes a literal control height', () => {
+    const hits = FILES.flatMap((file) => literalHeights(file, readFileSync(file, 'utf8')))
     expect(hits).toEqual([])
   })
 })
