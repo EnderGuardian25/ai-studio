@@ -1,5 +1,6 @@
 import React from 'react'
 import { cn } from '@/lib/utils'
+import { FieldLabel } from './FieldLabel'
 
 // The Folio field (DESIGN_SYSTEM.md §8.3): a 1 px --line edge (3:1), a
 // --surface-2 fill, and a --focus ring while focused. Shared with Select.
@@ -17,7 +18,6 @@ export const fieldClasses = [
 // competing border colours would be settled by CSS source order.
 export const fieldEdge = (error?: string) => (error ? 'border-status-failed' : 'border-line')
 
-export const fieldLabelClasses = 'font-text text-ui-sm font-medium text-fg'
 export const fieldErrorClasses = 'font-text text-ui-xs text-status-failed'
 
 interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
@@ -37,13 +37,11 @@ export function Input({
   const generatedId = React.useId()
   const inputId = id ?? (label ? generatedId : undefined)
 
+  // The label is the shared small-caps FieldLabel (014 FR-06): one field-label
+  // style app-wide, the same in Select.
   return (
     <div className="flex flex-col gap-1.5">
-      {label && (
-        <label htmlFor={inputId} className={fieldLabelClasses}>
-          {label}
-        </label>
-      )}
+      {label && <FieldLabel htmlFor={inputId}>{label}</FieldLabel>}
       <input
         id={inputId}
         className={cn(fieldClasses, fieldEdge(error), className)}

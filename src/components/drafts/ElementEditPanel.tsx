@@ -13,7 +13,8 @@ import {
   X,
 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
-import { Input, fieldClasses, fieldEdge, fieldErrorClasses, fieldLabelClasses } from '@/components/ui/Input'
+import { Input, fieldClasses, fieldEdge, fieldErrorClasses } from '@/components/ui/Input'
+import { FieldLabel } from '@/components/ui/FieldLabel'
 import { Notice } from '@/components/ui/Notice'
 import type { ElementEditKind } from '@/lib/drafts/inlineEdit'
 import {
@@ -76,7 +77,6 @@ interface ElementEditPanelProps {
   onUseWholeDocument: () => void
 }
 
-const LABEL = fieldLabelClasses
 const MUTED = 'text-ui-xs text-fg-muted'
 
 // Focus the element matching `selector` inside `root` once `disabled` is false,
@@ -280,9 +280,7 @@ function SelectionFields({
 
       {selection.canText ? (
         <div className="flex flex-col gap-1.5">
-          <label htmlFor="element-text" className={LABEL}>
-            Text
-          </label>
+          <FieldLabel htmlFor="element-text">Text</FieldLabel>
           <textarea
             id="element-text"
             value={text}
@@ -371,9 +369,7 @@ function ColorField({
   const hex = cssColorToHex(value)
   return (
     <div className="flex flex-col gap-1.5">
-      <label htmlFor={id} className={LABEL}>
-        {label}
-      </label>
+      <FieldLabel htmlFor={id}>{label}</FieldLabel>
       <div className="flex items-center gap-2">
         <span
           className="relative flex h-9 w-10 shrink-0 items-center justify-center overflow-hidden rounded-ui-sm border border-line focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-focus"
@@ -433,9 +429,7 @@ function SizeField({
   const [value, setValue] = useState(initial)
   return (
     <div className="flex flex-col gap-1.5">
-      <label htmlFor="element-fontSize" className={LABEL}>
-        Font size
-      </label>
+      <FieldLabel htmlFor="element-fontSize">Font size</FieldLabel>
       <Input
         id="element-fontSize"
         value={value}

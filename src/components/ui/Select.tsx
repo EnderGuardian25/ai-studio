@@ -1,7 +1,8 @@
 import React from 'react'
 import { ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { fieldClasses, fieldEdge, fieldErrorClasses, fieldLabelClasses } from './Input'
+import { fieldClasses, fieldEdge, fieldErrorClasses } from './Input'
+import { FieldLabel } from './FieldLabel'
 
 interface SelectOption {
   value: string
@@ -28,11 +29,7 @@ export function Select({
 
   return (
     <div className="flex flex-col gap-1.5">
-      {label && (
-        <label htmlFor={selectId} className={fieldLabelClasses}>
-          {label}
-        </label>
-      )}
+      {label && <FieldLabel htmlFor={selectId}>{label}</FieldLabel>}
       {/* The chevron is a real positioned element, not a background-image:
           bg-image utilities are one `background` shorthand away from being
           wiped (happened once via a legacy input class), and Tailwind arbitrary

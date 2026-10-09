@@ -3,7 +3,8 @@
 import React, { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Modal } from '@/components/ui/Modal'
-import { Input, fieldClasses, fieldEdge, fieldErrorClasses, fieldLabelClasses } from '@/components/ui/Input'
+import { Input, fieldClasses, fieldEdge, fieldErrorClasses } from '@/components/ui/Input'
+import { FieldLabel } from '@/components/ui/FieldLabel'
 import { Button } from '@/components/ui/Button'
 import { Select } from '@/components/ui/Select'
 import { SegmentedToggle } from '@/components/ui/SegmentedToggle'
@@ -63,6 +64,9 @@ export function QueueEntryModal({ campaignId, resolvedKitId, isTeamAdmin, entry,
   const [publishAt, setPublishAt] = useState(toLocalInput(entry?.publishAt))
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const specificsId = React.useId()
+  const channelsId = React.useId()
+  const actionId = React.useId()
 
   // Templates filtered to the campaign's resolved kit; the size filter is
   // applied client-side so switching sizes updates the picker immediately.
@@ -150,10 +154,11 @@ export function QueueEntryModal({ campaignId, resolvedKitId, isTeamAdmin, entry,
         />
 
         <div>
-          <label className={`${fieldLabelClasses} mb-1.5 block`}>
+          <FieldLabel htmlFor={specificsId} className="mb-1.5">
             Post specifics
-          </label>
+          </FieldLabel>
           <textarea
+            id={specificsId}
             value={description}
             onChange={e => setDescription(e.target.value)}
             rows={3}
@@ -168,8 +173,8 @@ export function QueueEntryModal({ campaignId, resolvedKitId, isTeamAdmin, entry,
         </div>
 
         <div>
-          <p className={`${fieldLabelClasses} mb-2`}>Channels</p>
-          <div className="flex flex-wrap gap-x-5 gap-y-2">
+          <FieldLabel as="span" id={channelsId} className="mb-2">Channels</FieldLabel>
+          <div role="group" aria-labelledby={channelsId} className="flex flex-wrap gap-x-5 gap-y-2">
             {CHANNEL_VALUES.map(ch => (
               <label key={ch} className="flex cursor-pointer items-center gap-2 text-ui-sm text-fg">
                 <input
@@ -186,7 +191,7 @@ export function QueueEntryModal({ campaignId, resolvedKitId, isTeamAdmin, entry,
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
-            <p className={`${fieldLabelClasses} mb-2`}>Size</p>
+            <FieldLabel as="span" className="mb-2">Size</FieldLabel>
             <SegmentedToggle
               options={[
                 { value: 'SQUARE', label: '1:1' },
@@ -198,7 +203,7 @@ export function QueueEntryModal({ campaignId, resolvedKitId, isTeamAdmin, entry,
             />
           </div>
           <div>
-            <p className={`${fieldLabelClasses} mb-2`}>Design</p>
+            <FieldLabel as="span" className="mb-2">Design</FieldLabel>
             <SegmentedToggle
               options={[
                 { value: 'GENERATE', label: 'Freeform' },
@@ -211,17 +216,15 @@ export function QueueEntryModal({ campaignId, resolvedKitId, isTeamAdmin, entry,
         </div>
 
         {designMode === 'TEMPLATE' && (
-          <div>
-            <label className={`${fieldLabelClasses} mb-1.5 block`}>Template</label>
-            <Select
-              options={[
-                { value: '', label: sizeTemplates.length ? 'Select a template…' : 'No templates for this size' },
-                ...sizeTemplates.map(t => ({ value: t.id, label: t.name })),
-              ]}
-              value={templateId}
-              onChange={e => setTemplateId(e.target.value)}
-            />
-          </div>
+          <Select
+            label="Template"
+            options={[
+              { value: '', label: sizeTemplates.length ? 'Select a template…' : 'No templates for this size' },
+              ...sizeTemplates.map(t => ({ value: t.id, label: t.name })),
+            ]}
+            value={templateId}
+            onChange={e => setTemplateId(e.target.value)}
+          />
         )}
 
         <Input
@@ -232,8 +235,8 @@ export function QueueEntryModal({ campaignId, resolvedKitId, isTeamAdmin, entry,
         />
 
         <div>
-          <p className={`${fieldLabelClasses} mb-2`}>After generation</p>
-          <div className="space-y-2.5">
+          <FieldLabel as="span" id={actionId} className="mb-2">After generation</FieldLabel>
+          <div role="radiogroup" aria-labelledby={actionId} className="space-y-2.5">
             {ACTION_OPTIONS.map(opt => {
               const disabled = !isTeamAdmin && opt.value !== 'HOLD'
               return (

@@ -91,8 +91,8 @@ export function SizeDesignStep({
 
       {/* Brand kit */}
       <div className={SECTION}>
-        <FieldLabel className="mb-2.5">Brand Kit</FieldLabel>
         <Select
+          label="Brand Kit"
           options={brandKitOptions}
           value={brandKitId}
           onChange={e => setBrandKitId(e.target.value)}

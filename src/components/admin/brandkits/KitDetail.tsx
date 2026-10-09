@@ -4,7 +4,8 @@ import React, { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { Plus, Pencil, Trash2, Star, Upload, ToggleLeft, ToggleRight, Sparkles, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
-import { Input, fieldLabelClasses } from '@/components/ui/Input'
+import { Input } from '@/components/ui/Input'
+import { FieldLabel } from '@/components/ui/FieldLabel'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { SectionHead } from '@/components/ui/SectionHead'
 import { COMPACT_FIELD, FOCUS, ICON, ICON_BUTTON, SECTION_HEAD, TAG } from '@/components/ui/folio'
@@ -47,6 +48,7 @@ export function KitDetail({ kit, onRefresh }: KitDetailProps) {
   const [saving, setSaving] = useState(false)
   const [templateName, setTemplateName] = useState('')
   const [templateHtml, setTemplateHtml] = useState('')
+  const templateHtmlId = React.useId()
   const [templateRatio, setTemplateRatio] = useState<AspectRatio>('SQUARE')
   const [addingTemplate, setAddingTemplate] = useState(false)
   const [assistantOpen, setAssistantOpen] = useState(false)
@@ -418,7 +420,7 @@ export function KitDetail({ kit, onRefresh }: KitDetailProps) {
                 placeholder="e.g. Event Announcement"
               />
               <div className="flex flex-col gap-1.5">
-                <label className={fieldLabelClasses}>Size</label>
+                <FieldLabel as="span">Size</FieldLabel>
                 <div role="group" aria-label="Size" className="flex flex-wrap gap-2">
                   {ASPECT_VALUES.map(r => {
                     const selected = templateRatio === r
@@ -440,8 +442,9 @@ export function KitDetail({ kit, onRefresh }: KitDetailProps) {
                 </p>
               </div>
               <div className="flex flex-col gap-1.5">
-                <label className={fieldLabelClasses}>HTML/CSS</label>
+                <FieldLabel htmlFor={templateHtmlId}>HTML/CSS</FieldLabel>
                 <textarea
+                  id={templateHtmlId}
                   value={templateHtml}
                   onChange={e => setTemplateHtml(e.target.value)}
                   rows={6}

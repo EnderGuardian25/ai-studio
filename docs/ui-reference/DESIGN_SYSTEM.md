@@ -433,6 +433,10 @@ All buttons: `display: inline-flex`, `gap: 8px`, `--text-sm` 600, `white-space: 
 - **Focus:** the §9 outline. Where the input sits inside a wrapper with an attached button (the refine prompt), the wrapper shows the outline on `:focus-within`.
 - **The caption textarea is ruled:** a `repeating-linear-gradient` draws a 1 px `--line-subtle` line every 26 px, line-height 26 px, `background-attachment: local`, padding 4 px 16 px, `--text-sm`. Only the caption is ruled.
 - **Selects** use `background-color` for the fill so the chevron `background-image` survives.
+- **Field labels are one style app-wide (014 FR-06):** the small-caps `FieldLabel` (§5.2 small caps, `--fg-muted`, §8.18). `Input` and `Select` render their `label` prop through it, 6 px above the field, so the style lives in the primitives, not at call sites. There is no other label class.
+  - A field's label is visible and associated: the `label` prop, or `FieldLabel htmlFor` with the field's `id` (from `React.useId()`). A placeholder is an example value, never the field's only name.
+  - The caption over a group of controls (checkboxes, radios, a segmented toggle, a set of option buttons) is `FieldLabel as="span"`. The group carries its own name: a checkbox set is `role="group"` and a radio set `role="radiogroup"`, each `aria-labelledby` the caption's `id`; a set of option buttons has its own `aria-label`; a segmented toggle's tablist is named by the toggle itself (014 T17).
+  - `text-transform` does not change the DOM text, so the accessible name stays in sentence case ("Brand Kit", not "BRAND KIT").
 
 ### 8.4 Segmented toggles (`SegmentedToggle`, the theme toggle)
 

@@ -2,7 +2,8 @@
 
 import React, { useState } from 'react'
 import { Modal } from '@/components/ui/Modal'
-import { Input, fieldLabelClasses, fieldErrorClasses } from '@/components/ui/Input'
+import { Input, fieldErrorClasses } from '@/components/ui/Input'
+import { FieldLabel } from '@/components/ui/FieldLabel'
 import { Button } from '@/components/ui/Button'
 import { apiFetch } from '@/lib/apiFetch'
 import { CHANNEL_VALUES, channelLabel } from '@/lib/channels'
@@ -30,6 +31,7 @@ export function PublishDialog({ draftId, onClose, onSuccess }: PublishDialogProp
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [outcomes, setOutcomes] = useState<Partial<Record<Channel, ChannelOutcome>>>({})
+  const channelsId = React.useId()
 
   function toggleChannel(ch: Channel) {
     setCheckedChannels((prev) =>
@@ -104,8 +106,8 @@ export function PublishDialog({ draftId, onClose, onSuccess }: PublishDialogProp
       }
     >
         {/* Channel checkboxes */}
-        <p className={`${fieldLabelClasses} mb-2`}>Channels</p>
-        <div className="flex flex-wrap gap-x-6 gap-y-2 pb-5 mb-5 border-b border-line-subtle">
+        <FieldLabel as="span" id={channelsId} className="mb-2">Channels</FieldLabel>
+        <div role="group" aria-labelledby={channelsId} className="flex flex-wrap gap-x-6 gap-y-2 pb-5 mb-5 border-b border-line-subtle">
           {CHANNELS.map((ch) => {
             const outcome = outcomes[ch]
             return (

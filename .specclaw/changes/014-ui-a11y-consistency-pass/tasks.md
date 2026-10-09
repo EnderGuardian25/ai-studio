@@ -171,7 +171,7 @@ There are **18 tasks in 3 waves**, all on `v2`. **The full clean mock E2E runs 3
 
 ### Wave 2 — C, plus the A items it couples to
 
-- [ ] `T9` — One field-label style; the brief kit select; the queue and template labels; test helpers
+- [x] `T9` — One field-label style; the brief kit select; the queue and template labels; test helpers
   - Files: `src/components/ui/Input.tsx`, `Select.tsx`, `src/components/library/PublishDialog.tsx`, `src/components/campaigns/QueueEntryModal.tsx`, `src/components/admin/brandkits/KitDetail.tsx`, `src/components/drafts/ElementEditPanel.tsx`, `src/components/brief/SizeDesignStep.tsx`, `tests/helpers/ui.ts` (new), `tests/e2e/surfaces.test.ts`, `tests/e2e/a11y.test.ts` (new), `docs/ui-reference/DESIGN_SYSTEM.md`
   - Estimate: medium
   - Kind: impl
