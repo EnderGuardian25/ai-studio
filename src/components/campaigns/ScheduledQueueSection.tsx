@@ -12,8 +12,8 @@ import { apiFetch } from '@/lib/apiFetch'
 import { ASPECT_LABELS } from '@/lib/aspectRatio'
 import { channelLabel } from '@/lib/channels'
 import { QueueEntryModal } from './QueueEntryModal'
-import { SectionHead } from './SectionHead'
-import { FOCUS, ICON, ICON_BUTTON, SCROLL_FOCUS, TABLE_HEAD_ROW, TEXT_LINK } from './folio'
+import { SectionHead } from '@/components/ui/SectionHead'
+import { FOCUS, ICON, ICON_BUTTON, SCROLL_FOCUS, TABLE_HEAD_ROW, TEXT_LINK } from '@/components/ui/folio'
 import type { ScheduledGeneration, GenerationStatus } from '@/lib/api-types'
 
 // Planned-posts queue under a campaign: table of scheduled generations with
@@ -90,7 +90,7 @@ export function ScheduledQueueSection({ campaignId, resolvedKitId, isTeamAdmin }
 
   return (
     <section className="pb-8 pt-[22px]">
-      <SectionHead numeral="ii." title={`Planned Posts (${entries.length})`}>
+      <SectionHead numeral="ii." title={`Planned Posts (${entries.length})`} className="mb-3">
         {/* Outline, not primary: the briefing's Save is the view's one primary. */}
         <Button variant="secondary" size="sm" onClick={() => setModal({ open: true })}>
           <Plus {...ICON} /> Plan a post

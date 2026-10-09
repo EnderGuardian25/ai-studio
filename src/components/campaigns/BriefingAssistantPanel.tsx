@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/Button'
 import { Drawer } from '@/components/ui/Modal'
 import { apiFetch } from '@/lib/apiFetch'
 import { CHANNEL_VALUES } from '@/lib/channels'
-import { COMPACT_FIELD, FOCUS, ICON, ICON_BUTTON, SCROLL_FOCUS, SMALL_CAPS } from '@/components/campaigns/folio'
+import { COMPACT_FIELD, FOCUS, ICON, ICON_BUTTON, SCROLL_FOCUS, SMALL_CAPS } from '@/components/ui/folio'
 
 // Shape the model proposes inside a ```schedule block (see briefingAssistant.ts).
 interface SchedulePlanItem {

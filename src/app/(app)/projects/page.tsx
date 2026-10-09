@@ -11,18 +11,10 @@ import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { QueryError } from '@/components/ui/QueryError'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
+import { PageHead } from '@/components/ui/PageHead'
+import { FOCUS, ICON, ICON_BUTTON, ICON_SM, TAG } from '@/components/ui/folio'
 import { apiFetch } from '@/lib/apiFetch'
-import {
-  EYEBROW,
-  FOCUS,
-  ICON,
-  ICON_BUTTON,
-  ICON_SM,
-  PAGE_LEAD,
-  PAGE_TITLE,
-  ROW_TITLE,
-  TAG,
-} from '@/components/campaigns/folio'
+import { ROW_TITLE } from '@/components/campaigns/folio'
 import type { ProjectSummary, BrandKitSummary } from '@/lib/api-types'
 
 export default function ProjectsPage() {
@@ -100,27 +92,28 @@ export default function ProjectsPage() {
   return (
     <>
       {/* Page head (DESIGN_SYSTEM.md §6): an eyebrow, the display title, a lead. */}
-      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div className="min-w-0">
-          <div className={EYEBROW}>Organize</div>
-          <h1 className={`mt-2 ${PAGE_TITLE}`}>Projects</h1>
-          <p className={PAGE_LEAD}>Organise campaigns under projects with shared brand kits and tones.</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button variant="ghost" size="sm" onClick={() => setShowDeleted(v => !v)}>
-            {showDeleted ? 'Show active' : 'Show deleted'}
-          </Button>
-          {/* One accent primary per view: while the form is open its Create is
-              the primary, and this toggle shows as an open Outline button. */}
-          <Button
-            variant={creating ? 'secondary' : 'primary'}
-            aria-expanded={creating}
-            onClick={() => setCreating(v => !v)}
-          >
-            <Plus {...ICON} /> New Project
-          </Button>
-        </div>
-      </div>
+      <PageHead
+        className="mb-8"
+        eyebrow="Organize"
+        title="Projects"
+        lead="Organise campaigns under projects with shared brand kits and tones."
+        actions={
+          <>
+            <Button variant="ghost" size="sm" onClick={() => setShowDeleted(v => !v)}>
+              {showDeleted ? 'Show active' : 'Show deleted'}
+            </Button>
+            {/* One accent primary per view: while the form is open its Create is
+                the primary, and this toggle shows as an open Outline button. */}
+            <Button
+              variant={creating ? 'secondary' : 'primary'}
+              aria-expanded={creating}
+              onClick={() => setCreating(v => !v)}
+            >
+              <Plus {...ICON} /> New Project
+            </Button>
+          </>
+        }
+      />
 
       {creating && (
         <Panel className="mb-8 animate-fade-in p-4">

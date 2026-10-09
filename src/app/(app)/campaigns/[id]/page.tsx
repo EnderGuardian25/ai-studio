@@ -7,19 +7,11 @@ import Link from 'next/link'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, Loader2 } from 'lucide-react'
 import { Select } from '@/components/ui/Select'
+import { PageTitle } from '@/components/ui/PageHead'
+import { EYEBROW, FOCUS, ICON, ICON_SM, TEXT_LINK } from '@/components/ui/folio'
 import { apiFetch } from '@/lib/apiFetch'
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser'
-import {
-  ASIDE_BLOCK,
-  ASIDE_HEAD,
-  CRUMB_CURRENT,
-  CRUMB_LINK,
-  FOCUS,
-  ICON,
-  ICON_SM,
-  PAGE_TITLE,
-  TEXT_LINK,
-} from '@/components/campaigns/folio'
+import { ASIDE_BLOCK, CRUMB_CURRENT, CRUMB_LINK } from '@/components/campaigns/folio'
 import { CampaignBriefingSection } from '@/components/campaigns/CampaignBriefingSection'
 import { ScheduledQueueSection } from '@/components/campaigns/ScheduledQueueSection'
 import type { Campaign, BrandKitSummary, ProjectSummary, ResolvedBrandKitResponse } from '@/lib/api-types'
@@ -137,7 +129,7 @@ export default function CampaignDetailPage() {
         <span aria-hidden>/</span>
         <span aria-current="page" className={CRUMB_CURRENT}>{campaign.name}</span>
       </nav>
-      <h1 className={`mb-10 break-words ${PAGE_TITLE}`}>{campaign.name}</h1>
+      <PageTitle className="mb-10 break-words">{campaign.name}</PageTitle>
 
       <div className="grid grid-cols-1 gap-x-12 gap-y-10 lg:grid-cols-[minmax(0,1fr)_280px]">
         {/* The briefing and the queue, numbered sections ruled apart (§8.14). */}
@@ -155,7 +147,7 @@ export default function CampaignDetailPage() {
         <aside className="min-w-0 border-t-2 border-fg">
           {resolved?.kit && (
             <section className={ASIDE_BLOCK}>
-              <h2 className={ASIDE_HEAD}>Brand Kit</h2>
+              <h2 className={`${EYEBROW} mb-3`}>Brand Kit</h2>
               <p className="break-words text-ui-sm font-medium text-fg">{resolved.kit.name}</p>
               {resolved.source && (
                 <p className="mt-0.5 text-ui-xs text-fg-muted">
@@ -178,7 +170,7 @@ export default function CampaignDetailPage() {
           )}
 
           <section className={ASIDE_BLOCK}>
-            <h2 className={ASIDE_HEAD}>Details</h2>
+            <h2 className={`${EYEBROW} mb-3`}>Details</h2>
             <dl className="space-y-3 text-ui-sm">
               <div>
                 <dt className="flex items-center gap-1.5 text-ui-xs text-fg-muted">
@@ -236,7 +228,7 @@ export default function CampaignDetailPage() {
           </section>
 
           <section className={ASIDE_BLOCK}>
-            <h2 className={ASIDE_HEAD}>Briefs ({campaign._count.briefs})</h2>
+            <h2 className={`${EYEBROW} mb-3`}>Briefs ({campaign._count.briefs})</h2>
             {campaign._count.briefs === 0 ? (
               <p className="text-ui-sm text-fg-muted">
                 No briefs created under this campaign yet.
@@ -250,7 +242,7 @@ export default function CampaignDetailPage() {
 
           {campaign.projects.length > 0 && (
             <section className={ASIDE_BLOCK}>
-              <h2 className={ASIDE_HEAD}>Projects</h2>
+              <h2 className={`${EYEBROW} mb-3`}>Projects</h2>
               <div className="flex flex-wrap gap-x-3 gap-y-1 text-ui-sm">
                 {campaign.projects.map(({ project }) => (
                   <Link

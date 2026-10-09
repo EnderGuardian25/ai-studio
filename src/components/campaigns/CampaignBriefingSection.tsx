@@ -9,8 +9,8 @@ import { SegmentedToggle } from '@/components/ui/SegmentedToggle'
 import { fieldClasses, fieldEdge } from '@/components/ui/Input'
 import { apiFetch } from '@/lib/apiFetch'
 import { cn } from '@/lib/utils'
-import { SectionHead } from '@/components/campaigns/SectionHead'
-import { ICON, SCROLL_FOCUS, SMALL_CAPS } from '@/components/campaigns/folio'
+import { SectionHead } from '@/components/ui/SectionHead'
+import { ICON, SCROLL_FOCUS, SMALL_CAPS } from '@/components/ui/folio'
 import { BriefingAssistantPanel } from '@/components/campaigns/BriefingAssistantPanel'
 import type { CampaignBriefing } from '@/lib/api-types'
 
@@ -114,7 +114,7 @@ export function CampaignBriefingSection({ campaignId, isTeamAdmin }: CampaignBri
 
   return (
     <section className="pb-8 pt-[22px]">
-      <SectionHead numeral="i." title="Campaign Briefing">
+      <SectionHead numeral="i." title="Campaign Briefing" className="mb-3">
         {isTeamAdmin && (
           <Button variant="ghost" size="sm" onClick={() => setAssistantOpen(true)}>
             <MessageSquareText {...ICON} /> Draft with AI

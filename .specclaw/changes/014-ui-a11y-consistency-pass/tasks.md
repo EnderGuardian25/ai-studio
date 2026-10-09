@@ -119,7 +119,7 @@ There are **18 tasks in 3 waves**, all on `v2`. **The full clean mock E2E runs 3
       - `RefinementPanel:282` (`warning`);
       - `ElementEditPanel:181` (`warning`). **Keep its `text-ui-xs`**: B carries the class set as it is.
 
-- [ ] `T6` — Campaigns and projects onto the primitives
+- [x] `T6` — Campaigns and projects onto the primitives
   - Files: `src/app/(app)/campaigns/page.tsx`, `campaigns/[id]/page.tsx`, `projects/page.tsx`, `projects/[id]/page.tsx`, `src/components/campaigns/folio.ts`, `BriefingAssistantPanel.tsx`, `CampaignBriefingSection.tsx`, `ScheduledQueueSection.tsx`, `QueueEntryModal.tsx`; delete `src/components/campaigns/SectionHead.tsx`
   - Estimate: medium
   - Kind: refactor

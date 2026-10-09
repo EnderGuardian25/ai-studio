@@ -8,20 +8,11 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, ArrowRight, Megaphone, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Select } from '@/components/ui/Select'
+import { PageTitle } from '@/components/ui/PageHead'
+import { EYEBROW, FOCUS, ICON, ICON_SM, SECTION_HEAD, SECTION_NUMERAL } from '@/components/ui/folio'
 import { apiFetch } from '@/lib/apiFetch'
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser'
-import {
-  ASIDE_BLOCK,
-  ASIDE_HEAD,
-  CRUMB_CURRENT,
-  CRUMB_LINK,
-  FOCUS,
-  ICON,
-  ICON_SM,
-  PAGE_TITLE,
-  SECTION_HEAD,
-  SECTION_NUMERAL,
-} from '@/components/campaigns/folio'
+import { ASIDE_BLOCK, CRUMB_CURRENT, CRUMB_LINK } from '@/components/campaigns/folio'
 import type { ProjectDetail, BrandKitSummary } from '@/lib/api-types'
 
 export default function ProjectDetailPage() {
@@ -81,7 +72,7 @@ export default function ProjectDetailPage() {
         <span aria-hidden>/</span>
         <span aria-current="page" className={CRUMB_CURRENT}>{project.name}</span>
       </nav>
-      <h1 className={`mb-10 break-words ${PAGE_TITLE}`}>{project.name}</h1>
+      <PageTitle className="mb-10 break-words">{project.name}</PageTitle>
 
       <div className="grid grid-cols-1 gap-x-12 gap-y-10 lg:grid-cols-[minmax(0,1fr)_280px]">
         {/* Campaigns list */}
@@ -120,7 +111,7 @@ export default function ProjectDetailPage() {
         {/* Project meta */}
         <aside className="min-w-0 border-t-2 border-fg">
           <section className={ASIDE_BLOCK}>
-            <h2 className={ASIDE_HEAD}>Details</h2>
+            <h2 className={`${EYEBROW} mb-3`}>Details</h2>
             <dl className="space-y-3 text-ui-sm">
               <div>
                 <dt className="flex items-center gap-1.5 text-ui-xs text-fg-muted">
