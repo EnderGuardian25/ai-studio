@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/Button'
 import { fieldClasses, fieldEdge } from '@/components/ui/Input'
 import { SegmentedToggle } from '@/components/ui/SegmentedToggle'
 import { QueryError } from '@/components/ui/QueryError'
+import { PageHead } from '@/components/ui/PageHead'
 import { PostCard } from '@/components/library/PostCard'
 import { PublishDialog } from '@/components/library/PublishDialog'
 import { PublishHistoryDrawer } from '@/components/library/PublishHistoryDrawer'
@@ -53,11 +54,6 @@ function SkeletonCard() {
     </div>
   )
 }
-
-// Folio page head (DESIGN_SYSTEM.md §5.2, §6).
-const EYEBROW = 'text-ui-2xs font-semibold uppercase tracking-[0.14em] text-fg-muted'
-const PAGE_TITLE =
-  "mt-2 font-display font-normal text-ui-xl md:text-ui-2xl leading-[1.04] tracking-[-0.025em] [font-variation-settings:'opsz'_144]"
 
 // Tiles: a contact sheet with room between frames for the 3 px outline offset.
 const GRID = 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-10'
@@ -149,29 +145,28 @@ export default function LibraryPage() {
   return (
     <>
       {/* Page header */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8">
-        <div>
-          <div className={EYEBROW}>Posts</div>
-          <h1 className={PAGE_TITLE}>Library</h1>
-          <p className="mt-3 text-ui-sm text-fg-muted">
-            All exported drafts and published posts.
-          </p>
-        </div>
-        <div className="relative w-full sm:w-72">
-          <Search
-            size={15}
-            strokeWidth={1.4}
-            className="absolute left-3.5 top-1/2 -translate-y-1/2 text-fg-muted pointer-events-none"
-          />
-          <input
-            type="search"
-            placeholder="Search by topic…"
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            className={cn(fieldClasses, fieldEdge(), 'pl-10')}
-          />
-        </div>
-      </div>
+      <PageHead
+        eyebrow="Posts"
+        title="Library"
+        lead="All exported drafts and published posts."
+        className="mb-8"
+        actions={
+          <div className="relative w-full sm:w-72">
+            <Search
+              size={15}
+              strokeWidth={1.4}
+              className="absolute left-3.5 top-1/2 -translate-y-1/2 text-fg-muted pointer-events-none"
+            />
+            <input
+              type="search"
+              placeholder="Search by topic…"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              className={cn(fieldClasses, fieldEdge(), 'pl-10')}
+            />
+          </div>
+        }
+      />
 
       {/* Status tabs, over the 2 px --fg rule that opens the sheet */}
       <div className="pb-4 mb-8 border-b-2 border-fg">

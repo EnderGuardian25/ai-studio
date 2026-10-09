@@ -3,6 +3,7 @@
 import React from 'react'
 import { ChevronLeft, ChevronRight, Sparkles, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
+import { PageHead } from '@/components/ui/PageHead'
 import { STEPS } from '@/components/brief/constants'
 import { Stepper } from '@/components/brief/Stepper'
 import { CampaignStep } from '@/components/brief/CampaignStep'
@@ -17,24 +18,18 @@ import { useBriefWizard } from '@/components/brief/useBriefWizard'
 // src/components/brief/.
 // ---------------------------------------------------------------------------
 
-// Folio page head (DESIGN_SYSTEM.md §5.2, §6), as on the dashboard and library.
-const EYEBROW = 'text-ui-2xs font-semibold uppercase tracking-[0.14em] text-fg-muted'
-const PAGE_TITLE =
-  "mt-2 font-display font-normal text-ui-xl md:text-ui-2xl leading-[1.04] tracking-[-0.025em] [font-variation-settings:'opsz'_144]"
-
 export default function NewBriefPage() {
   const wizard = useBriefWizard()
   const { step, setStep, submitting } = wizard
 
   return (
     <div className="max-w-3xl">
-      <div className="mb-10">
-        <div className={EYEBROW}>Create</div>
-        <h1 className={PAGE_TITLE}>New Brief</h1>
-        <p className="mt-3 text-ui-sm text-fg-muted">
-          Describe what you want to create and we&apos;ll generate an on-brand social post.
-        </p>
-      </div>
+      <PageHead
+        eyebrow="Create"
+        title="New Brief"
+        lead="Describe what you want to create and we'll generate an on-brand social post."
+        className="mb-10"
+      />
 
       <Stepper step={step} onJump={setStep} />
 

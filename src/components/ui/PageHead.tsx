@@ -24,7 +24,7 @@ export function PageHead({ eyebrow, title, lead, actions, className }: PageHeadP
         <h1 className={eyebrow ? `mt-2 ${PAGE_TITLE}` : PAGE_TITLE}>{title}</h1>
         {lead && <p className={PAGE_LEAD}>{lead}</p>}
       </div>
-      {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
+      {actions && <div className="flex min-w-0 flex-wrap items-center gap-2">{actions}</div>}
     </div>
   )
 }

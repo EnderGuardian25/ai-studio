@@ -13,6 +13,7 @@ import { TeamSwitcher } from '@/components/layout/TeamSwitcher'
 import { CreatePostButton } from '@/components/layout/CreatePostButton'
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser'
 import { authClient } from '@/lib/auth-client'
+import { EYEBROW } from '@/components/ui/folio'
 
 // Folio nav is text only, no icons (DESIGN_SYSTEM.md §8.6).
 interface NavItem {
@@ -68,8 +69,9 @@ const NAV_ITEM =
 const NAV_CURRENT =
   "text-fg font-semibold before:absolute before:left-0 before:top-2 before:bottom-2 before:w-0.5 before:bg-accent before:content-['']"
 
-// The header's menu button and the mobile sidebar's close button.
-const ICON_BUTTON =
+// The header's menu button and the mobile sidebar's close button: a 36 px
+// target, so not the 30 px ui ICON_BUTTON.
+const SHELL_ICON_BUTTON =
   'inline-flex items-center justify-center h-9 w-9 rounded-ui-md text-fg-muted hover:text-fg ' +
   'transition-colors duration-fast ease-standard ' +
   'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus'
@@ -128,7 +130,7 @@ function Sidebar({ onClose }: { onClose?: () => void }) {
     >
       {onClose && (
         <div className="flex items-center justify-end -mt-2.5 mb-2 px-3">
-          <button onClick={onClose} aria-label="Close sidebar" className={`md:hidden ${ICON_BUTTON}`}>
+          <button onClick={onClose} aria-label="Close sidebar" className={`md:hidden ${SHELL_ICON_BUTTON}`}>
             <X size={16} strokeWidth={1.4} />
           </button>
         </div>
@@ -139,7 +141,7 @@ function Sidebar({ onClose }: { onClose?: () => void }) {
       <nav className="flex flex-col">
         {sections.map(section => (
           <div key={section.label} className="flex flex-col px-5 mb-[18px]">
-            <div className="mb-1 text-ui-2xs font-semibold uppercase tracking-[0.14em] text-fg-muted">
+            <div className={`mb-1 ${EYEBROW}`}>
               {section.label}
             </div>
             {section.items.map(item => (
@@ -191,7 +193,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             {/* Mobile menu button */}
             <button
               onClick={() => setSidebarOpen(true)}
-              className={`md:hidden ${ICON_BUTTON}`}
+              className={`md:hidden ${SHELL_ICON_BUTTON}`}
               aria-label="Open sidebar"
             >
               <Menu size={20} strokeWidth={1.4} />

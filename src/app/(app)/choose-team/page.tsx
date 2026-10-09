@@ -8,6 +8,8 @@ import { toast } from 'sonner'
 import { apiFetch } from '@/lib/apiFetch'
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser'
 import { cn } from '@/lib/utils'
+import { PageTitle } from '@/components/ui/PageHead'
+import { FOCUS } from '@/components/ui/folio'
 
 // Reached when /api/me reports teamChoiceRequired (AppShell redirects here).
 // Deliberately fires no team-scoped query itself — useCurrentUser()'s /api/me
@@ -48,9 +50,7 @@ export default function ChooseTeamPage() {
   // button named by its team (plus "Switching…" while it is picked).
   return (
     <div className="mx-auto w-full max-w-md py-6 md:py-12 font-text text-fg">
-      <h1 className="font-display font-normal text-ui-xl md:text-ui-2xl leading-[1.04] tracking-[-0.025em] [font-variation-settings:'opsz'_144]">
-        Choose a team
-      </h1>
+      <PageTitle>Choose a team</PageTitle>
       <p className="mt-3 text-ui-base text-fg-muted">
         Pick which team you want to work in. You can switch again later from the sidebar.
       </p>
@@ -70,7 +70,7 @@ export default function ChooseTeamPage() {
                 className={cn(
                   'group flex w-full items-center gap-3 px-1 py-3.5 text-left',
                   'transition-colors duration-fast ease-standard hover:bg-surface',
-                  'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus',
+                  FOCUS,
                   'disabled:opacity-50 disabled:cursor-not-allowed',
                 )}
               >

@@ -12,6 +12,8 @@ import { resolveTeamForServerComponent } from '@/lib/authz/serverTeam'
 import { draftVisibilityWhere, postVisibilityWhere } from '@/lib/authz/visibility'
 import type { TeamAuthedUser } from '@/lib/api/handler'
 import { Panel } from '@/components/ui/Panel'
+import { PageHead } from '@/components/ui/PageHead'
+import { EYEBROW, SECTION_HEAD } from '@/components/ui/folio'
 import { RecentDraftsCard } from '@/components/dashboard/RecentDraftsCard'
 import { channelLabel as sharedChannelLabel } from '@/lib/channels'
 import { relativeTime } from '@/lib/format'
@@ -119,15 +121,6 @@ async function getDashboardData(user: TeamAuthedUser) {
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
-// Folio page head and section heads (DESIGN_SYSTEM.md §5.2, §6): an eyebrow,
-// a display title stepping down to --text-xl below md, and section heads in
-// the display face. Structure comes from rules, not boxes.
-const EYEBROW = 'text-ui-2xs font-semibold uppercase tracking-[0.14em] text-fg-muted'
-const PAGE_TITLE =
-  "mt-2 font-display font-normal text-ui-xl md:text-ui-2xl leading-[1.04] tracking-[-0.025em] [font-variation-settings:'opsz'_144]"
-const SECTION_HEAD =
-  "font-display text-ui-xl font-medium leading-tight tracking-[-0.01em] [font-variation-settings:'opsz'_48]"
-
 // A KPI: a small-caps label over a display numeral, on a ruled row (no box).
 function KpiCard({ label, value }: { label: string; value: number }) {
   return (
@@ -195,13 +188,12 @@ export default async function DashboardPage() {
 
   return (
     <>
-      <div className="mb-8">
-        <div className={EYEBROW}>Overview</div>
-        <h1 className={PAGE_TITLE}>Dashboard</h1>
-        <p className="mt-3 text-ui-sm text-fg-muted">
-          At-a-glance status across drafts, posts, and campaigns.
-        </p>
-      </div>
+      <PageHead
+        eyebrow="Overview"
+        title="Dashboard"
+        lead="At-a-glance status across drafts, posts, and campaigns."
+        className="mb-8"
+      />
 
       {/* KPI summary: a 2 px --fg rule opens the block; ruled cells, no boxes */}
       <div className="grid grid-cols-2 gap-x-6 border-t-2 border-fg lg:grid-cols-4">

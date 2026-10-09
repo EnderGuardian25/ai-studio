@@ -66,7 +66,7 @@ There are **18 tasks in 3 waves**, all on `v2`. **The full clean mock E2E runs 3
     - **Unit tests** use `react-dom/server` `renderToStaticMarkup` in a `.test.ts` file (`React.createElement`, no JSX). If a `.tsx` import fails under vitest, add `esbuild: { jsx: 'automatic' }` to `vitest.config.ts`, and change nothing else there.
     - Run `uiTokenGuard` and `designTokens` to confirm they are still green.
 
-- [ ] `T3` — Dashboard, library, the brief page head, choose-team and the shell onto the primitives
+- [x] `T3` — Dashboard, library, the brief page head, choose-team and the shell onto the primitives
   - Files: `src/app/(app)/page.tsx`, `src/app/(app)/library/page.tsx`, `src/app/(app)/brief/page.tsx`, `src/app/(app)/choose-team/page.tsx`, `src/components/layout/AppShell.tsx`, `src/components/dashboard/RecentDraftsCard.tsx`
   - Estimate: small
   - Kind: refactor

@@ -65,7 +65,7 @@ export function PageHead(props: {
   eyebrow?: React.ReactNode // EYEBROW div, above the title
   title: React.ReactNode // <h1 className={PAGE_TITLE}> (+ 'mt-2' when eyebrow is set)
   lead?: React.ReactNode // <p className={PAGE_LEAD}>
-  actions?: React.ReactNode // right slot: 'flex flex-wrap items-center gap-2'
+  actions?: React.ReactNode // right slot: 'flex min-w-0 flex-wrap items-center gap-2' (min-w-0 so a fixed-width action, e.g. the library search, can shrink as it did as a direct flex item — T3 review)
   className?: string // outer spacing only (mb-8 / mb-10)
 }): JSX.Element
 // root: 'flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between'; text column 'min-w-0'
