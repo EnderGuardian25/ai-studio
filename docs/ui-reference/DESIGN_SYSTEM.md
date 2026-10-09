@@ -597,6 +597,16 @@ Frozen Light rules that **no longer hold**: the glass utilities and glow blobs; 
 
 The guard also flags `GlassInput` and `GlassPanel`, the names of the removed Frozen Light primitives. It walks every `.ts`, `.tsx` and `.css` file under `src/` and fails with `file:line` for each hit.
 
+**Four more tokens (014 FR-11):** `glow-blob`, `animate-scale-in` (use `animate-modal-in`, §8.10), `font-inter` (the body is Instrument Sans, §5.1) and the legacy `primary` colour family, `(bg|text|border|ring|from|to|via|fill|stroke|divide|outline|placeholder|decoration|shadow)-primary` with any `-<word>` suffix (`bg-primary-light`). These match as **whole class tokens**:
+
+- a token starts at the start of the line or after one of ``\s " ' ` { ( :``, so a variant (`hover:text-primary`, `md:animate-scale-in`) is caught;
+- it ends at the end of the line or before one of ``\s " ' ` } ) ] /``, so an opacity (`text-primary/50`) is caught, or before `, . ; :`, the punctuation that follows a token in prose;
+- so `variant="primary"`, `my-glow-blob-x`, `xtext-primary` and `animate-scale-in-out` pass.
+
+**Comments are scanned like code.** A comment that names a retired token by its class name fails; describe it instead ("not the old scale-in keyframe").
+
+**The shared-name guard (014 FR-05)** lives in the same file: §8.18. `// ui-exception:` does not apply to it.
+
 **A line may opt out** by carrying `// ui-exception: <reason>` on the same line. The guard skips that line. Inside JSX children, where `//` is not a comment, write `{/* ui-exception: <reason> */}` on the same line. The reason says why a token cannot serve.
 
 **The expected exceptions are only these:**

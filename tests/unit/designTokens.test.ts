@@ -147,6 +147,14 @@ describe('semantic tokens in globals.css (AC-07)', () => {
     expect(block).not.toMatch(/animation(-name)?:\s*none/)
     expect(css).toMatch(/@keyframes modalIn[\s\S]*translate\(-50%, -50%\)/)
   })
+
+  // 014 AC-09 (FR-10): the body sets tabular figures, so counters, times and
+  // table numbers align without a local utility (DESIGN_SYSTEM.md §5.2).
+  it('sets font-variant-numeric: tabular-nums on the body rule', () => {
+    const bodies = [...css.matchAll(/(?:^|\n)\s*body\s*\{([^}]*)\}/g)].map((m) => m[1])
+    expect(bodies).toHaveLength(1)
+    expect(bodies[0]).toMatch(/(?:^|[;{\s])font-variant-numeric:\s*tabular-nums\s*;/)
+  })
 })
 
 describe('tailwind.config.ts semantic mapping (AC-07)', () => {

@@ -9,6 +9,10 @@ import { join, relative, resolve } from 'node:path'
 // carries `ui-exception:` is skipped, which covers both `// ui-exception: …`
 // and the JSX form `{/* ui-exception: … */}` (DESIGN_SYSTEM.md §11).
 //
+// 014 FR-11 adds four tokens to that guard, matched as whole class tokens:
+// glow-blob, animate-scale-in, font-inter and the legacy primary colour family
+// (text-primary, hover:bg-primary-light, text-primary/50, …).
+//
 // 014 FR-05: the shared Folio atoms and page primitives are defined once, in
 // src/components/ui/. Any other file under src/ that declares one of their
 // names, or spells out the small-caps tracking literally, is a new copy and
@@ -17,6 +21,17 @@ import { join, relative, resolve } from 'node:path'
 
 const ROOT = process.cwd()
 const SRC = resolve(ROOT, 'src')
+
+// 014 FR-11: a whole class token starts at the start of the line or after one
+// of \s " ' ` { ( : (so a variant such as `hover:text-primary` is caught), and
+// ends at the end of the line or before one of \s " ' ` } ) ] / (so an
+// opacity such as `text-primary/50` is caught) or , . ; : — the punctuation
+// that follows a token in a comment, since comments are scanned like code
+// (the old Modal comment read "NOT animate-scale-in: the keyframes …").
+// `my-glow-blob-x`, `xtext-primary` and `animate-scale-in-out` are other
+// tokens and pass.
+const START = String.raw`(?:^|(?<=[\s"'\`{(:!]))`
+const END = String.raw`(?=$|[\s"'\`})\]/,.;:])`
 
 const PATTERNS: Array<[string, RegExp]> = [
   [
@@ -29,6 +44,16 @@ const PATTERNS: Array<[string, RegExp]> = [
     /(bg|text|border|ring|fill|stroke)-(slate|gray|zinc|neutral|stone|sky|blue|red|green|amber|emerald|violet|purple|indigo|rose|orange|yellow|teal|cyan|lime|pink|fuchsia)-\d{2,3}/,
   ],
   ['removed Glass primitive', /GlassInput|GlassPanel/],
+  // 014 FR-11, matched as whole class tokens (design.md §5).
+  ['glow blob', new RegExp(`${START}glow-blob${END}`)],
+  ['scale-in animation', new RegExp(`${START}animate-scale-in${END}`)],
+  ['Inter font', new RegExp(`${START}font-inter${END}`)],
+  [
+    'legacy primary colour',
+    new RegExp(
+      `${START}(?:bg|text|border|ring|from|to|via|fill|stroke|divide|outline|placeholder|decoration|shadow)-primary(?:-[a-z]+)*${END}`
+    ),
+  ],
 ]
 
 const SHARED_NAME =
@@ -96,6 +121,38 @@ describe('UI token guard (AC-14)', () => {
     ].join('\n')
     const hits = findViolations('sample.tsx', sample)
     expect(hits.map((h) => h.split(':')[1])).toEqual(['1', '2', '3', '4'])
+  })
+
+  // 014 AC-10: each FR-11 token is flagged as a whole class token, wherever a
+  // variant or an opacity puts it, and only there.
+  it.each([
+    ['<div className="glow-blob" />', 'glow-blob'],
+    ["cn('animate-scale-in', open && 'block')", 'animate-scale-in'],
+    // The Modal comment before 014 T12: comments are scanned, punctuation ends a token.
+    ['// animate-modal-in, NOT animate-scale-in: the keyframes must carry', 'animate-scale-in'],
+    ['<p className="md:animate-scale-in">', 'animate-scale-in'],
+    ['<p className="font-inter text-fg">', 'font-inter'],
+    ['<p className="text-primary">', 'text-primary'],
+    ['<a className="text-fg hover:text-primary">', 'text-primary'],
+    ['<span className="text-primary/50">', 'text-primary'],
+    ['<div className={`bg-primary-light ${x}`}>', 'bg-primary-light'],
+    ['<svg className="[&_path]:fill-primary">', 'fill-primary'],
+  ])('flags %s', (line, token) => {
+    const hits = findViolations('sample.tsx', line)
+    expect(hits).toHaveLength(1)
+    expect(hits[0]).toContain(`: ${token} (`)
+  })
+
+  it.each([
+    '<Button variant="primary">',
+    '<div className="my-glow-blob-x" />',
+    '<p className="xtext-primary">',
+    '<p className="animate-scale-in-out font-interface">',
+    '<p className="text-fg">Primary text</p>',
+    '// animate-modal-in, not the old scale-in keyframe: the keyframes must carry',
+    '<div className="text-primary" /> // ui-exception: self-test',
+  ])('passes %s', (line) => {
+    expect(findViolations('sample.tsx', line)).toEqual([])
   })
 })
 

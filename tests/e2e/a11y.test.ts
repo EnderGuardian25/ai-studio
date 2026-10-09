@@ -19,6 +19,7 @@ import {
 //   T11: brand kits — AC-07 (FR-08, one accent primary), AC-08 (FR-09, the
 //        kit-list region), AC-11 (FR-12) for rows 12, 13, 15, 16 and 17, and
 //        AC-15's kit part (FR-16, read-once swatches).
+//   T12: AC-09 (FR-10, tabular figures on the body).
 
 const MOCKED = () => !!(process.env.MOCK_AI && process.env.MOCK_PUPPETEER)
 
@@ -445,5 +446,22 @@ test.describe('Brand kits (T11)', () => {
       tag: 'INPUT',
       placeholder: 'e.g. Extract the brand voice and style from these references',
     })
+  })
+})
+
+// ── T12: tabular figures on the body (AC-09) ─────────────────────────────────
+
+test.describe('Body figures (T12)', () => {
+  test('AC-09: the body computes font-variant-numeric: tabular-nums, signed out and in', async ({ page }) => {
+    const bodyFigures = () => page.evaluate(() => getComputedStyle(document.body).fontVariantNumeric)
+
+    await page.goto('/login')
+    await expect(page.getByRole('button', { name: 'Sign in' })).toBeVisible()
+    expect(await bodyFigures()).toBe('tabular-nums')
+
+    await pageLogin(page)
+    await page.goto('/library')
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
+    expect(await bodyFigures()).toBe('tabular-nums')
   })
 })

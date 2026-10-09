@@ -227,7 +227,7 @@ There are **18 tasks in 3 waves**, all on `v2`. **The full clean mock E2E runs 3
 
       List both in the report as 014 superseding 011 expectations.
 
-- [ ] `T12` — Guard tokens and body `tabular-nums`
+- [x] `T12` — Guard tokens and body `tabular-nums`
   - Files: `tests/unit/uiTokenGuard.test.ts`, `src/components/ui/Modal.tsx`, `src/app/globals.css`, `tests/unit/designTokens.test.ts`, `tests/e2e/a11y.test.ts`, `docs/ui-reference/DESIGN_SYSTEM.md`
   - Estimate: small
   - Kind: impl
