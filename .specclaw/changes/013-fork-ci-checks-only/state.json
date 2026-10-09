@@ -1,9 +1,12 @@
 {
   "change": "013-fork-ci-checks-only",
-  "phase": "proposal",
-  "branch": "",
+  "phase": "build",
+  "branch": "v2",
   "size": "bounded",
   "phases": {
-    "proposal": { "status": "approved", "at": "2026-10-09T04:12:27Z" }
+    "proposal": { "status": "approved", "at": "2026-10-09T04:12:27Z" },
+    "spec": { "status": "done", "at": "2026-10-09T04:43:38Z" },
+    "tasks": { "status": "done", "at": "2026-10-09T04:43:39Z" },
+    "build": { "status": "in-progress", "at": "2026-10-09T04:55:05Z" }
   }
 }
