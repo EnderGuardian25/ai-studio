@@ -440,7 +440,12 @@ All buttons: `display: inline-flex`, `gap: 8px`, `--text-sm` 600, `white-space: 
 
 ### 8.5 Status chips
 
-22 px tall, 0 8 px padding, `--radius-sm`, `--text-2xs` (§5.2), uppercase, 0.14em, 600. Text in the status colour, fill the same colour at **0.10**, and a 1 px inset ring in `currentColor` (`box-shadow: inset 0 0 0 1px currentColor`). Every chip carries its text label: status is never colour alone. The ten chip states map onto the five tokens as in §3.2.
+22 px tall, 0 8 px padding, `--radius-sm`, `--text-2xs` (§5.2), uppercase, 0.14em, 600. Text in the status colour, fill the same colour at **0.10**, and a 1 px inset ring in `currentColor` (`box-shadow: inset 0 0 0 1px currentColor`). Every chip carries its text label: status is never colour alone. The ten chip states map onto the five tokens as in §3.2. A chip never shrinks or wraps (`flex-shrink-0 whitespace-nowrap`).
+
+`StatusChip` takes one of two props (014 FR-03):
+
+- **`status`:** one of the ten known states. The label comes from the chip.
+- **`tone` with `children`:** for a state the chip has no entry for (Connected, Not connected, Invalid — reconnect, Active, Deactivated, Revoked). `tone` is one of `published`, `draft`, `scheduled`, `failed` or `exported` and borrows that status's colours; `children` is the visible label. It replaces the old team `StatusWord`, with the same classes.
 
 ### 8.6 Sidebar nav and team switcher
 
@@ -511,6 +516,38 @@ The study regroups the draft page's action bar:
 - **Undo moves beside the versions** (§8.13).
 
 **FR-12 binds this layout.** Every control that exists today must still be present and reachable, with its accessible name and **role** unchanged. The E2E suite opens the inline editor with `getByRole('button', { name: 'Edit inline' })` (`tests/e2e/draft-inline-edit.test.ts`, six cases). An item inside a Radix menu is a `menuitem`, not a `button`, and is hidden until the menu opens. So T9 either keeps such controls as visible buttons styled per Folio, or moves them into a menu only where no role or name changes. The study's menu labels are illustrative; the app keeps its own (for example "Export" / "Re-export"). No new actions are added: the menu holds only controls the page already has.
+
+### 8.18 Page primitives
+
+The page heads, section heads, notices and field labels are shared components in `src/components/ui/` (014 FR-01). The class strings they are built from live in `src/components/ui/folio.ts`, for the few heads with a bespoke structure.
+
+**The components:**
+
+- **`PageHead({ eyebrow?, title, lead?, actions?, actionsClassName?, className? })`** renders the page's `h1`, always level 1. The eyebrow is small caps in `--fg-muted` above the title, which then takes `mt-2`. The lead is a `--text-sm` `--fg-muted` paragraph. `actions` sits on the right and drops below the title at 375 px. Its wrapper does not shrink below its content, so a button never overflows; a caller with a fixed-width control that should shrink at md widths (the library search) passes `actionsClassName="min-w-0"`.
+- **`PageTitle({ children, className? })`** is the `h1` alone, for detail pages whose head is a breadcrumb plus a title (a campaign, a project, a draft, choose-team).
+- **`SectionHead({ title, numeral?, level = 2, id?, className?, children? })`** renders an `h2` in the §8.14 section style, or with `level={3}` an `h3` in the §5.2 sub-head style.
+  - The numeral is an `aria-hidden` span outside the heading's name.
+  - `id` goes on the heading, for `aria-labelledby`.
+  - `children` is the right-hand tail (a status chip, a count, small buttons), at `--text-xs`.
+  - The row wraps at 375 px, and the tail keeps right.
+- **`Notice({ tone, role?, icon?, className?, children, ...rest })`** is a notice on its status tint (§3.2).
+  - Tones: `warning` (`--status-scheduled`), `error` (`--status-failed`) and `info` (`--accent`): the text in that colour on its 10 % fill, with a 1 px inset ring in `currentColor`.
+  - `neutral` is a `--surface-1` fill with `--fg` text and an explicit `--line` ring. The ring no longer depends on the text colour, so a child that sets no colour of its own reads in `--fg`, never in `--line`.
+  - It renders **no `role` of its own.** The caller passes `role="status"` or `role="alert"` where it wants one, and `role`, `aria-*` and `data-*` pass through.
+  - `icon` puts the icon and a flexible body in a row (`items-start`, 8 px gap). Use it only where the notice is that row; a notice with its own layout passes it in `className`.
+- **`FieldLabel({ htmlFor?, id?, as = 'label', className?, children })`** is a field label in small caps, `--fg-muted`. `as="span"` is for the caption of a group that carries its own `aria-label`.
+- **`StatusChip`** is §8.5.
+
+**The use rule.**
+
+- A screen uses the component wherever its head is "numeral + title + tail" or "eyebrow + title + lead + actions".
+- A bespoke heading uses the class strings from `ui/folio.ts` instead. Today that covers the dashboard's Activity and Recent Drafts heads, the campaigns group head with its link, the project head, the kit title with its inline marks, the brief `StepHead` and the admin `GateNotice`.
+
+**No primitive owns its outer margin.** The caller passes the spacing in `className`: `mb-8` after a page head (`mb-10` on `/brief`), `mb-3` under a section head, `pb-2.5` where a rule follows. Pass spacing only: `cn` is a plain join, so a `className` that repeats a property the primitive already sets is settled by CSS source order, not by the order of the classes.
+
+**The residue rule.** A screen group's own style module (`brief/cardCls.ts`, `campaigns/folio.ts`, `admin/brandkits/folio.ts`, `team/folio.tsx`) keeps only helpers that one screen group uses and that are defined nowhere else, composed from the `ui` atoms. For example `BLOCK`, `ROW` and `GateNotice` for team and settings. It never redefines a shared name.
+
+**The guard.** `tests/unit/uiTokenGuard.test.ts` fails when any file under `src/` outside `src/components/ui/` declares a `const` or `function` with a shared name, or spells out the small-caps tracking `tracking-[0.14em]`. The names are `FOCUS`, `SCROLL_FOCUS`, `SMALL_CAPS`, `EYEBROW`, `FIELD_LABEL`, `PAGE_TITLE`, `PAGE_LEAD`, `SECTION_HEAD`, `SECTION_NUMERAL`, `SUB_HEAD`, `KIT_TITLE`, `STEP_HEAD`, `STEP_NUMERAL`, `STEP_LEAD`, `GROUP_HEAD`, `ASIDE_HEAD`, `NOTICE`, `WARN_NOTICE`, `ICON`, `ICON_SM`, `ICON_BUTTON`, `TEXT_LINK`, `TAG`, `TABLE_HEAD_ROW`, `COMPACT_FIELD`, `PageHead`, `PageTitle`, `SectionHead`, `SectionHeader`, `Notice`, `FieldLabel` and `StatusWord`. A copy has no legitimate exception, so `// ui-exception:` does not apply to this guard. Import the atom, or give a genuinely different thing a different name (the shell's 36 px icon button is `SHELL_ICON_BUTTON`).
 
 ---
 

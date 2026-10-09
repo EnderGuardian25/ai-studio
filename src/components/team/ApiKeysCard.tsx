@@ -6,7 +6,10 @@ import { toast } from 'sonner'
 import { Plus, Copy, Trash2 } from 'lucide-react'
 import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
-import { BLOCK, ICON_SM, ROW, SectionHead, StatusWord } from './folio'
+import { SectionHead } from '@/components/ui/SectionHead'
+import { StatusChip } from '@/components/ui/StatusChip'
+import { ICON_SM } from '@/components/ui/folio'
+import { BLOCK, ROW } from './folio'
 import { Modal } from '@/components/ui/Modal'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { QueryError } from '@/components/ui/QueryError'
@@ -55,7 +58,7 @@ export function ApiKeysCard({ numeral }: { numeral?: string }) {
 
   return (
     <section>
-      <SectionHead numeral={numeral} title="API keys">
+      <SectionHead numeral={numeral} title="API keys" className="mb-3">
         <Button size="sm" variant="secondary" onClick={() => setCreateOpen(true)}>
           <Plus {...ICON_SM} /> Create key
         </Button>
@@ -80,7 +83,7 @@ export function ApiKeysCard({ numeral }: { numeral?: string }) {
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="min-w-0 break-words text-ui-base font-medium text-fg">{k.label}</span>
-                      {k.revokedAt && <StatusWord tone="failed">Revoked</StatusWord>}
+                      {k.revokedAt && <StatusChip tone="failed">Revoked</StatusChip>}
                     </div>
                     <p className="mt-0.5 text-ui-xs text-fg-muted">
                       <span className="font-mono">{k.keyPrefix}••••</span> · created {new Date(k.createdAt).toLocaleDateString()}

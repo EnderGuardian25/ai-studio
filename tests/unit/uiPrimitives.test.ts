@@ -39,11 +39,18 @@ describe('PageHead', () => {
     expect(html).toContain(`<h1 class="mt-2 ${attr(PAGE_TITLE)}">Dashboard</h1>`)
     expect(html).toContain(`<p class="${PAGE_LEAD}">The lead.</p>`)
     expect(html).toContain(
-      '<div class="flex min-w-0 flex-wrap items-center gap-2"><button>New</button></div>',
+      '<div class="flex flex-wrap items-center gap-2"><button>New</button></div>',
     )
     expect(html).toMatch(
       /^<div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between mb-8">/,
     )
+  })
+
+  it('adds actionsClassName to the actions wrapper (the library search opt-in)', () => {
+    const html = renderToStaticMarkup(
+      h(PageHead, { title: 'Library', actions: h('input', null), actionsClassName: 'min-w-0' }),
+    )
+    expect(html).toContain('<div class="flex flex-wrap items-center gap-2 min-w-0"><input/></div>')
   })
 
   it('renders only the h1 when there is no eyebrow, lead or actions, and adds no margin', () => {

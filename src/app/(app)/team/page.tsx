@@ -9,25 +9,23 @@ import { Input } from '@/components/ui/Input'
 import { Panel } from '@/components/ui/Panel'
 import { SegmentedToggle } from '@/components/ui/SegmentedToggle'
 import { QueryError } from '@/components/ui/QueryError'
-import { TeamClaudeTokenCard } from '@/components/team/TeamClaudeTokenCard'
-import { ApiKeysCard } from '@/components/team/ApiKeysCard'
+import { PageHead } from '@/components/ui/PageHead'
+import { SectionHead } from '@/components/ui/SectionHead'
+import { Notice } from '@/components/ui/Notice'
+import { StatusChip } from '@/components/ui/StatusChip'
 import {
-  BLOCK,
+  EYEBROW,
   FOCUS,
-  GateNotice,
-  GROUP_HEAD,
   ICON,
   ICON_BUTTON,
   ICON_SM,
-  PageHead,
-  ROW,
-  SectionHead,
   SMALL_CAPS,
-  StatusWord,
   SUB_HEAD,
   TAG,
-  WARN_NOTICE,
-} from '@/components/team/folio'
+} from '@/components/ui/folio'
+import { TeamClaudeTokenCard } from '@/components/team/TeamClaudeTokenCard'
+import { ApiKeysCard } from '@/components/team/ApiKeysCard'
+import { BLOCK, GateNotice, ROW } from '@/components/team/folio'
 import { apiFetch } from '@/lib/apiFetch'
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser'
 import { pickServingImageProvider } from '@/providers/imageCapabilities'
@@ -329,8 +327,8 @@ function ChannelRow({
           <span className="text-ui-base font-medium text-fg">{label}</span>
         </div>
         {status.connected
-          ? <StatusWord tone="published">Connected</StatusWord>
-          : <StatusWord tone="draft">Not connected</StatusWord>}
+          ? <StatusChip tone="published">Connected</StatusChip>
+          : <StatusChip tone="draft">Not connected</StatusChip>}
       </div>
 
       <div className="space-y-2">
@@ -395,12 +393,12 @@ function ImageDefaultState({ rows, onRefresh }: { rows: Provider[]; onRefresh: (
 
   if (!serving) {
     return (
-      <div data-testid="image-default-state" data-state="none" role="status" className={WARN_NOTICE}>
+      <Notice tone="warning" data-testid="image-default-state" data-state="none" role="status">
         <p className="font-semibold">No image provider</p>
         <p className="mt-1 text-ui-xs text-fg">
           Teammates without a personal OpenAI key get no AI backgrounds.
         </p>
-      </div>
+      </Notice>
     )
   }
   if (serving.isDefault) {
@@ -411,14 +409,20 @@ function ImageDefaultState({ rows, onRefresh }: { rows: Provider[]; onRefresh: (
     )
   }
   return (
-    <div data-testid="image-default-state" data-state="fallback" role="status" className={`${WARN_NOTICE} flex flex-wrap items-center gap-3`}>
+    <Notice
+      tone="warning"
+      data-testid="image-default-state"
+      data-state="fallback"
+      role="status"
+      className="flex flex-wrap items-center gap-3"
+    >
       <p className="min-w-0 flex-1 text-ui-xs text-fg">
         No default set — teammates are using <span className="font-semibold">{serving.label}</span> (the oldest enabled image provider).
       </p>
       <Button variant="secondary" size="sm" onClick={() => makeDefault(serving.id)} disabled={busy}>
         Make default
       </Button>
-    </div>
+    </Notice>
   )
 }
 
@@ -473,7 +477,7 @@ function ProvidersSection() {
 
       {visibleSlots.map(slot => (
         <div key={slot} className="space-y-3">
-          <h3 className={GROUP_HEAD}>
+          <h3 className={EYEBROW}>
             {slot === 'COPY' ? 'Copy (text generation)' : 'Image generation'}
           </h3>
           {slot === 'COPY' && cliMode && (
@@ -576,18 +580,19 @@ export default function TeamSettingsPage() {
         eyebrow="Admin"
         title="Team settings"
         lead="Providers, channels, and credentials shared by everyone on this team."
+        className="mb-8"
       />
 
       <div className="flex flex-col gap-12">
         <section>
-          <SectionHead numeral="i." title="AI Providers" />
+          <SectionHead numeral="i." title="AI Providers" className="mb-3" />
           <div className={BLOCK}>
             <ProvidersSection />
           </div>
         </section>
 
         <section>
-          <SectionHead numeral="ii." title="Social Channels" />
+          <SectionHead numeral="ii." title="Social Channels" className="mb-3" />
           <div className={BLOCK}>
             <ChannelsSection />
           </div>

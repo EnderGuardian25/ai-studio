@@ -6,7 +6,11 @@ import { toast } from 'sonner'
 import { Unplug } from 'lucide-react'
 import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
-import { BLOCK, ICON, SectionHead, StatusWord, WARN_NOTICE } from '@/components/team/folio'
+import { SectionHead } from '@/components/ui/SectionHead'
+import { Notice } from '@/components/ui/Notice'
+import { StatusChip } from '@/components/ui/StatusChip'
+import { ICON } from '@/components/ui/folio'
+import { BLOCK } from '@/components/team/folio'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { apiFetch } from '@/lib/apiFetch'
 import type { OpenAiKeyInfo } from '@/lib/api-types'
@@ -22,9 +26,9 @@ import type { OpenAiKeyInfo } from '@/lib/api-types'
 const QUERY_KEY = ['me', 'openai-key'] as const
 
 function statusPill(info: OpenAiKeyInfo) {
-  if (!info.connected) return <StatusWord tone="draft">Not connected</StatusWord>
-  if (info.status === 'INVALID') return <StatusWord tone="scheduled">Invalid — reconnect</StatusWord>
-  return <StatusWord tone="published">Connected</StatusWord>
+  if (!info.connected) return <StatusChip tone="draft">Not connected</StatusChip>
+  if (info.status === 'INVALID') return <StatusChip tone="scheduled">Invalid — reconnect</StatusChip>
+  return <StatusChip tone="published">Connected</StatusChip>
 }
 
 export function OpenAiKeyCard({ numeral }: { numeral?: string }) {
@@ -76,7 +80,7 @@ export function OpenAiKeyCard({ numeral }: { numeral?: string }) {
 
   return (
     <section>
-      <SectionHead numeral={numeral} title="OpenAI key">
+      <SectionHead numeral={numeral} title="OpenAI key" className="mb-3">
         {!isLoading && statusPill(info)}
       </SectionHead>
 
@@ -86,12 +90,12 @@ export function OpenAiKeyCard({ numeral }: { numeral?: string }) {
         </p>
 
         {info.connected && info.status === 'INVALID' && (
-          <div className={WARN_NOTICE}>
+          <Notice tone="warning">
             <span className="text-fg">
               Your OpenAI key was rejected on a recent generation — reconnect below. Until then image
               generation uses the team&apos;s configured provider.
             </span>
-          </div>
+          </Notice>
         )}
 
         {info.connected && (

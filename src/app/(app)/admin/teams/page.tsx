@@ -11,19 +11,17 @@ import { Input } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { Modal } from '@/components/ui/Modal'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
+import { PageHead } from '@/components/ui/PageHead'
+import { SectionHead } from '@/components/ui/SectionHead'
 import {
-  BLOCK,
   FOCUS,
-  GateNotice,
   ICON,
   ICON_BUTTON,
   ICON_SM,
-  PageHead,
-  ROW,
   SCROLL_FOCUS,
-  SectionHead,
   TABLE_HEAD_ROW,
-} from '@/components/team/folio'
+} from '@/components/ui/folio'
+import { BLOCK, GateNotice, ROW } from '@/components/team/folio'
 import type { AdminTeamSummary, AdminTeamMember } from '@/lib/api-types'
 
 // Super-admin platform-wide team management — models admin/users/page.tsx
@@ -100,11 +98,13 @@ export default function AdminTeamsPage() {
         eyebrow="Admin"
         title="Teams"
         lead="Every team on the platform. Manage membership below a selected row."
-      >
-        <Button onClick={() => setAddOpen(true)}>
-          <Plus {...ICON} /> Add team
-        </Button>
-      </PageHead>
+        className="mb-8"
+        actions={
+          <Button onClick={() => setAddOpen(true)}>
+            <Plus {...ICON} /> Add team
+          </Button>
+        }
+      />
 
       {/* A Folio data table (§8.15), in a focusable, labelled scroll region;
           `relative` contains the sr-only Actions header at 375 px. */}
@@ -389,7 +389,7 @@ function TeamMembersPanel({
 
   return (
     <section className="mt-12">
-      <SectionHead title={`Members of ${team.name}`}>
+      <SectionHead title={`Members of ${team.name}`} className="mb-3">
         <button
           type="button"
           onClick={onClose}

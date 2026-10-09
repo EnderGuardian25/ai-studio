@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { Check, Copy } from 'lucide-react'
-import { FOCUS, ICON, ICON_BUTTON, TEXT_LINK } from '@/components/team/folio'
+import { FOCUS, ICON, ICON_BUTTON, TEXT_LINK } from '@/components/ui/folio'
 
 // Step-by-step "install Claude Code and get a token" walkthrough, shared by the
 // personal (/settings) and team (/team) Claude cards. Commands mirror

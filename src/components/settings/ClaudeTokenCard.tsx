@@ -9,7 +9,11 @@ import { Button } from '@/components/ui/Button'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { apiFetch } from '@/lib/apiFetch'
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser'
-import { BLOCK, ICON, NOTICE, SectionHead, StatusWord, SUB_HEAD, WARN_NOTICE } from '@/components/team/folio'
+import { SectionHead } from '@/components/ui/SectionHead'
+import { Notice } from '@/components/ui/Notice'
+import { StatusChip } from '@/components/ui/StatusChip'
+import { ICON, SUB_HEAD } from '@/components/ui/folio'
+import { BLOCK } from '@/components/team/folio'
 import { ClaudeConnectGuide } from './ClaudeConnectGuide'
 import type { ClaudeTokenInfo } from '@/lib/api-types'
 
@@ -21,9 +25,9 @@ import type { ClaudeTokenInfo } from '@/lib/api-types'
 const QUERY_KEY = ['me', 'claude-token'] as const
 
 function statusPill(info: ClaudeTokenInfo) {
-  if (!info.connected) return <StatusWord tone="draft">Not connected</StatusWord>
-  if (info.status === 'INVALID') return <StatusWord tone="scheduled">Invalid — reconnect</StatusWord>
-  return <StatusWord tone="published">Connected</StatusWord>
+  if (!info.connected) return <StatusChip tone="draft">Not connected</StatusChip>
+  if (info.status === 'INVALID') return <StatusChip tone="scheduled">Invalid — reconnect</StatusChip>
+  return <StatusChip tone="published">Connected</StatusChip>
 }
 
 export function ClaudeTokenCard({ numeral }: { numeral?: string }) {
@@ -80,7 +84,7 @@ export function ClaudeTokenCard({ numeral }: { numeral?: string }) {
 
   return (
     <section>
-      <SectionHead numeral={numeral} title="Claude account">
+      <SectionHead numeral={numeral} title="Claude account" className="mb-3">
         {!isLoading && statusPill(info)}
       </SectionHead>
 
@@ -90,21 +94,21 @@ export function ClaudeTokenCard({ numeral }: { numeral?: string }) {
         </p>
 
         {info.connected && info.status === 'INVALID' && (
-          <div className={WARN_NOTICE}>
+          <Notice tone="warning">
             <span className="text-fg">
               Your Claude token has expired or was revoked — reconnect below. Until then your
               generations use the team&apos;s Claude account if one is set, otherwise they can&apos;t run.
             </span>
-          </div>
+          </Notice>
         )}
 
         {!cliMode && (
-          <div className={`${NOTICE} bg-surface text-line`}>
+          <Notice tone="neutral">
             <span className="text-fg-muted">
               This server currently runs in API mode — a saved token is kept but only used when
               CLI-mode generation is active.
             </span>
-          </div>
+          </Notice>
         )}
 
         {info.connected && (

@@ -145,7 +145,7 @@ There are **18 tasks in 3 waves**, all on `v2`. **The full clean mock E2E runs 3
     - **`SectionHeader` (`shared.tsx`) is deleted.** Its 6 uses become `SectionHead level={3} className="mb-3"`, with `action` passed as children (**D2**: tail `gap-x` 12 → 14 px plus `text-ui-xs`, expected drift).
     - **The kit name `h2`** keeps its own flex row, with ui `SECTION_HEAD`. The page head → `PageHead className="mb-8"` with Add Kit in `actions`.
 
-- [ ] `T8` — Team, settings and admin onto the primitives; `StatusWord` folded; name guard; docs
+- [x] `T8` — Team, settings and admin onto the primitives; `StatusWord` folded; name guard; docs
   - Files: `src/app/(app)/team/page.tsx`, `settings/page.tsx`, `admin/users/page.tsx`, `admin/teams/page.tsx`, `admin/layout.tsx`, `src/components/team/folio.tsx`, `ApiKeysCard.tsx`, `TeamClaudeTokenCard.tsx`, `src/components/settings/ClaudeTokenCard.tsx`, `ClaudeTokenPrompt.tsx`, `OpenAiKeyCard.tsx`, `ChangePasswordCard.tsx`, `ClaudeConnectGuide.tsx`, `tests/unit/uiTokenGuard.test.ts`, `docs/ui-reference/DESIGN_SYSTEM.md`
   - Estimate: medium
   - Kind: refactor

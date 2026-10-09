@@ -150,6 +150,7 @@ export default function LibraryPage() {
         title="Library"
         lead="All exported drafts and published posts."
         className="mb-8"
+        actionsClassName="min-w-0"
         actions={
           <div className="relative w-full sm:w-72">
             <Search

@@ -6,7 +6,10 @@ import { toast } from 'sonner'
 import { Unplug } from 'lucide-react'
 import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
-import { BLOCK, ICON, SectionHead, StatusWord, SUB_HEAD } from './folio'
+import { SectionHead } from '@/components/ui/SectionHead'
+import { StatusChip } from '@/components/ui/StatusChip'
+import { ICON, SUB_HEAD } from '@/components/ui/folio'
+import { BLOCK } from './folio'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { apiFetch } from '@/lib/apiFetch'
 import type { TeamClaudeTokenInfo } from '@/lib/api-types'
@@ -21,8 +24,8 @@ import { ClaudeConnectGuide } from '@/components/settings/ClaudeConnectGuide'
 const QUERY_KEY = ['team', 'claude-token'] as const
 
 function statusPill(info: TeamClaudeTokenInfo) {
-  if (!info.connected) return <StatusWord tone="draft">Not connected</StatusWord>
-  return <StatusWord tone="published">Connected</StatusWord>
+  if (!info.connected) return <StatusChip tone="draft">Not connected</StatusChip>
+  return <StatusChip tone="published">Connected</StatusChip>
 }
 
 export function TeamClaudeTokenCard({ numeral }: { numeral?: string }) {
@@ -74,7 +77,7 @@ export function TeamClaudeTokenCard({ numeral }: { numeral?: string }) {
 
   return (
     <section>
-      <SectionHead numeral={numeral} title="Team Claude account">
+      <SectionHead numeral={numeral} title="Team Claude account" className="mb-3">
         {!isLoading && statusPill(info)}
       </SectionHead>
 

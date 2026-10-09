@@ -10,16 +10,10 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Modal } from '@/components/ui/Modal'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
-import {
-  GateNotice,
-  ICON,
-  ICON_SM,
-  PageHead,
-  SCROLL_FOCUS,
-  StatusWord,
-  TABLE_HEAD_ROW,
-  TAG,
-} from '@/components/team/folio'
+import { PageHead } from '@/components/ui/PageHead'
+import { StatusChip } from '@/components/ui/StatusChip'
+import { ICON, ICON_SM, SCROLL_FOCUS, TABLE_HEAD_ROW, TAG } from '@/components/ui/folio'
+import { GateNotice } from '@/components/team/folio'
 
 interface ManagedUser {
   id: string
@@ -40,8 +34,8 @@ function loginLabel(u: ManagedUser): string {
 
 function StatusPill({ disabled }: { disabled: boolean }) {
   return disabled
-    ? <StatusWord tone="failed">Deactivated</StatusWord>
-    : <StatusWord tone="published">Active</StatusWord>
+    ? <StatusChip tone="failed">Deactivated</StatusChip>
+    : <StatusChip tone="published">Active</StatusChip>
 }
 
 export default function AdminUsersPage() {
@@ -108,11 +102,13 @@ export default function AdminUsersPage() {
         eyebrow="Admin"
         title="Users"
         lead="Create accounts and manage roles. Share initial passwords out-of-band."
-      >
-        <Button onClick={() => setAddOpen(true)}>
-          <Plus {...ICON} /> Add user
-        </Button>
-      </PageHead>
+        className="mb-8"
+        actions={
+          <Button onClick={() => setAddOpen(true)}>
+            <Plus {...ICON} /> Add user
+          </Button>
+        }
+      />
 
       {/* A Folio data table (§8.15). It scrolls inside its own container at
           narrow widths, so the container is a focusable, labelled region with

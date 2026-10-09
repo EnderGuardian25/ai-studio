@@ -4,7 +4,8 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { X, KeyRound } from 'lucide-react'
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser'
-import { FOCUS, ICON, ICON_BUTTON, NOTICE, TEXT_LINK } from '@/components/team/folio'
+import { Notice } from '@/components/ui/Notice'
+import { FOCUS, ICON, ICON_BUTTON, TEXT_LINK } from '@/components/ui/folio'
 
 // Dismissible post-login banner nudging the user to connect (or reconnect)
 // their personal Claude account. Rendered only in CLI mode — the only mode
@@ -48,11 +49,7 @@ export function ClaudeTokenPrompt() {
   // A notice (§3.2): ochre for an invalid token (a warning state), a neutral
   // hairline nudge otherwise. Opaque and in-flow.
   return (
-    <div
-      className={`${NOTICE} mb-6 flex items-center gap-3 ${
-        invalid ? 'bg-status-scheduled/10 text-status-scheduled' : 'bg-surface text-line'
-      }`}
-    >
+    <Notice tone={invalid ? 'warning' : 'neutral'} className="mb-6 flex items-center gap-3">
       <KeyRound {...ICON} aria-hidden className={`shrink-0 ${invalid ? '' : 'text-fg-muted'}`} />
       <p className="flex-1 text-ui-sm text-fg">
         {invalid
@@ -70,6 +67,6 @@ export function ClaudeTokenPrompt() {
       >
         <X {...ICON} />
       </button>
-    </div>
+    </Notice>
   )
 }

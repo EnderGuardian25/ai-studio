@@ -4,7 +4,8 @@ import React, { useState } from 'react'
 import { toast } from 'sonner'
 import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
-import { BLOCK, SectionHead } from '@/components/team/folio'
+import { SectionHead } from '@/components/ui/SectionHead'
+import { BLOCK } from '@/components/team/folio'
 import { authClient } from '@/lib/auth-client'
 
 // Self-service password change. better-auth's base client always exposes
@@ -61,7 +62,7 @@ export function ChangePasswordCard({ numeral }: { numeral?: string }) {
 
   return (
     <section>
-      <SectionHead numeral={numeral} title="Password" />
+      <SectionHead numeral={numeral} title="Password" className="mb-3" />
 
       <div className={`${BLOCK} flex flex-col gap-5`}>
         <p className="text-ui-sm text-fg-muted">
