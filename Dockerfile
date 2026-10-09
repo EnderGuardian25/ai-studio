@@ -1,5 +1,5 @@
 # ─── Stage 1: deps ───────────────────────────────────────────────────────────
-FROM node:20-alpine AS deps
+FROM node:22-alpine AS deps
 WORKDIR /app
 
 # libc compat for Prisma's OpenSSL engine on Alpine; chromium for Puppeteer rendering.
@@ -12,7 +12,7 @@ COPY package.json package-lock.json* ./
 RUN npm ci --omit=dev --ignore-scripts
 
 # ─── Stage 2: builder ────────────────────────────────────────────────────────
-FROM node:20-alpine AS builder
+FROM node:22-alpine AS builder
 WORKDIR /app
 
 # openssl: required for `prisma generate` to detect OpenSSL 3 and download the
@@ -57,7 +57,7 @@ RUN npx esbuild src/scheduler/worker.ts \
     --external:@prisma/client
 
 # ─── Stage 3: runner ─────────────────────────────────────────────────────────
-FROM node:20-alpine AS runner
+FROM node:22-alpine AS runner
 WORKDIR /app
 
 # openssl: Prisma's runtime OpenSSL detection needs it (see builder stage note).
@@ -136,6 +136,17 @@ EXPOSE 3000
 
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
+
+# Commit SHA the image was built from (FR-P0-3) — passed as a build-arg by CI
+# (build-args: GIT_SHA=${{ github.sha }} in docker-publish.yml), not a secret.
+# Declared here, after every COPY/RUN layer above (still after `npm run build`
+# in the builder stage, so the force-dynamic reasoning in /api/health still
+# holds — this only changes which layer a new commit invalidates) so a new
+# SHA on every commit stops busting the Docker layer cache for the user setup
+# and COPY layers above; the app reads it at request time via src/lib/env.ts
+# (falls back to "unknown" when unset, e.g. local `docker build`).
+ARG GIT_SHA
+ENV GIT_SHA=$GIT_SHA
 
 # Migrations run on every boot, for both resources — the scheduler's CMD override
 # still passes through the entrypoint. See docker-entrypoint.sh for the advisory
