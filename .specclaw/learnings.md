@@ -260,3 +260,20 @@ sr-only (absolutely positioned) cells inside an overflow-x-auto container widen 
 Default scroll containers to relative; the AC-12 375px no-horizontal-scroll check catches it
 
 ---
+
+## [L16] design_gap — File .gitignore modified but not declared in any task: sp...
+
+**When:** 2026-10-09 17:20 UTC
+**Category:** design_gap
+**Priority:** low
+**Status:** pending
+
+### Detail
+
+File .gitignore modified but not declared in any task: specclaw-build setup's .lock/meta.json was swept into the plan commit, so .specclaw/changes/*/.lock/ was added to .gitignore (4b04e6cb)
+
+### Action
+
+Ignore .lock/ dirs from specclaw init onward
+
+---

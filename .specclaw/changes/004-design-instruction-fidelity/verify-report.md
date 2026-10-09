@@ -2,9 +2,9 @@
 
 **Verified:** 2026-10-01
 **Model:** Claude Opus 5.5 (claude-opus-5-5[1m])
-**Verdict:** PARTIAL (as of 2026-10-09, only AC-P0-4 is pending)
+**Verdict:** PASS (as of 2026-10-09, after the Phase 0 closure in the fork; it was PARTIAL on 2026-10-01)
 
-**Update (2026-10-09):** Phase 0 is now closed in the fork, except for one criterion. AC-P0-3 and AC-P0-5 pass on the merged `v2`. AC-P0-1 and AC-P0-2 are superseded by change 013, because the fork has no deploy target. **Only AC-P0-4 is pending:** it is read from the first `v2` CI run's annotations, which 013 T3 fills in. See "Phase 0 closure in the fork (2026-10-09)" at the end. The original 2026-10-01 verdict and reasons are kept below for history.
+**Update (2026-10-09):** Phase 0 is now closed in the fork. AC-P0-3 and AC-P0-5 pass on the merged `v2`. AC-P0-1 and AC-P0-2 are superseded by change 013, because the fork has no deploy target. **AC-P0-4 passes:** the first `v2` CI run ([run 37886671270](https://github.com/EnderGuardian25/ai-studio/actions/runs/37886671270), all 3 jobs green) shows no Node-20 deprecation annotation. See "Phase 0 closure in the fork (2026-10-09)" at the end. The original 2026-10-01 verdict and reasons are kept below for history.
 
 Target: branch `v2`, HEAD `f8a6aa3f`. This was a read-only verify. The only commands run were focused vitest files (7 files, 673/673 passed), greps and reads, and read-only `gh` queries.
 
@@ -331,6 +331,6 @@ The deferred can-wait items are in `.superpowers/sdd/tasks/final-{1,2,3}-review.
   - The same evidence closes 005's AC-17 re-check under node:22 (PASS).
 - ⏭️ **AC-P0-1: superseded by change 013.** The Coolify redeploy step it tested lived in `docker-publish.yml`, which was deleted by user decision on 2026-10-09. The fork has no deploy target, so there is no redeploy to fail or retry.
 - ⏭️ **AC-P0-2: superseded by change 013,** for the same reason. There is no prod for the fork, so there is no deployed `/api/health` SHA for CI to verify. A future deploy workflow for the user's own target should carry its own version of this check.
-- ⏳ **AC-P0-4: pending the first `v2` CI run.** `docker-publish.yml` no longer exists, so only `e2e.yml` remains to check. Actions are off on the fork until 013 T3 pushes 013 and turns them back on; 013 T3 records the first run's annotations here.
+- ✅ **AC-P0-4: no Node-20 deprecation warnings.** The first `v2` CI run, [run 37886671270](https://github.com/EnderGuardian25/ai-studio/actions/runs/37886671270) (2026-10-09, `cc92ba0a`): e2e, unit and build all ✓. Its only annotations are GitHub's notice that `ubuntu-latest` moves to Ubuntu 26 from 2026-10-19. There is no Node-20 deprecation annotation. `docker-publish.yml` no longer exists, so `e2e.yml` is the only workflow to check.
 
-**Phase 0 now:** 2 passed, 2 superseded, 1 pending. **Verdict:** still PARTIAL, but only AC-P0-4 remains. Once the first `v2` run shows no Node-20 deprecation annotations, 004 is complete.
+**Phase 0 now:** 3 passed, 2 superseded. **Verdict: PASS.** Phases 1–3 were already 29/29 after the F3 addendum (AC-04).

@@ -27,7 +27,7 @@ Delete `docker-publish.yml`, add `v2` to `e2e.yml`, and fix the comments that na
 
 ### Wave 2 — Turn CI on
 
-- [ ] `T3` — Push v2, re-enable Actions, and watch the first run
+- [x] `T3` — Push v2, re-enable Actions, and watch the first run
   - Files: none, unless an approved NFR-02 fix touches `.github/workflows/e2e.yml`, plus `reports/T3.md` and the 004 verify-report's AC-P0-4 line
   - Estimate: small
   - Kind: config
