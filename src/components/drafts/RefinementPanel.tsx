@@ -4,8 +4,9 @@ import React, { useEffect, useRef, useState } from 'react'
 import { Send as SendIcon, Loader2, AlertTriangle, Check } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/Button'
-import { SectionHead } from '@/components/drafts/SectionHead'
-import { FOCUS, ICON, NOTICE, SECTION, SMALL_CAPS } from '@/components/drafts/folio'
+import { Notice } from '@/components/ui/Notice'
+import { SectionHead } from '@/components/ui/SectionHead'
+import { FOCUS, ICON, SCROLL_FOCUS, SMALL_CAPS } from '@/components/ui/folio'
 import { NotAppliedCard } from '@/components/drafts/NotAppliedCard'
 import { apiFetch } from '@/lib/apiFetch'
 import type { DraftAction, DraftNotApplied } from '@/lib/api-types'
@@ -204,8 +205,8 @@ export function RefinementPanel({
   const busy = running || pendingAction !== null || awaitingResolution || adopting
 
   return (
-    <section className={SECTION}>
-      <SectionHead numeral="ii." title="Refine Design">
+    <section className="pt-[22px] pb-1.5">
+      <SectionHead numeral="ii." title="Refine Design" className="mb-3">
         {messages.length > 0 && (
           <span className="text-fg-muted">
             {messages.length} {messages.length === 1 ? 'request' : 'requests'}
@@ -218,7 +219,7 @@ export function RefinementPanel({
           (WCAG 2.1.1, the T7 rule). */}
       <div
         ref={listRef}
-        className="mb-4 max-h-72 overflow-y-auto focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus"
+        className={`mb-4 max-h-72 overflow-y-auto ${SCROLL_FOCUS}`}
         {...(messages.length > 0 ? { role: 'region', 'aria-label': 'Refine requests', tabIndex: 0 } : {})}
       >
         {messages.length === 0 ? (
@@ -279,28 +280,27 @@ export function RefinementPanel({
       )}
 
       {conflictCard && (
-        <div className={`${NOTICE} mb-4 animate-fade-in bg-status-scheduled/10 text-status-scheduled`}>
-          <div className="flex items-start gap-2">
-            <AlertTriangle {...ICON} className="mt-0.5 flex-shrink-0" aria-hidden />
-            <div className="min-w-0 flex-1">
-              <p className="font-semibold">This change conflicts with the brand kit</p>
-              <p className="mt-1 text-ui-xs text-fg">{conflictCard.explanation}</p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => send(conflictCard.instruction, conflictCard.conflictId)}
-                  disabled={busy}
-                >
-                  Override
-                </Button>
-                <Button variant="ghost" size="sm" onClick={() => setConflictCard(null)} disabled={busy}>
-                  Cancel
-                </Button>
-              </div>
-            </div>
+        <Notice
+          tone="warning"
+          icon={<AlertTriangle {...ICON} className="mt-0.5 flex-shrink-0" aria-hidden />}
+          className="mb-4 animate-fade-in"
+        >
+          <p className="font-semibold">This change conflicts with the brand kit</p>
+          <p className="mt-1 text-ui-xs text-fg">{conflictCard.explanation}</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => send(conflictCard.instruction, conflictCard.conflictId)}
+              disabled={busy}
+            >
+              Override
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => setConflictCard(null)} disabled={busy}>
+              Cancel
+            </Button>
           </div>
-        </div>
+        </Notice>
       )}
 
       {/* Suggestions (§8.14): text buttons with a dotted underline. */}

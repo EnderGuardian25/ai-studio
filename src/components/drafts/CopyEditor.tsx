@@ -4,8 +4,8 @@ import React, { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { Loader2, Check, Sparkles, Undo2, AlertTriangle } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
-import { SectionHead } from '@/components/drafts/SectionHead'
-import { ICON, SECTION } from '@/components/drafts/folio'
+import { SectionHead } from '@/components/ui/SectionHead'
+import { ICON } from '@/components/ui/folio'
 import { apiFetch } from '@/lib/apiFetch'
 import { channelLabel, channelCopyLimit } from '@/lib/channels'
 import { useUndoableAction } from '@/lib/hooks/useUndoableAction'
@@ -137,8 +137,8 @@ export function CopyEditor({ draft, onSaved, onActionStarted }: CopyEditorProps)
   const busy = regenerating || undoAction.undoing
 
   return (
-    <section className={SECTION}>
-      <SectionHead numeral="i." title="Copy">
+    <section className="pt-[22px] pb-1.5">
+      <SectionHead numeral="i." title="Copy" className="mb-3">
         {copyActionPending ? (
           <span className="flex items-center gap-1.5 text-fg-muted">
             <Loader2 {...ICON} className="animate-spin" aria-hidden /> Regenerating…

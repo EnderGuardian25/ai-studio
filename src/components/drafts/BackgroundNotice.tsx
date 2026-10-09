@@ -4,7 +4,8 @@ import Link from 'next/link'
 import { ImageOff } from 'lucide-react'
 import type { BackgroundSkipped } from '@/lib/drafts/backgroundNotice'
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser'
-import { FOCUS, ICON, NOTICE } from '@/components/drafts/folio'
+import { Notice } from '@/components/ui/Notice'
+import { FOCUS, ICON } from '@/components/ui/folio'
 
 export interface BackgroundNoticeProps {
   skipped: BackgroundSkipped
@@ -31,27 +32,24 @@ export function BackgroundNotice({ skipped }: BackgroundNoticeProps) {
   // Amber stays amber: Folio's warning colour is --status-scheduled (§3.2), as
   // a notice on its own 10 % tint (the pair §3.3 checks).
   return (
-    <div
+    <Notice
+      tone="warning"
       role="status"
       data-testid="background-notice"
       data-reason={skipped.reason}
-      className={`${NOTICE} mt-4 bg-status-scheduled/10 text-status-scheduled`}
+      icon={<ImageOff {...ICON} className="mt-0.5 flex-shrink-0" aria-hidden="true" />}
+      className="mt-4"
     >
-      <div className="flex items-start gap-2">
-        <ImageOff {...ICON} className="mt-0.5 flex-shrink-0" aria-hidden="true" />
-        <div className="min-w-0 flex-1">
-          <p className="font-semibold">No AI background</p>
-          <p className="mt-1 text-ui-xs text-fg">{skipped.message}</p>
-          {link && (
-            <Link
-              href={link.href}
-              className={`mt-1.5 inline-block text-ui-xs font-semibold underline decoration-current underline-offset-4 ${FOCUS}`}
-            >
-              {link.label}
-            </Link>
-          )}
-        </div>
-      </div>
-    </div>
+      <p className="font-semibold">No AI background</p>
+      <p className="mt-1 text-ui-xs text-fg">{skipped.message}</p>
+      {link && (
+        <Link
+          href={link.href}
+          className={`mt-1.5 inline-block text-ui-xs font-semibold underline decoration-current underline-offset-4 ${FOCUS}`}
+        >
+          {link.label}
+        </Link>
+      )}
+    </Notice>
   )
 }

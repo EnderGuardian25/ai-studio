@@ -14,7 +14,7 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Input, fieldClasses, fieldEdge, fieldErrorClasses, fieldLabelClasses } from '@/components/ui/Input'
-import { NOTICE } from '@/components/drafts/folio'
+import { Notice } from '@/components/ui/Notice'
 import type { ElementEditKind } from '@/lib/drafts/inlineEdit'
 import {
   cssColorToHex,
@@ -176,10 +176,7 @@ function NoticeBanner({
   onUseWholeDocument: () => void
 }) {
   return (
-    <div
-      role="alert"
-      className={`${NOTICE} flex flex-col gap-2 bg-status-scheduled/10 text-ui-xs text-status-scheduled`}
-    >
+    <Notice tone="warning" role="alert" className="flex flex-col gap-2 text-ui-xs">
       <p className="flex items-start gap-2">
         <AlertTriangle size={14} className="mt-0.5 shrink-0" aria-hidden />
         <span>{notice.message}</span>
@@ -194,7 +191,7 @@ function NoticeBanner({
           Use the whole-document editor
         </Button>
       )}
-    </div>
+    </Notice>
   )
 }
 

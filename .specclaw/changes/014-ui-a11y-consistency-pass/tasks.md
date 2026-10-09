@@ -100,7 +100,7 @@ There are **18 tasks in 3 waves**, all on `v2`. **The full clean mock E2E runs 3
     - **`ReviewStep` notices → `Notice`:** `warning` (`:93`), `error` (`:100`) and `info` (`:106`), with the same extra classes.
     - **`Stepper.tsx:52`'s literal → `SMALL_CAPS`.** `ContentStep`'s local `SCROLL_FOCUS` comes from ui.
 
-- [ ] `T5` — Draft page onto the primitives
+- [x] `T5` — Draft page onto the primitives
   - Files: `src/app/(app)/drafts/[id]/page.tsx`, `src/components/drafts/CopyEditor.tsx`, `RefinementPanel.tsx`, `BackgroundNotice.tsx`, `NotAppliedCard.tsx`, `ElementEditPanel.tsx`; delete `src/components/drafts/folio.ts`, `src/components/drafts/SectionHead.tsx`
   - Estimate: medium
   - Kind: refactor

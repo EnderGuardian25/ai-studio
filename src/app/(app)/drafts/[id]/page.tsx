@@ -25,8 +25,9 @@ import { CopyEditor } from '@/components/drafts/CopyEditor'
 import { RefinementPanel } from '@/components/drafts/RefinementPanel'
 import { InlineEditModal } from '@/components/drafts/InlineEditModal'
 import { BackgroundNotice } from '@/components/drafts/BackgroundNotice'
-import { SectionHead } from '@/components/drafts/SectionHead'
-import { FOCUS, ICON, PAGE_TITLE, SECTION, SMALL_CAPS, SUB_HEAD } from '@/components/drafts/folio'
+import { PageTitle } from '@/components/ui/PageHead'
+import { SectionHead } from '@/components/ui/SectionHead'
+import { EYEBROW, FOCUS, ICON, SMALL_CAPS, SUB_HEAD } from '@/components/ui/folio'
 import { apiFetch } from '@/lib/apiFetch'
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser'
 import { useUndoableAction } from '@/lib/hooks/useUndoableAction'
@@ -429,10 +430,10 @@ export default function DraftDetailPage() {
 
         {/* ── Right: the copy desk ────────────────────────────────────────── */}
         <div className="min-w-0">
-          <p className={`${SMALL_CAPS} text-fg-muted`}>
+          <p className={EYEBROW}>
             Draft{draft.brandKitName ? ` · ${draft.brandKitName}` : ''}
           </p>
-          <h1 className={`mb-3 mt-2 break-words ${PAGE_TITLE}`}>{draft.brief.topic}</h1>
+          <PageTitle className="mb-3 mt-2 break-words">{draft.brief.topic}</PageTitle>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-ui-sm text-fg-muted">
             <StatusChip status={STATUS_TO_CHIP[draft.status]} />
             <span>
@@ -513,8 +514,8 @@ export default function DraftDetailPage() {
               refine panel (008) stay self-contained components. */}
           <div className="divide-y divide-line-subtle">
             {copyPending ? (
-              <section className={SECTION}>
-                <SectionHead numeral="i." title="Copy" />
+              <section className="pt-[22px] pb-1.5">
+                <SectionHead numeral="i." title="Copy" className="mb-3" />
                 <div className="animate-pulse space-y-2.5" aria-label="Generating copy" role="status">
                   <div className="h-4 w-3/4 rounded-ui-sm bg-line-subtle" />
                   <div className="h-4 w-full rounded-ui-sm bg-line-subtle" />
