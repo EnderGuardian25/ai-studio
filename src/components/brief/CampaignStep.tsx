@@ -7,7 +7,8 @@ import { apiFetch } from '@/lib/apiFetch'
 import type { Campaign, CampaignBriefing } from '@/lib/api-types'
 import { SOURCE_LABEL } from './constants'
 import type { ResolvedKit } from './types'
-import { FOCUS, SMALL_CAPS, rowCls } from './cardCls'
+import { EYEBROW, FOCUS } from '@/components/ui/folio'
+import { rowCls } from './cardCls'
 import { StepHead } from './StepHead'
 import { CampaignRow } from './CampaignRow'
 import type { ProjectCampaignGroup } from './useBriefWizard'
@@ -85,7 +86,7 @@ export function CampaignStep({
           ) : resolvedKit ? (
             <>
               <span className="font-display text-ui-base font-medium text-fg">{resolvedKit.name}</span>
-              <span className={SMALL_CAPS}>
+              <span className={EYEBROW}>
                 {SOURCE_LABEL[resolvedKit.source] ?? resolvedKit.source}
               </span>
               <span className="text-ui-xs text-fg-muted sm:ml-auto">Default for this post</span>
@@ -122,7 +123,7 @@ export function CampaignStep({
         {/* Grouped by project */}
         {projectsWithCampaigns.map(({ project, campaigns: pcs }) => (
           <div key={project.id}>
-            <div className={`${SMALL_CAPS} pt-6 pb-2 border-b border-line-subtle`}>
+            <div className={`${EYEBROW} pt-6 pb-2 border-b border-line-subtle`}>
               {project.name}
             </div>
             {pcs.map(c => (
@@ -139,7 +140,7 @@ export function CampaignStep({
         {/* Standalone */}
         {standaloneCampaigns.length > 0 && (
           <div>
-            <div className={`${SMALL_CAPS} pt-6 pb-2 border-b border-line-subtle`}>
+            <div className={`${EYEBROW} pt-6 pb-2 border-b border-line-subtle`}>
               Standalone
             </div>
             {standaloneCampaigns.map(c => (

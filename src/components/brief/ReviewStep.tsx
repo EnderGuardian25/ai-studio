@@ -7,7 +7,7 @@ import { ASPECT_LABELS, dimensionsLabel } from '@/lib/aspectRatio'
 import type { Campaign, TemplateSummary, BrandKitSummary } from '@/lib/api-types'
 import type { DesignMode, UploadedImage } from './types'
 import { ReviewRow, type ReviewRowProps } from './ReviewRow'
-import { NOTICE } from './cardCls'
+import { Notice } from '@/components/ui/Notice'
 import { StepHead } from './StepHead'
 
 // ─── Step 4 — Review ─────────────────────────────────────────────────────────
@@ -90,22 +90,22 @@ export function ReviewStep({
       </dl>
 
       {providersLoaded && !copyProviderReady && (
-        <div className={`${NOTICE} mt-6 bg-status-scheduled/10 text-status-scheduled`}>
+        <Notice tone="warning" className="mt-6">
           No copy provider is configured, and the server is not in CLI mode. An admin must add a
           COPY provider in AI Providers before generating.
-        </div>
+        </Notice>
       )}
 
       {error && (
-        <div className={`${NOTICE} mt-6 bg-status-failed/10 text-status-failed`}>
+        <Notice tone="error" className="mt-6">
           {error}
-        </div>
+        </Notice>
       )}
 
       {submitting && (
-        <div className={`${NOTICE} mt-6 bg-accent/10 text-accent flex items-center gap-2`}>
+        <Notice tone="info" className="mt-6 flex items-center gap-2">
           <Loader2 size={15} strokeWidth={1.4} className="animate-spin" /> Generating your post — this can take up to a minute…
-        </div>
+        </Notice>
       )}
     </div>
   )

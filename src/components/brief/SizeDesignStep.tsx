@@ -9,7 +9,7 @@ import type { Campaign, TemplateSummary } from '@/lib/api-types'
 import { ASPECT_OPTIONS, SOURCE_LABEL } from './constants'
 import type { DesignMode, ResolvedKit } from './types'
 import { cardCls } from './cardCls'
-import { FieldLabel } from './FieldLabel'
+import { FieldLabel } from '@/components/ui/FieldLabel'
 import { StepHead } from './StepHead'
 import { TemplateCard } from './TemplateCard'
 
@@ -63,7 +63,7 @@ export function SizeDesignStep({
 
       {/* Post size */}
       <div className={SECTION}>
-        <FieldLabel>Post Size</FieldLabel>
+        <FieldLabel className="mb-2.5">Post Size</FieldLabel>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {ASPECT_OPTIONS.map(({ value, icon: Icon, sub }) => {
             const selected = aspectRatio === value
@@ -91,7 +91,7 @@ export function SizeDesignStep({
 
       {/* Brand kit */}
       <div className={SECTION}>
-        <FieldLabel>Brand Kit</FieldLabel>
+        <FieldLabel className="mb-2.5">Brand Kit</FieldLabel>
         <Select
           options={brandKitOptions}
           value={brandKitId}
@@ -109,7 +109,7 @@ export function SizeDesignStep({
 
       {/* Path */}
       <div className={SECTION}>
-        <FieldLabel>Generation Path</FieldLabel>
+        <FieldLabel className="mb-2.5">Generation Path</FieldLabel>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <button
             type="button"
@@ -149,7 +149,7 @@ export function SizeDesignStep({
       {/* Template picker — Path A */}
       {designMode === 'TEMPLATE' && (
         <div className={SECTION}>
-          <FieldLabel>Template</FieldLabel>
+          <FieldLabel className="mb-2.5">Template</FieldLabel>
           {!brandKitId ? (
             <div className={EMPTY}>
               Select a brand kit above to see its templates.
@@ -176,7 +176,7 @@ export function SizeDesignStep({
       {/* Reference template — Path B (optional) */}
       {designMode === 'GENERATE' && (
         <div className={SECTION}>
-          <FieldLabel>
+          <FieldLabel className="mb-2.5">
             Style Reference Template <span className="normal-case tracking-normal font-normal">(optional)</span>
           </FieldLabel>
           <p className="text-ui-xs text-fg-muted mb-3">

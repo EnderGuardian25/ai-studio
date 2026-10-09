@@ -1,9 +1,9 @@
 // Shared class helpers for the brief wizard's pickers, on the Folio tokens
-// (DESIGN_SYSTEM.md §8.2–§8.4, §9): rules and ink, opaque, no blue.
+// (DESIGN_SYSTEM.md §8.2–§8.4, §9): rules and ink, opaque, no blue. The shared
+// atoms (FOCUS, SMALL_CAPS, the section-head strings, NOTICE) come from
+// @/components/ui; this module keeps only the brief's own pickers (014 FR-02).
 
-// The §9 focus outline, for the raw <button>s the wizard draws itself.
-export const FOCUS =
-  'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus'
+import { FOCUS } from '@/components/ui/folio'
 
 // An option card (size, generation path, template, reference). Idle: a 1 px
 // --line control edge on the canvas, --fg on hover. Selected: paper fill and a
@@ -33,16 +33,3 @@ export function rowCls(selected: boolean, extra = '') {
     extra,
   ].join(' ')
 }
-
-// Small caps (eyebrows, field labels, group heads) — §5.2.
-export const SMALL_CAPS = 'text-ui-2xs font-semibold uppercase tracking-[0.14em] text-fg-muted'
-
-// A step's section head: an italic --accent numeral, then the h2 (§8.14).
-export const STEP_NUMERAL = 'font-display italic text-ui-base text-accent'
-export const STEP_HEAD =
-  "font-display text-ui-xl font-medium leading-tight tracking-[-0.01em] [font-variation-settings:'opsz'_48]"
-export const STEP_LEAD = 'mt-2 mb-8 text-ui-sm text-fg-muted'
-
-// A notice on its status tint (§3.2): the text in the status colour on its
-// 10 % fill (the pair §3.3 checks), ringed in currentColor like a chip (§8.5).
-export const NOTICE = 'rounded-ui-sm px-4 py-3 text-ui-sm shadow-[inset_0_0_0_1px_currentColor]'

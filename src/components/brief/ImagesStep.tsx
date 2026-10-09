@@ -3,7 +3,7 @@
 import React from 'react'
 import { Upload, X, Image as ImageIcon, Link as LinkIcon, Loader2 } from 'lucide-react'
 import type { UploadedImage } from './types'
-import { FOCUS } from './cardCls'
+import { FOCUS } from '@/components/ui/folio'
 import { StepHead } from './StepHead'
 
 // ─── Step 3 — Images ─────────────────────────────────────────────────────────

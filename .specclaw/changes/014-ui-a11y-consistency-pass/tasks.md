@@ -86,7 +86,7 @@ There are **18 tasks in 3 waves**, all on `v2`. **The full clean mock E2E runs 3
     - **`AppShell`:** the `:142` literal → `EYEBROW`; the local `ICON_BUTTON` is renamed `SHELL_ICON_BUTTON` (same value).
     - **Heading levels as in `design.md` §3.** No file under `tests/` changes.
 
-- [ ] `T4` — Brief wizard onto the primitives
+- [x] `T4` — Brief wizard onto the primitives
   - Files: `src/components/brief/cardCls.ts`, `StepHead.tsx`, `Stepper.tsx`, `ContentStep.tsx`, `SizeDesignStep.tsx`, `ReviewStep.tsx`, `ReviewRow.tsx`, `CampaignStep.tsx`, `CampaignRow.tsx`, `ImagesStep.tsx`, `TemplateCard.tsx`; delete `src/components/brief/FieldLabel.tsx`
   - Estimate: medium
   - Kind: refactor

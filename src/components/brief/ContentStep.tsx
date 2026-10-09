@@ -8,14 +8,10 @@ import { Select } from '@/components/ui/Select'
 import { apiFetch } from '@/lib/apiFetch'
 import { fieldClasses, fieldEdge } from '@/components/ui/Input'
 import { cn } from '@/lib/utils'
-import { FieldLabel } from './FieldLabel'
+import { FieldLabel } from '@/components/ui/FieldLabel'
+import { EYEBROW, SCROLL_FOCUS, SMALL_CAPS } from '@/components/ui/folio'
 import { StepHead } from './StepHead'
-import { SMALL_CAPS } from './cardCls'
 import { GOAL_OPTIONS, TONE_OPTIONS } from './constants'
-
-// The scroll containers' focus ring is inset, so their own overflow can't clip it.
-const SCROLL_FOCUS =
-  'focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus'
 
 // ─── Step 2 — Content ────────────────────────────────────────────────────────
 
@@ -67,7 +63,7 @@ export function ContentStep({ topic, setTopic, prompt, setPrompt, goal, setGoal,
         Give the post a short topic, tell Claude what it&apos;s about, then pick a goal and tone.
       </StepHead>
 
-      <FieldLabel>Topic</FieldLabel>
+      <FieldLabel className="mb-2.5">Topic</FieldLabel>
       <input
         type="text"
         value={topic}
@@ -81,12 +77,12 @@ export function ContentStep({ topic, setTopic, prompt, setPrompt, goal, setGoal,
         A short title — it names this post in the library.
       </div>
 
-      <FieldLabel>Brief</FieldLabel>
+      <FieldLabel className="mb-2.5">Brief</FieldLabel>
       {enhanceResult ? (
         <div className="space-y-4 mb-6">
           {enhanceResult.original.trim() && (
             <div>
-              <p className={`${SMALL_CAPS} mb-1.5`}>Before</p>
+              <p className={`${EYEBROW} mb-1.5`}>Before</p>
               {/* A scroll container: focusable and labelled so the keyboard can scroll it. */}
               <div
                 tabIndex={0}
@@ -99,7 +95,7 @@ export function ContentStep({ topic, setTopic, prompt, setPrompt, goal, setGoal,
             </div>
           )}
           <div>
-            <p className="text-ui-2xs font-semibold uppercase tracking-[0.14em] text-accent mb-1.5">AI suggestion</p>
+            <p className={`${SMALL_CAPS} text-accent mb-1.5`}>AI suggestion</p>
             <div
               tabIndex={0}
               role="region"

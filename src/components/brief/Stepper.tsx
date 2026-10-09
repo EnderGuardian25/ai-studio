@@ -3,7 +3,7 @@
 import React from 'react'
 import { Check } from 'lucide-react'
 import { STEPS } from './constants'
-import { FOCUS } from './cardCls'
+import { FOCUS, SMALL_CAPS } from '@/components/ui/folio'
 
 // ─── Stepper ─────────────────────────────────────────────────────────────────
 // Folio (DESIGN_SYSTEM.md §5.2, §6): one ruled column per step. The rule on top
@@ -49,7 +49,7 @@ export function Stepper({ step, onJump }: StepperProps) {
               >
                 {done ? <Check size={15} strokeWidth={2} aria-hidden className="text-accent" /> : i + 1}
               </span>
-              <span className="sr-only sm:not-sr-only sm:block mt-1.5 text-ui-2xs font-semibold uppercase tracking-[0.14em] leading-snug">
+              <span className={`sr-only sm:not-sr-only sm:block mt-1.5 ${SMALL_CAPS} leading-snug`}>
                 {label}
               </span>
             </button>
