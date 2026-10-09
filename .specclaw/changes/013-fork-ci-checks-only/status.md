@@ -1,8 +1,8 @@
-# Status: Per-channel captions (Instagram / LinkedIn / WhatsApp)
+# Status: Fork CI — checks only, no image push, no deploy
 
-**Change:** 012-per-channel-captions
-**Started:** 2026-09-23
-**Last Updated:** 2026-09-23
+**Change:** 013-fork-ci-checks-only
+**Started:** 2026-10-09
+**Last Updated:** 2026-10-09
 
 ## Progress
 
@@ -19,11 +19,12 @@
 
 **Completed:** 0 / 0
 **Failed:** 0
+**Deferred:** 0
 
 ## Agent Runs
 
-| Task | Agent | Model | Status | Duration |
-| ---- | ----- | ----- | ------ | -------- |
+| Task | Agent | Model | Status | Duration | Review |
+| ---- | ----- | ----- | ------ | -------- | ------ |
 
 ## Issues
 

@@ -89,6 +89,8 @@ The fixed header sits above scrolling content at 60–75% opacity, so text scrol
 - **Approved for planning on 2026-10-06.**
 - **2026-10-07 (user): Direction B, Folio.** Picked alone, from A Graphite, B Folio and C Instrument (`docs/ui-reference/direction-studies/pick.html`), with no changes to the study. `study-b-folio.html` is now the source for the new `docs/ui-reference/DESIGN_SYSTEM.md`; Frozen Light is archived at `docs/ui-reference/archive/frozen-light/`.
 - **2026-10-07 (user): the logo is the typeset "Studio" wordmark from the Folio study** (Fraunces italic, in the ink colour, accessible name "Studio"). `public/BistecStudioLogo.png` is not used. The user: _"The font Folio already has that says Studio is already nice, so leave as is."_ Implemented in T6, which rewrites `Logo.tsx` and removes the PNG. This supersedes `spec.md`'s "Dark-mode logo" edge case.
+- **2026-10-07 (user): no "More" menu on the draft page.** Every action stays a visible button.
+- **2026-10-09 (user): FR-12 exception approved for the theme toggle.** The toggle was one button, "Switch to dark/light mode". It is now a group named "Theme" holding "Light" and "Dark" buttons with `aria-pressed`. This was the T6 review's WCAG 2.5.3 (Label in Name) fix, documented in `reports/T6.md`. No test depended on the old name.
 
 ## Open Questions
 

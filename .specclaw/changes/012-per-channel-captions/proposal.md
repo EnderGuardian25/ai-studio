@@ -109,6 +109,15 @@ So a LinkedIn post carries the Instagram caption and its hashtags, and the rever
   - the publish-time empty-caption guard;
   - the E2E publish assertion that LinkedIn receives only the LinkedIn caption.
 
+## Decisions (2026-10-09, user)
+
+- **Approved for planning,** as the next roadmap change after 013 and 014.
+- **Storage: a `DraftCaption` table,** one row per (draft, channel), with its own caption-channel enum that includes WHATSAPP. Each channel is regenerated, fails and is undone on its own.
+- **On-image text: a separate short headline.** The caption call also returns a short headline, and the design, Path A and background prompts use it. They no longer use any caption.
+- **Revisions stay design-only.** Each caption panel has its own undo; restoring a revision never touches captions.
+- **The brief wizard step becomes "Brief & Caption Direction".**
+- **The UI is built on 014's shared `PageHead` / `Section` / `Notice` primitives.**
+
 ## Open Questions
 
 - **Storage shape.**
