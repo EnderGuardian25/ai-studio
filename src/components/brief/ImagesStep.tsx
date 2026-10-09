@@ -58,7 +58,7 @@ export function ImagesStep({
                 <button
                   type="button"
                   onClick={() => toggleIntent(img.id)}
-                  className={`inline-flex h-[30px] items-center gap-1.5 whitespace-nowrap rounded-ui-md border border-line px-2.5 font-text text-ui-xs font-semibold text-fg hover:border-fg transition-[border-color] duration-fast ease-standard ${FOCUS}`}
+                  className={`inline-flex h-control-sm items-center gap-1.5 whitespace-nowrap rounded-ui-md border border-line px-2.5 font-text text-ui-xs font-semibold text-fg hover:border-fg transition-[border-color] duration-fast ease-standard ${FOCUS}`}
                 >
                   {img.intent === 'embed'
                     ? <><ImageIcon size={15} strokeWidth={1.4} /> Embed</>
@@ -67,7 +67,7 @@ export function ImagesStep({
                 <button
                   type="button"
                   onClick={() => removeImage(img.id)}
-                  className={`ml-1 inline-flex h-[30px] w-[30px] items-center justify-center rounded-ui-sm text-fg-muted hover:text-status-failed transition-colors duration-fast ease-standard ${FOCUS}`}
+                  className={`ml-1 inline-flex h-control-sm w-control-sm items-center justify-center rounded-ui-sm text-fg-muted hover:text-status-failed transition-colors duration-fast ease-standard ${FOCUS}`}
                   aria-label="Remove image"
                 >
                   <X size={15} strokeWidth={1.4} />

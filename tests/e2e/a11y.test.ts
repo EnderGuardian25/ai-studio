@@ -14,6 +14,7 @@ import {
 // wave 3 task adds its own describe block here (design.md §6):
 //   T9:  AC-05 (FR-06, one field-label style) and AC-11 (FR-12) for rows 6,
 //        14, 21 and 22; the group captions name their groups (§8.3).
+//   T10: AC-06 (FR-07, one control height per size, read from --control-*).
 
 const MOCKED = () => !!(process.env.MOCK_AI && process.env.MOCK_PUPPETEER)
 
@@ -210,5 +211,89 @@ test.describe('Field labels (T9)', () => {
     const publishChannels = publish.getByRole('group', { name: 'Channels', exact: true })
     await expect(publishChannels).toBeVisible()
     await expect(publishChannels.getByRole('checkbox')).toHaveCount(2)
+  })
+})
+
+// ── T10: one control height per size, from the --control-* tokens (AC-06) ────
+
+const CONTROL_PX = { sm: 30, md: 36 } as const
+// Values no literal utility produces, for the override check below.
+const OVERRIDE_PX = { sm: 44, md: 52 } as const
+
+async function heightOf(control: Locator) {
+  await expect(control).toBeVisible()
+  return (await control.boundingBox())?.height ?? NaN
+}
+
+// Each control is its size's token height (± 0.5 px). Then the tokens are
+// overridden on :root and every control must follow: a control that writes its
+// height as a literal (h-9, h-[30px]) would keep its old height and fail.
+async function expectControlHeights(page: Page, controls: [string, Locator, keyof typeof CONTROL_PX][]) {
+  for (const [name, control, size] of controls) {
+    expect(await heightOf(control), `${name}: --control-${size}`).toBeCloseTo(CONTROL_PX[size], 0)
+  }
+  await page.evaluate((px) => {
+    for (const [size, value] of Object.entries(px)) {
+      document.documentElement.style.setProperty(`--control-${size}`, `${value}px`)
+    }
+  }, OVERRIDE_PX)
+  try {
+    for (const [name, control, size] of controls) {
+      await expect
+        .poll(() => heightOf(control), { message: `${name} follows --control-${size}` })
+        .toBeCloseTo(OVERRIDE_PX[size], 0)
+    }
+  } finally {
+    await page.evaluate(() => {
+      for (const size of ['sm', 'md']) document.documentElement.style.removeProperty(`--control-${size}`)
+    })
+  }
+}
+
+test.describe('Control heights (T10)', () => {
+  let api: ApiClient
+  const mintedKits: string[] = []
+  test.beforeEach(async ({ request }) => {
+    api = await loginAs(request, ADMIN_EMAIL, ADMIN_PASSWORD)
+  })
+  test.afterEach(async () => {
+    for (const id of mintedKits.splice(0)) await api.del(`/api/admin/brandkits/${id}`)
+    await api.dispose()
+  })
+
+  test('AC-06: the campaign form Input, Select and md Button are --control-md tall', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await pageLogin(page)
+    await page.goto('/campaigns')
+    await expect(page.getByRole('heading', { name: 'Campaigns', level: 1 })).toBeVisible()
+    await page.getByRole('button', { name: 'New Campaign' }).click()
+    const form = page.locator('form').filter({ has: page.getByRole('button', { name: 'Create', exact: true }) })
+    await expectControlHeights(page, [
+      ['"Campaign name" Input', form.getByRole('textbox', { name: 'Campaign name', exact: true }), 'md'],
+      ['"Project" Select', form.getByRole('combobox', { name: 'Project', exact: true }), 'md'],
+      ['"Create" md Button', form.getByRole('button', { name: 'Create', exact: true }), 'md'],
+    ])
+  })
+
+  test('AC-06: in kit edit mode the add-colour field and its sm "Add" are --control-sm tall', async ({ page }) => {
+    const { kit } = await mintBrandKitFixture(api)
+    mintedKits.push(kit.id)
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await pageLogin(page)
+    await page.goto('/admin/brandkits')
+    await expect(page.getByRole('heading', { name: 'Brand Kits', level: 1 })).toBeVisible()
+    await page.getByRole('button', { name: new RegExp(`^${kit.name}`) }).click()
+    await expect(page.getByRole('heading', { name: kit.name, level: 2 })).toBeVisible()
+    await page.getByRole('button', { name: 'Edit', exact: true }).click()
+
+    const colour = page.getByPlaceholder('#1A2B3C', { exact: true })
+    // The colour editor's own row: the field and the Add beside it.
+    const row = page.locator('div').filter({ has: colour }).filter({ has: page.getByRole('button', { name: 'Add' }) }).last()
+    await expectControlHeights(page, [
+      ['add-colour field (COMPACT_FIELD)', colour, 'sm'],
+      ['colour "Add" sm Button', row.getByRole('button', { name: 'Add', exact: true }), 'sm'],
+      // A raw single-line input on the same view (inputClasses).
+      ['font search field', page.getByPlaceholder('Search Google Fonts…', { exact: true }), 'md'],
+    ])
   })
 })

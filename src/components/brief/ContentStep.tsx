@@ -6,7 +6,7 @@ import { Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Select } from '@/components/ui/Select'
 import { apiFetch } from '@/lib/apiFetch'
-import { fieldClasses, fieldEdge } from '@/components/ui/Input'
+import { fieldClasses, fieldEdge, inputClasses } from '@/components/ui/Input'
 import { cn } from '@/lib/utils'
 import { FieldLabel } from '@/components/ui/FieldLabel'
 import { EYEBROW, SCROLL_FOCUS, SMALL_CAPS } from '@/components/ui/folio'
@@ -71,7 +71,7 @@ export function ContentStep({ topic, setTopic, prompt, setPrompt, goal, setGoal,
         placeholder="e.g. Q3 product launch"
         maxLength={120}
         autoFocus
-        className={cn(fieldClasses, fieldEdge())}
+        className={cn(inputClasses, fieldEdge())}
       />
       <div className="mt-2 mb-6 text-ui-xs text-fg-muted">
         A short title — it names this post in the library.

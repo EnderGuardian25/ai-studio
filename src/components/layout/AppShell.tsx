@@ -69,10 +69,10 @@ const NAV_ITEM =
 const NAV_CURRENT =
   "text-fg font-semibold before:absolute before:left-0 before:top-2 before:bottom-2 before:w-0.5 before:bg-accent before:content-['']"
 
-// The header's menu button and the mobile sidebar's close button: a 36 px
-// target, so not the 30 px ui ICON_BUTTON.
+// The header's menu button and the mobile sidebar's close button: a
+// --control-md target, so not the --control-sm ui ICON_BUTTON.
 const SHELL_ICON_BUTTON =
-  'inline-flex items-center justify-center h-9 w-9 rounded-ui-md text-fg-muted hover:text-fg ' +
+  'inline-flex items-center justify-center h-control-md w-control-md rounded-ui-md text-fg-muted hover:text-fg ' +
   'transition-colors duration-fast ease-standard ' +
   'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus'
 

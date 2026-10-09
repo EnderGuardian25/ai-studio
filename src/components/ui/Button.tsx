@@ -25,11 +25,12 @@ const variantClasses: Record<ButtonVariant, string> = {
 }
 
 // One class per property and size: `cn` is a plain join (no tailwind-merge),
-// so two competing paddings would be settled by CSS source order.
+// so two competing paddings would be settled by CSS source order. The heights
+// are the --control-* tokens (014 FR-07, DESIGN_SYSTEM.md §6).
 const sizeClasses: Record<ButtonSize, string> = {
-  sm: 'h-[30px] text-ui-xs',
-  md: 'h-9 text-ui-sm',
-  lg: 'h-10 text-ui-base',
+  sm: 'h-control-sm text-ui-xs',
+  md: 'h-control-md text-ui-sm',
+  lg: 'h-control-lg text-ui-base',
 }
 
 function paddingFor(variant: ButtonVariant, size: ButtonSize): string {

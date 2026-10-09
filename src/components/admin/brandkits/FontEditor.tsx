@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef, useState } from 'react'
 import { GOOGLE_FONTS, googleFontsUrl } from './googleFonts'
-import { fieldClasses, fieldEdge } from '@/components/ui/Input'
+import { inputClasses, fieldEdge } from '@/components/ui/Input'
 import { cn } from '@/lib/utils'
 import { FOCUS } from '@/components/ui/folio'
 
@@ -102,7 +102,7 @@ export function FontEditor({ fonts, onChange }: FontEditorProps) {
           aria-autocomplete="list"
           aria-activedescendant={expanded ? `${listboxId}-option-${highlighted}` : undefined}
           placeholder="Search Google Fonts…"
-          className={cn(fieldClasses, fieldEdge())}
+          className={cn(inputClasses, fieldEdge())}
         />
         {expanded && (
           <ul

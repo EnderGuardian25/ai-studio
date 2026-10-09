@@ -6,7 +6,7 @@ import { Search } from 'lucide-react'
 import { toast } from 'sonner'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { Button } from '@/components/ui/Button'
-import { fieldClasses, fieldEdge } from '@/components/ui/Input'
+import { inputClasses, fieldEdge } from '@/components/ui/Input'
 import { SegmentedToggle } from '@/components/ui/SegmentedToggle'
 import { QueryError } from '@/components/ui/QueryError'
 import { PageHead } from '@/components/ui/PageHead'
@@ -163,7 +163,7 @@ export default function LibraryPage() {
               placeholder="Search by topic…"
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
-              className={cn(fieldClasses, fieldEdge(), 'pl-10')}
+              className={cn(inputClasses, fieldEdge(), 'pl-10')}
             />
           </div>
         }

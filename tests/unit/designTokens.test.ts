@@ -1,7 +1,13 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
+import { createElement as h } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
 import tailwindConfig from '../../tailwind.config'
+import { Button } from '@/components/ui/Button'
+import { Input, fieldClasses, inputClasses } from '@/components/ui/Input'
+import { Select } from '@/components/ui/Select'
+import { COMPACT_FIELD, COMPACT_TEXTAREA, ICON_BUTTON } from '@/components/ui/folio'
 
 // AC-07 (011 FR-06/FR-07): the Folio semantic tokens live in globals.css, per
 // theme where they vary, and tailwind.config.ts exposes every semantic colour
@@ -54,6 +60,9 @@ const ROOT_ONLY_TOKENS = [
   'radius-md',
   'radius-lg',
   'radius-pill',
+  'control-sm',
+  'control-md',
+  'control-lg',
   'dur-fast',
   'dur-base',
   'dur-slow',
@@ -80,6 +89,11 @@ const TRIPLET = /^\d{1,3} \d{1,3} \d{1,3}$/
 type Tree = Record<string, unknown>
 const extend = (tailwindConfig.theme?.extend ?? {}) as Record<string, Tree>
 const colors = extend.colors as Record<string, string | Record<string, string>>
+
+// The height utilities in a class string (h-*), and the class attribute of the
+// first element in rendered markup.
+const heights = (cls: string) => cls.split(/\s+/).filter((c) => /^h-/.test(c))
+const classOf = (html: string) => html.match(/class="([^"]*)"/)?.[1] ?? ''
 
 const varOf = (value: string) => value.match(/^rgb\(var\(--([\w-]+)\) \/ <alpha-value>\)$/)?.[1]
 
@@ -217,5 +231,85 @@ describe('tailwind.config.ts semantic mapping (AC-07)', () => {
   it('no longer maps the Frozen Light colours (FR-13)', () => {
     const legacy = Object.keys(colors).filter((k) => /^(light|dark|primary)(-|$)/.test(k))
     expect(legacy).toEqual([])
+  })
+})
+
+// AC-06 (014 FR-07): one control height per size, from one source. The three
+// --control-* tokens on :root are the only place 30 / 36 / 40 px are written;
+// Tailwind exposes them as spacing keys, and every control reads them.
+describe('control heights (014 AC-06)', () => {
+  const CONTROL = { 'control-sm': '30px', 'control-md': '36px', 'control-lg': '40px' }
+
+  it.each(Object.entries(CONTROL))(':root declares --%s as %s', (token, value) => {
+    expect(ROOT[token]).toBe(value)
+  })
+
+  it('maps spacing.control-sm|md|lg to the tokens, and redefines no default step', () => {
+    for (const token of Object.keys(CONTROL)) {
+      expect(extend.spacing?.[token], `spacing.${token}`).toBe(`var(--${token})`)
+    }
+    // Only the control keys: Tailwind's default spacing steps stay (§3.4).
+    expect(Object.keys(extend.spacing ?? {}).sort()).toEqual(Object.keys(CONTROL).sort())
+  })
+
+  it('gives each Button size its token height', () => {
+    for (const [size, token] of [['sm', 'control-sm'], ['md', 'control-md'], ['lg', 'control-lg']] as const) {
+      const cls = classOf(renderToStaticMarkup(h(Button, { size }, 'x')))
+      expect(heights(cls), `Button size=${size}`).toEqual([`h-${token}`])
+    }
+  })
+
+  it('gives single-line fields the md height and textareas none', () => {
+    expect(heights(inputClasses)).toEqual(['h-control-md'])
+    expect(inputClasses).not.toMatch(/(?:^|\s)py-/)
+    for (const [name, html] of [
+      ['Input', renderToStaticMarkup(h(Input, { label: 'L' }))],
+      ['Select', renderToStaticMarkup(h(Select, { label: 'L', options: [] }))],
+    ] as const) {
+      const field = html.match(/<(?:input|select)\b[^>]*class="([^"]*)"/)?.[1] ?? ''
+      expect(heights(field), name).toEqual(['h-control-md'])
+    }
+    // A textarea's height comes from its rows: no control token.
+    expect(heights(fieldClasses)).toEqual([])
+    expect(heights(COMPACT_TEXTAREA)).toEqual([])
+  })
+
+  it('gives the compact field and the icon button the sm height', () => {
+    expect(heights(COMPACT_FIELD)).toEqual(['h-control-sm'])
+    expect(COMPACT_FIELD).not.toMatch(/(?:^|\s)py-/)
+    expect(heights(ICON_BUTTON)).toEqual(['h-control-sm'])
+    expect(ICON_BUTTON.split(/\s+/)).toContain('w-control-sm')
+  })
+
+  // The AC-06 grep, kept as a guard: no control in these files writes its
+  // height as a literal. The two exclusions are not controls (FR-07): the
+  // library skeleton bar and the brief image thumbnail.
+  const FILES = [
+    'src/components/ui/Button.tsx',
+    'src/components/ui/Input.tsx',
+    'src/components/ui/Select.tsx',
+    'src/components/ui/folio.ts',
+    'src/components/layout/AppShell.tsx',
+    'src/app/(app)/page.tsx',
+    'src/app/(app)/library/page.tsx',
+    'src/components/brief/ContentStep.tsx',
+    'src/components/brief/ImagesStep.tsx',
+    'src/components/admin/brandkits/FontEditor.tsx',
+    'src/components/library/PostCard.tsx',
+    'src/components/drafts/ElementEditPanel.tsx',
+  ]
+  const LITERAL = /(?:^|[\s"'`])(?:h-9|h-10|h-\[30px\]|w-\[30px\])(?=$|[\s"'`])/
+  const NOT_A_CONTROL = [
+    /className="h-\[30px\] rounded-ui-md bg-line-subtle w-1\/2 mt-1"/, // library skeleton bar
+    /<span className="w-10 h-10 rounded-ui-sm border border-line-subtle bg-surface /, // image thumbnail
+  ]
+
+  it.each(FILES)('%s writes no literal control height', (file) => {
+    const hits = readFileSync(resolve(process.cwd(), file), 'utf8')
+      .split('\n')
+      .map((line, i) => ({ line: line.trim(), n: i + 1 }))
+      .filter(({ line }) => LITERAL.test(line) && !NOT_A_CONTROL.some((re) => re.test(line)))
+      .map(({ line, n }) => `${file}:${n}: ${line.slice(0, 90)}`)
+    expect(hits).toEqual([])
   })
 })

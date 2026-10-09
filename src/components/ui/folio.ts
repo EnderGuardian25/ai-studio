@@ -41,10 +41,10 @@ export const NOTICE = 'rounded-ui-sm px-4 py-3 text-ui-sm shadow-[inset_0_0_0_1p
 export const ICON = { size: 15, strokeWidth: 1.4 } as const
 export const ICON_SM = { size: 12, strokeWidth: 1.4 } as const
 
-// A quiet icon-only button (§8.16): --fg-muted, a 30 px target. Callers add
-// the hover colour, FOCUS, and always an aria-label.
+// A quiet icon-only button (§8.16): --fg-muted, a --control-sm square target
+// (014 FR-07). Callers add the hover colour, FOCUS, and always an aria-label.
 export const ICON_BUTTON =
-  'inline-flex h-[30px] w-[30px] flex-shrink-0 items-center justify-center rounded-ui-sm text-fg-muted transition-colors duration-fast ease-standard disabled:cursor-not-allowed disabled:opacity-40'
+  'inline-flex h-control-sm w-control-sm flex-shrink-0 items-center justify-center rounded-ui-sm text-fg-muted transition-colors duration-fast ease-standard disabled:cursor-not-allowed disabled:opacity-40'
 
 // Links in text: --accent, underlined (§3.2).
 export const TEXT_LINK =
@@ -63,5 +63,11 @@ export const TABLE_HEAD_ROW =
 // A compact field, the §8.3 field at --text-sm. Written out in full because
 // `cn` is a plain join: overriding fieldClasses' padding would leave two
 // competing utilities.
-export const COMPACT_FIELD =
-  'rounded-ui-sm border border-line bg-surface-raised px-2.5 py-1.5 font-text text-ui-sm text-fg placeholder:text-fg-muted transition-[border-color,box-shadow] duration-fast ease-standard focus:outline-none focus:border-focus focus:ring-1 focus:ring-focus disabled:cursor-not-allowed disabled:opacity-50'
+const COMPACT_BOX =
+  'rounded-ui-sm border border-line bg-surface-raised px-2.5 font-text text-ui-sm text-fg placeholder:text-fg-muted transition-[border-color,box-shadow] duration-fast ease-standard focus:outline-none focus:border-focus focus:ring-1 focus:ring-focus disabled:cursor-not-allowed disabled:opacity-50'
+// Single-line: the sm control height (--control-sm, 014 FR-07), so it lines up
+// with the sm Button beside it.
+export const COMPACT_FIELD = `${COMPACT_BOX} h-control-sm`
+// Multi-line (a textarea): its height comes from its rows and padding, never
+// from a control token (FR-07 excludes textareas).
+export const COMPACT_TEXTAREA = `${COMPACT_BOX} py-1.5`

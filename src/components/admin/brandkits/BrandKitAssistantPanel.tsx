@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/Button'
 import { Drawer } from '@/components/ui/Modal'
 import { apiFetch } from '@/lib/apiFetch'
 import { ColorEditor } from './ColorEditor'
-import { COMPACT_FIELD, FOCUS, ICON, ICON_BUTTON, SCROLL_FOCUS, SMALL_CAPS, TAG } from '@/components/ui/folio'
+import { COMPACT_TEXTAREA, FOCUS, ICON, ICON_BUTTON, SCROLL_FOCUS, SMALL_CAPS, TAG } from '@/components/ui/folio'
 
 // F5 — conversational brand-kit extraction from reference images. Mirrors the
 // campaign BriefingAssistantPanel: chat grounded on the kit's feedToAI reference
@@ -314,7 +314,7 @@ export function BrandKitAssistantPanel({ kitId, open, onClose, onApplied }: Bran
                 value={voice}
                 onChange={e => setVoice(e.target.value)}
                 rows={4}
-                className={`${COMPACT_FIELD} mt-1.5 w-full resize-y leading-relaxed`}
+                className={`${COMPACT_TEXTAREA} mt-1.5 w-full resize-y leading-relaxed`}
               />
             </div>
 

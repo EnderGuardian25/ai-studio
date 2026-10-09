@@ -43,7 +43,7 @@ type ChipStatus = 'draft' | 'exported' | 'scheduled' | 'published' | 'failed'
 // uses fixed ink-on-paper values that read in both themes (DESIGN_SYSTEM.md
 // §8.12): 30 × 30, inset 10 px. Shown on hover or keyboard focus, as before.
 const EXPAND_BUTTON =
-  'absolute top-2.5 right-2.5 inline-flex h-[30px] w-[30px] items-center justify-center rounded-ui-sm border border-[#211c18] bg-[#fffefb] text-[#211c18] opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity duration-fast ease-standard focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus' // ui-exception: drawn on the post image, fixed ink-on-paper per DESIGN_SYSTEM.md §8.12
+  'absolute top-2.5 right-2.5 inline-flex h-control-sm w-control-sm items-center justify-center rounded-ui-sm border border-[#211c18] bg-[#fffefb] text-[#211c18] opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity duration-fast ease-standard focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus' // ui-exception: drawn on the post image, fixed ink-on-paper per DESIGN_SYSTEM.md §8.12
 
 function deriveStatus(draft: PostCardDraft): ChipStatus {
   if (draft.posts.length === 0) {
@@ -157,7 +157,7 @@ export function PostCard({ draft, isTeamAdmin, onPublish, onViewHistory, onDelet
               type="button"
               aria-label={`Delete ${draft.brief.topic}`}
               title="Delete post"
-              className="ml-auto inline-flex h-[30px] w-[30px] items-center justify-center rounded-ui-md text-fg-muted transition-colors duration-fast ease-standard hover:text-status-failed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+              className="ml-auto inline-flex h-control-sm w-control-sm items-center justify-center rounded-ui-md text-fg-muted transition-colors duration-fast ease-standard hover:text-status-failed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
               onClick={() => onDelete(draft.id)}
             >
               <Trash2 size={15} strokeWidth={1.4} />

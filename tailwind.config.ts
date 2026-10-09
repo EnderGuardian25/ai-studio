@@ -45,8 +45,14 @@ const config: Config = {
       },
       // Folio sizes and radii under ui-* keys: Tailwind's own sm/base/xl/2xl
       // (type) and md/lg (radius) differ from Folio's, and the app still uses
-      // a few of the defaults. Spacing needs nothing (Folio's steps equal
-      // Tailwind's).
+      // a few of the defaults. Spacing needs only the control heights (Folio's
+      // steps equal Tailwind's): h-control-md, w-control-sm and so on (014
+      // FR-07), under their own keys so no default step changes.
+      spacing: {
+        'control-sm': 'var(--control-sm)',
+        'control-md': 'var(--control-md)',
+        'control-lg': 'var(--control-lg)',
+      },
       fontSize: {
         'ui-2xs': 'var(--text-2xs)',
         'ui-xs': 'var(--text-xs)',

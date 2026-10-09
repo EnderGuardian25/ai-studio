@@ -1,7 +1,7 @@
 import React from 'react'
 import { ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { fieldClasses, fieldEdge, fieldErrorClasses } from './Input'
+import { inputClasses, fieldEdge, fieldErrorClasses } from './Input'
 import { FieldLabel } from './FieldLabel'
 
 interface SelectOption {
@@ -38,7 +38,7 @@ export function Select({
         <select
           id={selectId}
           className={cn(
-            fieldClasses,
+            inputClasses,
             'appearance-none pr-9',
             fieldEdge(error),
             className,

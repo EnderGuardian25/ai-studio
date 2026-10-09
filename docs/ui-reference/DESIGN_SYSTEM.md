@@ -38,7 +38,7 @@ All tokens live in `src/app/globals.css`, on `:root` (light) and `.dark` (dark),
 
 - **Colours are R G B triplets.** Consume them as `rgb(var(--x))`, or `rgb(var(--x) / a)` for a tint. Never write the hex. The one exception is the marked `ui-exception` in §8.12.
 - **Status-chip tint alpha is 0.10 in both themes.** The contrast results in §3.3 assume it. Today's chips use 0.15 in dark; Folio does not.
-- **Theme-independent tokens are declared once, on `:root`:** radius, motion, type and spacing. Colour, shadow and scrim tokens are declared in both blocks.
+- **Theme-independent tokens are declared once, on `:root`:** radius, motion, type, spacing and the control heights (`--control-sm|md|lg`, 014 FR-07; §6). Colour, shadow and scrim tokens are declared in both blocks.
 
 ### 3.1 Token block (exact)
 
@@ -225,7 +225,7 @@ The semantic names from 011 `design.md` §4, each colour as `rgb(var(--x) / <alp
 
 **Clashes with Tailwind defaults.** T4 kept them apart (FR-07, AC-08), and the cleanup (T13) left them so: the app uses the `ui-*` keys, and replacing Tailwind's defaults with Folio's values is a later change.
 
-- **Spacing needs nothing.** Folio's `--space-N` equals Tailwind's default step `N` (1 = 4 px, 2 = 8, 3 = 12, 4 = 16, 6 = 24, 8 = 32, 12 = 48). Use `p-4`, `gap-6` and so on.
+- **Spacing needs only the control heights.** Folio's `--space-N` equals Tailwind's default step `N` (1 = 4 px, 2 = 8, 3 = 12, 4 = 16, 6 = 24, 8 = 32, 12 = 48). Use `p-4`, `gap-6` and so on. The one addition is `spacing.control-sm|md|lg` → `var(--control-sm|md|lg)` (014 FR-07), under new keys, so `h-control-md`, `w-control-sm` and so on exist and no default step changes.
 - **Radius clashes by name.** Tailwind's `rounded-sm` is 2 px (matches), but `rounded` is 4 px and `rounded-md` is 6 px, whereas Folio's `md` is 4 px and `lg` is 6 px. Add the Folio radii under names that do not exist yet (for example `rounded-ui-sm|md|lg`), and do not redefine `sm`, `md` or `lg`.
 - **Font size clashes by name.** Tailwind's `text-xs` (12) and `text-lg` (18) match, but `sm`, `base`, `xl` and `2xl` differ (14 / 16 / 20 / 24 against Folio's 13.5 / 15 / 24 / 42). Add the Folio scale under new keys and do not redefine the defaults.
 
@@ -308,7 +308,9 @@ The body is `--font-sans`, `--text-base`, line-height 1.6, `font-variant-numeric
 
 **An 8 px grid on a 24 / 26 px baseline.** Spacing tokens: 4 · 8 · 12 · 16 · 24 · 32 · 48 px (`--space-1` to `--space-12`, equal to Tailwind's default steps).
 
-**Density is medium and reading-first.** Body 15 px / 1.6; controls 36 px tall, 30 px small.
+**Density is medium and reading-first.** Body 15 px / 1.6.
+
+**Control heights come from three tokens (014 FR-07),** declared once on `:root` in `globals.css` and nowhere else: `--control-md` is the default control, `--control-sm` the small one and `--control-lg` the large `Button` size. Tailwind exposes them as `h-control-*` / `w-control-*`. Buttons, single-line fields (`Input`, `Select`, `inputClasses`, `COMPACT_FIELD`), icon buttons (`ICON_BUTTON`, the shell's `SHELL_ICON_BUTTON`) and the other one-line controls read them; a control never writes its height as a literal (`h-9`, `h-[30px]`). Textareas, the display-size title field, the attached prompt fields and skeleton bars are not controls of a size and keep their own heights. `tests/unit/designTokens.test.ts` holds the values and the no-literal rule.
 
 | Element                | Desktop (from the study)                                                | At 375 px (A4 floor)                                                                                                                             |
 | ---------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -413,14 +415,14 @@ Under `@media (prefers-reduced-motion: reduce)`:
 
 All buttons: `display: inline-flex`, `gap: 8px`, `--text-sm` 600, `white-space: nowrap`, `--radius-md`, transitions on `background-color`, `color` and `box-shadow` at `--dur-fast`.
 
-| Variant         | Height        | Padding | Fill / border / text                                              | Hover                  |
-| --------------- | ------------- | ------- | ----------------------------------------------------------------- | ---------------------- |
-| **Primary**     | 36 px         | 0 20 px | `--accent` fill, 1 px `--accent` border, `--accent-fg` text       | adds `--shadow-raised` |
-| **Outline**     | 36 px         | 0 14 px | transparent, 1 px `--line` border, `--fg` text                    | border → `--fg`        |
-| **Text**        | —             | 0 6 px  | no border; `--fg` text, underlined in `--line` with a 4 px offset | —                      |
-| **Ink**         | fills its row | 0 16 px | `--fg` fill, `--canvas` text (the refine Send button)             | —                      |
-| **Danger**      | 36 px         | 0 14 px | the outline shape with `--status-failed` text and border          | —                      |
-| **Small** (any) | 30 px         | 0 10 px | `--text-xs`                                                       | —                      |
+| Variant         | Height         | Padding | Fill / border / text                                              | Hover                  |
+| --------------- | -------------- | ------- | ----------------------------------------------------------------- | ---------------------- |
+| **Primary**     | `--control-md` | 0 20 px | `--accent` fill, 1 px `--accent` border, `--accent-fg` text       | adds `--shadow-raised` |
+| **Outline**     | `--control-md` | 0 14 px | transparent, 1 px `--line` border, `--fg` text                    | border → `--fg`        |
+| **Text**        | —              | 0 6 px  | no border; `--fg` text, underlined in `--line` with a 4 px offset | —                      |
+| **Ink**         | fills its row  | 0 16 px | `--fg` fill, `--canvas` text (the refine Send button)             | —                      |
+| **Danger**      | `--control-md` | 0 14 px | the outline shape with `--status-failed` text and border          | —                      |
+| **Small** (any) | `--control-sm` | 0 10 px | `--text-xs`                                                       | —                      |
 
 - **One accent primary per view.** On the draft page it is Publish. A submit attached to a field or sitting in an inline form (the refine Send, inline add and save rows) uses **Ink**, and per-item actions in repeated lists and grids use **Outline**, so the view's one primary stays the only accent fill.
 - **An open menu button** (`aria-expanded="true"`) takes a `--fg` border and a `--surface-2` fill.
@@ -429,7 +431,8 @@ All buttons: `display: inline-flex`, `gap: 8px`, `--text-sm` 600, `white-space: 
 
 ### 8.3 Inputs, selects and textareas
 
-- **Edge:** 1 px `--line` (3:1). **Fill:** `--surface-2`. **Radius:** `--radius-sm`. Padding 10 px 14 px, `--text-base`. Placeholder in `--fg-muted`.
+- **Edge:** 1 px `--line` (3:1). **Fill:** `--surface-2`. **Radius:** `--radius-sm`. `--text-base`. Placeholder in `--fg-muted`.
+- **Height (014 FR-07):** a single-line field (`Input`, `Select`, a raw `<input>` with `inputClasses`) is `--control-md` tall with 14 px side padding and no vertical padding, so it lines up with the md button beside it. A textarea (`fieldClasses`) has no fixed height: padding 10 px 14 px, and its rows set the height. The compact field (`COMPACT_FIELD`, `--text-sm`) is `--control-sm` tall, beside small buttons; its multi-line form is `COMPACT_TEXTAREA`.
 - **Focus:** the §9 outline. Where the input sits inside a wrapper with an attached button (the refine prompt), the wrapper shows the outline on `:focus-within`.
 - **The caption textarea is ruled:** a `repeating-linear-gradient` draws a 1 px `--line-subtle` line every 26 px, line-height 26 px, `background-attachment: local`, padding 4 px 16 px, `--text-sm`. Only the caption is ruled.
 - **Selects** use `background-color` for the fill so the chevron `background-image` survives.

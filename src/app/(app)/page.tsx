@@ -147,7 +147,7 @@ function QuickAction({
   return (
     <Link
       href={href}
-      className="inline-flex h-9 items-center gap-2 whitespace-nowrap rounded-ui-md border border-line px-3.5 text-ui-sm font-semibold text-fg transition-[border-color] duration-fast ease-standard hover:border-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+      className="inline-flex h-control-md items-center gap-2 whitespace-nowrap rounded-ui-md border border-line px-3.5 text-ui-sm font-semibold text-fg transition-[border-color] duration-fast ease-standard hover:border-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
     >
       {icon}
       {label}

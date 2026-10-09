@@ -372,7 +372,7 @@ function ColorField({
       <FieldLabel htmlFor={id}>{label}</FieldLabel>
       <div className="flex items-center gap-2">
         <span
-          className="relative flex h-9 w-10 shrink-0 items-center justify-center overflow-hidden rounded-ui-sm border border-line focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-focus"
+          className="relative flex h-control-md w-10 shrink-0 items-center justify-center overflow-hidden rounded-ui-sm border border-line focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-focus"
           style={hex ? { backgroundColor: hex } : NONE_SWATCH}
         >
           {!hex && (

@@ -294,3 +294,20 @@ Enable Actions BEFORE pushing: a push made while Actions are disabled triggers n
 Order: gh api enable, then git push
 
 ---
+
+## [L18] design_gap — T10: COMPACT_FIELD also styled a textarea (BrandKitAssist...
+
+**When:** 2026-10-09 22:15 UTC
+**Category:** design_gap
+**Priority:** low
+**Status:** pending
+
+### Detail
+
+T10: COMPACT_FIELD also styled a textarea (BrandKitAssistantPanel 'Brand voice'), which the spec missed; split into COMPACT_FIELD (h-control-sm) + COMPACT_TEXTAREA
+
+### Action
+
+When a shared class gains a fixed height, grep every consumer for <textarea>
+
+---

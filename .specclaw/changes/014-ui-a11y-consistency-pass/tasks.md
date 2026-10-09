@@ -191,7 +191,7 @@ There are **18 tasks in 3 waves**, all on `v2`. **The full clean mock E2E runs 3
       - `a11y.test.ts` gets the AC-05 block and the AC-11 cases for rows 6, 14, 21 and 22.
     - **This is a visible change:** every field label becomes small caps (A3). `DESIGN_SYSTEM.md` §8.3 gets the field-label rule.
 
-- [ ] `T10` — One control height per size, from tokens
+- [x] `T10` — One control height per size, from tokens
   - Files: `src/app/globals.css`, `tailwind.config.ts`, `src/components/ui/Button.tsx`, `Input.tsx`, `Select.tsx`, `ui/folio.ts`, `src/components/layout/AppShell.tsx`, `src/app/(app)/page.tsx`, `src/app/(app)/library/page.tsx`, `src/components/brief/ContentStep.tsx`, `ImagesStep.tsx`, `src/components/admin/brandkits/FontEditor.tsx`, `src/components/library/PostCard.tsx`, `src/components/drafts/ElementEditPanel.tsx`, `tests/unit/designTokens.test.ts`, `tests/e2e/a11y.test.ts`, `docs/ui-reference/DESIGN_SYSTEM.md`
   - Estimate: medium
   - Kind: impl
