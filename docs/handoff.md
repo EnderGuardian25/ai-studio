@@ -1,13 +1,48 @@
 # bistec-studio — Session Handoff
 
-**Date:** 2026-10-08 (latest: **011 built 13/13 on `v2` in the fork; verify next**). Previous: 2026-10-07 (005 verified PASS; 011 planned, wave 1 built; the move to the fork). Previous: 2026-10-03 (004 finished and verified PARTIAL, Phase 0 only; 005 built 9/10, waiting on one operator check). Before that: 2026-09-28 (build session — 004 Waves 1–3 built, MinIO → silo, PR #42 + draft PR #43). Before that: 2026-09-23 (later, later the same day: proposal **012** per-channel captions + copy→caption rename, a floating **Create post** button folded into 011, and a launch-video legibility pass. Before that: planning session — proposals 008–011 + roadmap, 004 re-planned to 24 tasks incl. Phase 0, and the deploy pipeline found broken: Coolify 401 since 2026-09-15). Previous: 2026-07-28 (copy-edit status clobber fix).
+**Date:** 2026-10-09 (latest: **011 verified PASS; fork `main` merged into `v2`; 013 fork CI (checks only) building; 014 and 012 approved**). Previous: 2026-10-08 (011 built 13/13 on `v2` in the fork). Previous: 2026-10-07 (005 verified PASS; 011 planned, wave 1 built; the move to the fork). Previous: 2026-10-03 (004 finished and verified PARTIAL, Phase 0 only; 005 built 9/10, waiting on one operator check). Before that: 2026-09-28 (build session — 004 Waves 1–3 built, MinIO → silo, PR #42 + draft PR #43). Before that: 2026-09-23 (later, later the same day: proposal **012** per-channel captions + copy→caption rename, a floating **Create post** button folded into 011, and a launch-video legibility pass. Before that: planning session — proposals 008–011 + roadmap, 004 re-planned to 24 tasks incl. Phase 0, and the deploy pipeline found broken: Coolify 401 since 2026-09-15). Previous: 2026-07-28 (copy-edit status clobber fix).
 **Repo (since 2026-10-07):** https://github.com/EnderGuardian25/ai-studio — a public GitHub **fork** of the company repo `bistec-oss/studio`. All development continues here. The company repo is left as it is and receives nothing from this work. See the 2026-10-07 fork section below.
-**Branch:** work continues on **`v2`**, the fork's default branch. Fork `main` = `671ad6e9`, the company `main` at fork time.
+**Branch:** work continues on **`v2`**, the fork's default branch. Fork `main` = `671ad6e9`, the company `main` at fork time. `v2` has contained fork `main` since the merge at `2506de0b` (2026-10-09).
 **Production:** none for the fork. `https://studio.bistecglobal.com` is the **company's** prod. It runs company `main` and is not ours to deploy.
 
 ---
 
-## ⏸️ 2026-10-08 — PICK UP HERE: 011 is built (13/13); verify next
+## ⏸️ 2026-10-09 — PICK UP HERE: 011 verified PASS; `main` merged into `v2`; 013 (fork CI, checks only) is building
+
+### The user's decisions (2026-10-09)
+
+- **The fork runs checks only.** It pushes no GHCR image and redeploys nothing. `docker-publish.yml` is **deleted** (change 013, T1), not guarded. The user will write their own deploy workflow later, for their own target.
+- **`e2e.yml` is the only workflow.** It runs typecheck, lint, the E2E suite, unit tests, the build and `docker build .` (no push). It triggers on PRs and on pushes to `v2` and `main`.
+- **Re-enabling Actions is approved** once 013 is pushed to `v2` (013 T3).
+- **The 011 theme-toggle exception to FR-12 is approved.** The toggle is now a "Theme" group with "Light" and "Dark" buttons.
+- **The next changes run in this order: 013 → 014 → 012.**
+  - **013 fork CI, checks only** (bounded): approved, planned, building now.
+  - **014 UI accessibility, shared primitives and consistency** (architectural): approved. The panel's CHANGES_REQUESTED was resolved by the user's rulings: it stays one change, a full E2E runs per wave, the shared primitive comes first, and scroll regions follow a static rule.
+  - **012 per-channel captions:** approved, with these decisions: a `DraftCaption` table, a separate on-image headline, revisions stay design-only, and the brief step is named "Brief & Caption Direction".
+
+### What happened
+
+- **011 verified PASS, 20/20** (`.specclaw/changes/011-app-visual-redesign/verify-report.md`). A fresh E2E run at HEAD gave **311 passed / 3 skipped / 1 flaky / 0 failed**. The flake was a one-off Chromium `Page crashed` at `tests/e2e/surfaces.test.ts:521` (library thumbnails); it passed on retry and when run alone.
+- **Fork `main` merged into `v2` at `2506de0b`.** The merge was clean. It brings 004 Phase 0: Node 22, `/api/health`, the CI hardening and MinIO → silo. Gates on the merged tree:
+  - tsc clean, lint 0 errors, unit **1722/1722**, build passes;
+  - full clean mock E2E **313 passed / 3 skipped / 0 failed / 0 flaky** (5.8 min);
+  - `tests/e2e/auth.test.ts` 8/8, including the new "/api/health is public and returns exactly {ok, commit}".
+- **`/api/health` with no session** returns HTTP 200 and `{"ok":true,"commit":"unknown"}`. The commit is `unknown` because `GIT_SHA` is not set locally. Whoever builds the image passes `--build-arg GIT_SHA=<sha>`.
+- **`docker build` on `node:22-alpine` works.** In the image, `claude --version` is `2.1.287 (Claude Code)` and `node -v` is `v22.23.3`, with 0 `EBADENGINE` warnings. **005 AC-17 re-check: PASS.**
+- **004 Phase 0 is closed in the fork** (`.specclaw/changes/004-design-instruction-fidelity/verify-report.md` → "Phase 0 closure in the fork"). AC-P0-3 and AC-P0-5 pass. AC-P0-1 and AC-P0-2 are superseded by 013, because the fork has no deploy target. **AC-P0-4 waits on the first `v2` CI run's annotations.**
+- **Local MinIO swapped to silo:** `pgsty/silo:RELEASE.2026-09-16T00-00-00Z`, on the same volume. All 6 buckets, their object counts and their policies are unchanged. Backups are in the session scratchpad, and the old image is tagged `local/minio-rollback:pre-silo` for a rollback.
+
+### Do this next, in order
+
+1. **Finish 013 with T3.** Push `v2` to `origin` (the fork only), run `gh api -X PUT repos/EnderGuardian25/ai-studio/actions/permissions -F enabled=true`, and watch the first `E2E` run on `v2`. Record its annotations as 004's AC-P0-4. If a runner-only failure appears, such as a timeout or a Playwright cache miss, report it to the user before making a minimal `e2e.yml` fix (013 NFR-02). **Until 013 T3 lands, Actions are off** and the gates run locally.
+2. **Plan and build 014** (`.specclaw/changes/014-ui-a11y-consistency-pass/`), with the user's rulings above.
+3. **Plan and build 012** (`.specclaw/changes/012-per-channel-captions/`), with the user's decisions above.
+4. **Operator run for 005 AC-16:** `scripts/cli-sandbox-check.mjs` in the rebuilt node:22 image, with a real OAuth token. 🔴 **First revoke the token pasted into chat on 2026-10-06** and make a new one with `claude setup-token`.
+5. **Watch the `surfaces.test.ts:521` page-crash flake.** If it recurs, look into it with `/specclaw:debug`.
+
+---
+
+## ⏸️ 2026-10-08 — superseded by 2026-10-09 above (kept for history): 011 is built (13/13); verify next
 
 All of 011 is on `v2` in the fork. Every screen is **Folio**. Each task followed one cycle: an implementer subagent with a written brief, then a `specclaw:code-reviewer` subagent, then the orchestrator fixed any WARNs, re-ran the gates and committed. The reports are in `.specclaw/changes/011-app-visual-redesign/reports/T*.md` and the reviews (with resolutions) in `reviews/T*.md`.
 
@@ -46,9 +81,9 @@ There was also one separate docs commit: `1f5a2a39`, the AC-23 wording-guard fix
 
 ### Do this next, in order
 
-1. **`/specclaw:verify 011-app-visual-redesign`.**
-2. **Fork CI-fix proposal** (`/specclaw:propose`, then the user approves it): guard or remove the `docker-publish.yml` deploy job, add `v2` to `e2e.yml`, and re-enable Actions. See the fork section below.
-3. **011 follow-up proposal** (`/specclaw:propose`, then the user approves it). These items were kept out of 011 on purpose, because FR-12 froze accessible names and because they are refactors:
+1. ~~**`/specclaw:verify 011-app-visual-redesign`.**~~ **Done 2026-10-09:** PASS, 20/20.
+2. ~~**Fork CI-fix proposal** (`/specclaw:propose`, then the user approves it): guard or remove the `docker-publish.yml` deploy job, add `v2` to `e2e.yml`, and re-enable Actions.~~ **Superseded 2026-10-09 by change 013:** `docker-publish.yml` is deleted, CI is checks only, and Actions are re-enabled by 013 T3.
+3. **011 follow-up proposal** (`/specclaw:propose`, then the user approves it). **Proposed and approved 2026-10-09 as change 014.** These items were kept out of 011 on purpose, because FR-12 froze accessible names and because they are refactors:
    - **Accessibility naming pass:**
      - labels for placeholder-named inputs (the /team register and channel fields, the add-colour field, the template Size and HTML/CSS fields, the brief topic and kit select);
      - the unnamed COPY/IMAGE tablist;
@@ -67,7 +102,7 @@ There was also one separate docs commit: `1f5a2a39`, the AC-23 wording-guard fix
      - cap the kit list's height;
      - set `tabular-nums` on body as DESIGN_SYSTEM §5 says;
      - extend the guard to catch `glow-blob`, `animate-scale-in`, `text-primary` and `font-inter`.
-4. **Merge fork `main` into `v2`.** This brings 004 Phase 0: Node 22, `/api/health`, CI hardening and MinIO → silo. Then recheck 005 AC-17 under node:22, re-run AC-16 on a rebuilt image and close 004's Phase 0 ACs. Expect a `docker-publish.yml` conflict, so pair it with step 2.
+4. ~~**Merge fork `main` into `v2`.** This brings 004 Phase 0: Node 22, `/api/health`, CI hardening and MinIO → silo. Then recheck 005 AC-17 under node:22, re-run AC-16 on a rebuilt image and close 004's Phase 0 ACs. Expect a `docker-publish.yml` conflict, so pair it with step 2.~~ **Done 2026-10-09 at `2506de0b`** (a clean merge). AC-17 passes, and 004 Phase 0 is closed except AC-P0-4. AC-16 still needs an operator run.
 
 ### Follow-ups and gotchas from this build
 
@@ -107,19 +142,27 @@ There was also one separate docs commit: `1f5a2a39`, the AC-23 wording-guard fix
 - **Untracked and gitignored files never reach the fork:** `.env`, `.env.test`, `brag-output/`, the specclaw `logs/` and `.lock/`.
 - 🔴 **Still open, and unrelated to the fork:** the OAuth token pasted into chat on 2026-10-06 lives in the session transcript, not the repo. Revoke it and make a new one with `claude setup-token`.
 
-### CI on the fork: Actions are OFF until the workflows are changed
+### CI on the fork: checks only (change 013)
+
+**Updated 2026-10-09 (change 013).** By the user's decision, the fork runs **checks only**:
+
+- **`docker-publish.yml` is deleted** (013 T1), not guarded. The fork pushes no GHCR image, calls no Coolify and polls no `/api/health`. The user will write their own deploy workflow later.
+- **`e2e.yml` is the only workflow.** It runs typecheck, lint, E2E, unit, the build and `docker build .` with no push, on PRs and on pushes to `v2` and `main`.
+- **Actions are re-enabled by 013 T3**, after 013 is pushed to `v2`. Until 013 T3 lands, Actions are off and the gates run locally.
+
+The 2026-10-07 state is kept below for history.
 
 `gh api -X PUT repos/EnderGuardian25/ai-studio/actions/permissions -F enabled=false` was run on 2026-10-07. Both workflows still assume the company repo:
 
 - **`docker-publish.yml`** (push to `main`) builds and pushes `ghcr.io/<repo>` (here, `ghcr.io/enderguardian25/ai-studio`). It then **calls the company's Coolify** (`coolify.bistecglobal.com`, the company's two resource UUIDs) and polls the company's `/api/health`. With no `COOLIFY_API_TOKEN` it can only fail red. It must never be given one.
 - **`e2e.yml`** runs only on PRs and pushes to `main`. Draft PR #43 existed only to get CI on `v2`; the fork needs `v2` in its triggers instead.
 
-**The user's timing (2026-10-07): this waits until 011 is finished.** Then draft it with `/specclaw:propose` for the user to approve; don't build it between 011 tasks. **Next step (a specclaw change, so propose it first):** remove or guard the deploy job with `if: github.repository == 'bistec-oss/studio'`, and add `v2` to `e2e.yml`'s triggers. Then turn Actions back on with `-F enabled=true`. Until then, **gates are run locally** (unit, lint, build, mock E2E), exactly as before.
+**The user's timing (2026-10-07): this waits until 011 is finished.** Then draft it with `/specclaw:propose` for the user to approve; don't build it between 011 tasks. ~~**Next step (a specclaw change, so propose it first):** remove or guard the deploy job with `if: github.repository == 'bistec-oss/studio'`, and add `v2` to `e2e.yml`'s triggers. Then turn Actions back on with `-F enabled=true`.~~ **Superseded by 013** (see above). Until then, **gates are run locally** (unit, lint, build, mock E2E), exactly as before.
 
 ### What changed in the open items
 
 - **PR #42 was already merged** into company `main` on 2026-09-28 (`671ad6e9`). The "merges only on go-ahead" notes were stale. Fork `main` = `671ad6e9`.
-- **Still to do, now inside the fork:** merge `main` into `v2`, which brings 004 Phase 0: `/api/health`, Node 22, the CI hardening and MinIO → silo. Then recheck 005 AC-17 under node:22, re-run AC-16 against a rebuilt image, and close 004's Phase 0 ACs. Expect conflicts in `.github/workflows/docker-publish.yml`, so do the CI change above right after.
+- ~~**Still to do, now inside the fork:**~~ **Done 2026-10-09** (merge `2506de0b`; only AC-16 and AC-P0-4 remain): merge `main` into `v2`, which brings 004 Phase 0: `/api/health`, Node 22, the CI hardening and MinIO → silo. Then recheck 005 AC-17 under node:22, re-run AC-16 against a rebuilt image, and close 004's Phase 0 ACs. Expect conflicts in `.github/workflows/docker-publish.yml`, so do the CI change above right after.
 - **No longer ours, so don't act on them from here:**
   - draft PR #43 (left open on the company repo, as it is);
   - the Coolify token rotation;

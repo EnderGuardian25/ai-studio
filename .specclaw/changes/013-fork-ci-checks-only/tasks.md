@@ -18,7 +18,7 @@ Delete `docker-publish.yml`, add `v2` to `e2e.yml`, and fix the comments that na
   - Kind: config
   - Notes: AC-01, AC-02, AC-03. Comment-only edits in the three source files. Gates: lint, unit, build.
 
-- [~] `T2` — Docs: the fork CI state, and the 004 Phase 0 closure
+- [x] `T2` — Docs: the fork CI state, and the 004 Phase 0 closure
   - Files: `CLAUDE.md`, `docs/handoff.md`, `.specclaw/changes/004-design-instruction-fidelity/verify-report.md`
   - Estimate: small
   - Kind: docs

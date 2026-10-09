@@ -2,7 +2,28 @@
 
 This repo contains planning documents for **bistec-studio**, an internal marketing post generation tool for the Bistec marketing team.
 
-## ✅ Outstanding work — START HERE (updated 2026-10-08)
+## ✅ Outstanding work — START HERE (updated 2026-10-09)
+
+- **🧭 2026-10-09 — 011 verified PASS; fork `main` merged into `v2`; 013 (fork CI, checks only) is building.** Full detail: [`docs/handoff.md`](docs/handoff.md) top section.
+  - **The user's decisions:**
+    - **The fork runs checks only:** no GHCR push and no redeploy. `docker-publish.yml` is deleted (013 T1); the user will write their own deploy workflow later. `e2e.yml` (typecheck, lint, E2E, unit, build, `docker build .` with no push) runs on PRs and on pushes to `v2` and `main`.
+    - **The 011 theme-toggle exception to FR-12 is approved.**
+    - **Order: 013 → 014 → 012.**
+      - **013 fork CI** (bounded) is building.
+      - **014 UI accessibility / shared primitives / consistency** is approved: one change, a full E2E per wave, the shared primitive first, a static scroll-region rule.
+      - **012 per-channel captions** is approved: a `DraftCaption` table, a separate on-image headline, design-only revisions, and a brief step named "Brief & Caption Direction".
+  - **011 verify: PASS, 20/20.** A fresh E2E at HEAD gave 311 passed / 3 skipped / 1 flaky / 0 failed. The flake was a one-off Chromium page crash at `tests/e2e/surfaces.test.ts:521`.
+  - **The merge `2506de0b`** was clean and brought 004 Phase 0. Gates on the merged tree: tsc clean, lint 0 errors, unit 1722/1722, build, full clean mock E2E **313/3/0/0**, and `auth.test.ts` 8/8 with the new `/api/health` case.
+    - `/api/health` without a session returns 200 `{"ok":true,"commit":"unknown"}`; the commit is unknown because `GIT_SHA` is unset locally.
+    - The `node:22-alpine` image builds, with `claude` 2.1.287, node v22.23.3 and no `EBADENGINE` warnings. **005 AC-17 re-check: PASS.**
+    - **004 Phase 0:** AC-P0-3 and AC-P0-5 pass; AC-P0-1 and AC-P0-2 are superseded by 013, because the fork has no deploy target; AC-P0-4 waits on the first `v2` CI run.
+  - **Local MinIO now runs silo** (`pgsty/silo:RELEASE.2026-09-16T00-00-00Z`, same volume; buckets, object counts and policies unchanged). The rollback image is `local/minio-rollback:pre-silo`.
+  - **Next, in order:**
+    1. **Finish 013 with T3:** push `v2` to `origin`, re-enable Actions, watch the first `v2` E2E run and record AC-P0-4. Report any runner-only failure to the user before fixing it.
+    2. **Plan and build 014.**
+    3. **Plan and build 012.**
+    4. **The operator run of 005 AC-16:** `scripts/cli-sandbox-check.mjs` in the rebuilt image, with a real OAuth token. 🔴 Revoke the token pasted into chat on 2026-10-06 first.
+    5. **Watch the `surfaces.test.ts:521` page-crash flake.**
 
 - **🎨 2026-10-08 — 011 (app visual redesign) is BUILT: 13/13 tasks on `v2` in the fork.** Every screen is **Folio**. Full detail: [`docs/handoff.md`](docs/handoff.md) top section.
   - **The user's decisions:**
@@ -15,13 +36,13 @@ This repo contains planning documents for **bistec-studio**, an internal marketi
     - **The default font is Instrument Sans,** with Fraunces for display and JetBrains Mono for code.
   - **Gates at `c37357a3`:** unit 1722/1722, lint 0 errors, build, `test:render` 15/15, full clean mock E2E **312/3/0/0**. The suite grew by 47 (`tests/e2e/surfaces.test.ts`).
   - **Next, in order:**
-    1. **`/specclaw:verify 011-app-visual-redesign`.**
-    2. **The fork CI-fix proposal.** The user approves it; they asked for it after 011. It means guarding or removing the `docker-publish.yml` deploy job, adding `v2` to `e2e.yml`, then re-enabling Actions.
-    3. **The 011 follow-up proposal, for the user to approve.** Its contents are listed in the handoff:
+    1. ~~**`/specclaw:verify 011-app-visual-redesign`.**~~ **Done 2026-10-09:** PASS, 20/20.
+    2. ~~**The fork CI-fix proposal.** The user approves it; they asked for it after 011. It means guarding or removing the `docker-publish.yml` deploy job, adding `v2` to `e2e.yml`, then re-enabling Actions.~~ **Superseded 2026-10-09 by change 013:** `docker-publish.yml` is deleted, and CI is checks only.
+    3. **The 011 follow-up proposal, for the user to approve.** **Approved 2026-10-09 as change 014.** Its contents are listed in the handoff:
        - an accessibility naming pass;
        - one shared page-head / section primitive replacing 8 `folio.ts` copies;
        - smaller consistency items.
-    4. **Merge fork `main` into `v2`.** This brings 004 Phase 0: Node 22, `/api/health`, CI hardening and MinIO → silo. Then recheck 005 AC-17 and AC-16.
+    4. ~~**Merge fork `main` into `v2`.** This brings 004 Phase 0: Node 22, `/api/health`, CI hardening and MinIO → silo. Then recheck 005 AC-17 and AC-16.~~ **Done 2026-10-09 at `2506de0b`.** AC-17 passes; AC-16 still needs an operator run.
   - **Pre-existing bug, logged as a follow-up:** a refine row can stay on "Applying…" if the mock refine finishes before the post-202 refetch sees `pendingAction`. It was seen once.
   - **The capture tool:** `node scripts/capture-ui.mjs --out ui-captures/<name>`, against `npm run test:e2e:serve`, captures every screen. `ui-captures/` is gitignored.
 
@@ -31,15 +52,15 @@ This repo contains planning documents for **bistec-studio**, an internal marketi
     - `origin` = the fork. Push here; `main` and `v2` track it, and **`v2` is the fork's default branch**.
     - `company` = `bistec-oss/studio`, **fetch-only**. Its push URL is deliberately `DISABLED-company-repo-is-read-only`; never "repair" it.
     - `gh repo set-default` = `EnderGuardian25/ai-studio`. In a fork, `gh pr create` and `/specclaw:pr` otherwise default the PR base to the **company** repo. If `gh` ever proposes `bistec-oss/studio`, stop.
-  - **GitHub Actions are OFF on the fork** (2026-10-07). `docker-publish.yml` still redeploys the **company's** Coolify and polls the company's `/api/health`, and `e2e.yml` doesn't trigger on `v2`.
-    - **Next code change, proposed first:** guard or remove the deploy job (`if: github.repository == 'bistec-oss/studio'`), add `v2` to the E2E triggers, then re-enable Actions with `gh api -X PUT repos/EnderGuardian25/ai-studio/actions/permissions -F enabled=true`.
-    - **Never** give the fork a `COOLIFY_API_TOKEN`. Until CI is back, run the gates locally.
+  - **CI on the fork is checks only** (user decision 2026-10-09, change 013). `docker-publish.yml` is **deleted**, so there is no GHCR push, no Coolify redeploy and no company health poll. `e2e.yml` is the only workflow; it runs on PRs and on pushes to `v2` and `main`.
+    - **Actions are re-enabled by 013 T3** (`gh api -X PUT repos/EnderGuardian25/ai-studio/actions/permissions -F enabled=true`), once 013 is pushed to `v2`. Until 013 T3 lands, Actions are off (since 2026-10-07) and the gates run locally.
+    - **Never** give the fork a `COOLIFY_API_TOKEN`. A deploy workflow for the user's own target will be written fresh later.
   - **The repo is public.**
     - The 2026-10-07 audit found no real credential in the tree or in `v2` history, and everything was already public on the company repo.
     - **Never commit** secrets, `.env*` (except `.env.example`), prod IDs, customer data or tokens. Test fixtures use obvious fakes (`FAKE`, `AAAA…`).
     - `BistecStudio2026!` is the test-only seed password; it is never used outside a `*_test` DB.
   - **Company prod (`studio.bistecglobal.com`) is not ours.** The Coolify, MinIO → silo prod swap, B4, team-token and prod-test items further down are **company history and reference**, not to-dos. The fork has no deploy target yet.
-  - **PR #42 was merged into company `main` on 2026-09-28** (`671ad6e9` = fork `main`). Every "merge #42 only on go-ahead" note below is stale. **To do in the fork:** merge `main` into `v2`, recheck 005 AC-17 under node:22, re-run AC-16 against a rebuilt image, and close 004's Phase 0 ACs.
+  - **PR #42 was merged into company `main` on 2026-09-28** (`671ad6e9` = fork `main`). Every "merge #42 only on go-ahead" note below is stale. ~~**To do in the fork:** merge `main` into `v2`, recheck 005 AC-17 under node:22, re-run AC-16 against a rebuilt image, and close 004's Phase 0 ACs.~~ **Done 2026-10-09** (`2506de0b`), except the AC-16 operator run and AC-P0-4.
   - **Branch rule (kept):** `v2` is the integration branch. Fork `main` moves only on the user's go-ahead.
 
 - **⏸️ 2026-10-07 — PICK UP HERE. 005 is done and verified PASS. 011 (app visual redesign) is planned, and wave 1 is built. The build is paused at its operator gate: the user picks a design direction.** Full detail: [`docs/handoff.md`](docs/handoff.md) top section.
