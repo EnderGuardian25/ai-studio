@@ -277,3 +277,20 @@ File .gitignore modified but not declared in any task: specclaw-build setup's .l
 Ignore .lock/ dirs from specclaw init onward
 
 ---
+
+## [L17] best_practice — Enable Actions BEFORE pushing: a push made while Actions ...
+
+**When:** 2026-10-09 17:20 UTC
+**Category:** best_practice
+**Priority:** medium
+**Status:** pending
+
+### Detail
+
+Enable Actions BEFORE pushing: a push made while Actions are disabled triggers no run
+
+### Action
+
+Order: gh api enable, then git push
+
+---
