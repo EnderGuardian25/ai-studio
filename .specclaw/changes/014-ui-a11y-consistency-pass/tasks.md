@@ -34,7 +34,7 @@ There are **18 tasks in 3 waves**, all on `v2`. **The full clean mock E2E runs 3
 
 ### Wave 1 — B: shared page primitives
 
-- [ ] `T1` — Capture compare script and the `before` baseline
+- [x] `T1` — Capture compare script and the `before` baseline
   - Files: `scripts/compare-captures.mjs` (new)
   - Estimate: small
   - Kind: config
