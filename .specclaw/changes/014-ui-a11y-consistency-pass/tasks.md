@@ -49,7 +49,7 @@ There are **18 tasks in 3 waves**, all on `v2`. **The full clean mock E2E runs 3
       - **Do not recreate the DB again until the wave-1 gate.** `ui-captures/` is gitignored.
     - **The report records:** the commit SHA of the baseline, the shot count (58 expected) and the noise list.
 
-- [ ] `T2` — Shared primitives in `src/components/ui/`, with no consumer
+- [x] `T2` — Shared primitives in `src/components/ui/`, with no consumer
   - Files: `src/components/ui/folio.ts`, `PageHead.tsx`, `SectionHead.tsx`, `Notice.tsx`, `FieldLabel.tsx` (all new), `src/components/ui/StatusChip.tsx`, `src/components/ui/index.ts`, `tests/unit/uiPrimitives.test.ts` (new)
   - Estimate: medium
   - Kind: impl
