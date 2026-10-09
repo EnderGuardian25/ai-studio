@@ -12,13 +12,13 @@ Delete `docker-publish.yml`, add `v2` to `e2e.yml`, and fix the comments that na
 
 ### Wave 1 — Workflows, comments and docs
 
-- [ ] `T1` — Delete docker-publish.yml, add v2 to the e2e.yml triggers, fix the GIT_SHA comments
+- [x] `T1` — Delete docker-publish.yml, add v2 to the e2e.yml triggers, fix the GIT_SHA comments
   - Files: `.github/workflows/docker-publish.yml` (delete), `.github/workflows/e2e.yml`, `Dockerfile`, `src/app/api/health/route.ts`, `src/lib/env.ts`
   - Estimate: small
   - Kind: config
   - Notes: AC-01, AC-02, AC-03. Comment-only edits in the three source files. Gates: lint, unit, build.
 
-- [ ] `T2` — Docs: the fork CI state, and the 004 Phase 0 closure
+- [~] `T2` — Docs: the fork CI state, and the 004 Phase 0 closure
   - Files: `CLAUDE.md`, `docs/handoff.md`, `.specclaw/changes/004-design-instruction-fidelity/verify-report.md`
   - Estimate: small
   - Kind: docs

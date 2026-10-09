@@ -77,8 +77,9 @@ const envSchema = z.object({
   NEXT_PUBLIC_APP_URL: z.string().optional(),
 
   // --- Build metadata (FR-P0-3) --- Baked into the runner image as ENV by the
-  // Dockerfile from a CI build-arg (docker-publish.yml); read by /api/health.
-  // Unset locally (no build-arg passed) — the route falls back to "unknown".
+  // Dockerfile from --build-arg GIT_SHA=<sha>, passed by whoever builds the
+  // image (e.g. a future deploy workflow); read by /api/health. Without it the
+  // route reports commit "unknown".
   GIT_SHA: z.string().optional(),
 })
 

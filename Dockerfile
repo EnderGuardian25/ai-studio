@@ -137,8 +137,8 @@ EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
-# Commit SHA the image was built from (FR-P0-3) — passed as a build-arg by CI
-# (build-args: GIT_SHA=${{ github.sha }} in docker-publish.yml), not a secret.
+# Commit SHA the image was built from (FR-P0-3) — whoever builds the image
+# passes --build-arg GIT_SHA=<sha> (e.g. a future deploy workflow); not a secret.
 # Declared here, after every COPY/RUN layer above (still after `npm run build`
 # in the builder stage, so the force-dynamic reasoning in /api/health still
 # holds — this only changes which layer a new commit invalidates) so a new

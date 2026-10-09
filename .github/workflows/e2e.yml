@@ -4,11 +4,15 @@ name: E2E (security-fix regression gate)
 # cases that guard the 28 code-review security/correctness fixes (H1–H13, M*, L*)
 # and §A RBAC/IDOR. Block merges on this so those fixes can never silently break.
 # See docs/e2e-test-plan.md.
+#
+# In the fork this runs on PRs and on pushes to v2 and main, and it is the
+# fork's only workflow: checks only (typecheck, lint, E2E, unit, build, and a
+# docker build with no push). Nothing is published and nothing is deployed.
 
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [v2, main]
 
 # One run per ref — a new push cancels the in-flight run for the same branch/PR.
 concurrency:
