@@ -1,6 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk"
 import type { BriefInput, CopyProvider } from "../../interfaces/CopyProvider"
-import { buildCopyPrompt } from "@/lib/agent/prompts/copy"
+import { buildCopyPrompt } from "@/lib/agent/prompts/caption"
 
 export class AnthropicCopyProvider implements CopyProvider {
   private client: Anthropic

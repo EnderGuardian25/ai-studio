@@ -1,8 +1,13 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import type { ResolvedBrandKit } from '@/lib/brandkit/resolve'
 import { buildPathBSystemPrompt, buildPathBUserMessage } from '@/lib/agent/prompts/pathB'
 import { buildPathASystemPrompt, buildPathAUserMessage } from '@/lib/agent/prompts/pathA'
-import { buildCopyPrompt } from '@/lib/agent/prompts/copy'
+import {
+  buildCaptionPrompt,
+  buildCopyPrompt,
+  CAPTION_MAX_TOKENS,
+  CAPTION_PROMPT_VERSION,
+} from '@/lib/agent/prompts/caption'
 import { placeholderNote, SCRIPT_SUPPORT_NOTE, PROMPT_VERSION } from '@/lib/agent/prompts/shared'
 
 const kit: ResolvedBrandKit = {
@@ -190,7 +195,7 @@ describe('SCRIPT_SUPPORT_NOTE — no-emoji guidance', () => {
   })
 })
 
-describe('buildCopyPrompt', () => {
+describe('buildCopyPrompt (deprecated wrapper, removed in 012 T5)', () => {
   const brief = {
     topic: 'Hiring push',
     description: 'We are growing',
@@ -215,5 +220,113 @@ describe('buildCopyPrompt', () => {
     const generic = buildCopyPrompt(brief)
     expect(generic.system).toContain('copywriter for the brand')
     expect(generic.system).not.toContain('Brand voice guidelines')
+  })
+})
+
+describe('buildCaptionPrompt (012 FR-07)', () => {
+  const brief = {
+    topic: 'Hiring push',
+    description: 'We are growing',
+    goal: 'Applications',
+    tone: 'Friendly',
+    channels: ['INSTAGRAM', 'LINKEDIN'],
+  }
+  const ALL = ['HEADLINE', 'INSTAGRAM', 'LINKEDIN', 'WHATSAPP'] as const
+
+  it('is pure and embeds the brief fields', () => {
+    expect(buildCaptionPrompt(brief, ALL)).toEqual(buildCaptionPrompt(brief, ALL))
+    const { user } = buildCaptionPrompt(brief, ALL)
+    expect(user).toContain('Topic: Hiring push')
+    expect(user).toContain('Description: We are growing')
+    expect(user).toContain('Goal: Applications')
+    expect(user).toContain('Tone: Friendly')
+  })
+
+  it('takes the length guidance from the registry: hard limits and the WhatsApp soft guide', () => {
+    const { user } = buildCaptionPrompt(brief, ALL)
+    expect(user).toContain('"instagram" (Instagram): Hook in the first line.')
+    expect(user).toContain('At most 2,200 characters.')
+    expect(user).toContain('"linkedin" (LinkedIn): Professional and longer-form.')
+    expect(user).toContain('At most 3,000 characters.')
+    expect(user).toContain('"whatsapp" (WhatsApp): Short and direct.')
+    expect(user).toContain('Aim for at most 1,000 characters.')
+    expect(user).toContain(
+      '"headline": the short line printed on the post image: one line, at most 100 characters, no hashtags, no emoji, no markdown.'
+    )
+  })
+
+  it('lists bullets headline first, then channels in registry order, whatever the target order', () => {
+    const { user } = buildCaptionPrompt(brief, ['WHATSAPP', 'INSTAGRAM', 'HEADLINE', 'LINKEDIN'])
+    const at = (k: string) => user.indexOf(`- "${k}"`)
+    expect(at('headline')).toBeGreaterThan(-1)
+    expect(at('headline')).toBeLessThan(at('instagram'))
+    expect(at('instagram')).toBeLessThan(at('linkedin'))
+    expect(at('linkedin')).toBeLessThan(at('whatsapp'))
+  })
+
+  it('names exactly the requested keys in the output protocol and asks for nothing else', () => {
+    const all = buildCaptionPrompt(brief, ALL).user
+    expect(all).toContain(
+      'Reply with exactly one JSON object whose keys are exactly "headline", "instagram", "linkedin", "whatsapp", each a string. No other keys. Escape newlines as \\n.'
+    )
+    expect(all).toContain('nothing else')
+
+    const one = buildCaptionPrompt(brief, ['LINKEDIN']).user
+    expect(one).toContain('whose keys are exactly "linkedin", each a string.')
+    expect(one).not.toContain('"instagram"')
+    expect(one).not.toContain('"whatsapp"')
+    expect(one).not.toContain('"headline"')
+  })
+
+  it('writes all three captions whatever brief.channels says (A5)', () => {
+    const { user } = buildCaptionPrompt({ ...brief, channels: ['INSTAGRAM'] }, ALL)
+    expect(user).toContain('"linkedin"')
+    expect(user).toContain('"whatsapp"')
+  })
+
+  it('keeps the brand, voice and campaign briefing in the system prompt', () => {
+    const { system } = buildCaptionPrompt(
+      { ...brief, brandName: 'Bistec', brandVoice: 'Bold voice.', campaignBriefing: 'IRP context.' },
+      ALL
+    )
+    expect(system).toContain('copywriter for Bistec')
+    expect(system).toContain('Bold voice.')
+    expect(system).toContain('Campaign briefing (applies to every post in this campaign):\nIRP context.')
+    expect(system.indexOf('Bold voice.')).toBeLessThan(system.indexOf('IRP context.'))
+
+    const generic = buildCaptionPrompt(brief, ALL).system
+    expect(generic).toContain('copywriter for the brand')
+    expect(generic).not.toContain('Brand voice guidelines')
+    expect(generic).not.toContain('Campaign briefing')
+  })
+
+  it('exports the caption prompt version and the token budget', () => {
+    expect(CAPTION_PROMPT_VERSION).toMatch(/^\d{4}-\d{2}-\d{2}\.\d+$/)
+    expect(CAPTION_MAX_TOKENS).toBe(8192)
+  })
+
+  it('a test registry with a changed limit changes the prompt text (AC-01)', async () => {
+    vi.resetModules()
+    vi.doMock('@/lib/channels', async (importOriginal) => {
+      const real = await importOriginal<typeof import('@/lib/channels')>()
+      return {
+        ...real,
+        CAPTION_CHANNELS: real.CAPTION_CHANNELS.map((s) =>
+          s.channel === 'INSTAGRAM' ? { ...s, hardLimit: 1234 } : s.channel === 'WHATSAPP' ? { ...s, softLimit: 777 } : s
+        ),
+      }
+    })
+    try {
+      const { buildCaptionPrompt: build } = await import('@/lib/agent/prompts/caption')
+      const { user } = build(brief, ALL)
+      expect(user).toContain('At most 1,234 characters.')
+      expect(user).not.toContain('2,200')
+      expect(user).toContain('Aim for at most 777 characters.')
+      expect(user).not.toContain('1,000')
+      expect(user).toContain('At most 3,000 characters.')
+    } finally {
+      vi.doUnmock('@/lib/channels')
+      vi.resetModules()
+    }
   })
 })

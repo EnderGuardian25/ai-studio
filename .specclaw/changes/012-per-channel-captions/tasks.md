@@ -59,7 +59,7 @@ Waves 2 and 3 add UX and wording only.
     - **Every listed input validator** uses `isPublishableChannel`. The messages keep their wording, with the list derived (for example 'channel must be INSTAGRAM or LINKEDIN'). `queue.ts` uses `z.enum(PUBLISHABLE_CHANNELS)`. MCP `publish_post` throws before any Post row exists.
     - **The registry unit test** fails when a `Channel` value is missing from `CAPTION_CHANNELS` or duplicated in it.
 
-- [ ] `T2` — The caption prompt, the extractor and the headline rules (pure)
+- [x] `T2` — The caption prompt, the extractor and the headline rules (pure)
   - Files: `src/lib/agent/prompts/copy.ts` → `src/lib/agent/prompts/caption.ts` (git mv), `src/lib/captions/extract.ts` (new), `src/lib/captions/headline.ts` (new), `tests/unit/captionExtract.test.ts` (new), `tests/unit/captionHeadline.test.ts` (new), `tests/unit/prompts.test.ts`
   - Estimate: medium
   - Kind: impl

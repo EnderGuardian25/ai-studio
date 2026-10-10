@@ -5,7 +5,7 @@
 import { describe, it, expect } from 'vitest'
 import type { Brief } from '@prisma/client'
 import type { ResolvedBrandKit } from '@/lib/brandkit/resolve'
-import { buildCopyPrompt } from '@/lib/agent/prompts/copy'
+import { buildCopyPrompt } from '@/lib/agent/prompts/caption'
 import { buildPathASystemPrompt } from '@/lib/agent/prompts/pathA'
 import { buildPathBUserMessage } from '@/lib/agent/prompts/pathB'
 import { buildBackgroundDecisionPrompt } from '@/lib/agent/prompts/background'

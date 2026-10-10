@@ -1,6 +1,6 @@
 import OpenAI from "openai"
 import type { BriefInput, CopyProvider } from "../../interfaces/CopyProvider"
-import { buildCopyPrompt } from "@/lib/agent/prompts/copy"
+import { buildCopyPrompt } from "@/lib/agent/prompts/caption"
 
 export class OpenAICopyProvider implements CopyProvider {
   private client: OpenAI

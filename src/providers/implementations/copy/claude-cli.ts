@@ -1,6 +1,6 @@
 import type { BriefInput, CopyProvider } from "../../interfaces/CopyProvider"
 import { runClaudeCli } from "@/lib/agent/claudeCli"
-import { buildCopyPrompt } from "@/lib/agent/prompts/copy"
+import { buildCopyPrompt } from "@/lib/agent/prompts/caption"
 
 // Copy provider backed by the local Claude Code CLI (`claude -p`). Activated in
 // CLI mode (DESIGN_PROVIDER=cli) so copy can be generated without an API key.
