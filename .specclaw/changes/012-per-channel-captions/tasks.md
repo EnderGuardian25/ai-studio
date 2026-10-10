@@ -102,7 +102,7 @@ Waves 2 and 3 add UX and wording only.
     - **The backfill:** the advisory lock, paging, per-draft `try/catch`, and the summary and `REVIEW` lines (spec FR-04). The entrypoint step sits inside the `SKIP_MIGRATIONS` guard. Add the second esbuild bundle (design §8) and the `captions:backfill` / `captions:report` npm scripts.
     - **Unit-test `migrateDraft`'s transaction shape** with Prisma mocked: `createMany skipDuplicates`, then the guarded update. **Do not run the script against the dev DB;** AC-23 runs it against the test DB in T10.
 
-- [ ] `T5` — The writers, the mock caption seam, and the headline in the design prompts
+- [x] `T5` — The writers, the mock caption seam, and the headline in the design prompts
   - Files: `src/providers/interfaces/CopyProvider.ts`, `src/providers/implementations/copy/{anthropic,openai,claude-cli}.ts`, `src/providers/registry.ts`, `src/lib/testHooks.ts`, `src/lib/captions/generate.ts` (new), `src/lib/agent/generateDraft.ts`, `src/app/api/drafts/[id]/retry/route.ts`, `src/lib/agent/{pathA,pathB,background}.ts`, `src/lib/agent/prompts/{pathA,pathB,background,shared,caption}.ts`, `src/app/api/drafts/[id]/regenerate-design/route.ts`, `tests/unit/{prompts,background,campaignBriefing,renderStamps,testHooks,copyProviderCliMode}.test.ts`
   - Estimate: large
   - Kind: impl

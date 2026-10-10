@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { withTeamAuth } from '@/lib/api/handler'
 import { canAccessContent } from '@/lib/authz/visibility'
 import { startBackgroundGeneration } from '@/lib/agent/backgroundGeneration'
+import { CAPTION_CHANNELS } from '@/lib/channels'
 
 type Params = { id: string }
 
@@ -30,9 +31,25 @@ export const POST = withTeamAuth<Params>(async (_req, { params }, user) => {
     )
   }
 
+  // One update (one transaction): IN_PROGRESS and every caption row back to
+  // PENDING, so the rerun's caption write (guarded on PENDING) lands on all
+  // three (012 FR-10). createMany fills any registry channel the draft has no
+  // row for (a draft from before 012 that failed before it was migrated).
   await prisma.draft.update({
     where: { id: params.id },
-    data: { status: 'IN_PROGRESS', failureReason: null },
+    data: {
+      status: 'IN_PROGRESS',
+      failureReason: null,
+      // A rerun writes a fresh headline; never leave a stale one on a FAILED draft.
+      headline: null,
+      captions: {
+        updateMany: { where: {}, data: { status: 'PENDING', failureReason: null } },
+        createMany: {
+          data: CAPTION_CHANNELS.map(({ channel }) => ({ channel, status: 'PENDING' as const })),
+          skipDuplicates: true,
+        },
+      },
+    },
   })
   await startBackgroundGeneration(params.id, user.userId, user.teamId)
 

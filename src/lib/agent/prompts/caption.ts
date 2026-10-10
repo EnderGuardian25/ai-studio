@@ -79,21 +79,3 @@ ${bullets.join('\n')}
 Reply with exactly one JSON object whose keys are exactly ${keys}, each a string. No other keys. Escape newlines as \\n. The reply must contain that JSON object and nothing else: no preamble, no explanation, no code fences.`,
   }
 }
-
-/**
- * @deprecated The single-caption prompt, kept only until the copy providers
- * move to buildCaptionPrompt (012 T5 removes it).
- */
-export function buildCopyPrompt(brief: BriefInput): CaptionPrompt {
-  const channelList = brief.channels.join(', ')
-  return {
-    system: systemPrompt(brief, `Write compelling, on-brand copy for ${channelList} posts.`),
-    user: `Topic: ${brief.topic}
-Description: ${brief.description}
-Goal: ${brief.goal}
-Tone: ${brief.tone}
-Channels: ${channelList}
-
-Write engaging copy for the above brief. Return ONLY the post copy text — no preamble, no explanation, no markdown headings.`,
-  }
-}

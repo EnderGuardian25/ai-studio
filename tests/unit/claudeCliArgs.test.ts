@@ -180,15 +180,15 @@ describe('AC-13: every text-mode call site spawns with --tools "" and never --al
   describe('through the real call wrappers', () => {
     beforeEach(() => setPlatform('linux'))
 
-    it('copy — ClaudeCliCopyProvider.generateCopy', async () => {
+    it('copy — ClaudeCliCopyProvider.generateCaptions', async () => {
       await inAuth(() =>
-        new ClaudeCliCopyProvider().generateCopy({
+        new ClaudeCliCopyProvider().generateCaptions({
           topic: 't',
           description: 'd',
           goal: 'g',
           tone: 'friendly',
           channels: ['INSTAGRAM'],
-        }),
+        }, ['INSTAGRAM']),
       )
       expectNoTools(h.spawnCalls[0].args, '')
     })

@@ -17,24 +17,62 @@ import type { ConstrainTarget, InstructionClass } from '@/lib/agent/instructionC
 // module for MOCK_AI + the two seams below.
 import type { VerifyResult } from '@/lib/drafts/refineVerify'
 import type { ImageProvider } from '@/providers/interfaces/ImageProvider'
+import { CAPTION_CHANNELS, type CaptionTarget } from '@/lib/channels'
+import { HEADLINE_MAX } from '@/lib/captions/headline'
 
 export const MOCK_AI = process.env.MOCK_AI === 'true'
 export const MOCK_PUPPETEER = process.env.MOCK_PUPPETEER === 'true'
 export const MOCK_SOCIAL = process.env.MOCK_SOCIAL === 'true'
 export const MOCK_SOCIAL_FAIL = process.env.MOCK_SOCIAL_FAIL === 'true'
 
-/** Deterministic copy text returned by the mock copy provider. */
-export const MOCK_COPY_TEXT =
-  'Mock copy text for E2E tests — deterministic output from the MOCK_AI seam.'
+// ── 012 FR-21: the mock caption reply seam ──────────────────────────────────
+
+const DROP_CAPTION_SENTINELS: Record<CaptionTarget, string> = {
+  HEADLINE: '__DROP_CAPTION_HEADLINE__',
+  INSTAGRAM: '__DROP_CAPTION_INSTAGRAM__',
+  LINKEDIN: '__DROP_CAPTION_LINKEDIN__',
+  WHATSAPP: '__DROP_CAPTION_WHATSAPP__',
+}
 
 /**
- * Mock copy that embeds the brief topic. The topic flows into the caption the
- * publishers receive (Draft.copyText), so a test can steer the mock publishers'
- * success/failure per-post by placing a sentinel in the brief topic (see
- * shouldMockPublishFail). Without a sentinel the behaviour is unchanged.
+ * Deterministic RAW caption reply returned by the mock copy provider (MOCK_AI):
+ * a chat preamble, a ```json-fenced object holding only the requested keys,
+ * and a sign-off — the shape a real model drifts into — so the REAL extractor
+ * (extractCaptionReply) parses every mock reply.
+ *
+ * Each caption embeds the brief topic, so the existing topic sentinels still
+ * reach whatever reads a caption (__FAIL_ALWAYS__ / __FAIL_ONCE__ for the
+ * publishers). The WhatsApp caption carries `**` so its normaliser is
+ * exercised (it becomes `*WhatsApp*`).
+ *
+ * A "__DROP_CAPTION_<TARGET>__" sentinel in the topic omits that key, ONLY in
+ * a reply that requests every channel (a generation or "Regenerate all"). So
+ * a single-channel regenerate of the dropped channel succeeds, with no stored
+ * state. Deterministic: same input, same bytes.
  */
-export function buildMockCopy(topic: string): string {
-  return `${MOCK_COPY_TEXT} [${topic}]`
+export function buildMockCaptionReply(topic: string, targets: readonly CaptionTarget[]): string {
+  const allChannels = CAPTION_CHANNELS.every((s) => targets.includes(s.channel))
+  const dropped = (target: CaptionTarget) => allChannels && topic.includes(DROP_CAPTION_SENTINELS[target])
+
+  const reply: Record<string, string> = {}
+  if (targets.includes('HEADLINE') && !dropped('HEADLINE')) {
+    reply.headline = `Mock headline ${topic}`.slice(0, HEADLINE_MAX)
+  }
+  for (const s of CAPTION_CHANNELS) {
+    if (!targets.includes(s.channel) || dropped(s.channel)) continue
+    const label = s.channel === 'WHATSAPP' ? `**${s.label}**` : s.label
+    reply[s.jsonKey] = `Mock ${label} caption [${topic}]`
+  }
+
+  return [
+    'Here are your captions:',
+    '',
+    '```json',
+    JSON.stringify(reply, null, 2),
+    '```',
+    '',
+    "Let me know if you'd like changes.",
+  ].join('\n')
 }
 
 // Per-caption record so a __FAIL_ONCE__ post fails the first publish attempt and

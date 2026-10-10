@@ -1,3 +1,5 @@
+import type { CaptionTarget } from '@/lib/channels'
+
 // Input to copy generation — only what copy providers actually consume.
 // Design-path concerns (designMode, image URLs, template references) live on
 // the Brief row and are consumed by the design pipeline, not copy providers.
@@ -16,6 +18,9 @@ export interface BriefInput {
   campaignBriefing?: string
 }
 
+// The COPY slot keeps its name (it also drives brand-voice drafting). One call
+// writes every requested caption target (012 FR-07) and returns the RAW reply:
+// parsing never happens in a provider — extractCaptionReply does it.
 export interface CopyProvider {
-  generateCopy(brief: BriefInput): Promise<string>
+  generateCaptions(brief: BriefInput, targets: readonly CaptionTarget[]): Promise<string>
 }

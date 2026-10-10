@@ -6,7 +6,7 @@ import type { ResolvedBrandKit } from '@/lib/brandkit/resolve'
 import { buildBrandKitSystemContext } from '@/lib/brandkit/systemContext'
 import type { PipelineMode } from '@/lib/agent/config'
 import type { BriefImage } from '@/lib/agent/briefInput'
-import { outputProtocol, SCRIPT_SUPPORT_NOTE } from './shared'
+import { onImageHeadline, outputProtocol, SCRIPT_SUPPORT_NOTE } from './shared'
 
 export interface PathBPromptOptions {
   kit: ResolvedBrandKit
@@ -63,7 +63,8 @@ export interface PathBUserMessageOptions {
   goal: string
   tone: string
   channels: string[]
-  copyText: string
+  // The on-image headline (012 FR-09) — never a caption.
+  headline: string
   mode: PipelineMode
   width: number
   height: number
@@ -76,7 +77,7 @@ export interface PathBUserMessageOptions {
 export type { BriefImage }
 
 export function buildPathBUserMessage(opts: PathBUserMessageOptions): string {
-  const { topic, description, goal, tone, channels, copyText, mode, width, height, briefImages = [], campaignBriefing } = opts
+  const { topic, description, goal, tone, channels, headline, mode, width, height, briefImages = [], campaignBriefing } = opts
 
   const imageSection = briefImages.length > 0
     ? `\n\nProvided images (follow intent rules from system prompt):\n${briefImages.map((img) => `- ${img.url} (intent: ${img.intent})`).join('\n')}`
@@ -101,7 +102,7 @@ Goal: ${goal}
 Tone: ${tone}
 Channels: ${channels.join(', ')}
 
-Copy text to use: ${copyText}${imageSection}
+${onImageHeadline(headline)}${imageSection}
 
 Design a complete, original HTML/CSS post. ${finalStep}`
 }

@@ -50,12 +50,88 @@ describe('shouldMockPublishFail', () => {
   })
 })
 
-describe('buildMockCopy', () => {
-  it('embeds the brief topic so sentinels reach the publishers via the caption', async () => {
+// 012 FR-21 / AC-11 — the mock caption reply runs through the REAL extractor.
+describe('buildMockCaptionReply', () => {
+  const ALL = ['HEADLINE', 'INSTAGRAM', 'LINKEDIN', 'WHATSAPP'] as const
+
+  it('is a raw reply (preamble, json fence, sign-off) the real extractor parses into 3 captions and a headline', async () => {
     const hooks = await loadHooks()
-    const copy = hooks.buildMockCopy('launch __FAIL_ONCE__ t1')
-    expect(copy).toContain(hooks.MOCK_COPY_TEXT)
-    expect(copy).toContain('__FAIL_ONCE__')
+    const { extractCaptionReply } = await import('@/lib/captions/extract')
+    const raw = hooks.buildMockCaptionReply('Launch day', ALL)
+    expect(raw.startsWith('Here are your captions:')).toBe(true)
+    expect(raw).toContain('```json\n')
+    expect(raw.trimEnd().endsWith("Let me know if you'd like changes.")).toBe(true)
+
+    const result = extractCaptionReply(raw, ALL)
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.fields).toEqual({
+      HEADLINE: { ok: true, text: 'Mock headline Launch day' },
+      INSTAGRAM: { ok: true, text: 'Mock Instagram caption [Launch day]' },
+      LINKEDIN: { ok: true, text: 'Mock LinkedIn caption [Launch day]' },
+      WHATSAPP: { ok: true, text: 'Mock *WhatsApp* caption [Launch day]' },
+    })
+    for (const f of Object.values(result.fields)) expect(f.ok && f.text).not.toContain('**')
+    // The preamble and sign-off are what the extractor discards.
+    expect(result.discarded).toContain('Here are your captions:')
+  })
+
+  it('carries only the requested keys', async () => {
+    const hooks = await loadHooks()
+    const raw = hooks.buildMockCaptionReply('t', ['LINKEDIN'])
+    expect(raw).toContain('"linkedin"')
+    expect(raw).not.toMatch(/"(headline|instagram|whatsapp)"/)
+  })
+
+  it('embeds the topic in every caption, so the topic sentinels still reach a caption reader', async () => {
+    const hooks = await loadHooks()
+    const raw = hooks.buildMockCaptionReply('launch __FAIL_ONCE__ t1', ALL)
+    expect(raw.match(/__FAIL_ONCE__/g)).toHaveLength(4)
+  })
+
+  it('__DROP_CAPTION_LINKEDIN__ drops linkedin from an all-channel reply, but not from a {linkedin} reply', async () => {
+    const hooks = await loadHooks()
+    const { extractCaptionReply } = await import('@/lib/captions/extract')
+    const topic = 'x __DROP_CAPTION_LINKEDIN__'
+
+    const all = extractCaptionReply(hooks.buildMockCaptionReply(topic, ALL), ALL)
+    expect(all.ok && all.fields.LINKEDIN).toEqual({ ok: false, reason: 'missing' })
+    expect(all.ok && all.fields.INSTAGRAM?.ok).toBe(true)
+    expect(all.ok && all.fields.WHATSAPP?.ok).toBe(true)
+
+    const one = extractCaptionReply(hooks.buildMockCaptionReply(topic, ['LINKEDIN']), ['LINKEDIN'])
+    expect(one.ok && one.fields.LINKEDIN?.ok).toBe(true)
+  })
+
+  it('each drop sentinel drops only its own key, and only when every channel is requested', async () => {
+    const hooks = await loadHooks()
+    const { extractCaptionReply } = await import('@/lib/captions/extract')
+    for (const target of ALL) {
+      const topic = `t __DROP_CAPTION_${target}__`
+      const all = extractCaptionReply(hooks.buildMockCaptionReply(topic, ALL), ALL)
+      if (!all.ok) throw new Error('mock reply rejected')
+      for (const other of ALL) {
+        expect(all.fields[other]?.ok).toBe(other !== target)
+      }
+    }
+    // A headline-only request keeps the headline; channels without the headline keep every channel.
+    const headlineOnly = hooks.buildMockCaptionReply('t __DROP_CAPTION_HEADLINE__', ['HEADLINE'])
+    expect(headlineOnly).toContain('"headline"')
+    const channelsOnly = hooks.buildMockCaptionReply('t __DROP_CAPTION_HEADLINE__', ['INSTAGRAM', 'LINKEDIN', 'WHATSAPP'])
+    expect(channelsOnly).not.toContain('"headline"')
+    expect(channelsOnly).toContain('"instagram"')
+  })
+
+  it('clips the headline to 100 characters', async () => {
+    const hooks = await loadHooks()
+    const { extractCaptionReply } = await import('@/lib/captions/extract')
+    const result = extractCaptionReply(hooks.buildMockCaptionReply('y'.repeat(200), ['HEADLINE']), ['HEADLINE'])
+    expect(result.ok && result.fields.HEADLINE).toEqual({ ok: true, text: `Mock headline ${'y'.repeat(86)}` })
+  })
+
+  it('is deterministic: the same input gives byte-identical output', async () => {
+    const hooks = await loadHooks()
+    expect(hooks.buildMockCaptionReply('Launch "day"\nnew', ALL)).toBe(hooks.buildMockCaptionReply('Launch "day"\nnew', ALL))
   })
 })
 

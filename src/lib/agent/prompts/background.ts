@@ -6,6 +6,7 @@
 
 import type { ResolvedBrandKit } from '@/lib/brandkit/resolve'
 import { buildBrandKitSystemContext } from '@/lib/brandkit/systemContext'
+import { onImageHeadline } from './shared'
 
 export interface BackgroundDecisionPrompt {
   system: string
@@ -32,7 +33,8 @@ export interface GenerationDecisionOptions {
   description?: string | null
   goal: string
   tone: string
-  copyText: string
+  // The on-image headline (012 FR-09) — never a caption.
+  headline: string
   // Active campaign briefing — campaign-level context that should inform the
   // background mood/subject alongside the per-post brief.
   campaignBriefing?: string | null
@@ -41,7 +43,7 @@ export interface GenerationDecisionOptions {
 // Initial generation (Path B): biased toward generating — most posts benefit
 // from a real background; skip only when a flat/gradient design is clearly better.
 export function buildBackgroundDecisionPrompt(opts: GenerationDecisionOptions): BackgroundDecisionPrompt {
-  const { kit, topic, description, goal, tone, copyText, campaignBriefing } = opts
+  const { kit, topic, description, goal, tone, headline, campaignBriefing } = opts
 
   const briefingSection = campaignBriefing
     ? `Campaign briefing (applies to every post in this campaign):
@@ -66,7 +68,7 @@ Description: ${description || 'none'}
 Goal: ${goal}
 Tone: ${tone}
 
-Post copy: ${copyText}`
+${onImageHeadline(headline)}`
 
   return { system, user }
 }

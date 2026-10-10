@@ -1,6 +1,7 @@
 import OpenAI from "openai"
 import type { BriefInput, CopyProvider } from "../../interfaces/CopyProvider"
-import { buildCopyPrompt } from "@/lib/agent/prompts/caption"
+import type { CaptionTarget } from "@/lib/channels"
+import { buildCaptionPrompt, CAPTION_MAX_TOKENS } from "@/lib/agent/prompts/caption"
 
 export class OpenAICopyProvider implements CopyProvider {
   private client: OpenAI
@@ -9,12 +10,12 @@ export class OpenAICopyProvider implements CopyProvider {
     this.client = new OpenAI({ apiKey })
   }
 
-  async generateCopy(brief: BriefInput): Promise<string> {
-    const prompt = buildCopyPrompt(brief)
+  async generateCaptions(brief: BriefInput, targets: readonly CaptionTarget[]): Promise<string> {
+    const prompt = buildCaptionPrompt(brief, targets)
 
     const response = await this.client.chat.completions.create({
       model: this.model,
-      max_tokens: 500,
+      max_tokens: CAPTION_MAX_TOKENS,
       temperature: 0.7,
       messages: [
         { role: "system", content: prompt.system },

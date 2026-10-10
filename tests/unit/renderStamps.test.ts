@@ -22,7 +22,9 @@ const fake = vi.hoisted(() => {
         return { id: 'd1', ...data }
       },
       findUnique: async () => db.draft,
+      updateMany: async () => ({ count: 1 }),
     },
+    draftCaption: { updateMany: async () => ({ count: 1 }) },
     draftRevision: {
       create: async ({ data }: { data: Record<string, unknown> }) => {
         db.revisionCreates.push(data)
@@ -35,7 +37,12 @@ const fake = vi.hoisted(() => {
     },
     brandKitTemplate: { findFirst: async () => ({ id: 't1', aspectRatio: 'SQUARE' }) },
   }
-  const client = { ...tx, $transaction: async <T>(fn: (t: typeof tx) => Promise<T>) => fn(tx) }
+  // Both transaction forms: the interactive callback and the batch array.
+  const client = {
+    ...tx,
+    $transaction: async (arg: unknown) =>
+      Array.isArray(arg) ? Promise.all(arg) : (arg as (t: typeof tx) => Promise<unknown>)(tx),
+  }
   return { db, client }
 })
 const db = fake.db
@@ -45,7 +52,10 @@ vi.mock('@/lib/renderer/fontSet', () => ({ getFontSetId: () => 'fonts-test' }))
 vi.mock('@/lib/brandkit/resolve', () => ({ resolveBrandKit: async () => ({ id: 'kit', name: 'Kit' }) }))
 vi.mock('@/lib/campaign/briefing', () => ({ getActiveCampaignBriefing: async () => null }))
 vi.mock('@/providers/registry', () => ({
-  resolveCopyProvider: async () => ({ generateCopy: async () => 'the caption' }),
+  resolveCopyProvider: async () => ({
+    generateCaptions: async () =>
+      JSON.stringify({ headline: 'the headline', instagram: 'ig', linkedin: 'li', whatsapp: 'wa' }),
+  }),
 }))
 vi.mock('@/lib/agent/briefInput', () => ({ buildBriefInput: () => ({}) }))
 vi.mock('@/lib/agent/pathA', () => ({
@@ -119,7 +129,7 @@ describe('regenerate-design', () => {
 
   it('the regenerated revision and the draft carry the same (current) stamp', async () => {
     db.draft = {
-      id: 'd1', teamId: 'team1', brief, copyText: 'c', htmlContent: '<html>v1</html>', exportUrl: 'exports/v1.png',
+      id: 'd1', teamId: 'team1', brief, headline: 'h', htmlContent: '<html>v1</html>', exportUrl: 'exports/v1.png',
       currentRevisionNumber: 1, promptVersion: 'pv-old', fontSet: 'fonts-old',
     }
     const res = (await regenerateDesign(req, ctx)) as Response
@@ -131,7 +141,7 @@ describe('regenerate-design', () => {
 
   it("a legacy draft's 'Design before regenerate' snapshot keeps the DRAFT's own stamp (it is that render)", async () => {
     db.draft = {
-      id: 'd1', teamId: 'team1', brief, copyText: 'c', htmlContent: '<html>legacy</html>', exportUrl: 'exports/l.png',
+      id: 'd1', teamId: 'team1', brief, headline: 'h', htmlContent: '<html>legacy</html>', exportUrl: 'exports/l.png',
       currentRevisionNumber: null, promptVersion: 'pv-old', fontSet: 'fonts-old',
     }
     await regenerateDesign(req, ctx)
@@ -146,7 +156,7 @@ describe('regenerate-design', () => {
 
   it('a legacy snapshot of an unstamped draft is null, never undefined', async () => {
     db.draft = {
-      id: 'd1', teamId: 'team1', brief, copyText: 'c', htmlContent: '<html>legacy</html>', exportUrl: 'exports/l.png',
+      id: 'd1', teamId: 'team1', brief, headline: 'h', htmlContent: '<html>legacy</html>', exportUrl: 'exports/l.png',
       currentRevisionNumber: null, promptVersion: null, fontSet: null,
     }
     await regenerateDesign(req, ctx)

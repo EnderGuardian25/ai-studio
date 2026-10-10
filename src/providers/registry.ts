@@ -7,7 +7,7 @@ import { OpenAIImageProvider } from "./implementations/image/openai"
 import { GeminiImageProvider } from "./implementations/image/gemini"
 import { AnthropicCopyProvider } from "./implementations/copy/anthropic"
 import { ClaudeCliCopyProvider } from "./implementations/copy/claude-cli"
-import { MOCK_AI, buildMockCopy } from "@/lib/testHooks"
+import { MOCK_AI, buildMockCaptionReply } from "@/lib/testHooks"
 import { env } from "@/lib/env"
 import { isCliMode } from "@/lib/agent/config"
 import { IMAGE_PROVIDERS } from "./imageCapabilities"
@@ -50,11 +50,12 @@ function instantiateImageProvider(providerName: string, apiKey: string): ImagePr
 // Every caller runs inside an already team-scoped request/generation context,
 // so the real team id is always available (mirrors resolveImageProvider).
 export async function resolveCopyProvider(teamId: string, providerKey?: string): Promise<CopyProvider> {
-  // Test seam: deterministic copy with no provider API call. The brief's
-  // copyProviderKey must still reference a real enabled COPY provider (validated
-  // at brief creation) — only the generation call is stubbed here.
+  // Test seam: a deterministic RAW caption reply with no provider API call — the
+  // real extractor still parses it (012 FR-21). The brief's copyProviderKey must
+  // still reference a real enabled COPY provider (validated at brief creation) —
+  // only the generation call is stubbed here.
   if (MOCK_AI) {
-    return { generateCopy: async (brief) => buildMockCopy(brief?.topic ?? '') }
+    return { generateCaptions: async (brief, targets) => buildMockCaptionReply(brief?.topic ?? '', targets) }
   }
 
   if (providerKey) {

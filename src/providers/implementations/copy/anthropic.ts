@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk"
 import type { BriefInput, CopyProvider } from "../../interfaces/CopyProvider"
-import { buildCopyPrompt } from "@/lib/agent/prompts/caption"
+import type { CaptionTarget } from "@/lib/channels"
+import { buildCaptionPrompt, CAPTION_MAX_TOKENS } from "@/lib/agent/prompts/caption"
 
 export class AnthropicCopyProvider implements CopyProvider {
   private client: Anthropic
@@ -9,12 +10,12 @@ export class AnthropicCopyProvider implements CopyProvider {
     this.client = new Anthropic({ apiKey })
   }
 
-  async generateCopy(brief: BriefInput): Promise<string> {
-    const prompt = buildCopyPrompt(brief)
+  async generateCaptions(brief: BriefInput, targets: readonly CaptionTarget[]): Promise<string> {
+    const prompt = buildCaptionPrompt(brief, targets)
 
     const response = await this.client.messages.create({
       model: this.model,
-      max_tokens: 500,
+      max_tokens: CAPTION_MAX_TOKENS,
       system: prompt.system,
       messages: [{ role: "user", content: prompt.user }],
     })

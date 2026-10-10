@@ -10,6 +10,9 @@ import { currentRenderStamp, type RenderStamp } from '@/lib/drafts/revisions'
 import { humanizeGenerationError } from '@/lib/agent/generationErrors'
 import { generationSkipFields, type BackgroundSkipFields } from '@/lib/drafts/backgroundNotice'
 import type { GenerationActor } from '@/lib/agent/types'
+import { CAPTION_CHANNELS } from '@/lib/channels'
+import { GENERATION_TARGETS, requireHeadline, writeCaptions } from '@/lib/captions/generate'
+import { captionRowsFromFields, saveGenerationCaptions } from '@/lib/captions/store'
 
 // Path B needs a resolvable brand kit; thrown before any model call is paid for.
 export class NoBrandKitError extends Error {
@@ -83,15 +86,16 @@ interface ProducedDesign {
 }
 
 // Path A/B design dispatch → rendered PNG. The heavy model + Puppeteer work,
-// shared by the sync and async lifecycles.
+// shared by the sync and async lifecycles. The design reads the on-image
+// headline only, never a caption (012 FR-09).
 async function produceDesign(
   brief: Brief,
   { kit, campaignBriefing, template }: ResolvedInputs,
-  copyText: string,
+  headline: string,
   actor: GenerationActor,
 ): Promise<ProducedDesign> {
   if (template) {
-    const result = await runPathADesign(brief, kit, template, copyText, campaignBriefing, actor)
+    const result = await runPathADesign(brief, kit, template, headline, campaignBriefing, actor)
     return {
       htmlContent: result.htmlContent,
       exportUrl: result.exportUrl,
@@ -101,7 +105,7 @@ async function produceDesign(
       stamp: currentRenderStamp(),
     }
   }
-  const result = await runPathBDesign(brief, kit!, copyText, campaignBriefing, actor)
+  const result = await runPathBDesign(brief, kit!, headline, campaignBriefing, actor)
   return {
     htmlContent: result.htmlContent,
     exportUrl: result.exportUrl,
@@ -149,12 +153,15 @@ async function finalizeDraftV1(
   })
 }
 
-// SYNCHRONOUS brief→draft orchestrator: copy → design → render, then create the
-// draft (EXPORTED, with v1) at the END on success. Used by the NON-interactive
-// callers — MCP/ACP surface and the scheduled-generation runner — which want the
-// finished draft back and rely on the thrown typed errors (a failure creates NO
-// draft, so scheduler retries don't accumulate orphan FAILED drafts). The
-// interactive brief wizard uses createPendingDraft + runGenerationForDraft instead.
+// SYNCHRONOUS brief→draft orchestrator: captions → design → render, then create
+// the draft (EXPORTED, with its caption rows and v1) at the END on success. Used
+// by the NON-interactive callers — MCP/ACP surface and the scheduled-generation
+// runner — which want the finished draft back and rely on the thrown typed
+// errors (a failure creates NO draft, so scheduler retries don't accumulate
+// orphan FAILED drafts). A reply with no valid headline throws
+// HeadlineMissingError BEFORE any design is paid for (012 FR-09/FR-10), so the
+// scheduler retries and MCP reports it. The interactive brief wizard uses
+// createPendingDraft + runGenerationForDraft instead.
 export async function generateDraftForBrief(
   brief: Brief,
   // The MCP/ACP surface and the scheduler have no signed-in actor (Task 13/14
@@ -167,16 +174,25 @@ export async function generateDraftForBrief(
   const inputs = await resolveGenerationInputs(brief, opts?.templateId)
 
   const copyProvider = await resolveCopyProvider(brief.teamId, brief.copyProviderKey ?? undefined)
-  const copyText = await copyProvider.generateCopy(buildBriefInput(brief, inputs.kit, inputs.campaignBriefing))
+  const fields = await writeCaptions(
+    copyProvider,
+    buildBriefInput(brief, inputs.kit, inputs.campaignBriefing),
+    GENERATION_TARGETS,
+  )
+  const headline = requireHeadline(fields)
 
-  const design = await produceDesign(brief, inputs, copyText, actor)
+  const design = await produceDesign(brief, inputs, headline, actor)
 
   const draft = await prisma.$transaction(async (tx) => {
     const created = await tx.draft.create({
       data: {
         teamId: brief.teamId,
         briefId: brief.id,
-        copyText,
+        // Placeholder nothing reads; T9 drops the write (the column becomes
+        // the nullable legacyCaptionText).
+        copyText: '',
+        headline,
+        captions: { create: captionRowsFromFields(fields) },
         htmlContent: design.htmlContent,
         templateId: inputs.template?.id ?? null,
         exportUrl: design.exportUrl,
@@ -209,10 +225,12 @@ export async function generateDraftForBrief(
 // synchronous) then runGenerationForDraft (the heavy work, run in the background
 // and never awaited by the request). The draft page polls while IN_PROGRESS.
 
-// Validate inputs and create an IN_PROGRESS placeholder draft (empty copy, no
-// image yet). Throws the same typed errors as the sync path BEFORE any draft
-// exists, so the route can return a 4xx for bad input. copyText='' is the
-// "copy not written yet" sentinel the preview page renders as a skeleton.
+// Validate inputs and create an IN_PROGRESS placeholder draft (no headline, no
+// image yet) with one PENDING caption row per registry channel, in one
+// transaction (the nested create). Throws the same typed errors as the sync
+// path BEFORE any draft exists, so the route can return a 4xx for bad input.
+// A PENDING row is the "caption not written yet" state the preview page
+// renders as a skeleton.
 export async function createPendingDraft(
   brief: Brief,
   opts?: { templateId?: string | null },
@@ -222,18 +240,23 @@ export async function createPendingDraft(
     data: {
       teamId: brief.teamId,
       briefId: brief.id,
+      // Placeholder nothing reads; T9 drops the write.
       copyText: '',
       templateId: inputs.template?.id ?? null,
       status: 'IN_PROGRESS',
+      captions: { create: CAPTION_CHANNELS.map(({ channel }) => ({ channel, status: 'PENDING' as const })) },
     },
   })
 }
 
-// Run the heavy generation for an existing IN_PROGRESS draft: copy (persisted
-// as soon as it's ready, so the copy skeleton resolves independently of the
-// image) → design + render → finalize as EXPORTED with a v1 revision. On any
-// failure the draft is marked FAILED with the reason for the inline error card.
-// Designed to be fire-and-forget from the route; also reused by the retry route.
+// Run the heavy generation for an existing IN_PROGRESS draft: one caption call
+// for every channel and the headline, written the moment it's ready (rows +
+// headline in one transaction, so the caption skeletons resolve independently
+// of the image) → design + render from the headline → finalize as EXPORTED
+// with a v1 revision. No valid headline fails the draft (A6) and keeps the
+// captions that validated. On any failure the draft is marked FAILED with the
+// reason for the inline error card. Designed to be fire-and-forget from the
+// route; also reused by the retry route, which resets the rows to PENDING.
 export async function runGenerationForDraft(draftId: string, actor: GenerationActor): Promise<void> {
   const draft = await prisma.draft.findUnique({ where: { id: draftId }, include: { brief: true } })
   if (!draft) return
@@ -241,19 +264,35 @@ export async function runGenerationForDraft(draftId: string, actor: GenerationAc
     const inputs = await resolveGenerationInputs(draft.brief, draft.templateId)
 
     const copyProvider = await resolveCopyProvider(draft.brief.teamId, draft.brief.copyProviderKey ?? undefined)
-    const copyText = await copyProvider.generateCopy(
+    const fields = await writeCaptions(
+      copyProvider,
       buildBriefInput(draft.brief, inputs.kit, inputs.campaignBriefing),
+      GENERATION_TARGETS,
     )
-    // Persist copy the moment it's ready — the preview page's copy skeleton
-    // resolves now while the image skeleton keeps animating.
-    await prisma.draft.update({ where: { id: draftId }, data: { copyText } })
+    await saveGenerationCaptions(draftId, fields)
+    const headline = requireHeadline(fields)
 
-    const design = await produceDesign(draft.brief, inputs, copyText, actor)
+    const design = await produceDesign(draft.brief, inputs, headline, actor)
     await finalizeDraftV1(draftId, design)
   } catch (err) {
     const reason = humanizeGenerationError(err)
     await prisma.draft
-      .update({ where: { id: draftId }, data: { status: 'FAILED', failureReason: reason } })
+      .update({
+        where: { id: draftId },
+        data: {
+          status: 'FAILED',
+          failureReason: reason,
+          // A row still PENDING here was never written (the caption call
+          // itself failed); PENDING must mean "work is running", so it fails
+          // with the draft. Rows that were written are kept.
+          captions: {
+            updateMany: {
+              where: { status: 'PENDING' },
+              data: { status: 'FAILED', text: '', failureReason: 'generation failed' },
+            },
+          },
+        },
+      })
       .catch(() => {
         /* draft deleted mid-flight — nothing to record */
       })

@@ -9,9 +9,10 @@ import { runPathBDesign } from '@/lib/agent/pathB'
 import { currentRenderStamp, withNextRevisionNumber } from '@/lib/drafts/revisions'
 import { claimDraftAction, startDraftAction } from '@/lib/drafts/draftActions'
 import { generationSkipFields } from '@/lib/drafts/backgroundNotice'
+import { designHeadline, headlineFallbackMessage } from '@/lib/captions/headline'
 
 // Regenerates the freeform (Path B) design for a draft: produces a brand-new
-// design variant from the same brief + existing copy. Validation runs
+// design variant from the same brief + on-image headline. Validation runs
 // synchronously, then the model work runs in-process fire-and-forget (the F1
 // pattern — see draftActions.ts) and the route returns 202; the draft page
 // polls pendingAction/pendingActionError to completion. Before overwriting,
@@ -46,6 +47,10 @@ export const POST = withTeamAuth<{ id: string }>(async (_req, { params }, user) 
 
   const campaignBriefing = await getActiveCampaignBriefing(draft.brief.campaignId)
 
+  // The design reads the on-image headline, never a caption (012 FR-09). A
+  // migrated draft has none and falls back to the brief Topic, logged.
+  const headline = designHeadline(draft, draft.brief)
+
   const claimed = await claimDraftAction(draft.id, 'REGENERATE_DESIGN')
   if (!claimed) {
     return NextResponse.json({ error: 'Another action is already running on this draft' }, { status: 409 })
@@ -56,10 +61,11 @@ export const POST = withTeamAuth<{ id: string }>(async (_req, { params }, user) 
   // request unwinds and pins it onto the background run. A throw below is
   // recorded on Draft.pendingActionError; the draft itself is left untouched.
   await startDraftAction(draft.id, user.userId, user.teamId, 'REGENERATE_DESIGN', async () => {
+    if (headline.fallback) console.info(headlineFallbackMessage(draft.id))
     // Run the new design first — if it fails, the draft is left untouched.
     // actor is the acting teammate (NOT the brief owner) — the image-provider
     // resolution must follow whoever clicked Regenerate.
-    const result = await runPathBDesign(draft.brief, kit, draft.copyText, campaignBriefing, {
+    const result = await runPathBDesign(draft.brief, kit, headline.text, campaignBriefing, {
       userId: user.userId,
       teamId: user.teamId,
     })

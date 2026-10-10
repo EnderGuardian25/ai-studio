@@ -213,7 +213,8 @@ async function resolveProvider(opts: {
 export async function generateBackgroundForBrief(
   brief: Brief,
   kit: ResolvedBrandKit,
-  copyText: string,
+  // The on-image headline (012 FR-09) — never a caption.
+  headline: string,
   campaignBriefing: string | null | undefined,
   actor: GenerationActor,
 ): Promise<BackgroundResult> {
@@ -225,7 +226,7 @@ export async function generateBackgroundForBrief(
         description: brief.description,
         goal: brief.goal,
         tone: brief.tone,
-        copyText,
+        headline,
         campaignBriefing,
       }),
     {

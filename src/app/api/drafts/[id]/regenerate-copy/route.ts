@@ -6,6 +6,7 @@ import { resolveCopyProvider } from '@/providers/registry'
 import { resolveBrandKit } from '@/lib/brandkit/resolve'
 import { getActiveCampaignBriefing } from '@/lib/campaign/briefing'
 import { buildBriefInput } from '@/lib/agent/briefInput'
+import { writeCaptions } from '@/lib/captions/generate'
 import { claimDraftAction, startDraftAction } from '@/lib/drafts/draftActions'
 
 // Regenerates the post copy for a draft by re-running the resolved copy provider
@@ -49,7 +50,12 @@ export const POST = withTeamAuth<{ id: string }>(async (_req, { params }, user) 
     // request unwinds and pins it onto the background run. A throw below is
     // recorded on Draft.pendingActionError; the previous copy is left untouched.
     await startDraftAction(draft.id, user.userId, user.teamId, 'REGENERATE_COPY', async () => {
-      const copyText = await provider.generateCopy(buildBriefInput(draft.brief, kit, campaignBriefing))
+      // Interim (012 T5 → T6): the legacy single string, now from the
+      // Instagram caption. T6 replaces this closure with the per-row write.
+      const fields = await writeCaptions(provider, buildBriefInput(draft.brief, kit, campaignBriefing), ['INSTAGRAM'])
+      const instagram = fields.INSTAGRAM
+      if (!instagram?.ok) throw new Error(`The caption reply was unusable (${instagram?.reason ?? 'missing'})`)
+      const copyText = instagram.text
       await prisma.draft.update({
         where: { id: draft.id },
         data: { copyText },

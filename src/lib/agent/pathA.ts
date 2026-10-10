@@ -45,14 +45,14 @@ export function assertTemplateMatchesBrief(brief: Brief, template: BrandKitTempl
 }
 
 // Runs the Path A (template fill) design pipeline for a given brief + template +
-// already-generated copy, dispatching CLI vs API. Single source of truth shared
-// by the assemble-a route and the scheduled-generation runner, mirroring
-// runPathBDesign's shape.
+// on-image headline (012 FR-09: the design never reads a caption), dispatching
+// CLI vs API. Single source of truth shared by the assemble-a route and the
+// scheduled-generation runner, mirroring runPathBDesign's shape.
 export async function runPathADesign(
   brief: Brief,
   kit: ResolvedBrandKit | null,
   template: BrandKitTemplate,
-  copyText: string,
+  headline: string,
   campaignBriefing: string | null | undefined,
   actor: GenerationActor,
 ): Promise<DesignAgentResult> {
@@ -80,7 +80,9 @@ export async function runPathADesign(
   })
   const userMessage = buildPathAUserMessage({
     slimTemplate,
-    copyText,
+    headline,
+    topic: brief.topic,
+    description: brief.description,
     mode,
     width,
     height,

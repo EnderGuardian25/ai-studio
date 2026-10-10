@@ -23,14 +23,15 @@ export type PathBDesignResult = DesignAgentResult & {
   background: BackgroundResult
 }
 
-// Runs the Path B (freeform) design pipeline for a given brief + already-generated
-// copy, dispatching CLI vs API. Single source of truth for initial generation
-// (assemble-b), regeneration (regenerate-design), and the ACP surface, so the
-// entry points never drift.
+// Runs the Path B (freeform) design pipeline for a given brief + its on-image
+// headline (012 FR-09: the design never reads a caption), dispatching CLI vs
+// API. Single source of truth for initial generation (assemble-b),
+// regeneration (regenerate-design), and the ACP surface, so the entry points
+// never drift.
 export async function runPathBDesign(
   brief: Brief,
   kit: ResolvedBrandKit,
-  copyText: string,
+  headline: string,
   campaignBriefing: string | null | undefined,
   actor: GenerationActor,
 ): Promise<PathBDesignResult> {
@@ -74,7 +75,7 @@ export async function runPathBDesign(
   // full-bleed background before the design call. A skip (with its reason)
   // on no provider/failure — the design proceeds with CSS/SVG visuals as
   // before. See agent/background.ts.
-  const background = await generateBackgroundForBrief(brief, kit, copyText, campaignBriefing, actor)
+  const background = await generateBackgroundForBrief(brief, kit, headline, campaignBriefing, actor)
   const backgroundImageUrl = background.url
 
   const systemPrompt = buildPathBSystemPrompt({
@@ -93,7 +94,7 @@ export async function runPathBDesign(
     goal: brief.goal,
     tone: brief.tone,
     channels: brief.channels,
-    copyText,
+    headline,
     mode,
     width,
     height,

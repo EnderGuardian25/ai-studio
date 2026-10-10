@@ -101,3 +101,26 @@ describe('resolveCopyProvider — non-CLI mode unchanged', () => {
     await expect(resolveCopyProvider(TEAM_ID)).rejects.toThrow(/No COPY provider configured/)
   })
 })
+
+// 012 FR-21: under MOCK_AI the registry's COPY provider returns the raw mock
+// caption reply (testHooks.buildMockCaptionReply), which the real extractor
+// then parses — no row lookup, no provider call.
+describe('resolveCopyProvider — MOCK_AI caption seam', () => {
+  it('returns buildMockCaptionReply for the brief topic and the requested targets', async () => {
+    vi.resetModules()
+    vi.stubEnv('MOCK_AI', 'true')
+    try {
+      const { resolveCopyProvider: resolveMocked } = await import('@/providers/registry')
+      const { buildMockCaptionReply } = await import('@/lib/testHooks')
+      const provider = await resolveMocked(TEAM_ID)
+      const brief = { topic: 'Launch', description: '', goal: 'g', tone: 't', channels: [] }
+      await expect(provider.generateCaptions(brief, ['LINKEDIN'])).resolves.toBe(
+        buildMockCaptionReply('Launch', ['LINKEDIN']),
+      )
+      expect(h.availableProviderFindFirst).not.toHaveBeenCalled()
+    } finally {
+      vi.unstubAllEnvs()
+      vi.resetModules()
+    }
+  })
+})
