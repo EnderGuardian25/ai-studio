@@ -253,7 +253,7 @@ There are **18 tasks in 3 waves**, all on `v2`. **The full clean mock E2E runs 3
     - **Library:** `FieldLabel htmlFor` "Search by topic" in the `PageHead` `actions` slot. **The 011 AC-17 helper still reads the placeholder,** so `surfaces.test.ts:469` is unchanged.
     - **Brief:** "Topic" and "Brief" get `htmlFor`.
 
-- [ ] `T14` — Campaigns and projects labels
+- [x] `T14` — Campaigns and projects labels
   - Files: `src/app/(app)/campaigns/[id]/page.tsx`, `src/app/(app)/projects/[id]/page.tsx`, `src/components/campaigns/BriefingAssistantPanel.tsx`, `CampaignBriefingSection.tsx`, `tests/e2e/a11y.test.ts`
   - Estimate: small
   - Kind: impl

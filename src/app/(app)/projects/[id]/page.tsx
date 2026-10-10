@@ -21,6 +21,8 @@ export default function ProjectDetailPage() {
   const queryClient = useQueryClient()
   const { isTeamAdmin } = useCurrentUser()
   const [savingKit, setSavingKit] = useState(false)
+  // The aside kit select is named by its visible dt (FR-12 row 25).
+  const kitLabelId = React.useId()
 
   const projectQuery = useQuery({
     queryKey: ['projects', params.id],
@@ -114,13 +116,14 @@ export default function ProjectDetailPage() {
             <h2 className={`${EYEBROW} mb-3`}>Details</h2>
             <dl className="space-y-3 text-ui-sm">
               <div>
-                <dt className="flex items-center gap-1.5 text-ui-xs text-fg-muted">
+                <dt id={kitLabelId} className="flex items-center gap-1.5 text-ui-xs text-fg-muted">
                   Default brand kit
                   {savingKit && <Loader2 {...ICON_SM} className="animate-spin" aria-hidden />}
                 </dt>
                 {isTeamAdmin ? (
                   <dd className="mt-1">
                     <Select
+                      aria-labelledby={kitLabelId}
                       options={[
                         { value: '', label: 'No default brand kit' },
                         ...brandKits.map(k => ({ value: k.id, label: k.name })),

@@ -24,6 +24,8 @@ import {
 //   T12: AC-09 (FR-10, tabular figures on the body).
 //   T13: AC-11 (FR-12) for rows 1–5 (login, library, brief) and AC-13 (FR-14,
 //        the login h1).
+//   T14: AC-11 (FR-12) for rows 18, 19, 20 (briefing assistant, campaign
+//        briefing) and 23, 24, 25 (the campaign and project aside selects).
 
 const MOCKED = () => !!(process.env.MOCK_AI && process.env.MOCK_PUPPETEER)
 
@@ -540,6 +542,104 @@ test.describe('Labels: login, library, brief (T13)', () => {
         if (!before.has(id)) await api.del(`/api/brief-drafts/${id}`)
       }
       await api.dispose()
+    }
+  })
+})
+
+// ── T14: labels on campaigns and projects (AC-11 rows 18–20, 23–25) ─────────
+
+// AC-11 rows 23–25: the select is named by the visible dt it points at.
+async function expectNamedByTerm(page: Page, name: string) {
+  const select = page.getByRole('combobox', { name, exact: true })
+  await expect(select, `"${name}" names exactly one select`).toHaveCount(1)
+  await expect(select).toHaveJSProperty('tagName', 'SELECT')
+  const labelledBy = await select.getAttribute('aria-labelledby')
+  expect(labelledBy, `the "${name}" select has aria-labelledby`).toBeTruthy()
+  const term = page.locator(`[id="${labelledBy}"]`)
+  await expect(term).toHaveJSProperty('tagName', 'DT')
+  await expect(term, `the "${name}" dt is visible`).toBeVisible()
+  await expect(term).toHaveText(name)
+}
+
+const BRIEFING_PLACEHOLDER = "Audience, key messages, themes, do's and don'ts for this campaign…"
+const ASSISTANT_PLACEHOLDER = 'Tell the assistant about this campaign…'
+
+test.describe('Labels: campaigns and projects (T14)', () => {
+  let api: ApiClient
+  // Every campaign and project a case mints is deleted after it.
+  const minted: { project: { id: string }; camp: { id: string } }[] = []
+  test.beforeEach(async ({ request }) => {
+    api = await loginAs(request, ADMIN_EMAIL, ADMIN_PASSWORD)
+  })
+  test.afterEach(async () => {
+    for (const { project, camp } of minted.splice(0)) {
+      await api.del(`/api/campaigns/${camp.id}`)
+      await api.del(`/api/projects/${project.id}`)
+    }
+    await api.dispose()
+  })
+
+  async function mint() {
+    const fixture = await mintCampaignFixture(api)
+    minted.push(fixture)
+    return fixture
+  }
+
+  test('AC-11 rows 23, 24 and 20: the campaign aside selects and the new-version briefing are labelled', async ({ page }) => {
+    const { camp } = await mint()
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await pageLogin(page)
+    await page.goto(`/campaigns/${camp.id}`)
+    await expect(page.getByRole('heading', { name: camp.name, level: 1 })).toBeVisible()
+
+    // Rows 23 and 24.
+    await expectNamedByTerm(page, 'Project')
+    await expectNamedByTerm(page, 'Brand kit override')
+
+    // Row 20: the new-version textarea.
+    await page.getByRole('button', { name: 'Edit as new version' }).click()
+    await expectLabelled(page, 'Briefing', { tag: 'TEXTAREA', placeholder: BRIEFING_PLACEHOLDER })
+  })
+
+  test('AC-11 row 25: the project aside default kit select is labelled', async ({ page }) => {
+    const { project } = await mint()
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await pageLogin(page)
+    await page.goto(`/projects/${project.id}`)
+    await expect(page.getByRole('heading', { name: project.name, level: 1 })).toBeVisible()
+    await expectNamedByTerm(page, 'Default brand kit')
+  })
+
+  test('AC-11 rows 19 and 18: the briefing assistant message and each plan row topic are named', async ({ page }) => {
+    test.skip(!MOCKED(), 'needs MOCK_AI for the assistant schedule plan')
+    const { camp } = await mint()
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await pageLogin(page)
+    await page.goto(`/campaigns/${camp.id}`)
+    await expect(page.getByRole('heading', { name: camp.name, level: 1 })).toBeVisible()
+    await page.getByRole('button', { name: 'Draft with AI' }).click()
+    const drawer = page.getByRole('dialog', { name: 'Draft briefing with AI' })
+    await expect(drawer).toBeVisible()
+
+    // Row 19.
+    await expectLabelled(drawer, 'Message', { tag: 'INPUT', placeholder: ASSISTANT_PLACEHOLDER })
+
+    // Row 18: aria-label only (A6), one per plan row, alongside "Generate at".
+    const ask = drawer.getByLabel('Message', { exact: true })
+    await ask.fill('Please schedule a short series of posts.')
+    await ask.press('Enter')
+    const plan = drawer.getByRole('region', { name: 'Proposed schedule' })
+    await expect(plan).toBeVisible({ timeout: 30_000 })
+    const rows = plan.getByRole('listitem')
+    await expect(rows).toHaveCount(2)
+    for (let i = 0; i < 2; i++) {
+      const row = rows.nth(i)
+      const topic = row.getByLabel('Post topic', { exact: true })
+      await expect(topic, `row ${i + 1} has one "Post topic" field`).toHaveCount(1)
+      await expect(topic).toHaveJSProperty('tagName', 'INPUT')
+      await expect(topic).toHaveAttribute('aria-label', 'Post topic')
+      await expect(topic.and(row.getByPlaceholder('Post topic', { exact: true }))).toHaveCount(1)
+      await expect(row.getByRole('textbox', { name: 'Post topic', exact: true })).toHaveValue(`Mock scheduled post ${i + 1}`)
     }
   })
 })

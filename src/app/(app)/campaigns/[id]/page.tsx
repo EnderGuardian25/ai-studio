@@ -30,6 +30,9 @@ export default function CampaignDetailPage() {
   const { isTeamAdmin } = useCurrentUser()
   const [savingKit, setSavingKit] = useState(false)
   const [savingProject, setSavingProject] = useState(false)
+  // The aside selects are named by their visible dt (FR-12 rows 23, 24).
+  const projectLabelId = React.useId()
+  const kitLabelId = React.useId()
 
   const campaignQuery = useQuery({
     queryKey: ['campaigns', params.id],
@@ -173,13 +176,14 @@ export default function CampaignDetailPage() {
             <h2 className={`${EYEBROW} mb-3`}>Details</h2>
             <dl className="space-y-3 text-ui-sm">
               <div>
-                <dt className="flex items-center gap-1.5 text-ui-xs text-fg-muted">
+                <dt id={projectLabelId} className="flex items-center gap-1.5 text-ui-xs text-fg-muted">
                   Project
                   {savingProject && <Loader2 {...ICON_SM} className="animate-spin" aria-hidden />}
                 </dt>
                 {isTeamAdmin ? (
                   <dd className="mt-1">
                     <Select
+                      aria-labelledby={projectLabelId}
                       options={[
                         { value: '', label: 'Standalone (no project)' },
                         ...projects.map(p => ({ value: p.id, label: p.name })),
@@ -202,13 +206,14 @@ export default function CampaignDetailPage() {
                 </dd>
               </div>
               <div>
-                <dt className="flex items-center gap-1.5 text-ui-xs text-fg-muted">
+                <dt id={kitLabelId} className="flex items-center gap-1.5 text-ui-xs text-fg-muted">
                   Brand kit override
                   {savingKit && <Loader2 {...ICON_SM} className="animate-spin" aria-hidden />}
                 </dt>
                 {isTeamAdmin ? (
                   <dd className="mt-1">
                     <Select
+                      aria-labelledby={kitLabelId}
                       options={[
                         { value: '', label: 'No override (inherit / system default)' },
                         ...brandKits.map(k => ({ value: k.id, label: k.name })),

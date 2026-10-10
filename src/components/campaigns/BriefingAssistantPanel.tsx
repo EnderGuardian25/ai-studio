@@ -6,6 +6,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { FileText, Loader2, Paperclip, Send, Trash2, ArrowUp, ArrowDown, CalendarClock } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Drawer } from '@/components/ui/Modal'
+import { FieldLabel } from '@/components/ui/FieldLabel'
 import { apiFetch } from '@/lib/apiFetch'
 import { CHANNEL_VALUES } from '@/lib/channels'
 import { COMPACT_FIELD, FOCUS, ICON, ICON_BUTTON, SCROLL_FOCUS, SMALL_CAPS } from '@/components/ui/folio'
@@ -88,6 +89,7 @@ export function BriefingAssistantPanel({ campaignId, open, onClose, onApply }: B
   // The plan the admin is currently reviewing (from the latest ```schedule block).
   const [plan, setPlan] = useState<PlanRow[] | null>(null)
   const [scheduling, setScheduling] = useState(false)
+  const messageId = React.useId()
 
   const { data: docs = [] } = useQuery({
     queryKey: ['campaigns', campaignId, 'documents'],
@@ -363,6 +365,7 @@ export function BriefingAssistantPanel({ campaignId, open, onClose, onApply }: B
                 <li key={i} className="space-y-2 border-b border-line-subtle py-2.5">
                   <div className="flex items-center gap-1">
                     <input
+                      aria-label="Post topic"
                       value={row.topic}
                       onChange={e => updateRow(i, { topic: e.target.value })}
                       placeholder="Post topic"
@@ -429,8 +432,10 @@ export function BriefingAssistantPanel({ campaignId, open, onClose, onApply }: B
         {/* The prompt (§8.3, §8.14): a display-italic field with the ink Send
             button attached; the wrapper shows the focus outline. */}
         <form onSubmit={send} className="flex-shrink-0 border-t border-line-subtle px-5 py-4">
+          <FieldLabel htmlFor={messageId} className="mb-1.5">Message</FieldLabel>
           <div className="flex rounded-ui-sm border border-line bg-surface-raised focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-focus">
             <input
+              id={messageId}
               value={input}
               onChange={e => setInput(e.target.value)}
               placeholder="Tell the assistant about this campaign…"

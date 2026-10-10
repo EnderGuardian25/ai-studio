@@ -6,6 +6,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Sparkles, MessageSquareText } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { SegmentedToggle } from '@/components/ui/SegmentedToggle'
+import { FieldLabel } from '@/components/ui/FieldLabel'
 import { fieldClasses, fieldEdge } from '@/components/ui/Input'
 import { apiFetch } from '@/lib/apiFetch'
 import { cn } from '@/lib/utils'
@@ -34,6 +35,7 @@ export function CampaignBriefingSection({ campaignId, isTeamAdmin }: CampaignBri
   const [enhancing, setEnhancing] = useState(false)
   // Before/after review: the AI rewrite is only committed to the textarea on Accept.
   const [enhanceResult, setEnhanceResult] = useState<{ original: string; draft: string } | null>(null)
+  const draftId = React.useId()
 
   const { data: briefings = [] } = useQuery({
     queryKey: ['campaigns', campaignId, 'briefing'],
@@ -226,13 +228,17 @@ export function CampaignBriefingSection({ campaignId, isTeamAdmin }: CampaignBri
                 </div>
               ) : (
                 <>
-                  <textarea
-                    value={draft}
-                    onChange={e => setDraft(e.target.value)}
-                    rows={8}
-                    placeholder="Audience, key messages, themes, do's and don'ts for this campaign…"
-                    className={cn(fieldClasses, fieldEdge(), 'resize-none leading-relaxed')}
-                  />
+                  <div className="flex flex-col gap-1.5">
+                    <FieldLabel htmlFor={draftId}>Briefing</FieldLabel>
+                    <textarea
+                      id={draftId}
+                      value={draft}
+                      onChange={e => setDraft(e.target.value)}
+                      rows={8}
+                      placeholder="Audience, key messages, themes, do's and don'ts for this campaign…"
+                      className={cn(fieldClasses, fieldEdge(), 'resize-none leading-relaxed')}
+                    />
+                  </div>
                   <div className="flex flex-wrap gap-2">
                     <Button size="sm" onClick={saveVersion} disabled={!draft.trim() || saving}>
                       {saving ? 'Saving…' : 'Save as new version'}
