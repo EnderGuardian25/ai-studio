@@ -71,7 +71,7 @@ Waves 2 and 3 add UX and wording only.
     - **The extractor is design §3:** the string-aware brace scanner, escaping raw control characters inside strings, exactly one candidate, unknown keys rejected against the **requested** targets, and the per-field order from spec FR-08.
     - **No I/O** in either module. The extractor returns `discarded` and does not log; T5's `writeCaptions` logs.
 
-- [ ] `T3` — The migration planner and the publish resolver (pure)
+- [x] `T3` — The migration planner and the publish resolver (pure)
   - Files: `src/lib/captions/migrationPlan.ts` (new), `src/lib/captions/resolve.ts` (new), `tests/unit/captionMigrationPlan.test.ts` (new), `tests/unit/captionResolve.test.ts` (new)
   - Estimate: medium
   - Kind: impl
