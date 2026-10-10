@@ -1,7 +1,7 @@
 # 🦞 SpecClaw Dashboard
 
 **Project:** bistec-studio
-**Last Updated:** 2026-10-10 17:45 UTC
+**Last Updated:** 2026-10-10 18:19 UTC
 
 ## Active Changes
 
@@ -11,8 +11,9 @@
 - 🔍 **004-design-instruction-fidelity** — verify PARTIAL | 23/24 tasks (95%) | 0 failed | 75h58m
 - 🔍 **005-provider-flexibility-onboarding** — verify PASS | 10/10 tasks (100%) | 0 failed | 122h0m
 - 🔍 **011-app-visual-redesign** — verify PASS | 13/13 tasks (100%) | 0 failed | 59h23m
+- 📝 **012-per-channel-captions** ▣ — tasks done | 0/16 tasks (0%) | 0 failed
 - 🔍 **013-fork-ci-checks-only** ▫ — verify PASS | 3/3 tasks (100%) | 0 failed | 13h13m
-- 🔨 **014-ui-a11y-consistency-pass** ▣ — build in-progress | 12/18 tasks (66%) | 0 failed | 37h35m
+- 🔨 **014-ui-a11y-consistency-pass** ▣ — build in-progress | 13/18 tasks (72%) | 0 failed | 37h57m
 
 ## Pending Proposals
 
@@ -21,7 +22,6 @@
 - 📋 **008-model-selection** — proposal ready, awaiting planning
 - 📋 **009-hero-image-design** — proposal ready, awaiting planning
 - 📋 **010-whatsapp-channel-posting** — proposal ready, awaiting planning
-- 📋 **012-per-channel-captions** ▣ — proposal ready, awaiting planning
 
 ## Recently Completed
 
@@ -29,6 +29,6 @@ _None._
 
 ## Stats
 
-- **Total changes:** 8
-- **Active:** 8
+- **Total changes:** 9
+- **Active:** 9
 - **Completed:** 0
