@@ -5,7 +5,7 @@ import { withTeamAuth, withTeamAdmin, parseBody } from '@/lib/api/handler'
 import { postVisibilityWhere } from '@/lib/authz/visibility'
 import { resolveExportUrl } from '@/lib/storage/minio'
 import { createAndPublishPost, findLivePost } from '@/lib/publish/publishDraft'
-import { Channel } from '@prisma/client'
+import { isPublishableChannel, PUBLISHABLE_CHANNELS } from '@/lib/channels'
 
 // Permissive schema: only guards the JSON parse. The manual checks below keep
 // their exact error messages (asserted by tests).
@@ -24,8 +24,8 @@ export const POST = withTeamAdmin(async (req: NextRequest, _ctx, auth) => {
   if (!draftId?.trim()) {
     return NextResponse.json({ error: 'draftId is required' }, { status: 400 })
   }
-  if (!channel || !['INSTAGRAM', 'LINKEDIN'].includes(channel)) {
-    return NextResponse.json({ error: 'channel must be INSTAGRAM or LINKEDIN' }, { status: 400 })
+  if (!isPublishableChannel(channel)) {
+    return NextResponse.json({ error: `channel must be ${PUBLISHABLE_CHANNELS.join(' or ')}` }, { status: 400 })
   }
 
   const draft = await prisma.draft.findUnique({ where: { id: draftId } })
@@ -46,7 +46,7 @@ export const POST = withTeamAdmin(async (req: NextRequest, _ctx, auth) => {
   // Idempotency: a live post (PENDING/SCHEDULED/PUBLISHING/PUBLISHED) for the
   // same draft+channel means a double-click or client retry — reject instead of
   // double-posting. Re-publishing after FAILED/CANCELLED stays allowed.
-  const existing = await findLivePost(draftId, channel as Channel)
+  const existing = await findLivePost(draftId, channel)
   if (existing) {
     return NextResponse.json(
       { error: 'A post for this draft and channel already exists', postId: existing.id, status: existing.status },
@@ -62,7 +62,7 @@ export const POST = withTeamAdmin(async (req: NextRequest, _ctx, auth) => {
         teamId: draft.teamId,
         draftId,
         userId: auth.userId,
-        channel: channel as Channel,
+        channel,
         status: 'SCHEDULED',
         scheduledAt: scheduledAtDate,
       },
@@ -79,7 +79,7 @@ export const POST = withTeamAdmin(async (req: NextRequest, _ctx, auth) => {
   // Immediate path — shared PENDING → publish → PUBLISHED/FAILED state machine.
   const { post } = await createAndPublishPost({
     draftId,
-    channel: channel as Channel,
+    channel,
     userId: auth.userId,
     scheduledAt: scheduledAtDate,
   })

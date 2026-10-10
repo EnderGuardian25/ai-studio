@@ -3,7 +3,8 @@ import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { withTeamAuth, parseBody } from '@/lib/api/handler'
 import { isAllowedAssetUrl } from '@/lib/storage/minio'
-import { Prisma, Channel, DesignMode, type AspectRatio } from '@prisma/client'
+import { Prisma, DesignMode, type AspectRatio, type Channel } from '@prisma/client'
+import { isPublishableChannel, PUBLISHABLE_CHANNELS } from '@/lib/channels'
 import { isAspectRatio } from '@/lib/aspectRatio'
 import { isCliMode } from '@/lib/agent/config'
 import { resolveBriefCopyKey } from '@/lib/brief/copyProvider'
@@ -65,13 +66,13 @@ export const POST = withTeamAuth(async (req: NextRequest, _ctx, user) => {
   if (!Array.isArray(channels) || channels.length === 0) {
     return NextResponse.json({ error: 'channels must be a non-empty array' }, { status: 400 })
   }
-  // Normalize casing (legacy clients sent lowercase) and validate against the enum.
+  // Normalize casing (legacy clients sent lowercase) and accept only publishable channels.
   const normalizedChannels: Channel[] = []
   for (const ch of channels) {
-    const upper = typeof ch === 'string' ? (ch.toUpperCase() as Channel) : null
-    if (!upper || !Object.values(Channel).includes(upper)) {
+    const upper = typeof ch === 'string' ? ch.toUpperCase() : null
+    if (!isPublishableChannel(upper)) {
       return NextResponse.json(
-        { error: `channels entries must be one of: ${Object.values(Channel).join(', ')}` },
+        { error: `channels entries must be one of: ${PUBLISHABLE_CHANNELS.join(', ')}` },
         { status: 400 }
       )
     }

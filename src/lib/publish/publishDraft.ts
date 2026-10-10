@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma'
+import { CHANNEL_LABELS } from '@/lib/channels'
 import * as instagramPublisher from '@/lib/social/instagram'
 import * as linkedinPublisher from '@/lib/social/linkedin'
 import { PublishError } from '@/lib/social/types'
@@ -8,13 +9,13 @@ import type { Channel, Post } from '@prisma/client'
 // The one channel → publisher map. Every publish surface (immediate API path,
 // FAILED-retry, scheduler tick, ACP tool) goes through this module so a new
 // channel or telemetry change is a single edit.
-export const publishers = {
+// A channel with no entry (WhatsApp, until 010) fails closed and terminally.
+export const publishers: Partial<
+  Record<Channel, { publish(url: string, caption: string, teamId: string): Promise<{ platformId: string }> }>
+> = {
   INSTAGRAM: instagramPublisher,
   LINKEDIN: linkedinPublisher,
-} as const satisfies Record<
-  Channel,
-  { publish(url: string, caption: string, teamId: string): Promise<{ platformId: string }> }
->
+}
 
 // Statuses that count as "live" for duplicate detection: a second publish of the
 // same (draft, channel) while one of these exists would double-post. FAILED and
@@ -36,11 +37,19 @@ export async function publishToChannel(
   copyText: string,
   teamId: string
 ): Promise<{ platformId: string }> {
+  const publisher = publishers[channel]
+  if (!publisher) {
+    throw new PublishError(
+      channel,
+      `${CHANNEL_LABELS[channel]} publishing isn't available yet. Copy the caption and post it by hand.`,
+      { terminal: true }
+    )
+  }
   const signedExportUrl = await resolveExportUrl(exportKey)
   if (!signedExportUrl) {
     throw new PublishError(channel, 'draft export missing')
   }
-  return publishers[channel].publish(signedExportUrl, copyText, teamId)
+  return publisher.publish(signedExportUrl, copyText, teamId)
 }
 
 // Immediate-publish state machine shared by the API POST /api/posts path and

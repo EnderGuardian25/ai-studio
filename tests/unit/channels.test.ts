@@ -1,10 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { Channel } from '@prisma/client'
 import {
+  CAPTION_CHANNELS,
+  CHANNEL_CAPTION_LIMITS,
+  CHANNEL_LABELS,
   CHANNEL_VALUES,
+  PUBLISHABLE_CHANNELS,
+  captionLength,
+  captionSpec,
   channelLabel,
   channelCopyLimit,
-  isChannel,
+  isPublishableChannel,
 } from '@/lib/channels'
+import { PublishError } from '@/lib/social/types'
 
 // --- Team-scoped channel-token credential resolution (Task 12) ---
 // linkedin.ts / instagram.ts each resolve their credentials via
@@ -92,21 +100,75 @@ describe('channelCopyLimit', () => {
     expect(channelCopyLimit('linkedin')).toBe(3000)
   })
 
-  it('returns undefined for unknown channels', () => {
+  it('returns undefined for unknown channels and for WhatsApp (soft guide only)', () => {
     expect(channelCopyLimit('tiktok')).toBeUndefined()
+    expect(channelCopyLimit('WHATSAPP')).toBeUndefined()
   })
 })
 
-describe('isChannel', () => {
-  it('accepts both enum values in any casing', () => {
-    expect(CHANNEL_VALUES.every(isChannel)).toBe(true)
-    expect(isChannel('instagram')).toBe(true)
-    expect(isChannel('LinkedIn')).toBe(true)
+// --- 012 FR-01 / AC-01: the per-channel registry ---
+describe('CAPTION_CHANNELS registry', () => {
+  it('covers every Channel enum value exactly once', () => {
+    const registered = CAPTION_CHANNELS.map((s) => s.channel)
+    // Sorted equality fails on a missing value and on a duplicate alike.
+    expect([...registered].sort()).toEqual([...Object.values(Channel)].sort())
+    expect(new Set(registered).size).toBe(registered.length)
   })
 
-  it('rejects non-channels and non-strings', () => {
-    expect(isChannel('facebook')).toBe(false)
-    expect(isChannel(null)).toBe(false)
-    expect(isChannel(42)).toBe(false)
+  it('is ordered Instagram, LinkedIn, WhatsApp with unique JSON keys', () => {
+    expect(CAPTION_CHANNELS.map((s) => s.channel)).toEqual(['INSTAGRAM', 'LINKEDIN', 'WHATSAPP'])
+    expect(CAPTION_CHANNELS.map((s) => s.jsonKey)).toEqual(['instagram', 'linkedin', 'whatsapp'])
+  })
+
+  it('IG hard limit 2200, LI 3000, WA no hard limit and a 1000 soft limit', () => {
+    expect(captionSpec('INSTAGRAM')).toMatchObject({ hardLimit: 2200, softLimit: null })
+    expect(captionSpec('LINKEDIN')).toMatchObject({ hardLimit: 3000, softLimit: null })
+    expect(captionSpec('WHATSAPP')).toMatchObject({ hardLimit: null, softLimit: 1000 })
+    expect(CHANNEL_CAPTION_LIMITS).toEqual({ INSTAGRAM: 2200, LINKEDIN: 3000 })
+  })
+
+  it('derives the labels', () => {
+    expect(CHANNEL_LABELS).toEqual({ INSTAGRAM: 'Instagram', LINKEDIN: 'LinkedIn', WHATSAPP: 'WhatsApp' })
+    expect(channelLabel('whatsapp')).toBe('WhatsApp')
+  })
+
+  it('only IG and LI are publishable, and CHANNEL_VALUES equals them', () => {
+    expect(PUBLISHABLE_CHANNELS).toEqual(['INSTAGRAM', 'LINKEDIN'])
+    expect(CHANNEL_VALUES).toEqual(['INSTAGRAM', 'LINKEDIN'])
+  })
+
+  it('normalises model output: IG/LI drop every **, WhatsApp turns ** into *', () => {
+    expect(captionSpec('INSTAGRAM').normalise('**Big** news ****x')).toBe('Big news x')
+    expect(captionSpec('LINKEDIN').normalise('a ***b*** c')).toBe('a *b* c')
+    expect(captionSpec('WHATSAPP').normalise('**Big** news')).toBe('*Big* news')
+    expect(captionSpec('WHATSAPP').normalise('****x****')).toBe('*x*')
+  })
+
+  it('captionLength counts UTF-16 code units', () => {
+    expect(captionLength('abc')).toBe(3)
+    expect(captionLength('😀')).toBe(2)
+  })
+})
+
+describe('isPublishableChannel', () => {
+  it('accepts the publishable enum values', () => {
+    expect(PUBLISHABLE_CHANNELS.every(isPublishableChannel)).toBe(true)
+  })
+
+  it('rejects WhatsApp, other casings, non-channels and non-strings', () => {
+    expect(isPublishableChannel('WHATSAPP')).toBe(false)
+    expect(isPublishableChannel('instagram')).toBe(false)
+    expect(isPublishableChannel('facebook')).toBe(false)
+    expect(isPublishableChannel(null)).toBe(false)
+    expect(isPublishableChannel(42)).toBe(false)
+  })
+})
+
+describe('PublishError', () => {
+  it('is not terminal by default and carries terminal when set', () => {
+    expect(new PublishError('INSTAGRAM', 'boom').terminal).toBe(false)
+    const err = new PublishError('WHATSAPP', 'no publisher', { terminal: true })
+    expect(err.terminal).toBe(true)
+    expect(err.message).toBe('[WHATSAPP] no publisher')
   })
 })

@@ -1,7 +1,8 @@
 import { z } from 'zod'
 import { NextResponse } from 'next/server'
-import { Channel, AspectRatio, DesignMode, PostGenerationAction } from '@prisma/client'
+import { AspectRatio, DesignMode, PostGenerationAction, type Channel } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
+import { PUBLISHABLE_CHANNELS } from '@/lib/channels'
 import { resolveBrandKit } from '@/lib/brandkit/resolve'
 
 // Body schema for creating/replacing a scheduled-generation queue entry.
@@ -14,7 +15,10 @@ export const queueEntrySchema = z
     description: z.string().trim().optional(),
     goal: z.string().trim().min(1, 'goal is required'),
     tone: z.string().trim().min(1, 'tone is required'),
-    channels: z.array(z.nativeEnum(Channel)).min(1, 'at least one channel is required'),
+    // Publishable channels only (WhatsApp has no publisher yet).
+    channels: z
+      .array(z.enum(PUBLISHABLE_CHANNELS as [Channel, ...Channel[]]))
+      .min(1, 'at least one channel is required'),
     aspectRatio: z.nativeEnum(AspectRatio).default('SQUARE'),
     designMode: z.nativeEnum(DesignMode),
     templateId: z.string().optional().nullable(),

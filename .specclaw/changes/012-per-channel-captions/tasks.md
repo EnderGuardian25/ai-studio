@@ -46,7 +46,7 @@ Waves 2 and 3 add UX and wording only.
 
 ### Wave 1 — Storage, extraction and the publish fix (shippable boundary)
 
-- [ ] `T1` — `WHATSAPP` in `Channel`, the per-channel registry, and publishable-only channel inputs
+- [x] `T1` — `WHATSAPP` in `Channel`, the per-channel registry, and publishable-only channel inputs
   - Files: `prisma/schema.prisma`, `prisma/migrations/<ts>_channel_whatsapp/migration.sql` (new), `src/lib/channels.ts`, `src/lib/social/types.ts`, `src/lib/publish/publishDraft.ts` (typing only), `src/app/api/briefs/route.ts`, `src/lib/campaign/queue.ts`, `src/app/api/posts/route.ts`, `src/app/api/team/channels/route.ts`, `src/app/api/team/channels/[channel]/route.ts`, `src/mcp/tools/generate.ts`, `src/mcp/tools/publish.ts`, `tests/unit/channels.test.ts`, `tests/unit/queueSchema.test.ts`
   - Estimate: medium
   - Kind: impl

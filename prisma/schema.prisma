@@ -46,6 +46,7 @@ enum DraftAction {
 enum Channel {
   INSTAGRAM
   LINKEDIN
+  WHATSAPP
 }
 
 enum PostStatus {

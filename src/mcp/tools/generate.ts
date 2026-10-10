@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma'
-import type { Channel } from '@prisma/client'
+import { isPublishableChannel, PUBLISHABLE_CHANNELS } from '@/lib/channels'
 import { generateDraftForBrief, NoBrandKitError } from '@/lib/agent/generateDraft'
 import { resolveExportUrl } from '@/lib/storage/minio'
 import { getSystemUserId } from '@/mcp/systemUser'
@@ -23,6 +23,13 @@ interface GeneratePostArgs {
 // precedence, per-path models, and CLI/API dispatch can never drift from the
 // app. TEMPLATE mode needs a template selection this surface doesn't have.
 export async function generatePost(args: GeneratePostArgs) {
+  // Channel enum values are uppercase; tolerate lowercase from older callers.
+  // Only publishable channels are accepted (WhatsApp has no publisher yet).
+  const channels = args.channels.map((c: string) => c.toUpperCase())
+  if (!channels.every(isPublishableChannel)) {
+    throw new Error(`channels entries must be one of: ${PUBLISHABLE_CHANNELS.join(', ')}`)
+  }
+
   if (args.designMode === 'TEMPLATE') {
     throw new Error(
       'TEMPLATE mode is not supported via ACP — it requires selecting a brand template. Use GENERATE, or create the post in the web app.'
@@ -53,8 +60,7 @@ export async function generatePost(args: GeneratePostArgs) {
       description: args.description,
       goal: args.goal,
       tone: args.tone,
-      // Channel enum values are uppercase; tolerate lowercase from older callers.
-      channels: args.channels.map((c: string) => c.toUpperCase() as Channel),
+      channels,
       designMode: args.designMode,
       copyProviderKey: args.copyProviderKey ?? 'env-default',
       campaignId: args.campaignId ?? null,
