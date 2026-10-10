@@ -303,7 +303,7 @@ There are **18 tasks in 3 waves**, all on `v2`. **The full clean mock E2E runs 3
     - **Regions:** drop the `messages.length > 0 ? {…} : {}` spreads at `BrandKitAssistantPanel:252`, `BriefingAssistantPanel:300` and `RefinementPanel:219`. The attributes become unconditional.
     - **Discard:** `inline-flex h-6 w-6 items-center justify-center` (24 × 24).
 
-- [ ] `T18` — The axe scan and close-out
+- [x] `T18` — The axe scan and close-out
   - Files: `package.json`, `package-lock.json`, `tests/e2e/a11y.test.ts`, `docs/ui-reference/DESIGN_SYSTEM.md`
   - Estimate: medium
   - Kind: test

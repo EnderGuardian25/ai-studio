@@ -19,6 +19,13 @@
 | 2026-10-06 | The default theme follows the OS. Light and dark are both mandatory.                                                                                                                                                                                                          | user |
 | 2026-10-07 | **Direction B, Folio**, picked over A Graphite and C Instrument. No changes to the study.                                                                                                                                                                                     | user |
 | 2026-10-07 | **Logo: the typeset "Studio" wordmark** from the Folio study, not the Bistec Studio logo image. `public/BistecStudioLogo.png` is no longer used. The user: _"The font Folio already has that says Studio is already nice, so leave as is."_ Implemented in 011 T6 (see §8.1). | user |
+| 2026-10-07 | **No "More" menu on the draft page.** Every action stays a visible button (§8.17).                                                                                                                                                                                            | user |
+| 2026-10-09 | **014 (accessibility and consistency) is one change, not split,** with the full clean mock E2E once per wave and lint, unit and `tsc` per task. The shared page primitives land first (wave 1), so later work builds on them (§8.18).                                         | user |
+| 2026-10-09 | **Scroll regions follow a static rule:** every container that can scroll on its own is a focusable, labelled region whether or not it overflows now. There is no overflow measurement (§8.15).                                                                                | user |
+| 2026-10-09 | **All 27 fields found by the plan-time sweep get a label** (014 A1), not only the proposal's 9. A placeholder is an example value, never a field's only name (§8.3).                                                                                                          | user |
+| 2026-10-09 | **Every field label is the small-caps `FieldLabel`, app-wide** (014 A3): Input and Select share one label style, so there is no sentence-case label beside a small-caps one (§8.3).                                                                                           | user |
+| 2026-10-09 | **`axe-core` is declared as a devDependency** (014 A4), at the lockfile's 4.12.1 (already present through `eslint-plugin-jsx-a11y`). The E2E injects it with `page.addScriptTag`; `@axe-core/playwright` is not added (§9).                                                   | user |
+| 2026-10-09 | **The primitives' three micro-drifts are accepted** (014 A5): each moves 4 px of spacing or less, or a line-height, with no colour, typeface or size change.                                                                                                                  | user |
 
 The logo decision supersedes 011 `spec.md`'s "Dark-mode logo" edge case, which assumed the PNG and its `dark:invert` stay.
 
@@ -512,19 +519,27 @@ Ruled rows (1 px `--line-subtle`), with a small-caps `--fg-muted` header row at 
 
 **A container that scrolls on its own** (a wide table at 375 px, a long list) is a focusable, labelled region: `tabIndex={0}`, `role="region"` and an `aria-label`, so a keyboard user can scroll it. It is `relative` when it holds `sr-only` cells: an `sr-only` element is absolutely positioned, and without a positioned ancestor inside the container it widens the page.
 
+**The rule is static (014 FR-17).** Any `overflow-*-auto` box with a height or width cap has `tabIndex={0}`, `role="region"`, an `aria-label` and the inset `SCROLL_FOCUS` **unconditionally**, whether or not it overflows now. Never spread `role: 'region'` conditionally on measured overflow: an empty conversation or refine log is still a region, so its tab stop never appears or vanishes as content arrives. Examples: the kit list "Brand kits", the assistant drawers' "Conversation", the draft page's "Refine requests", "Planned posts", "Recent drafts", the admin teams and users tables.
+
+**Exempt, with the reason:**
+
+- **The app shell's `main` and sidebar:** page-level scroll, and each is already a landmark.
+- **`Modal` and `Drawer` bodies, and the `ElementEditPanel` aside inside the inline-edit dialog:** Radix moves focus to the first focusable element, so a tab stop on the body would change every dialog's initial focus. Their content is reached through the controls it holds.
+- **The `FontEditor` listbox:** a popup that manages its own focus.
+
 ### 8.16 Icons
 
 `lucide-react` stays (NFR-05). Icons are 15 px, `strokeWidth={1.4}`, in `currentColor`. They label actions inside buttons and menus. The sidebar nav has none. An icon-only button always has an `aria-label`.
 
 ### 8.17 Draft page: Folio's grouping, and FR-12
 
-The study regroups the draft page's action bar:
+**The draft page has no "More" menu** (user decision, 2026-10-07). The study grouped some actions under a "More ▾" menu; the app does not. **Every action is a visible button** with its own name:
 
-- **Bar:** Regenerate (outline) and Refine (outline) on the left; then **More ▾** (outline, opens a menu) and **Publish** (primary) on the right. A 2 px `--fg` rule above the bar, a 1 px `--line-subtle` rule below, 14 px vertical padding.
-- **More menu:** Re-export, Download, View full screen, Edit inline, a separator, then Delete (destructive).
-- **Undo moves beside the versions** (§8.13).
+- **Bar:** **Regenerate design** (outline, Path B only) on the left; on the right **Edit inline** (outline, once the draft is ready), **Export** / **Re-export** (outline) and **Publish** (primary, team admins only), the view's one accent fill (§8.2). A 2 px `--fg` rule above the bar, a 1 px `--line-subtle` rule below, 14 px vertical padding. The bar wraps; it never scrolls.
+- **View full screen** is the 30 × 30 button on the post itself (§8.12), not a bar action.
+- **Undo sits beside the versions** (§8.13).
 
-**FR-12 binds this layout.** Every control that exists today must still be present and reachable, with its accessible name and **role** unchanged. The E2E suite opens the inline editor with `getByRole('button', { name: 'Edit inline' })` (`tests/e2e/draft-inline-edit.test.ts`, six cases). An item inside a Radix menu is a `menuitem`, not a `button`, and is hidden until the menu opens. So T9 either keeps such controls as visible buttons styled per Folio, or moves them into a menu only where no role or name changes. The study's menu labels are illustrative; the app keeps its own (for example "Export" / "Re-export"). No new actions are added: the menu holds only controls the page already has.
+**FR-12 binds this layout, which is why there is no menu.** Every control must stay present and reachable, with its accessible name and **role** unchanged. The E2E suite opens the inline editor with `getByRole('button', { name: 'Edit inline' })` (`tests/e2e/draft-inline-edit.test.ts`, six cases). An item inside a Radix menu is a `menuitem`, not a `button`, and is hidden until the menu opens, so moving an action into a menu would change its role. No action is added or regrouped into a menu without a new decision.
 
 ### 8.18 Page primitives
 
@@ -566,7 +581,14 @@ The page heads, section heads, notices and field labels are shared components in
 - **NFR-02, visible focus.** Every interactive element shows `outline: 2px solid rgb(var(--focus))` with `outline-offset: 2px` on `:focus-visible`. That is at least 6.22:1 on paper and 6.60:1 on espresso. A Tailwind `ring-2 ring-focus ring-offset-2 ring-offset-canvas` is an accepted equivalent where an outline would be clipped. `outline: none` without a replacement is never allowed.
 - **NFR-03, reduced motion.** §7.3.
 - **Status is never colour alone.** Chips and refine outcomes always carry a text label.
-- **Targets.** Controls are 36 px tall (30 px small), above WCAG 2.2's 24 × 24 px minimum.
+- **Targets.** Controls take their height from the `--control-*` tokens (§3.1, §8.2, §8.3): `--control-md` by default, `--control-sm` for small controls, both above WCAG 2.2's 24 × 24 px minimum.
+  - **The 24 px box (014 FR-18).** A remove or delete target is at least 24 × 24 px as **its own border box** (`boundingBox()` at zoom 1), not by the spacing exception's hit area. An icon-only remove button that is not an `ICON_BUTTON` (30 × 30) is `inline-flex h-6 w-6 items-center justify-center`, as the ColorEditor and FontEditor "Remove …" buttons and the Recent Drafts "Discard unfinished brief" are.
+- **Every field has a label (014 FR-12).** A visible, associated label (§8.3): the `label` prop, `FieldLabel htmlFor`, or `aria-labelledby` a visible heading or `dt` (the draft caption and refine prompt, the campaign and project aside selects). A placeholder is never a field's only name. `aria-label` alone is kept only where a visible label would repeat a sibling's (each row's "Post topic" in the proposed schedule).
+- **Every tablist has a name (014 FR-13).** `SegmentedToggle` takes a **required** `label`, rendered as the `tablist`'s `aria-label` ("Filter by status", "Provider slot", "Prompt view", "Briefing view", "Size", "Design", "Edit mode"). `tsc` fails without it.
+- **Stepper steps not yet reached are `aria-disabled="true"` (014 FR-15).** They stay focusable, so the tab order is unchanged; the current step is `aria-current="step"`, and done steps carry neither.
+- **A name is read once (014 FR-16).** Decorative duplicates are `aria-hidden`: a kit row's colour swatches (they keep their `title`), and a breadcrumb's current-page crumb, which stays visible while the `h1` beneath carries the name.
+- **One `h1` per page,** including `/login` (a `sr-only` "Sign in to Studio", 014 FR-14).
+- **The axe scan (014 AC-19).** `tests/e2e/a11y.test.ts` injects `axe-core` and runs `label`, `select-name`, `aria-input-field-name`, `aria-toggle-field-name`, `button-name`, `link-name`, `page-has-heading-one`, `scrollable-region-focusable`, `target-size`, `aria-allowed-attr`, `aria-valid-attr-value` and `aria-required-attr` on the main routes, in light theme at 1440 px, and expects zero violations. A rule is never removed to make the scan pass. `nested-interactive` is not in the list because of the library tile's nested button, which predates 014.
 - **375 px.** Every screen works at 375 px wide with no horizontal page scroll (A4, AC-11, AC-12).
 
 ---

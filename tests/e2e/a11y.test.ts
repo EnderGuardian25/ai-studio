@@ -34,6 +34,8 @@ import {
 //        AC-17 (FR-18, 24 × 24 remove targets). AC-14 (the stepper) and the
 //        campaign breadcrumb live in surfaces.test.ts, in the 011 cases they
 //        supersede.
+//   T18: AC-19 (A4, the axe-core scan on the listed routes and rules), and
+//        AC-07's no-kit-open state (Add Kit is the one accent fill).
 
 const MOCKED = () => !!(process.env.MOCK_AI && process.env.MOCK_PUPPETEER)
 
@@ -337,6 +339,27 @@ function kitSection(page: Page, title: string): Locator {
   return page.locator('section').filter({ has: page.getByRole('heading', { name: title, level: 3 }) }).last()
 }
 
+// The tokens as computed colours, read off :root.
+async function tokenColours(page: Page) {
+  return page.evaluate(() => {
+    const root = getComputedStyle(document.documentElement)
+    const rgb = (name: string) => `rgb(${root.getPropertyValue(name).trim().split(/\s+/).join(', ')})`
+    return { accent: rgb('--accent'), fg: rgb('--fg') }
+  })
+}
+
+// The names of the buttons in main whose computed fill is the accent (AC-07).
+async function accentFilledInMain(page: Page): Promise<string[]> {
+  const { accent } = await tokenColours(page)
+  return page.locator('main button').evaluateAll(
+    (buttons, colour) =>
+      buttons
+        .filter((b) => getComputedStyle(b).backgroundColor === colour)
+        .map((b) => (b.getAttribute('aria-label') ?? b.textContent ?? '').trim()),
+    accent,
+  )
+}
+
 test.describe('Brand kits (T11)', () => {
   let api: ApiClient
   const mintedKits: string[] = []
@@ -366,20 +389,8 @@ test.describe('Brand kits (T11)', () => {
     await expect(saveTemplate).toBeVisible()
     await expect(saveVersion).toBeVisible()
 
-    // The tokens as computed colours, read off :root.
-    const { accent, fg } = await page.evaluate(() => {
-      const root = getComputedStyle(document.documentElement)
-      const rgb = (name: string) => `rgb(${root.getPropertyValue(name).trim().split(/\s+/).join(', ')})`
-      return { accent: rgb('--accent'), fg: rgb('--fg') }
-    })
-    const accentFilled = await page.locator('main button').evaluateAll(
-      (buttons, colour) =>
-        buttons
-          .filter((b) => getComputedStyle(b).backgroundColor === colour)
-          .map((b) => (b.getAttribute('aria-label') ?? b.textContent ?? '').trim()),
-      accent,
-    )
-    expect(accentFilled, 'the accent-filled buttons in main').toEqual(['Save'])
+    const { fg } = await tokenColours(page)
+    expect(await accentFilledInMain(page), 'the accent-filled buttons in main').toEqual(['Save'])
     // The inline-form submits are Ink.
     await expect(saveTemplate).toHaveCSS('background-color', fg)
     await expect(saveVersion).toHaveCSS('background-color', fg)
@@ -399,6 +410,8 @@ test.describe('Brand kits (T11)', () => {
     // the helper fails a stop that draws no focus indicator.
     const stops = await tabThreeFromMain(page)
     expect(stops.slice(0, 2)).toEqual(['Add Kit', 'Brand kits'])
+    // AC-07, the other state: with no kit open, Add Kit is the one accent fill.
+    expect(await accentFilledInMain(page), 'the accent-filled buttons in main, no kit open').toEqual(['Add Kit'])
   })
 
   test('AC-15 (kit part): a kit row is named by the kit alone; its swatches are aria-hidden and keep their titles', async ({ page }) => {
@@ -1020,5 +1033,160 @@ test.describe('ARIA states (T17)', () => {
     } finally {
       await api.del(`/api/brief-drafts/${briefDraftId}`)
     }
+  })
+})
+
+// ── T18: the axe-core scan (AC-19) ───────────────────────────────────────────
+
+// The rules AC-19 names, and only those (runOnly keeps the scan scoped to what
+// 014 fixes). `nested-interactive` is deliberately absent: the library tile's
+// nested button predates 014 (011 T7). A rule is never removed to make the
+// scan pass.
+const AXE_RULES = [
+  'label',
+  'select-name',
+  'aria-input-field-name',
+  'aria-toggle-field-name',
+  'button-name',
+  'link-name',
+  'page-has-heading-one',
+  'scrollable-region-focusable',
+  'target-size',
+  'aria-allowed-attr',
+  'aria-valid-attr-value',
+  'aria-required-attr',
+]
+
+type Axe = typeof import('axe-core')
+
+// Inject axe-core (the declared devDependency, design.md §6) once the page has
+// settled, run the AC-19 rules over the whole document, and expect no
+// violation. Each one is reported as `rule: node target`.
+async function expectNoAxeViolations(page: Page, what: string) {
+  await page.waitForLoadState('networkidle')
+  await page.evaluate(async () => {
+    await document.fonts.ready
+  })
+  if (!(await page.evaluate(() => 'axe' in window))) {
+    await page.addScriptTag({ path: require.resolve('axe-core/axe.min.js') })
+  }
+  const violations = await page.evaluate(async (rules) => {
+    const { axe } = window as unknown as { axe: Axe }
+    const result = await axe.run(document, { runOnly: { type: 'rule', values: rules } })
+    return result.violations.flatMap((v) => v.nodes.map((n) => `${v.id}: ${n.target.join(' ')}`))
+  }, AXE_RULES)
+  expect(violations, `axe (AC-19) on ${what}`).toEqual([])
+}
+
+test.describe('axe scan (T18)', () => {
+  let api: ApiClient
+  let before: Set<string>
+  const mintedKits: string[] = []
+  const mintedCampaigns: string[] = []
+  const mintedProjects: string[] = []
+  test.beforeEach(async ({ page, request }) => {
+    api = await loginAs(request, ADMIN_EMAIL, ADMIN_PASSWORD)
+    before = new Set(await briefDraftIds(api))
+    // AC-19: light theme at 1440 px.
+    await page.emulateMedia({ colorScheme: 'light' })
+    await page.setViewportSize({ width: 1440, height: 900 })
+  })
+  test.afterEach(async () => {
+    // A brief walk can autosave an unfinished brief; discard any this suite made.
+    for (const id of await briefDraftIds(api)) {
+      if (!before.has(id)) await api.del(`/api/brief-drafts/${id}`)
+    }
+    for (const id of mintedCampaigns.splice(0)) await api.del(`/api/campaigns/${id}`)
+    for (const id of mintedProjects.splice(0)) await api.del(`/api/projects/${id}`)
+    for (const id of mintedKits.splice(0)) await api.del(`/api/admin/brandkits/${id}`)
+    await api.dispose()
+  })
+
+  test('AC-19: /login', async ({ page }) => {
+    await page.goto('/login')
+    await expect(page.getByRole('button', { name: 'Sign in' })).toBeVisible()
+    await expectNoAxeViolations(page, '/login')
+  })
+
+  test('AC-19: the dashboard, /library, /campaigns, /settings and /admin/users', async ({ page }) => {
+    await pageLogin(page)
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
+    await expectNoAxeViolations(page, '/')
+
+    await page.goto('/library')
+    await expect(page.getByRole('heading', { name: 'Library', level: 1 })).toBeVisible()
+    await expectNoAxeViolations(page, '/library')
+
+    await page.goto('/campaigns')
+    await expect(page.getByRole('heading', { name: 'Campaigns', level: 1 })).toBeVisible()
+    await expectNoAxeViolations(page, '/campaigns')
+
+    await page.goto('/settings')
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
+    await expectNoAxeViolations(page, '/settings')
+
+    await page.goto('/admin/users')
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
+    await expect(page.getByRole('row').nth(1)).toBeVisible()
+    await expectNoAxeViolations(page, '/admin/users')
+  })
+
+  test('AC-19: /brief steps 1, 2 and 3', async ({ page }) => {
+    await pageLogin(page)
+    await page.goto('/brief')
+    await expect(page.getByRole('heading', { name: 'Select Campaign' })).toBeVisible()
+    await expectNoAxeViolations(page, '/brief step 1')
+
+    await briefStepTwo(page)
+    await expectNoAxeViolations(page, '/brief step 2')
+
+    await page.getByRole('button', { name: /Path B — Freeform/ }).click()
+    await page.getByRole('button', { name: /continue/i }).click()
+    await expect(page.getByRole('heading', { name: 'Brief & Copy Direction' })).toBeVisible()
+    await expectNoAxeViolations(page, '/brief step 3')
+  })
+
+  test('AC-19: /drafts/[id]', async ({ page }) => {
+    test.skip(!MOCKED(), 'needs MOCK_AI + MOCK_PUPPETEER to mint an exported draft')
+    const draft = await mintExportedDraft(api, `a11y-axe-${Date.now()}`)
+    await pageLogin(page)
+    await page.goto(`/drafts/${draft.id}`)
+    await expect(page.getByRole('button', { name: 'View full screen', exact: true })).toBeVisible({ timeout: 20_000 })
+    await expectNoAxeViolations(page, '/drafts/[id]')
+  })
+
+  test('AC-19: /campaigns/[id] and /projects/[id]', async ({ page }) => {
+    const { project, camp } = await mintCampaignFixture(api)
+    mintedCampaigns.push(camp.id)
+    mintedProjects.push(project.id)
+    await pageLogin(page)
+
+    await page.goto(`/campaigns/${camp.id}`)
+    await expect(page.getByRole('heading', { name: camp.name, level: 1 })).toBeVisible()
+    await expect(page.getByText(`T10 pending`, { exact: false }).first()).toBeVisible()
+    await expectNoAxeViolations(page, '/campaigns/[id]')
+
+    await page.goto(`/projects/${project.id}`)
+    await expect(page.getByRole('heading', { name: project.name, level: 1 })).toBeVisible()
+    await expectNoAxeViolations(page, '/projects/[id]')
+  })
+
+  test('AC-19: /admin/brandkits with a kit open in edit mode', async ({ page }) => {
+    const { kit } = await mintBrandKitFixture(api)
+    mintedKits.push(kit.id)
+    await pageLogin(page)
+    const kitPanel = await openKit(page, kit.name)
+    await kitPanel.getByRole('button', { name: 'Edit', exact: true }).click()
+    await expect(kitPanel.getByPlaceholder('#1A2B3C', { exact: true })).toBeVisible()
+    await expectNoAxeViolations(page, '/admin/brandkits (kit in edit mode)')
+  })
+
+  test('AC-19: /team with the register form open', async ({ page }) => {
+    await pageLogin(page)
+    await page.goto('/team')
+    await expect(page.getByRole('heading', { name: 'AI Providers' })).toBeVisible()
+    await page.getByRole('button', { name: /^(Register Provider|Register image key)$/ }).click()
+    await expect(page.getByRole('heading', { name: 'Register new provider', level: 3 })).toBeVisible()
+    await expectNoAxeViolations(page, '/team (register form open)')
   })
 })
