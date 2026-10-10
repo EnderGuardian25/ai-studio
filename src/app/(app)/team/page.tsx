@@ -174,6 +174,7 @@ function RegisterForm({ onSuccess, allowCopySlot }: { onSuccess: () => void; all
             ]}
             value={slot}
             onChange={v => setSlot(v as ProviderSlot)}
+            label="Provider slot"
           />
         ) : (
           <p className="text-ui-xs text-fg-muted">

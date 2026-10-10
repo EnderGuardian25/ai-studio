@@ -613,7 +613,7 @@ export function InlineEditModal({
               </>
             )}
           </p>
-          <SegmentedToggle options={MODE_OPTIONS} value={mode} onChange={switchMode} />
+          <SegmentedToggle options={MODE_OPTIONS} value={mode} onChange={switchMode} label="Edit mode" />
         </div>
         <div className={elementMode ? 'grid gap-4 lg:grid-cols-[minmax(0,1fr)_300px]' : undefined}>
           {/* Neutral stage: the canvas is centered and fit to this box on both

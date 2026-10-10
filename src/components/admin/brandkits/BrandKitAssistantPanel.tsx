@@ -249,11 +249,14 @@ export function BrandKitAssistantPanel({ kitId, open, onClose, onApplied }: Bran
         </div>
 
         {/* The conversation (§8.14's log vocabulary): ruled rows, newest last.
-            It scrolls inside its own box, so once it has turns the box is a
-            focusable, labelled region (WCAG 2.1.1, the T7 rule). */}
+            It scrolls inside its own box, so the box is always a focusable,
+            labelled region, even before the first turn (WCAG 2.1.1; the static
+            rule, 014 FR-17). */}
         <div
+          tabIndex={0}
+          role="region"
+          aria-label="Conversation"
           className={`flex-1 overflow-y-auto px-5 py-4 ${SCROLL_FOCUS}`}
-          {...(messages.length > 0 ? { role: 'region', 'aria-label': 'Conversation', tabIndex: 0 } : {})}
         >
           {messages.length === 0 && (
             <p className="text-ui-sm text-fg-muted">

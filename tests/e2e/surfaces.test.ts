@@ -485,6 +485,20 @@ test.describe('Brief wizard (T8)', () => {
     expect(await tabThreeFromMain(page)).toEqual(['1Campaign', '2Size & Design', '3Content'])
     await expect(page.locator('[aria-current="step"]')).toHaveCount(1)
     await expect(page.locator('[aria-current="step"]')).toHaveText(/Campaign/)
+
+    // 014 AC-14 (FR-15) supersedes 011 AC-17 for the stepper: a step not yet
+    // reached is aria-disabled, and stays focusable (the stops above).
+    const steps = page.locator('ol:has([aria-current="step"])').getByRole('button')
+    await expect(steps).toHaveCount(5)
+    await expect(steps.nth(0)).toHaveAttribute('aria-current', 'step')
+    await expect(steps.nth(0)).not.toHaveAttribute('aria-disabled')
+    for (const i of [1, 2, 3, 4]) await expect(steps.nth(i)).toHaveAttribute('aria-disabled', 'true')
+    await page.getByRole('button', { name: /continue/i }).click()
+    await expect(page.getByRole('heading', { name: 'Size & Design' })).toBeVisible()
+    await expect(steps.nth(1)).toHaveAttribute('aria-current', 'step')
+    await expect(steps.nth(0)).not.toHaveAttribute('aria-disabled')
+    await expect(steps.nth(1)).not.toHaveAttribute('aria-disabled')
+    for (const i of [2, 3, 4]) await expect(steps.nth(i)).toHaveAttribute('aria-disabled', 'true')
   })
 
   test('AC-12 + FR-12: every step at 375px keeps its controls and never scrolls sideways', async ({ page }) => {
@@ -758,7 +772,14 @@ test.describe('Campaigns and projects (T10)', () => {
     const crumbs = page.getByRole('navigation', { name: 'Breadcrumb' })
     await expect(crumbs.getByRole('button', { name: 'Projects' })).toBeVisible()
     await expect(crumbs.getByRole('link', { name: project.name })).toBeVisible()
-    await expect(crumbs.locator('[aria-current="page"]')).toHaveText(camp.name)
+    // 014 AC-15 (FR-16) supersedes the aria-current tail: the tail crumb stays
+    // visible but is aria-hidden, so the name is read once, by the h1.
+    const tail = crumbs.getByText(camp.name, { exact: true })
+    await expect(tail).toBeVisible()
+    await expect(tail).toHaveAttribute('aria-hidden', 'true')
+    await expect(crumbs.locator('[aria-current]')).toHaveCount(0)
+    expect(await crumbs.ariaSnapshot()).not.toContain(camp.name)
+    await expect(page.getByRole('heading', { name: camp.name, level: 1 })).toBeVisible()
 
     // The briefing and the queue, with the aside's two selects.
     await expect(page.getByRole('heading', { name: 'Campaign Briefing', level: 2 })).toBeVisible()

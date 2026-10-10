@@ -130,7 +130,7 @@ export default function CampaignDetailPage() {
           </button>
         )}
         <span aria-hidden>/</span>
-        <span aria-current="page" className={CRUMB_CURRENT}>{campaign.name}</span>
+        <span aria-hidden className={CRUMB_CURRENT}>{campaign.name}</span>
       </nav>
       <PageTitle className="mb-10 break-words">{campaign.name}</PageTitle>
 

@@ -185,7 +185,7 @@ export function RecentDraftsCard({
                         aria-label="Discard unfinished brief"
                         disabled={discarding === u.id}
                         onClick={() => void discardUnfinished(u)}
-                        className={`inline-flex items-center text-fg-muted transition-colors duration-fast ease-standard hover:text-status-failed disabled:opacity-50 ${FOCUS_ROUNDED}`}
+                        className={`inline-flex h-6 w-6 items-center justify-center text-fg-muted transition-colors duration-fast ease-standard hover:text-status-failed disabled:opacity-50 ${FOCUS_ROUNDED}`}
                       >
                         <Trash2 size={15} strokeWidth={1.4} />
                       </button>

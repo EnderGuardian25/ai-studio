@@ -287,7 +287,7 @@ There are **18 tasks in 3 waves**, all on `v2`. **The full clean mock E2E runs 3
     - **The On/Off word** sits beside the toggle button, outside it, `aria-hidden`, `SMALL_CAPS`: `text-accent` "On", `text-fg-muted` "Off".
     - **E2E:** scope each channel's "Access token" to its row, and use `{ exact: true }`, because "Show API key" would otherwise match `getByLabel('API key')`.
 
-- [ ] `T17` — ARIA states: named tablists, stepper, breadcrumb tail, static scroll regions, the Discard target
+- [x] `T17` — ARIA states: named tablists, stepper, breadcrumb tail, static scroll regions, the Discard target
   - Files: `src/components/ui/SegmentedToggle.tsx`, `src/app/(app)/library/page.tsx`, `src/app/(app)/team/page.tsx`, `src/components/admin/brandkits/PromptSection.tsx`, `src/components/campaigns/CampaignBriefingSection.tsx`, `QueueEntryModal.tsx`, `src/components/drafts/InlineEditModal.tsx`, `src/components/brief/Stepper.tsx`, `src/app/(app)/campaigns/[id]/page.tsx`, `src/app/(app)/projects/[id]/page.tsx`, `src/components/admin/brandkits/BrandKitAssistantPanel.tsx`, `src/components/campaigns/BriefingAssistantPanel.tsx`, `src/components/drafts/RefinementPanel.tsx`, `src/components/dashboard/RecentDraftsCard.tsx`, `tests/e2e/surfaces.test.ts`, `tests/e2e/a11y.test.ts`
   - Estimate: medium
   - Kind: impl

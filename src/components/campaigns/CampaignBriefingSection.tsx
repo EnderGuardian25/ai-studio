@@ -139,6 +139,7 @@ export function CampaignBriefingSection({ campaignId, isTeamAdmin }: CampaignBri
             ]}
             value={view}
             onChange={v => setView(v as 'active' | 'history' | 'new')}
+            label="Briefing view"
           />
 
           {view === 'active' && (

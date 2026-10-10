@@ -29,6 +29,11 @@ import {
 //   T15: AC-11 (FR-12) for rows 26 and 27 (the draft caption and refine prompt).
 //   T16: AC-11 (FR-12) for rows 7–11 (/team register form and channel rows) and
 //        AC-18 (FR-19, the provider toggle's On/Off word).
+//   T17: ARIA states — AC-12 (FR-13, named tablists), AC-15's breadcrumb part
+//        on the project page (FR-16), AC-16 (FR-17, static scroll regions) and
+//        AC-17 (FR-18, 24 × 24 remove targets). AC-14 (the stepper) and the
+//        campaign breadcrumb live in surfaces.test.ts, in the 011 cases they
+//        supersede.
 
 const MOCKED = () => !!(process.env.MOCK_AI && process.env.MOCK_PUPPETEER)
 
@@ -822,6 +827,198 @@ test.describe('Labels: team (T16)', () => {
       await api.dispose()
       await sa.del(`/api/admin/teams/${team.id}`)
       await sa.dispose()
+    }
+  })
+})
+
+// ── T17: ARIA states — tablists, breadcrumb, scroll regions, remove targets ──
+
+// AC-12: each listed name names exactly one tablist in the scope, and every
+// tablist there (the listed ones and any other, such as /team's "Operating
+// system" guide) has a non-empty accessible name.
+async function expectTablistsNamed(scope: Page | Locator, names: string[]) {
+  for (const name of names) {
+    await expect(scope.getByRole('tablist', { name, exact: true }), `one tablist named "${name}"`).toHaveCount(1)
+  }
+  const all = await scope.getByRole('tablist').all()
+  expect(all.length).toBeGreaterThanOrEqual(names.length)
+  for (const tablist of all) await expect(tablist, 'every tablist is named').toHaveAccessibleName(/\S/)
+}
+
+// AC-16: a static scroll region — named, a region, in the tab order whether or
+// not it has content to scroll.
+async function expectStaticRegion(scope: Page | Locator, name: string) {
+  const region = scope.getByRole('region', { name, exact: true })
+  await expect(region, `one "${name}" region`).toHaveCount(1)
+  await expect(region).toHaveAttribute('tabindex', '0')
+  await region.focus()
+  await expect(region).toBeFocused()
+}
+
+// AC-17: the control's own border box is at least 24 × 24 CSS px.
+async function expectAtLeast24(control: Locator, what: string) {
+  await expect(control, what).toBeVisible()
+  const box = await control.boundingBox()
+  expect(box, `${what} has a box`).toBeTruthy()
+  expect(box!.width, `${what} width`).toBeGreaterThanOrEqual(24)
+  expect(box!.height, `${what} height`).toBeGreaterThanOrEqual(24)
+}
+
+test.describe('ARIA states (T17)', () => {
+  let api: ApiClient
+  const mintedKits: string[] = []
+  const mintedCampaigns: string[] = []
+  const mintedProjects: string[] = []
+  test.beforeEach(async ({ request }) => {
+    api = await loginAs(request, ADMIN_EMAIL, ADMIN_PASSWORD)
+  })
+  test.afterEach(async () => {
+    for (const id of mintedCampaigns.splice(0)) await api.del(`/api/campaigns/${id}`)
+    for (const id of mintedProjects.splice(0)) await api.del(`/api/projects/${id}`)
+    for (const id of mintedKits.splice(0)) await api.del(`/api/admin/brandkits/${id}`)
+    await api.dispose()
+  })
+  const mintKit = async () => {
+    const kit = await (
+      await api.post('/api/admin/brandkits', {
+        name: `T17 Kit ${Date.now()}`,
+        colors: ['#0b6e4f'],
+        fonts: [{ name: 'DM Sans', url: 'https://fonts.googleapis.com/css2?family=DM+Sans' }],
+      })
+    ).json()
+    mintedKits.push(kit.id)
+    return kit as { id: string; name: string }
+  }
+  const mintCampaign = async () => {
+    const fixture = await mintCampaignFixture(api)
+    mintedCampaigns.push(fixture.camp.id)
+    mintedProjects.push(fixture.project.id)
+    return fixture
+  }
+
+  test('AC-12: every tablist is named — library, /team, an open kit, a campaign and its queue modal', async ({ page }) => {
+    const kit = await mintKit()
+    const { camp } = await mintCampaign()
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await pageLogin(page)
+
+    await page.goto('/library')
+    await expect(page.getByRole('heading', { name: 'Library', level: 1 })).toBeVisible()
+    await expectTablistsNamed(page, ['Filter by status'])
+
+    // /team with the register form open. CLI mode locks the slot to IMAGE and
+    // renders no toggle (the T16 case reads the mode the same way).
+    await page.goto('/team')
+    const register = page.getByRole('button', { name: /^(Register Provider|Register image key)$/ })
+    const cliMode = (await register.innerText()).includes('image key')
+    await register.click()
+    await expect(page.getByRole('heading', { name: 'Register new provider', level: 3 })).toBeVisible()
+    await expectTablistsNamed(page, cliMode ? [] : ['Provider slot'])
+
+    await openKit(page, kit.name)
+    await expectTablistsNamed(page, ['Prompt view'])
+
+    await page.goto(`/campaigns/${camp.id}`)
+    await expect(page.getByRole('heading', { name: camp.name, level: 1 })).toBeVisible()
+    await expectTablistsNamed(page, ['Briefing view'])
+    await page.getByRole('button', { name: 'Plan a post' }).click()
+    const modal = page.getByRole('dialog', { name: 'Plan a post' })
+    await expect(modal).toBeVisible()
+    await expectTablistsNamed(modal, ['Size', 'Design'])
+  })
+
+  test('AC-12 + AC-16: on a draft with no refine requests, "Refine requests" is a region, and the inline editor names its tablist', async ({ page }) => {
+    test.skip(!MOCKED(), 'needs MOCK_AI + MOCK_PUPPETEER to mint an exported draft')
+    const draft = await mintExportedDraft(api, `a11y-t17-${Date.now()}`)
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await pageLogin(page)
+    await page.goto(`/drafts/${draft.id}`)
+    await expect(page.getByRole('button', { name: 'View full screen', exact: true })).toBeVisible({ timeout: 20_000 })
+
+    // AC-16: no requests yet, and the log is still a focusable, labelled region.
+    await expectStaticRegion(page, 'Refine requests')
+    await expect(page.getByRole('region', { name: 'Refine requests', exact: true }).getByRole('listitem')).toHaveCount(0)
+
+    // AC-12: the inline-edit modal.
+    await page.getByRole('button', { name: 'Edit inline' }).click()
+    const dialog = page.getByRole('dialog', { name: 'Edit inline' })
+    await expect(dialog.locator('[data-editor-ready="true"]')).toBeAttached({ timeout: 20_000 })
+    await expectTablistsNamed(dialog, ['Edit mode'])
+  })
+
+  test('AC-16: with no turns yet, both assistant drawers hold a focusable "Conversation" region', async ({ page }) => {
+    const kit = await mintKit()
+    const { camp } = await mintCampaign()
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await pageLogin(page)
+
+    const kitPanel = await openKit(page, kit.name)
+    await kitPanel.getByRole('button', { name: 'Extract from references' }).click()
+    const kitDrawer = page.getByRole('dialog', { name: 'Extract brand from references' })
+    await expect(kitDrawer).toBeVisible()
+    // The empty-state hint: there are no turns yet.
+    await expect(kitDrawer.getByText('then ask me to extract the brand voice and style', { exact: false })).toBeVisible()
+    await expectStaticRegion(kitDrawer, 'Conversation')
+    await page.keyboard.press('Escape')
+    await expect(kitDrawer).toBeHidden()
+
+    await page.goto(`/campaigns/${camp.id}`)
+    await expect(page.getByRole('heading', { name: camp.name, level: 1 })).toBeVisible()
+    await page.getByRole('button', { name: 'Draft with AI' }).click()
+    const briefingDrawer = page.getByRole('dialog', { name: 'Draft briefing with AI' })
+    await expect(briefingDrawer).toBeVisible()
+    await expect(briefingDrawer.getByText('the assistant will interview', { exact: false })).toBeVisible()
+    await expectStaticRegion(briefingDrawer, 'Conversation')
+  })
+
+  test('AC-15 (breadcrumb): on a project page the tail crumb is visible but aria-hidden, and the h1 carries the name', async ({ page }) => {
+    const { project } = await mintCampaign()
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await pageLogin(page)
+    await page.goto(`/projects/${project.id}`)
+    await expect(page.getByRole('heading', { name: project.name, level: 1 })).toBeVisible()
+    const crumbs = page.getByRole('navigation', { name: 'Breadcrumb' })
+    const tail = crumbs.getByText(project.name, { exact: true })
+    await expect(tail).toBeVisible()
+    await expect(tail).toHaveAttribute('aria-hidden', 'true')
+    await expect(crumbs.locator('[aria-current]')).toHaveCount(0)
+    expect(await crumbs.ariaSnapshot()).not.toContain(project.name)
+  })
+
+  test('AC-17: "Discard unfinished brief", "Remove color …" and "Remove font …" are at least 24 × 24', async ({ page }) => {
+    const kit = await mintKit()
+    const topic = `T17 unfinished ${Date.now()}`
+    const put = await api.put('/api/brief-drafts', {
+      payload: {
+        step: 2,
+        campaignId: '',
+        aspectRatio: 'SQUARE',
+        brandKitId: '',
+        designMode: 'GENERATE',
+        templateId: '',
+        referenceTemplateId: '',
+        topic,
+        prompt: 'A prompt long enough to matter',
+        goal: 'awareness',
+        tone: 'professional',
+        images: [],
+      },
+    })
+    expect(put.status()).toBe(200)
+    const briefDraftId = (await put.json()).id as string
+    try {
+      await page.setViewportSize({ width: 1440, height: 900 })
+      await pageLogin(page)
+      const row = page.getByRole('row').filter({ hasText: topic })
+      await expect(row).toHaveCount(1)
+      await expectAtLeast24(row.getByRole('button', { name: 'Discard unfinished brief', exact: true }), 'Discard unfinished brief')
+
+      const kitPanel = await openKit(page, kit.name)
+      await kitPanel.getByRole('button', { name: 'Edit', exact: true }).click()
+      await expectAtLeast24(kitPanel.getByRole('button', { name: 'Remove color #0b6e4f', exact: true }), 'Remove color')
+      await expectAtLeast24(kitPanel.getByRole('button', { name: 'Remove font DM Sans', exact: true }), 'Remove font')
+    } finally {
+      await api.del(`/api/brief-drafts/${briefDraftId}`)
     }
   })
 })

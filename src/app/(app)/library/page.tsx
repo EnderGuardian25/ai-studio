@@ -183,6 +183,7 @@ export default function LibraryPage() {
           options={STATUS_TABS.map(({ label, value }) => ({ value, label }))}
           value={activeStatus}
           onChange={(v) => setActiveStatus(v as StatusFilter)}
+          label="Filter by status"
         />
       </div>
 

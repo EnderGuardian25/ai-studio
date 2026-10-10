@@ -217,12 +217,15 @@ export function RefinementPanel({
       </SectionHead>
 
       {/* The refine log (§8.14): ruled rows, newest last. It scrolls inside its
-          own box once it is long, so the box is a focusable, labelled region
-          (WCAG 2.1.1, the T7 rule). */}
+          own box once it is long, so the box is always a focusable, labelled
+          region, even with no requests yet (WCAG 2.1.1; the static rule, 014
+          FR-17). */}
       <div
         ref={listRef}
+        tabIndex={0}
+        role="region"
+        aria-label="Refine requests"
         className={`mb-4 max-h-72 overflow-y-auto ${SCROLL_FOCUS}`}
-        {...(messages.length > 0 ? { role: 'region', 'aria-label': 'Refine requests', tabIndex: 0 } : {})}
       >
         {messages.length === 0 ? (
           <p className="text-ui-sm text-fg-muted">

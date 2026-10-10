@@ -200,6 +200,7 @@ export function QueueEntryModal({ campaignId, resolvedKitId, isTeamAdmin, entry,
               ]}
               value={aspectRatio}
               onChange={v => setAspectRatio(v as AspectRatio)}
+              label="Size"
             />
           </div>
           <div>
@@ -211,6 +212,7 @@ export function QueueEntryModal({ campaignId, resolvedKitId, isTeamAdmin, entry,
               ]}
               value={designMode}
               onChange={v => setDesignMode(v as 'GENERATE' | 'TEMPLATE')}
+              label="Design"
             />
           </div>
         </div>

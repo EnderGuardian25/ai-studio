@@ -72,7 +72,7 @@ export default function ProjectDetailPage() {
           <ArrowLeft {...ICON} /> Projects
         </button>
         <span aria-hidden>/</span>
-        <span aria-current="page" className={CRUMB_CURRENT}>{project.name}</span>
+        <span aria-hidden className={CRUMB_CURRENT}>{project.name}</span>
       </nav>
       <PageTitle className="mb-10 break-words">{project.name}</PageTitle>
 

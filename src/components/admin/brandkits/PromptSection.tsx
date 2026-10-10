@@ -91,6 +91,7 @@ export function PromptSection({ kitId, prompts, onRefresh }: PromptSectionProps)
         ]}
         value={view}
         onChange={v => setView(v as 'active' | 'history' | 'new')}
+        label="Prompt view"
       />
 
       {view === 'active' && (

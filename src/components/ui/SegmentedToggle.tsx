@@ -12,6 +12,8 @@ interface SegmentedToggleProps {
   options: SegmentOption[]
   value: string
   onChange: (value: string) => void
+  /** The tablist's accessible name (014 FR-13): every tablist is named. */
+  label: string
   className?: string
 }
 
@@ -22,11 +24,13 @@ export function SegmentedToggle({
   options,
   value,
   onChange,
+  label,
   className,
 }: SegmentedToggleProps) {
   return (
     <div
       role="tablist"
+      aria-label={label}
       className={cn(
         'inline-flex items-center overflow-hidden',
         'border border-line rounded-ui-md',
