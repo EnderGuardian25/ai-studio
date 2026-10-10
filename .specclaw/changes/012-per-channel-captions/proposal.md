@@ -116,6 +116,21 @@ So a LinkedIn post carries the Instagram caption and its hashtags, and the rever
 - **On-image text: a separate short headline.** The caption call also returns a short headline, and the design, Path A and background prompts use it. They no longer use any caption.
 - **Revisions stay design-only.** Each caption panel has its own undo; restoring a revision never touches captions.
 - **The brief wizard step becomes "Brief & Caption Direction".**
+- **WhatsApp counter (2026-10-10):** a soft 1,000-character guide with a warning past it, not a hard block. 010 can tighten it once the real Channel limit is confirmed.
+- **Panel rulings (2026-10-10, user), after the deep panel (CHANGES_REQUESTED):**
+  - **Full scope as decided:** three captions including WhatsApp, per-channel regenerate plus "Regenerate all", and per-panel undo. Tasks are ordered so that storage, extraction and the publish fix land first.
+  - **WHATSAPP is added to `Channel` now,** and `DraftCaption` is keyed on `Channel`. WhatsApp is not selectable in the publish dialog until 010. A publish to a channel with no publisher fails closed: rejected up front, or a terminal FAILED with a readable reason, never retried.
+  - **The headline is a required `Draft.headline` on new drafts.** A migrated draft with no headline makes design fall back to the brief Topic, and the fallback is logged. The headline panel offers "Generate headline".
+  - **Contracts keep their names.** The UI strings, docs and internal identifiers are renamed. The routes `regenerate-copy` and `generate/copy`, the persisted `DraftAction.REGENERATE_COPY` and the MCP/ACP field names stay as they are, listed as deliberately unchanged like the `COPY` slot.
+  - **Orchestrator defaults from the panel, adopted:**
+    - `copyText` is preserved as a read-only `legacyCaptionText` and dropped only in a later change;
+    - each draft records how it migrated (split, unsplit fallback or empty), and fallback drafts show a "review this caption" notice;
+    - fallback drafts with a pending scheduled post are listed at migration time;
+    - one shared caption resolver refuses failed, empty or over-limit captions, with a terminal error and no retry;
+    - the strict JSON extractor accepts exactly one object;
+    - a mock caption seam returns a raw reply through the real extractor, with a sentinel that drops one channel;
+    - the channel limits and briefs come from one per-channel registry;
+    - MCP/ACP returns captions as a `{channel, text}` list.
 - **The UI is built on 014's shared `PageHead` / `Section` / `Notice` primitives.**
 
 ## Open Questions
@@ -135,3 +150,32 @@ So a LinkedIn post carries the Instagram caption and its hashtags, and the rever
 ---
 
 **To proceed:** Review this proposal and approve to begin planning.
+
+- (party-po, BLOCK) No cheaper variant priced; per-channel regenerate, per-channel undo, the WhatsApp caption and the renames carry no stated value — see party-report.md
+- (party-architect, BLOCK) A second caption-channel enum beside `Channel`, with no mapping contract — see party-report.md
+- (party-architect, BLOCK) The headline has no storage, extractor key, migration value or regenerate owner; Solution 5 contradicts the Decisions — see party-report.md
+- (party-security, BLOCK) The migration rewrites every caption on deploy and retires `copyText` with no way back — see party-report.md
+- (party-po) The WhatsApp caption ships before any consumer exists; name the cut line — see party-report.md
+- (party-po) The recurring cost (tokens, spawns per draft) is unstated; is the headline required? — see party-report.md
+- (party-po) The migration and the identifier renames carry no stated value — see party-report.md
+- (party-po) Name the ship order inside the change — see party-report.md
+- (party-ba) Problem 1's prevalence is unmeasured — see party-report.md
+- (party-ba) No falsifiable criterion for the style rules (`**`, WhatsApp length) — see party-report.md
+- (party-ba) Mark Solution 5 and the stale open questions superseded; flag migrated drafts as not channel-tailored — see party-report.md
+- (party-architect) "Data-only" migration is wrong; state the migration sequence — see party-report.md
+- (party-architect) Per-channel regenerate and failure need a request shape, a single-flight scope and per-channel status — see party-report.md
+- (party-architect) Write the extractor's JSON contract and per-field rules — see party-report.md
+- (party-architect) One shared caption resolver for publish and the job runner; partial results on scheduler post-actions — see party-report.md
+- (party-architect) Give the PATCH, draft GET and MCP/ACP output shapes; does `copyText` stay externally? — see party-report.md
+- (party-architect) Name the mock caption seam (raw reply through the real extractor, plus a drop-one-channel sentinel) — see party-report.md
+- (party-architect) Slicing needs `copyText` live until the panels and PATCH land; a read-time fallback belongs in the one resolver — see party-report.md
+- (party-security) Record how each draft migrated, and flag unsplit fallbacks with pending scheduled posts — see party-report.md
+- (party-security) The publish guard must key on caption status, trimmed emptiness and hard limits; terminal, not retryable — see party-report.md
+- (party-security) The headline must be required and validated; never run design on nothing — see party-report.md
+- (party-security) The extractor must accept exactly one matching object — see party-report.md
+- (party-security) If WHATSAPP joins `Channel`, a publish with no publisher fails closed and stays out of the publish dialog — see party-report.md
+- (party-visionary) The headline needs its own storage, model setting and prompt version — see party-report.md
+- (party-visionary) Split the rename rule: routes, persisted enums and MCP fields are renamed only on purpose — see party-report.md
+- (party-visionary) Build the prompt's length guidance from `CHANNEL_CAPTION_LIMITS` — see party-report.md
+- (party-visionary) Keep `copyText` as a read-only legacy column, dropped later — see party-report.md
+- (party-visionary) Drive prompt keys, extractor, panels and MCP output from one per-channel registry; MCP returns a `{channel, text}` list — see party-report.md

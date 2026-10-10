@@ -18,3 +18,13 @@
 {"ev":"start","span":"T8","kind":"task","label":"team/settings/admin + StatusWord + name guard + docs","parent":"W1","model":"claude","attempt":"1","at":"2026-10-09T18:10:04Z","ts":1791569404}
 {"ev":"stop","span":"T8","at":"2026-10-09T18:26:29Z","ts":1791570389,"status":"ok"}
 {"ev":"stop","span":"W1","at":"2026-10-09T18:36:49Z","ts":1791571009,"status":"ok"}
+{"ev":"start","span":"W2","kind":"wave","label":"wave 2","at":"2026-10-09T18:37:14Z","ts":1791571034}
+{"ev":"start","span":"T9","kind":"task","label":"field-label style","parent":"W2","model":"claude","attempt":"1","at":"2026-10-09T18:37:14Z","ts":1791571034}
+{"ev":"stop","span":"T9","at":"2026-10-09T18:54:34Z","ts":1791572074,"status":"ok"}
+{"ev":"start","span":"T10","kind":"task","label":"control heights","parent":"W2","model":"claude","attempt":"1","at":"2026-10-09T18:54:34Z","ts":1791572074}
+{"ev":"stop","span":"T10","at":"2026-10-09T22:16:37Z","ts":1791584197,"status":"ok"}
+{"ev":"start","span":"T11","kind":"task","label":"brand kits a11y+consistency","parent":"W2","model":"claude","attempt":"1","at":"2026-10-09T22:16:37Z","ts":1791584197}
+{"ev":"stop","span":"T11","at":"2026-10-09T22:32:47Z","ts":1791585167,"status":"ok"}
+{"ev":"start","span":"T12","kind":"task","label":"guard tokens + tabular-nums","parent":"W2","model":"claude","attempt":"1","at":"2026-10-09T22:32:47Z","ts":1791585167}
+{"ev":"stop","span":"T12","at":"2026-10-09T22:38:33Z","ts":1791585513,"status":"ok"}
+{"ev":"stop","span":"W2","at":"2026-10-10T17:45:05Z","ts":1791654305,"status":"ok"}

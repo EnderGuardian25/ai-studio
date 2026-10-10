@@ -1,7 +1,7 @@
 # 🦞 SpecClaw Dashboard
 
 **Project:** bistec-studio
-**Last Updated:** 2026-10-09 18:37 UTC
+**Last Updated:** 2026-10-10 17:45 UTC
 
 ## Active Changes
 
@@ -12,7 +12,7 @@
 - 🔍 **005-provider-flexibility-onboarding** — verify PASS | 10/10 tasks (100%) | 0 failed | 122h0m
 - 🔍 **011-app-visual-redesign** — verify PASS | 13/13 tasks (100%) | 0 failed | 59h23m
 - 🔍 **013-fork-ci-checks-only** ▫ — verify PASS | 3/3 tasks (100%) | 0 failed | 13h13m
-- 🔨 **014-ui-a11y-consistency-pass** ▣ — build in-progress | 8/18 tasks (44%) | 0 failed | 14h27m
+- 🔨 **014-ui-a11y-consistency-pass** ▣ — build in-progress | 12/18 tasks (66%) | 0 failed | 37h35m
 
 ## Pending Proposals
 
