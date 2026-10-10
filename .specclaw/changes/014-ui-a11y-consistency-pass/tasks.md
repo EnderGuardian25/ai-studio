@@ -265,7 +265,7 @@ There are **18 tasks in 3 waves**, all on `v2`. **The full clean mock E2E runs 3
     - **Rows 19 and 20:** `FieldLabel htmlFor`.
     - **`surfaces.test.ts:875/897`** (combobox counts) are unaffected.
 
-- [ ] `T15` — Draft page labels
+- [x] `T15` — Draft page labels
   - Files: `src/components/drafts/CopyEditor.tsx`, `src/components/drafts/RefinementPanel.tsx`, `tests/e2e/a11y.test.ts`
   - Estimate: small
   - Kind: impl

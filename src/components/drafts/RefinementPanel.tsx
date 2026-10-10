@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useId, useRef, useState } from 'react'
 import { Send as SendIcon, Loader2, AlertTriangle, Check } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/Button'
@@ -81,6 +81,8 @@ export function RefinementPanel({
 }: RefinementPanelProps) {
   const [messages, setMessages] = useState<RefineMessage[]>([])
   const [input, setInput] = useState('')
+  // The prompt is named by the "Refine Design" heading (FR-12 row 27).
+  const headingId = useId()
   // True only while a POST is in flight; the background refine itself is
   // tracked via the polled `pendingAction` prop.
   const [running, setRunning] = useState(false)
@@ -206,7 +208,7 @@ export function RefinementPanel({
 
   return (
     <section className="pt-[22px] pb-1.5">
-      <SectionHead numeral="ii." title="Refine Design" className="mb-3">
+      <SectionHead numeral="ii." title="Refine Design" id={headingId} className="mb-3">
         {messages.length > 0 && (
           <span className="text-fg-muted">
             {messages.length} {messages.length === 1 ? 'request' : 'requests'}
@@ -329,6 +331,7 @@ export function RefinementPanel({
         }}
       >
         <input
+          aria-labelledby={headingId}
           value={input}
           onChange={(e) => setInput(e.target.value)}
           disabled={busy}

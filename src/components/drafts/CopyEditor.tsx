@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useId, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { Loader2, Check, Sparkles, Undo2, AlertTriangle } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
@@ -48,6 +48,8 @@ function copyLimitFor(channels: string[]): { channel: string; limit: number } {
 
 export function CopyEditor({ draft, onSaved, onActionStarted }: CopyEditorProps) {
   const [value, setValue] = useState(draft.copyText)
+  // The caption is named by the "Copy" heading (FR-12 row 26).
+  const headingId = useId()
   const [saved, setSaved] = useState(true)
   const [saving, setSaving] = useState(false)
   // True only while the regenerate POST itself is in flight (202 arrives fast);
@@ -138,7 +140,7 @@ export function CopyEditor({ draft, onSaved, onActionStarted }: CopyEditorProps)
 
   return (
     <section className="pt-[22px] pb-1.5">
-      <SectionHead numeral="i." title="Copy" className="mb-3">
+      <SectionHead numeral="i." title="Copy" id={headingId} className="mb-3">
         {copyActionPending ? (
           <span className="flex items-center gap-1.5 text-fg-muted">
             <Loader2 {...ICON} className="animate-spin" aria-hidden /> Regenerating…
@@ -178,6 +180,7 @@ export function CopyEditor({ draft, onSaved, onActionStarted }: CopyEditorProps)
       {/* The ruled caption field (§8.3): a 1 px --line-subtle rule every 26 px,
           scrolling with the text. Only the caption is ruled. */}
       <textarea
+        aria-labelledby={headingId}
         value={value}
         onChange={(e) => {
           setValue(e.target.value)

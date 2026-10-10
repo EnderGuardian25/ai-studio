@@ -26,6 +26,7 @@ import {
 //        the login h1).
 //   T14: AC-11 (FR-12) for rows 18, 19, 20 (briefing assistant, campaign
 //        briefing) and 23, 24, 25 (the campaign and project aside selects).
+//   T15: AC-11 (FR-12) for rows 26 and 27 (the draft caption and refine prompt).
 
 const MOCKED = () => !!(process.env.MOCK_AI && process.env.MOCK_PUPPETEER)
 
@@ -641,5 +642,53 @@ test.describe('Labels: campaigns and projects (T14)', () => {
       await expect(topic.and(row.getByPlaceholder('Post topic', { exact: true }))).toHaveCount(1)
       await expect(row.getByRole('textbox', { name: 'Post topic', exact: true })).toHaveValue(`Mock scheduled post ${i + 1}`)
     }
+  })
+})
+
+// ── T15: labels on the draft page (AC-11 rows 26 and 27) ────────────────────
+
+// AC-11 rows 26–27: the field is named by the visible section heading it points
+// at. The numeral ("i.", "ii.") is aria-hidden and outside the heading, so the
+// name is the heading text alone.
+async function expectNamedByHeading(
+  page: Page,
+  name: string,
+  opts: { tag: 'INPUT' | 'TEXTAREA'; placeholder: string },
+) {
+  const field = page.getByRole('textbox', { name, exact: true })
+  await expect(field, `"${name}" names exactly one field`).toHaveCount(1)
+  await expect(field).toHaveJSProperty('tagName', opts.tag)
+  const labelledBy = await field.getAttribute('aria-labelledby')
+  expect(labelledBy, `the "${name}" field has aria-labelledby`).toBeTruthy()
+  const heading = page.locator(`[id="${labelledBy}"]`)
+  await expect(heading).toHaveJSProperty('tagName', 'H2')
+  await expect(heading, `the "${name}" heading is visible`).toBeVisible()
+  await expect(heading).toHaveText(name)
+  const byPlaceholder = page.getByPlaceholder(opts.placeholder, { exact: true })
+  await expect(byPlaceholder).toHaveCount(1)
+  await expect(field.and(byPlaceholder), 'name and placeholder find the same element').toHaveCount(1)
+}
+
+test.describe('Labels: draft page (T15)', () => {
+  let api: ApiClient
+  test.beforeEach(async ({ request }) => {
+    api = await loginAs(request, ADMIN_EMAIL, ADMIN_PASSWORD)
+  })
+  test.afterEach(async () => {
+    await api.dispose()
+  })
+
+  test('AC-11 rows 26 and 27: the caption and the refine prompt are named by their section headings', async ({ page }) => {
+    test.skip(!MOCKED(), 'needs MOCK_AI + MOCK_PUPPETEER to mint an exported draft')
+    const draft = await mintExportedDraft(api, `a11y-draft-labels-${Date.now()}`)
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await pageLogin(page)
+    await page.goto(`/drafts/${draft.id}`)
+    await expect(page.getByRole('button', { name: 'View full screen', exact: true })).toBeVisible({ timeout: 20_000 })
+
+    // Row 26.
+    await expectNamedByHeading(page, 'Copy', { tag: 'TEXTAREA', placeholder: 'Post copy…' })
+    // Row 27.
+    await expectNamedByHeading(page, 'Refine Design', { tag: 'INPUT', placeholder: 'e.g. Make the logo larger…' })
   })
 })
