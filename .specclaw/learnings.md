@@ -311,3 +311,20 @@ T10: COMPACT_FIELD also styled a textarea (BrandKitAssistantPanel 'Brand voice')
 When a shared class gains a fixed height, grep every consumer for <textarea>
 
 ---
+
+## [L19] agent_issue — A finished gate agent restarted a detached :3001 next dev...
+
+**When:** 2026-10-10 22:48 UTC
+**Category:** agent_issue
+**Priority:** medium
+**Status:** pending
+
+### Detail
+
+A finished gate agent restarted a detached :3001 next dev minutes later (after its background task died), which collided with the next gate's clean server
+
+### Action
+
+Gate agents must not restart servers after hand-back; the next gate checks for exactly one :3001 listener before E2E
+
+---
