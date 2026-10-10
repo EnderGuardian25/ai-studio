@@ -42,3 +42,5 @@
 {"ev":"start","span":"T18","kind":"task","label":"axe scan + close-out","parent":"W3","model":"claude","attempt":"1","at":"2026-10-10T18:57:47Z","ts":1791658667}
 {"ev":"stop","span":"T18","at":"2026-10-10T22:37:26Z","ts":1791671846,"status":"ok"}
 {"ev":"stop","span":"W3","at":"2026-10-10T22:48:33Z","ts":1791672513,"status":"ok"}
+{"ev":"start","span":"verify-1791672541","kind":"phase","label":"verify","at":"2026-10-10T22:49:01Z","ts":1791672541}
+{"ev":"stop","span":"verify","at":"2026-10-10T22:54:43Z","ts":1791672883,"status":"ok"}
