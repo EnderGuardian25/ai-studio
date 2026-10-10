@@ -49,6 +49,24 @@ enum Channel {
   WHATSAPP
 }
 
+// One caption row's state (012 FR-02). PENDING = a generation or regenerate is
+// writing it now; READY = validated model output or the user's own text (may
+// be empty); FAILED = the last attempt produced no usable text AND the row has
+// none — the DraftCaption_failed_has_no_text CHECK constraint enforces that.
+enum CaptionStatus {
+  PENDING
+  READY
+  FAILED
+}
+
+// How a pre-012 draft's single legacy caption became per-channel rows
+// (012 FR-05).
+enum CaptionMigration {
+  SPLIT
+  UNSPLIT_FALLBACK
+  EMPTY
+}
+
 enum PostStatus {
   PENDING
   SCHEDULED
@@ -490,12 +508,23 @@ model Draft {
   // detail is the clipped (≤300 chars) error text. Null = no notice.
   backgroundSkipReason String?
   backgroundSkipDetail String?
+  // The short line printed on the post image (012 FR-03/FR-09), written by the
+  // caption call. Null only on drafts migrated from a legacy caption — design
+  // then falls back to the brief topic (captions/headline.ts designHeadline).
+  headline        String?
+  // How the legacy caption became DraftCaption rows (012 FR-04/FR-05). Set
+  // once, guarded on null, by captions/store.ts migrateDraft. Null on drafts
+  // created after 012.
+  captionMigration CaptionMigration?
   createdAt       DateTime        @default(now())
   // @default(now()) keeps the added column valid for pre-existing rows
   updatedAt       DateTime        @default(now()) @updatedAt
   posts           Post[]
   revisions       DraftRevision[] @relation("DraftRevisions")
   scheduledGenerations ScheduledGeneration[]
+  // Per-channel captions (012 FR-02). Read only through captions/store.ts
+  // loadDraftCaptions, which materializes legacy drafts first.
+  captions        DraftCaption[]
 
   @@index([briefId])
   @@index([teamId])
@@ -702,4 +731,30 @@ model DraftRevision {
   notAppliedOn   Draft[]  @relation("DraftNotAppliedRevision")
 
   @@unique([draftId, revisionNumber])
+}
+
+// One caption per draft per registry channel (012 FR-02, src/lib/channels.ts
+// CAPTION_CHANNELS). Reached only through its draft, so every caption read and
+// write sits behind the draft's access check; deleted with the draft.
+// The migration adds the CHECK DraftCaption_failed_has_no_text:
+// status <> 'FAILED' OR text = '' (A7 — FAILED means "no usable text").
+model DraftCaption {
+  id            String        @id @default(cuid())
+  draftId       String
+  draft         Draft         @relation(fields: [draftId], references: [id], onDelete: Cascade)
+  channel       Channel
+  text          String        @default("") @db.Text
+  status        CaptionStatus @default(PENDING)
+  // Why the last write attempt for this channel failed — also set on a failed
+  // regenerate that left good text READY (A7). Cleared by the next successful
+  // write or by an edit.
+  failureReason String?
+  // True only on fallback-migrated Instagram/LinkedIn rows (FR-05). Cleared by
+  // an edit or a successful regenerate.
+  needsReview   Boolean       @default(false)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @default(now()) @updatedAt
+
+  @@unique([draftId, channel])
+  @@index([draftId])
 }

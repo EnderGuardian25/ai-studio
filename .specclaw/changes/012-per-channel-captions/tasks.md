@@ -82,7 +82,7 @@ Waves 2 and 3 add UX and wording only.
     - **The resolver:** client-safe (imports only `channels.ts` and types). Rules in the spec FR-14 order, with the exact reason strings, which T10's E2E asserts on substrings.
     - **The row type** is a structural `{ status, text, failureReason }`, so neither module imports `@prisma/client` values.
 
-- [ ] `T4` — `DraftCaption` schema, the caption store and materializer, and the boot backfill
+- [x] `T4` — `DraftCaption` schema, the caption store and materializer, and the boot backfill
   - Files: `prisma/schema.prisma`, `prisma/migrations/<ts>_draft_captions/migration.sql` (new), `src/lib/captions/store.ts` (new), `src/lib/captions/backfill.ts` (new), `src/scripts/backfill-captions.ts` (new), `docker-entrypoint.sh`, `Dockerfile`, `package.json`
   - Estimate: large
   - Kind: migration

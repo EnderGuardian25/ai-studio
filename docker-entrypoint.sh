@@ -33,6 +33,14 @@ else
   # to download it from the registry on every boot.
   node node_modules/prisma/build/index.js migrate deploy
   echo "[entrypoint] migrations up to date"
+  # 012: split legacy single captions into per-channel DraftCaption rows. Data
+  # never moves in SQL, so this runs after the schema is in place. Idempotent
+  # (a second run writes 0) and serialized across containers by an advisory
+  # lock; per-draft errors are only counted, so it exits non-zero — failing the
+  # boot under `set -e` — only when the database itself is unusable. Bundled
+  # by the Dockerfile (src/scripts/backfill-captions.ts).
+  echo "[entrypoint] backfilling per-channel captions…"
+  node dist/scripts/backfill-captions.js
 fi
 
 exec "$@"
