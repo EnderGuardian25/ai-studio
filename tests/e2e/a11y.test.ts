@@ -27,6 +27,8 @@ import {
 //   T14: AC-11 (FR-12) for rows 18, 19, 20 (briefing assistant, campaign
 //        briefing) and 23, 24, 25 (the campaign and project aside selects).
 //   T15: AC-11 (FR-12) for rows 26 and 27 (the draft caption and refine prompt).
+//   T16: AC-11 (FR-12) for rows 7–11 (/team register form and channel rows) and
+//        AC-18 (FR-19, the provider toggle's On/Off word).
 
 const MOCKED = () => !!(process.env.MOCK_AI && process.env.MOCK_PUPPETEER)
 
@@ -690,5 +692,136 @@ test.describe('Labels: draft page (T15)', () => {
     await expectNamedByHeading(page, 'Copy', { tag: 'TEXTAREA', placeholder: 'Post copy…' })
     // Row 27.
     await expectNamedByHeading(page, 'Refine Design', { tag: 'INPUT', placeholder: 'e.g. Make the logo larger…' })
+  })
+})
+
+// ── T16: labels on /team (AC-11 rows 7–11) and the provider On/Off word (AC-18) ─
+
+// Rows 7 and 10: the eye button is absolutely centred in the relative wrapper
+// around the field, and the label sits above that wrapper (spec Edge Cases),
+// so the button's centre stays on the field's centre.
+async function expectEyeCentred(field: Locator, eye: Locator) {
+  const [f, e] = [await field.boundingBox(), await eye.boundingBox()]
+  expect(f && e, 'the field and its eye button have boxes').toBeTruthy()
+  expect(Math.abs(f!.y + f!.height / 2 - (e!.y + e!.height / 2))).toBeLessThan(1)
+}
+
+// A channel's ruled row, found by its visible channel name.
+function channelRow(page: Page, name: string): Locator {
+  return page.getByRole('listitem').filter({ has: page.getByText(name, { exact: true }) })
+}
+
+test.describe('Labels: team (T16)', () => {
+  test('AC-11 rows 7, 8 and 9: the register form key, provider name and display label are labelled', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await pageLogin(page)
+    await page.goto('/team')
+    await expect(page.getByRole('heading', { name: 'AI Providers' })).toBeVisible()
+
+    // API mode offers COPY and IMAGE ("API key"); CLI mode hides COPY ("Image API key").
+    const register = page.getByRole('button', { name: /^(Register Provider|Register image key)$/ })
+    const cliMode = (await register.innerText()).includes('image key')
+    await register.click()
+    await expect(page.getByRole('heading', { name: 'Register new provider', level: 3 })).toBeVisible()
+
+    // Row 7. Exact, so the "Show API key" button doesn't also match.
+    const keyLabel = cliMode ? 'Image API key' : 'API key'
+    const keyPlaceholder = cliMode
+      ? 'Image API key (sk-… OpenAI or AIza… Gemini)'
+      : 'API key (sk-ant-…, sk-…, or AIza… Gemini for images)'
+    await expectLabelled(page, keyLabel, { tag: 'INPUT', placeholder: keyPlaceholder })
+    const key = page.getByLabel(keyLabel, { exact: true })
+    await expectEyeCentred(key, page.getByRole('button', { name: 'Show API key' }))
+
+    // Rows 8 and 9 appear for a key of unknown format.
+    await key.fill('xyz-unknown-format-key')
+    await expectLabelled(page, 'Provider name', { tag: 'INPUT', placeholder: 'Provider name (e.g. groq)' })
+    await expectLabelled(page, 'Display label', { tag: 'INPUT', placeholder: 'Display label (e.g. Llama 3 (Groq))' })
+  })
+
+  test('AC-11 rows 10 and 11: each channel row labels its access token and its ID field', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await pageLogin(page)
+    await page.goto('/team')
+    await expect(page.getByRole('heading', { name: 'Social Channels' })).toBeVisible()
+
+    for (const [name, idLabel] of [
+      ['Instagram', 'Business Account ID'],
+      ['LinkedIn', 'Organization ID'],
+    ] as const) {
+      const row = channelRow(page, name)
+      await expect(row, `one ${name} row`).toHaveCount(1)
+      // Row 10, scoped to the channel row: both rows say "Access token".
+      await expectLabelled(row, 'Access token', { tag: 'INPUT', placeholder: 'Access token' })
+      await expectEyeCentred(
+        row.getByLabel('Access token', { exact: true }),
+        row.getByRole('button', { name: 'Show access token' }),
+      )
+      // Row 11.
+      await expectLabelled(row, idLabel, { tag: 'INPUT', placeholder: idLabel })
+    }
+
+    // The two "Access token" labels point at two different fields.
+    const ids = await page.getByLabel('Access token', { exact: true }).evaluateAll((els) => els.map((el) => el.id))
+    expect(ids).toHaveLength(2)
+    expect(new Set(ids).size).toBe(2)
+  })
+
+  test('AC-18: a provider row shows "On" or "Off" beside its toggle, aria-hidden, and the toggle keeps its name', async ({ page, request }) => {
+    test.skip(!MOCKED(), 'needs MOCK_AI so a fake key registers')
+    // A fresh team, so the shared team's providers are never touched.
+    const sa = await loginAs(request, ADMIN_EMAIL, ADMIN_PASSWORD)
+    const teamName = `a11y T16 ${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+    const teamRes = await sa.post('/api/admin/teams', { name: teamName })
+    expect(teamRes.status()).toBe(201)
+    const team = (await teamRes.json()) as { id: string }
+    const api = await loginAs(request, ADMIN_EMAIL, ADMIN_PASSWORD, { team: teamName })
+    let providerId: string | undefined
+    try {
+      const label = 'T16 Toggle Image'
+      const reg = await api.post('/api/admin/providers', { apiKey: 'sk-t16-image-000001', slot: 'IMAGE', label })
+      expect(reg.status()).toBe(201)
+      const row = (await reg.json()) as { id: string; isEnabled: boolean }
+      providerId = row.id
+      expect(row.isEnabled).toBe(true)
+
+      await page.setViewportSize({ width: 1440, height: 900 })
+      await page.goto('/login')
+      await page.getByPlaceholder('Username').fill(ADMIN_EMAIL)
+      await page.getByPlaceholder('Password').fill(ADMIN_PASSWORD)
+      await page.getByRole('button', { name: 'Sign in' }).click()
+      await page.waitForURL((url) => url.pathname === '/' || url.pathname === '/choose-team')
+      expect((await page.request.post('/api/me/active-team', { data: { teamId: team.id } })).ok()).toBe(true)
+      await page.goto('/team')
+
+      const toggle = page.getByRole('button', { name: `Enable ${label}`, exact: true })
+      await expect(toggle).toHaveCount(1)
+      const providerRow = page.getByRole('listitem').filter({ has: toggle })
+      const word = providerRow.getByText(/^(On|Off)$/)
+      await expect(word).toHaveCount(1)
+      // Outside the button, so it is not part of the button's name.
+      await expect(toggle.getByText(/^(On|Off)$/)).toHaveCount(0)
+      await expect(word).toHaveAttribute('aria-hidden', 'true')
+
+      // Enabled: "On" in the accent, aria-pressed true.
+      await expect(toggle).toHaveAttribute('aria-pressed', 'true')
+      await expect(word).toBeVisible()
+      await expect(word).toHaveText('On')
+      await expect(word).toHaveClass(/(^|\s)text-accent(\s|$)/)
+
+      // Toggled off: "Off" in --fg-muted, aria-pressed false, the name unchanged.
+      await toggle.click()
+      await expect(toggle).toHaveAttribute('aria-pressed', 'false')
+      await expect(word).toHaveText('Off')
+      await expect(word).toBeVisible()
+      await expect(word).toHaveClass(/(^|\s)text-fg-muted(\s|$)/)
+      await expect(word).toHaveAttribute('aria-hidden', 'true')
+      await expect(page.getByRole('button', { name: `Enable ${label}`, exact: true })).toHaveCount(1)
+    } finally {
+      if (providerId) await api.del(`/api/admin/providers/${providerId}`)
+      await api.dispose()
+      await sa.del(`/api/admin/teams/${team.id}`)
+      await sa.dispose()
+    }
   })
 })

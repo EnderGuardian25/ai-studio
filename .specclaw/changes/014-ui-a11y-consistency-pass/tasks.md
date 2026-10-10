@@ -275,7 +275,7 @@ There are **18 tasks in 3 waves**, all on `v2`. **The full clean mock E2E runs 3
     - **Pass `id`** (`useId`) to `SectionHead` for "Copy" and "Refine Design", and `aria-labelledby` on the caption textarea and the refine input. There is no visual change.
     - **012 rebuilds `CopyEditor` later.** Keep this edit to the two attributes.
 
-- [ ] `T16` — Team labels and the provider On/Off word
+- [x] `T16` — Team labels and the provider On/Off word
   - Files: `src/app/(app)/team/page.tsx`, `tests/e2e/a11y.test.ts`
   - Estimate: small
   - Kind: impl

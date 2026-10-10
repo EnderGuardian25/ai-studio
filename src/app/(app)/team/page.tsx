@@ -6,6 +6,7 @@ import { toast } from 'sonner'
 import { Plus, Trash2, ToggleLeft, ToggleRight, Star, Eye, EyeOff } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
+import { FieldLabel } from '@/components/ui/FieldLabel'
 import { Panel } from '@/components/ui/Panel'
 import { SegmentedToggle } from '@/components/ui/SegmentedToggle'
 import { QueryError } from '@/components/ui/QueryError'
@@ -84,6 +85,7 @@ function RegisterForm({ onSuccess, allowCopySlot }: { onSuccess: () => void; all
   const [providerName, setProviderName] = useState('')
   const [label, setLabel] = useState('')
   const [showKey, setShowKey] = useState(false)
+  const keyId = React.useId()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -115,23 +117,29 @@ function RegisterForm({ onSuccess, allowCopySlot }: { onSuccess: () => void; all
       <h3 className={SUB_HEAD}>Register new provider</h3>
 
       <div className="space-y-3">
-        <div className="relative">
-          <Input
-            className="pr-11"
-            type={showKey ? 'text' : 'password'}
-            placeholder={allowCopySlot ? 'API key (sk-ant-…, sk-…, or AIza… Gemini for images)' : 'Image API key (sk-… OpenAI or AIza… Gemini)'}
-            value={apiKey}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setApiKey(e.target.value)}
-          />
-          <button
-            type="button"
-            onClick={() => setShowKey(v => !v)}
-            aria-label={showKey ? 'Hide API key' : 'Show API key'}
-            aria-pressed={showKey}
-            className={`absolute right-1.5 top-1/2 -translate-y-1/2 ${ICON_BUTTON} hover:text-fg ${FOCUS}`}
-          >
-            {showKey ? <EyeOff {...ICON} /> : <Eye {...ICON} />}
-          </button>
+        {/* The label sits above the relative wrapper, not inside it, so the eye
+            button stays centred on the field (014 FR-12 row 7). */}
+        <div className="flex flex-col gap-1.5">
+          <FieldLabel htmlFor={keyId}>{allowCopySlot ? 'API key' : 'Image API key'}</FieldLabel>
+          <div className="relative">
+            <Input
+              id={keyId}
+              className="pr-11"
+              type={showKey ? 'text' : 'password'}
+              placeholder={allowCopySlot ? 'API key (sk-ant-…, sk-…, or AIza… Gemini for images)' : 'Image API key (sk-… OpenAI or AIza… Gemini)'}
+              value={apiKey}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setApiKey(e.target.value)}
+            />
+            <button
+              type="button"
+              onClick={() => setShowKey(v => !v)}
+              aria-label={showKey ? 'Hide API key' : 'Show API key'}
+              aria-pressed={showKey}
+              className={`absolute right-1.5 top-1/2 -translate-y-1/2 ${ICON_BUTTON} hover:text-fg ${FOCUS}`}
+            >
+              {showKey ? <EyeOff {...ICON} /> : <Eye {...ICON} />}
+            </button>
+          </div>
         </div>
 
         {detected && (
@@ -144,11 +152,13 @@ function RegisterForm({ onSuccess, allowCopySlot }: { onSuccess: () => void; all
           <div className="space-y-2">
             <p className="text-ui-xs text-fg-muted">Unknown key format — enter provider details</p>
             <Input
+              label="Provider name"
               placeholder="Provider name (e.g. groq)"
               value={providerName}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => setProviderName(e.target.value)}
             />
             <Input
+              label="Display label"
               placeholder="Display label (e.g. Llama 3 (Groq))"
               value={label}
               onChange={(e: React.ChangeEvent<HTMLInputElement>) => setLabel(e.target.value)}
@@ -228,6 +238,15 @@ function ProviderCard({ provider, onRefresh }: { provider: Provider; onRefresh: 
       </div>
 
       <div className="flex flex-shrink-0 flex-wrap items-center justify-end gap-1">
+        {/* The state in words (014 FR-19), outside the button and aria-hidden:
+            the button keeps its "Enable <label>" name and aria-pressed, so a
+            visible "On" inside it can't break Label in Name. */}
+        <span
+          aria-hidden="true"
+          className={`${SMALL_CAPS} ${provider.isEnabled ? 'text-accent' : 'text-fg-muted'}`}
+        >
+          {provider.isEnabled ? 'On' : 'Off'}
+        </span>
         <button
           type="button"
           onClick={() => toggle('isEnabled', !provider.isEnabled)}
@@ -293,6 +312,7 @@ function ChannelRow({
   const [token, setToken] = useState('')
   const [metadata, setMetadata] = useState('')
   const [showToken, setShowToken] = useState(false)
+  const tokenId = React.useId()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -332,25 +352,32 @@ function ChannelRow({
       </div>
 
       <div className="space-y-2">
-        <div className="relative">
-          <Input
-            className="pr-11"
-            type={showToken ? 'text' : 'password'}
-            placeholder={tokenPlaceholder}
-            value={token}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setToken(e.target.value)}
-          />
-          <button
-            type="button"
-            onClick={() => setShowToken(v => !v)}
-            aria-label={showToken ? 'Hide access token' : 'Show access token'}
-            aria-pressed={showToken}
-            className={`absolute right-1.5 top-1/2 -translate-y-1/2 ${ICON_BUTTON} hover:text-fg ${FOCUS}`}
-          >
-            {showToken ? <EyeOff {...ICON} /> : <Eye {...ICON} />}
-          </button>
+        {/* The label sits above the relative wrapper, not inside it, so the eye
+            button stays centred on the field (014 FR-12 row 10). */}
+        <div className="flex flex-col gap-1.5">
+          <FieldLabel htmlFor={tokenId}>Access token</FieldLabel>
+          <div className="relative">
+            <Input
+              id={tokenId}
+              className="pr-11"
+              type={showToken ? 'text' : 'password'}
+              placeholder={tokenPlaceholder}
+              value={token}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setToken(e.target.value)}
+            />
+            <button
+              type="button"
+              onClick={() => setShowToken(v => !v)}
+              aria-label={showToken ? 'Hide access token' : 'Show access token'}
+              aria-pressed={showToken}
+              className={`absolute right-1.5 top-1/2 -translate-y-1/2 ${ICON_BUTTON} hover:text-fg ${FOCUS}`}
+            >
+              {showToken ? <EyeOff {...ICON} /> : <Eye {...ICON} />}
+            </button>
+          </div>
         </div>
         <Input
+          label={metadataPlaceholder}
           placeholder={metadataPlaceholder}
           value={metadata}
           onChange={(e: React.ChangeEvent<HTMLInputElement>) => setMetadata(e.target.value)}
