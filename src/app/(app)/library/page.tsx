@@ -10,6 +10,7 @@ import { inputClasses, fieldEdge } from '@/components/ui/Input'
 import { SegmentedToggle } from '@/components/ui/SegmentedToggle'
 import { QueryError } from '@/components/ui/QueryError'
 import { PageHead } from '@/components/ui/PageHead'
+import { FieldLabel } from '@/components/ui/FieldLabel'
 import { PostCard } from '@/components/library/PostCard'
 import { PublishDialog } from '@/components/library/PublishDialog'
 import { PublishHistoryDrawer } from '@/components/library/PublishHistoryDrawer'
@@ -65,6 +66,7 @@ export default function LibraryPage() {
   const confirm = useConfirm()
   const [activeStatus, setActiveStatus] = useState<StatusFilter>('ALL')
   const [searchInput, setSearchInput] = useState('')
+  const searchId = React.useId()
   const [search, setSearch] = useState('')
   const { isTeamAdmin } = useCurrentUser()
 
@@ -152,19 +154,25 @@ export default function LibraryPage() {
         className="mb-8"
         actionsClassName="min-w-0"
         actions={
-          <div className="relative w-full sm:w-72">
-            <Search
-              size={15}
-              strokeWidth={1.4}
-              className="absolute left-3.5 top-1/2 -translate-y-1/2 text-fg-muted pointer-events-none"
-            />
-            <input
-              type="search"
-              placeholder="Search by topic…"
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              className={cn(inputClasses, fieldEdge(), 'pl-10')}
-            />
+          // The label sits above the icon's relative box, so the icon stays
+          // centred on the field (014 FR-12 row 3).
+          <div className="flex w-full flex-col gap-1.5 sm:w-72">
+            <FieldLabel htmlFor={searchId}>Search by topic</FieldLabel>
+            <div className="relative">
+              <Search
+                size={15}
+                strokeWidth={1.4}
+                className="absolute left-3.5 top-1/2 -translate-y-1/2 text-fg-muted pointer-events-none"
+              />
+              <input
+                id={searchId}
+                type="search"
+                placeholder="Search by topic…"
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
+                className={cn(inputClasses, fieldEdge(), 'pl-10')}
+              />
+            </div>
           </div>
         }
       />

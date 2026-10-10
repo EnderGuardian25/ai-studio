@@ -507,6 +507,9 @@ test.describe('Brief wizard (T8)', () => {
       await expect(page.getByRole('button', { name })).toBeVisible()
     }
     const kit = page.getByRole('combobox', { name: 'Brand Kit' })
+    // The kit options load after the step renders: wait for one before choosing
+    // (the same race a11y.test.ts's briefStepTwo guards against).
+    await expect(kit.locator('option:not([value=""])').first()).toBeAttached()
     if ((await kit.inputValue()) === '') {
       const values = await kit.locator('option').evaluateAll((os) => (os as HTMLOptionElement[]).map((o) => o.value).filter(Boolean))
       await kit.selectOption(values[0])

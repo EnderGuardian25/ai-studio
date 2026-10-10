@@ -31,6 +31,9 @@ interface ContentStepProps {
 
 export function ContentStep({ topic, setTopic, prompt, setPrompt, goal, setGoal, tone, setTone, campaignId, brandKitId }: ContentStepProps) {
   const [enhancing, setEnhancing] = useState(false)
+  // The Topic and Brief labels name their fields (014 FR-12 rows 4, 5).
+  const topicId = React.useId()
+  const briefId = React.useId()
   // Before/after review: the AI rewrite only reaches the brief on Accept.
   const [enhanceResult, setEnhanceResult] = useState<{ original: string; draft: string } | null>(null)
 
@@ -63,8 +66,9 @@ export function ContentStep({ topic, setTopic, prompt, setPrompt, goal, setGoal,
         Give the post a short topic, tell Claude what it&apos;s about, then pick a goal and tone.
       </StepHead>
 
-      <FieldLabel className="mb-2.5">Topic</FieldLabel>
+      <FieldLabel htmlFor={topicId} className="mb-2.5">Topic</FieldLabel>
       <input
+        id={topicId}
         type="text"
         value={topic}
         onChange={e => setTopic(e.target.value)}
@@ -77,7 +81,8 @@ export function ContentStep({ topic, setTopic, prompt, setPrompt, goal, setGoal,
         A short title — it names this post in the library.
       </div>
 
-      <FieldLabel className="mb-2.5">Brief</FieldLabel>
+      {/* While the AI suggestion is up there is no textarea, so nothing to point at. */}
+      <FieldLabel htmlFor={enhanceResult ? undefined : briefId} className="mb-2.5">Brief</FieldLabel>
       {enhanceResult ? (
         <div className="space-y-4 mb-6">
           {enhanceResult.original.trim() && (
@@ -117,6 +122,7 @@ export function ContentStep({ topic, setTopic, prompt, setPrompt, goal, setGoal,
       ) : (
         <>
           <textarea
+            id={briefId}
             value={prompt}
             onChange={e => setPrompt(e.target.value)}
             placeholder="e.g. Announce our Q3 product launch with excitement. Highlight that it saves the marketing team hours on post creation. Include a CTA to try it."

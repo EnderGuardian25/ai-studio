@@ -40,10 +40,13 @@ export default function LoginPage() {
   return (
     <main className="min-h-screen flex items-center justify-center bg-canvas text-fg font-text px-4 py-12">
       <div className="w-full max-w-sm">
+        {/* The page's one h1, for screen readers (014 FR-14): the wordmark is an img. */}
+        <h1 className="sr-only">Sign in to Studio</h1>
         <Logo size="2xl" />
         <p className="mt-3 text-ui-sm text-fg-muted">Sign in to continue</p>
         <form onSubmit={handleSubmit} className="mt-8 pt-6 border-t-2 border-fg space-y-4">
           <Input
+            label="Username"
             type="text"
             placeholder="Username"
             value={username}
@@ -52,6 +55,7 @@ export default function LoginPage() {
             autoComplete="username"
           />
           <Input
+            label="Password"
             type="password"
             placeholder="Password"
             value={password}

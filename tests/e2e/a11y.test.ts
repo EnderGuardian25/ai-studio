@@ -4,11 +4,13 @@ import {
   ADMIN_EMAIL,
   ADMIN_PASSWORD,
   briefDraftIds,
+  expectNoHorizontalScroll,
   mintBrandKitFixture,
   mintCampaignFixture,
   mintExportedDraft,
   pageLogin,
   tabThreeFromMain,
+  tabThreeWithVisibleFocus,
 } from '../helpers/ui'
 
 // Change 014 — accessibility naming and the consistency pass. Each wave 2 and
@@ -20,6 +22,8 @@ import {
 //        kit-list region), AC-11 (FR-12) for rows 12, 13, 15, 16 and 17, and
 //        AC-15's kit part (FR-16, read-once swatches).
 //   T12: AC-09 (FR-10, tabular figures on the body).
+//   T13: AC-11 (FR-12) for rows 1–5 (login, library, brief) and AC-13 (FR-14,
+//        the login h1).
 
 const MOCKED = () => !!(process.env.MOCK_AI && process.env.MOCK_PUPPETEER)
 
@@ -463,5 +467,79 @@ test.describe('Body figures (T12)', () => {
     await page.goto('/library')
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
     expect(await bodyFigures()).toBe('tabular-nums')
+  })
+})
+
+// ── T13: labels on login, library and brief (AC-11 rows 1–5); the login h1 ───
+
+test.describe('Labels: login, library, brief (T13)', () => {
+  test('AC-11 rows 1 and 2: the login Username and Password fields are labelled', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await page.goto('/login')
+    await expect(page.getByRole('button', { name: 'Sign in' })).toBeVisible()
+    await expectLabelled(page, 'Username', { tag: 'INPUT', placeholder: 'Username' })
+    await expectLabelled(page, 'Password', { tag: 'INPUT', placeholder: 'Password' })
+    // The accessible names are unchanged.
+    await expect(page.getByRole('textbox', { name: 'Username', exact: true })).toHaveAttribute('type', 'text')
+  })
+
+  test('AC-13: /login has one sr-only h1 "Sign in to Studio", and its focus stops are unchanged', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await page.goto('/login')
+    await expect(page.getByRole('button', { name: 'Sign in' })).toBeVisible()
+    await expect(page.locator('h1')).toHaveCount(1)
+    const h1 = page.getByRole('heading', { level: 1, name: 'Sign in to Studio', exact: true })
+    await expect(h1).toHaveCount(1)
+    await expect(h1).toHaveClass(/(^|\s)sr-only(\s|$)/)
+    expect(await tabThreeWithVisibleFocus(page)).toEqual(['Username', 'Password', 'Sign in'])
+  })
+
+  test('AC-11 row 3: the library search is labelled "Search by topic", above the field', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await pageLogin(page)
+    await page.goto('/library')
+    await expect(page.getByRole('heading', { name: 'Library', level: 1 })).toBeVisible()
+    await expectLabelled(page, 'Search by topic', { tag: 'INPUT', placeholder: 'Search by topic…' })
+
+    // The label sits over the field, which keeps its 288 px column (sm:w-72).
+    const field = page.getByLabel('Search by topic', { exact: true })
+    const label = page.locator('label').filter({ hasText: /^Search by topic$/ })
+    const [f, l] = [await field.boundingBox(), await label.boundingBox()]
+    expect(f && l, 'the field and its label have boxes').toBeTruthy()
+    expect(l!.y + l!.height).toBeLessThanOrEqual(f!.y)
+    expect(Math.abs(l!.x - f!.x)).toBeLessThan(1)
+    expect(f!.width).toBeCloseTo(288, 0)
+
+    // The head still fits at the md and phone widths.
+    for (const width of [768, 375]) {
+      await page.setViewportSize({ width, height: 900 })
+      await expect(field).toBeVisible()
+      await expectNoHorizontalScroll(page, `library at ${width}px`)
+    }
+  })
+
+  test('AC-11 rows 4 and 5: the brief Topic and Brief fields are labelled', async ({ page, request }) => {
+    const api = await loginAs(request, ADMIN_EMAIL, ADMIN_PASSWORD)
+    const before = new Set(await briefDraftIds(api))
+    try {
+      await page.setViewportSize({ width: 1440, height: 900 })
+      await pageLogin(page)
+      await briefStepTwo(page)
+      await page.getByRole('button', { name: /Path B — Freeform/ }).click()
+      await page.getByRole('button', { name: /continue/i }).click()
+      await expect(page.getByRole('heading', { name: 'Brief & Copy Direction' })).toBeVisible()
+      await expectLabelled(page, 'Topic', { tag: 'INPUT', placeholder: 'e.g. Q3 product launch' })
+      await expectLabelled(page, 'Brief', {
+        tag: 'TEXTAREA',
+        placeholder:
+          'e.g. Announce our Q3 product launch with excitement. Highlight that it saves the marketing team hours on post creation. Include a CTA to try it.',
+      })
+    } finally {
+      // A brief walk can autosave an unfinished brief; discard any this case made.
+      for (const id of await briefDraftIds(api)) {
+        if (!before.has(id)) await api.del(`/api/brief-drafts/${id}`)
+      }
+      await api.dispose()
+    }
   })
 })

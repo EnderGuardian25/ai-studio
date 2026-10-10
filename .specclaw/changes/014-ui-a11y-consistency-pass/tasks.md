@@ -241,7 +241,7 @@ There are **18 tasks in 3 waves**, all on `v2`. **The full clean mock E2E runs 3
 
 ### Wave 3 — A: accessibility naming
 
-- [ ] `T13` — Login, library and brief labels; the login `h1`
+- [x] `T13` — Login, library and brief labels; the login `h1`
   - Files: `src/app/(auth)/login/page.tsx`, `src/app/(app)/library/page.tsx`, `src/components/brief/ContentStep.tsx`, `tests/e2e/a11y.test.ts`
   - Estimate: small
   - Kind: impl
