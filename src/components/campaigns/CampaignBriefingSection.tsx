@@ -125,7 +125,7 @@ export function CampaignBriefingSection({ campaignId, isTeamAdmin }: CampaignBri
         {active && <span className="text-fg-muted">v{active.version}</span>}
       </SectionHead>
       <p className="mb-4 text-ui-sm text-fg-muted">
-        Shared context for every post generated under this campaign — injected into copy and
+        Shared context for every post generated under this campaign — injected into captions and
         design prompts alongside the brand voice.
       </p>
 

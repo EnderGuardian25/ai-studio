@@ -132,7 +132,7 @@ test.describe('Field labels (T9)', () => {
     // Path B needs no template, so step 2 can continue.
     await page.getByRole('button', { name: /Path B — Freeform/ }).click()
     await page.getByRole('button', { name: /continue/i }).click()
-    await expect(page.getByRole('heading', { name: 'Brief & Copy Direction' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Brief & Caption Direction' })).toBeVisible()
     const reference = await labelStyle(page.locator('label').filter({ hasText: /^Topic$/ }))
     expect(reference.textTransform).toBe('uppercase')
     expect(reference.fontSize).toBe('11px')
@@ -550,7 +550,7 @@ test.describe('Labels: login, library, brief (T13)', () => {
       await briefStepTwo(page)
       await page.getByRole('button', { name: /Path B — Freeform/ }).click()
       await page.getByRole('button', { name: /continue/i }).click()
-      await expect(page.getByRole('heading', { name: 'Brief & Copy Direction' })).toBeVisible()
+      await expect(page.getByRole('heading', { name: 'Brief & Caption Direction' })).toBeVisible()
       await expectLabelled(page, 'Topic', { tag: 'INPUT', placeholder: 'e.g. Q3 product launch' })
       await expectLabelled(page, 'Brief', {
         tag: 'TEXTAREA',
@@ -1149,7 +1149,7 @@ test.describe('axe scan (T18)', () => {
 
     await page.getByRole('button', { name: /Path B — Freeform/ }).click()
     await page.getByRole('button', { name: /continue/i }).click()
-    await expect(page.getByRole('heading', { name: 'Brief & Copy Direction' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Brief & Caption Direction' })).toBeVisible()
     await expectNoAxeViolations(page, '/brief step 3')
   })
 

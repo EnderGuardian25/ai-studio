@@ -536,7 +536,7 @@ test.describe('Brief wizard (T8)', () => {
     await cont.click()
 
     // Step 3 — Content, with the Enhance with AI before/after
-    await expect(page.getByRole('heading', { name: 'Brief & Copy Direction' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Brief & Caption Direction' })).toBeVisible()
     await page.getByPlaceholder('e.g. Q3 product launch').fill(`T8 wizard ${Date.now()}`)
     await page.locator('textarea').fill('Announce the restyled brief wizard with a short call to action.')
     await expect(page.getByRole('combobox', { name: 'Goal' })).toBeVisible()

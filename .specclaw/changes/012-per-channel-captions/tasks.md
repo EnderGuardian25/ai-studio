@@ -230,7 +230,7 @@ Waves 2 and 3 add UX and wording only.
 
 ### Wave 3 — Wording, scripts and docs
 
-- [ ] `T14` — "copy" → "caption" in the UI strings, and the wording guard
+- [x] `T14` — "copy" → "caption" in the UI strings, and the wording guard
   - Files: `src/components/brief/ContentStep.tsx`, `src/components/campaigns/CampaignBriefingSection.tsx`, `src/app/(app)/team/page.tsx`, `tests/unit/captionWording.test.ts` (new), `tests/e2e/a11y.test.ts`, `tests/e2e/surfaces.test.ts`
   - Estimate: small
   - Kind: impl

@@ -62,7 +62,7 @@ export function ContentStep({ topic, setTopic, prompt, setPrompt, goal, setGoal,
 
   return (
     <div>
-      <StepHead index={2} title={<>Brief &amp; Copy Direction</>}>
+      <StepHead index={2} title={<>Brief &amp; Caption Direction</>}>
         Give the post a short topic, tell Claude what it&apos;s about, then pick a goal and tone.
       </StepHead>
 
