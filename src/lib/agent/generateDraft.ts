@@ -188,9 +188,6 @@ export async function generateDraftForBrief(
       data: {
         teamId: brief.teamId,
         briefId: brief.id,
-        // Placeholder nothing reads; T9 drops the write (the column becomes
-        // the nullable legacyCaptionText).
-        copyText: '',
         headline,
         captions: { create: captionRowsFromFields(fields) },
         htmlContent: design.htmlContent,
@@ -240,8 +237,6 @@ export async function createPendingDraft(
     data: {
       teamId: brief.teamId,
       briefId: brief.id,
-      // Placeholder nothing reads; T9 drops the write.
-      copyText: '',
       templateId: inputs.template?.id ?? null,
       status: 'IN_PROGRESS',
       captions: { create: CAPTION_CHANNELS.map(({ channel }) => ({ channel, status: 'PENDING' as const })) },

@@ -211,7 +211,6 @@ describe('createPendingDraft', () => {
     expect(db.draftCreates).toHaveLength(1)
     expect(db.draftCreates[0]).toMatchObject({
       status: 'IN_PROGRESS',
-      copyText: '',
       captions: {
         create: [
           { channel: 'INSTAGRAM', status: 'PENDING' },
@@ -221,6 +220,7 @@ describe('createPendingDraft', () => {
       },
     })
     expect(db.draftCreates[0]).not.toHaveProperty('headline')
+    expect(db.draftCreates[0]).not.toHaveProperty('legacyCaptionText')
   })
 })
 
@@ -291,8 +291,8 @@ describe('generateDraftForBrief (sync: scheduler, MCP, ACP)', () => {
     h.reply = json({ headline: 'H', instagram: 'IG text', whatsapp: 'WA text' })
     await generateDraftForBrief(brief, { userId: null, teamId: 'team1' })
     expect(h.pathB.mock.calls[0][2]).toBe('H')
+    expect(db.draftCreates[0]).not.toHaveProperty('legacyCaptionText')
     expect(db.draftCreates[0]).toMatchObject({
-      copyText: '',
       headline: 'H',
       status: 'EXPORTED',
       captions: {

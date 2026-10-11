@@ -459,7 +459,13 @@ model Draft {
   teamId          String
   briefId         String
   brief           Brief           @relation(fields: [briefId], references: [id])
-  copyText        String
+  // The pre-012 single caption (012 FR-03, A1): renamed in code only, so the
+  // column keeps the name "copyText" and the previous container keeps working
+  // during cutover. Read-only — nothing writes it (tests/unit/
+  // legacyCaptionGuard.test.ts); its one reader is captions/store.ts, which
+  // migrates it into DraftCaption rows. New drafts leave it null. Dropped in a
+  // later change.
+  legacyCaptionText String?       @map("copyText")
   imageUrl        String?
   htmlContent     String?         @db.Text
   templateId      String?

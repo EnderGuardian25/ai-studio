@@ -169,7 +169,7 @@ Waves 2 and 3 add UX and wording only.
     - **`publishPost`** surfaces a caption refusal as `Publish failed (<reason>) — recorded as post <id> with status FAILED` (the existing format).
     - **`generate/copy`** returns `{ copyText, headline, captions }`, without persisting.
 
-- [ ] `T9` — The legacy rename: `legacyCaptionText @map("copyText")`, no more placeholder writes, the read-only guard, the fixture seed and the rollback file
+- [x] `T9` — The legacy rename: `legacyCaptionText @map("copyText")`, no more placeholder writes, the read-only guard, the fixture seed and the rollback file
   - Files: `prisma/schema.prisma`, `prisma/migrations/<ts>_legacy_caption_text/migration.sql` (new), `prisma/rollback/012-per-channel-captions.down.sql` (new), `src/lib/captions/store.ts`, `src/lib/captions/backfill.ts`, `src/lib/agent/generateDraft.ts`, `scripts/seed-teams.mjs`, `tests/unit/legacyCaptionGuard.test.ts` (new)
   - Estimate: small
   - Kind: migration

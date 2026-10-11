@@ -13,16 +13,16 @@ interface FakeDraft {
   createdAt: Date
   status: string
   pendingAction: string | null
-  copyText: string
+  legacyCaptionText: string
 }
 
 const at = (n: number) => new Date(Date.UTC(2026, 0, 1, 0, 0, n))
-const draft = (id: string, n: number, copyText: string, over: Partial<FakeDraft> = {}): FakeDraft => ({
+const draft = (id: string, n: number, legacyCaptionText: string, over: Partial<FakeDraft> = {}): FakeDraft => ({
   id,
   createdAt: at(n),
   status: 'EXPORTED',
   pendingAction: null,
-  copyText,
+  legacyCaptionText,
   ...over,
 })
 
@@ -131,7 +131,7 @@ describe('runCaptionBackfill', () => {
     expect(summary).toMatchObject({ split: 2, deferred: 1 })
     expect(pageQueries).toHaveLength(2)
     const [first, second] = pageQueries as Array<{ where: Record<string, unknown>; take: number }>
-    expect(first.where).toEqual({ captionMigration: null, captions: { none: {} } })
+    expect(first.where).toEqual({ captionMigration: null, legacyCaptionText: { not: null }, captions: { none: {} } })
     expect(first.take).toBe(2)
     expect(second.where.OR).toEqual([
       { createdAt: { gt: at(2) } },

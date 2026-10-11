@@ -87,7 +87,7 @@ function draftRow() {
     status: 'EXPORTED',
     pendingAction: null,
     captionMigration: null,
-    copyText: '',
+    legacyCaptionText: null,
     updatedAt: new Date(),
     captions: rows.map((r) => ({ ...r, needsReview: false, updatedAt: new Date() })),
   }

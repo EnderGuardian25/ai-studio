@@ -48,8 +48,8 @@ interface PageCursor {
 function legacyDraftPage(db: PrismaClient, after: PageCursor | null, take: number) {
   return db.draft.findMany({
     where: {
-      // T9 adds `legacyCaptionText: { not: null }` once the column is nullable.
       captionMigration: null,
+      legacyCaptionText: { not: null },
       captions: { none: {} },
       ...(after && {
         OR: [
@@ -60,7 +60,7 @@ function legacyDraftPage(db: PrismaClient, after: PageCursor | null, take: numbe
     },
     orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
     take,
-    select: { id: true, createdAt: true, status: true, pendingAction: true, copyText: true },
+    select: { id: true, createdAt: true, status: true, pendingAction: true, legacyCaptionText: true },
   })
 }
 
@@ -95,7 +95,7 @@ export async function runCaptionBackfill(opts: BackfillOptions = {}): Promise<Ba
       for (const d of page) {
         const step = materializeStep({
           rowCount: 0,
-          legacyText: d.copyText,
+          legacyText: d.legacyCaptionText,
           captionMigration: null,
           status: d.status,
           pendingAction: d.pendingAction,
@@ -105,7 +105,8 @@ export async function runCaptionBackfill(opts: BackfillOptions = {}): Promise<Ba
           continue
         }
         try {
-          const { outcome, written } = await migrateDraft(d.id, d.copyText, db)
+          // The page filter guarantees a non-null legacy text.
+          const { outcome, written } = await migrateDraft(d.id, d.legacyCaptionText!, db)
           if (!written) continue // the lazy loader got there first
           if (outcome === 'SPLIT') summary.split++
           else if (outcome === 'EMPTY') summary.empty++

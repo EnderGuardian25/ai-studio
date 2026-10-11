@@ -56,7 +56,7 @@ function legacyDraft(over: Record<string, unknown> = {}) {
     status: 'EXPORTED',
     pendingAction: null,
     captionMigration: null,
-    copyText: 'INSTAGRAM:\nig text\nLINKEDIN:\nli text',
+    legacyCaptionText: 'INSTAGRAM:\nig text\nLINKEDIN:\nli text',
     updatedAt: T,
     captions: [],
     ...over,
@@ -180,7 +180,7 @@ describe('loadDraftCaptions — the materializer', () => {
   })
 
   it('logs the REVIEW line for a fallback it migrated', async () => {
-    h.draftFindUnique.mockResolvedValue(legacyDraft({ copyText: 'one caption for all' }))
+    h.draftFindUnique.mockResolvedValue(legacyDraft({ legacyCaptionText: 'one caption for all' }))
     h.captionFindMany.mockResolvedValue([row('INSTAGRAM'), row('LINKEDIN'), row('WHATSAPP')])
     h.draftFindMany.mockResolvedValue([
       {
@@ -227,7 +227,7 @@ describe('loadDraftCaptions — the materializer', () => {
   it('never migrates a draft that already has rows', async () => {
     h.draftFindUnique.mockResolvedValue(
       legacyDraft({
-        copyText: '',
+        legacyCaptionText: '',
         captions: [row('LINKEDIN', 'b'), row('INSTAGRAM', 'a'), row('WHATSAPP', 'c')],
       }),
     )

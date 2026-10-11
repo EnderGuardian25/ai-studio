@@ -116,7 +116,7 @@ function draftRow() {
     status: 'EXPORTED',
     pendingAction: null,
     captionMigration: null,
-    copyText: LEGACY,
+    legacyCaptionText: LEGACY,
     updatedAt: new Date(),
     captions: rows.map((r) => ({ ...r, needsReview: false, updatedAt: new Date() })),
   }
@@ -166,7 +166,7 @@ describe('getDraft', () => {
   it('never selects or returns the legacy column', async () => {
     const out = await getDraft({ id: 'd1', teamId: 'team1' })
     const ownSelect = h.draftFindUnique.mock.calls[0][0].select
-    expect(ownSelect).not.toHaveProperty('copyText')
+    expect(ownSelect).not.toHaveProperty('legacyCaptionText')
     expect(JSON.stringify(out)).not.toContain(LEGACY)
   })
 

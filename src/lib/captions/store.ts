@@ -4,9 +4,8 @@
 // caption, no rows yet) BEFORE returning, so no reader ever has a "rows, or
 // else the legacy column" branch.
 //
-// Until T9 the legacy column is still the Prisma field `copyText` (NOT NULL);
-// T9 renames it to `legacyCaptionText @map("copyText")` and makes it nullable.
-// The materializer reads it under its current name.
+// The legacy column is the read-only, nullable Prisma field `legacyCaptionText`
+// (`@map("copyText")`, FR-03). The materializer is its only runtime reader.
 //
 // What to write is decided by pure modules (migrationPlan.ts for a legacy
 // draft, actionTargets.ts for a caption write's settle). This file only issues
@@ -69,11 +68,10 @@ export interface MaterializeInput {
 // The one rule for "is this a legacy draft, and may it be migrated now?",
 // shared by the loader and the boot backfill. A legacy draft has no caption
 // rows, a legacy text and no recorded outcome. "No rows" is the key: a draft
-// created after 012 always has rows, so the `copyText: ''` placeholder new
-// drafts write until T9 never looks legacy. A draft still being generated, or
-// with a caption regenerate in flight (possibly an old container's, which
-// writes the legacy column), is deferred: migrating it now would freeze a text
-// that is about to change.
+// created after 012 always has rows and a null legacy text. A draft still
+// being generated, or with a caption regenerate in flight (possibly an old
+// container's, which writes the legacy column), is deferred: migrating it now
+// would freeze a text that is about to change.
 export function materializeStep(d: MaterializeInput): 'migrate' | 'defer' | null {
   if (d.rowCount > 0 || d.legacyText == null || d.captionMigration != null) return null
   if (d.status === 'IN_PROGRESS' || d.pendingAction === 'REGENERATE_COPY') return 'defer'
@@ -136,7 +134,7 @@ export async function loadDraftCaptions(
       status: true,
       pendingAction: true,
       captionMigration: true,
-      copyText: true,
+      legacyCaptionText: true,
       updatedAt: true,
       captions: { select: ROW_SELECT },
     },
@@ -145,7 +143,7 @@ export async function loadDraftCaptions(
 
   const step = materializeStep({
     rowCount: draft.captions.length,
-    legacyText: draft.copyText,
+    legacyText: draft.legacyCaptionText,
     captionMigration: draft.captionMigration,
     status: draft.status,
     pendingAction: draft.pendingAction,
@@ -157,7 +155,8 @@ export async function loadDraftCaptions(
   let rows = draft.captions
   let captionMigration = draft.captionMigration
   if (step === 'migrate') {
-    const { outcome, written } = await migrateDraft(draftId, draft.copyText, db)
+    // 'migrate' implies a non-null legacy text (materializeStep).
+    const { outcome, written } = await migrateDraft(draftId, draft.legacyCaptionText!, db)
     // A racing reader that recorded it first planned the same text, so the
     // outcome is the same either way.
     captionMigration = outcome
