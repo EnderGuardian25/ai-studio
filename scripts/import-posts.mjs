@@ -18,6 +18,12 @@
  *   brandKit → matched by name (non-deleted), else null (falls back to kit precedence)
  *   referenceTemplate → matched by name within the matched kit, else null
  *
+ * Captions (change 012): a v2 bundle restores each draft's DraftCaption rows,
+ * headline and captionMigration as they were. A v1 (pre-012) bundle carries
+ * only the single `copyText`; it is written to the legacy column
+ * (legacyCaptionText, @map("copyText")) with no caption rows, so the caption
+ * loader materializes it on first read (src/lib/captions/store.ts).
+ *
  * Post rows: only terminal statuses (PUBLISHED / FAILED / CANCELLED) are
  * imported. PENDING / SCHEDULED / PUBLISHING rows are skipped so this
  * machine's publish scheduler doesn't unexpectedly act on imported work.
@@ -80,6 +86,15 @@ const CONTENT_TYPES = {
   ".ttf": "font/ttf",
   ".otf": "font/otf",
   ".pdf": "application/pdf",
+}
+
+// A draft's caption fields, from either bundle version (see the header).
+function draftCaptionFields(d) {
+  return {
+    legacyCaptionText: "legacyCaptionText" in d ? d.legacyCaptionText : (d.copyText ?? null),
+    headline: d.headline ?? null,
+    captionMigration: d.captionMigration ?? null,
+  }
 }
 
 async function ensureBucket(bucket) {
@@ -156,13 +171,15 @@ async function main() {
   const args = parseArgs(process.argv.slice(2))
   const dir = path.resolve(args.dir)
   const manifest = JSON.parse(fs.readFileSync(path.join(dir, "manifest.json"), "utf8"))
-  if (manifest.version !== 1) throw new Error(`Unsupported manifest version: ${manifest.version}`)
+  if (manifest.version !== 1 && manifest.version !== 2)
+    throw new Error(`Unsupported manifest version: ${manifest.version}`)
   if (args.dryRun) console.log("DRY RUN — no writes will happen\n")
 
   // If this machine serves MinIO from a different endpoint than the source,
   // rewrite every stored URL (imageUrl, briefImages, URLs embedded in HTML)
   // in one pass at the JSON level. No-op when both are localhost:9000.
   let { briefs, drafts, revisions, posts } = manifest
+  const captions = manifest.captions ?? [] // absent in a v1 bundle
   for (const src of new Set([manifest.sourcePublicEndpoint, manifest.sourceEndpoint].filter(Boolean))) {
     if (src !== publicEndpoint) {
       console.log(`Rewriting asset URLs: ${src} → ${publicEndpoint}`)
@@ -260,7 +277,7 @@ async function main() {
     const data = {
       id: d.id,
       briefId: d.briefId,
-      copyText: d.copyText,
+      ...draftCaptionFields(d),
       imageUrl: d.imageUrl,
       htmlContent: d.htmlContent,
       // Bare string column (no FK) — kept as provenance; may not exist here.
@@ -274,8 +291,51 @@ async function main() {
       createdAt: d.createdAt,
       updatedAt: d.updatedAt,
     }
-    if (!args.dryRun) await prisma.draft.create({ data })
+    if (args.dryRun) {
+      const legacy = data.legacyCaptionText == null ? "none" : `${data.legacyCaptionText.length} chars`
+      const rows = captions.filter((c) => c.draftId === d.id).map((c) => c.channel)
+      console.log(
+        `  draft ${d.id}: headline ${JSON.stringify(data.headline)}, captionMigration ${data.captionMigration}, ` +
+          `legacy caption ${legacy}, caption rows [${rows.join(", ")}]`
+      )
+    } else await prisma.draft.create({ data })
     stats.drafts.created++
+  }
+
+  // Caption rows after their drafts (FK), and only for drafts created in this
+  // run: a draft already here keeps exactly the captions it has (an un-read
+  // legacy draft is left for the loader). Also skipped when the id exists, or
+  // when this machine already has a row for that (draft, channel) — so a
+  // re-run never changes an existing caption.
+  const haveCaptions = await prisma.draftCaption.findMany({
+    where: { OR: [{ id: { in: captions.map((c) => c.id) } }, { draftId: { in: drafts.map((d) => d.id) } }] },
+    select: { id: true, draftId: true, channel: true },
+  })
+  const haveCaptionIds = new Set(haveCaptions.map((c) => c.id))
+  const haveCaptionSlots = new Set(haveCaptions.map((c) => `${c.draftId}/${c.channel}`))
+  const newCaptions = captions
+    .filter((c) => !haveDrafts.has(c.draftId))
+    .filter((c) => !haveCaptionIds.has(c.id) && !haveCaptionSlots.has(`${c.draftId}/${c.channel}`))
+    .map((c) => ({
+      id: c.id,
+      draftId: c.draftId,
+      channel: c.channel,
+      text: c.text,
+      status: c.status,
+      failureReason: c.failureReason,
+      needsReview: c.needsReview,
+      createdAt: c.createdAt,
+      updatedAt: c.updatedAt,
+    }))
+  stats.captions = { created: newCaptions.length, skipped: captions.length - newCaptions.length }
+  if (args.dryRun) {
+    for (const c of newCaptions)
+      console.log(
+        `  caption ${c.draftId}/${c.channel}: ${c.status}, ${c.text.length} chars` +
+          (c.needsReview ? ", needsReview" : "")
+      )
+  } else if (newCaptions.length > 0) {
+    stats.captions.created = (await prisma.draftCaption.createMany({ data: newCaptions, skipDuplicates: true })).count
   }
 
   const haveRevisions = await existingIds(prisma.draftRevision, revisions.map((r) => r.id))
@@ -340,6 +400,7 @@ async function main() {
   if (stats.briefs.unlinkedKits > 0)
     console.log(`             ⚠ ${stats.briefs.unlinkedKits} brand-kit links dropped (no kit with that name here — kit precedence fallback applies)`)
   console.log(`  drafts:    ${stats.drafts.created} created, ${stats.drafts.skipped} already present`)
+  console.log(`  captions:  ${stats.captions.created} created, ${stats.captions.skipped} already present`)
   console.log(
     `  revisions: ${stats.revisions.created} created, ${stats.revisions.skipped} already present` +
       (stats.revisions.skippedRejected ? `, ${stats.revisions.skippedRejected} rejected renders skipped` : '')

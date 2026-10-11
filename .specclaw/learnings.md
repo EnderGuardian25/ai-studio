@@ -362,3 +362,20 @@ Fork CI on v2 has been red since 014 wave 1 (run 37974533639, 2026-10-09): one r
 User decision 2026-10-11: debug it as its own /specclaw:debug change after 012, together with the refine 'Applying…' follow-up. After each push, check the CI run (gh run list --branch v2), not only the local gate.
 
 ---
+
+## [L22] spec_gap — scripts/import-posts.mjs has never set teamId, which has ...
+
+**When:** 2026-10-11 19:23 UTC
+**Category:** spec_gap
+**Priority:** medium
+**Status:** pending
+
+### Detail
+
+scripts/import-posts.mjs has never set teamId, which has been required on Brief/Draft/Post since team tenancy (2026-07-21). A real import fails at the first brief.create; --dry-run never calls create, so it hides this. Found by 012 T15.
+
+### Action
+
+Follow-up change after 012: add a --team <name|id> remap flag (or match by name) to import-posts.mjs, then prove a real import into a scratch test DB.
+
+---

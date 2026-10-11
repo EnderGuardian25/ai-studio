@@ -1,5 +1,5 @@
 /**
- * Exports library posts (Brief → Draft → DraftRevision[] + Post[]) plus every
+ * Exports library posts (Brief → Draft → DraftRevision[] + DraftCaption[] + Post[]) plus every
  * MinIO object they reference into a portable folder, so they can be merged
  * into ANOTHER machine's dev environment with scripts/import-posts.mjs
  * (selective merge — nothing on the target is overwritten or deleted).
@@ -26,7 +26,11 @@ import path from "node:path"
 
 const prisma = new PrismaClient()
 
-const MANIFEST_VERSION = 1
+// 2 = change 012: drafts carry headline / captionMigration / legacyCaptionText
+// (the old copyText column) and the bundle carries their DraftCaption rows. A
+// v1 bundle is still importable; a pre-012 importer rejects a v2 bundle rather
+// than silently dropping its captions.
+const MANIFEST_VERSION = 2
 
 const endpoint = process.env.MINIO_ENDPOINT ?? "http://localhost:9000"
 const publicEndpoint = (process.env.MINIO_PUBLIC_ENDPOINT ?? endpoint).replace(/\/+$/, "")
@@ -118,6 +122,8 @@ async function main() {
         where: { rejectedAt: null, revisionNumber: { not: null } },
         orderBy: { revisionNumber: "asc" },
       },
+      // Per-channel captions (012 FR-22), restored as they were on import.
+      captions: true,
       posts: true,
     },
   })
@@ -143,8 +149,9 @@ async function main() {
 
   const rows = {
     briefs: [...briefs.values()],
-    drafts: drafts.map(({ brief: _brief, revisions: _revisions, posts: _posts, ...d }) => d),
+    drafts: drafts.map(({ brief: _brief, revisions: _revisions, captions: _captions, posts: _posts, ...d }) => d),
     revisions: drafts.flatMap((d) => d.revisions),
+    captions: drafts.flatMap((d) => d.captions),
     posts: drafts.flatMap((d) => d.posts),
   }
 
@@ -174,6 +181,7 @@ async function main() {
       briefs: rows.briefs.length,
       drafts: rows.drafts.length,
       revisions: rows.revisions.length,
+      captions: rows.captions.length,
       posts: rows.posts.length,
       objects: downloaded,
     },
@@ -184,7 +192,7 @@ async function main() {
 
   console.log(`Exported to ${outDir}`)
   console.log(
-    `  ${rows.drafts.length} drafts, ${rows.briefs.length} briefs, ${rows.revisions.length} revisions, ${rows.posts.length} posts`
+    `  ${rows.drafts.length} drafts, ${rows.briefs.length} briefs, ${rows.revisions.length} revisions, ${rows.captions.length} captions, ${rows.posts.length} posts`
   )
   console.log(`  ${downloaded}/${assets.length} MinIO objects (${(totalBytes / 1024 / 1024).toFixed(1)} MB)`)
   if (missing.length > 0) {

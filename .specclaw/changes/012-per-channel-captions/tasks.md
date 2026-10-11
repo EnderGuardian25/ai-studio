@@ -241,7 +241,7 @@ Waves 2 and 3 add UX and wording only.
     - **E2E edits:** the "Brief & Copy Direction" assertions (`a11y.test.ts:123`, `:530`, `surfaces.test.ts:522`).
     - **This task runs the wave-3 gate**, because it is the last task touching `src/`. T15 and T16 change no app code. Push `v2`.
 
-- [ ] `T15` — `export-posts` / `import-posts` carry captions and the headline
+- [x] `T15` — `export-posts` / `import-posts` carry captions and the headline
   - Files: `scripts/export-posts.mjs`, `scripts/import-posts.mjs`
   - Estimate: small
   - Kind: impl
