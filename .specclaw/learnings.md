@@ -345,3 +345,20 @@ Caption settle guards key on state (row PENDING / pendingAction=REGENERATE_COPY)
 Follow-up change: thread a pendingActionClaimId through claim/settle for all draft actions
 
 ---
+
+## [L21] best_practice — Fork CI on v2 has been red since 014 wave 1 (run 37974533...
+
+**When:** 2026-10-11 18:18 UTC
+**Category:** best_practice
+**Priority:** high
+**Status:** pending
+
+### Detail
+
+Fork CI on v2 has been red since 014 wave 1 (run 37974533639, 2026-10-09): one runner-only failure, tests/e2e/surfaces.test.ts 'Draft review (T9) at 375px', times out waiting for the refine log row 'Applied' (first attempt and retry); it passes locally every time. Nobody noticed because the gates ran locally and the handoff said CI was green at 013. Likely the logged refine 'Applying…' race, made deterministic by the slower runner.
+
+### Action
+
+User decision 2026-10-11: debug it as its own /specclaw:debug change after 012, together with the refine 'Applying…' follow-up. After each push, check the CI run (gh run list --branch v2), not only the local gate.
+
+---

@@ -195,7 +195,7 @@ Waves 2 and 3 add UX and wording only.
 
 ### Wave 2 — The panels completed
 
-- [ ] `T11` — Per-channel regenerate, the headline panel, per-panel undo, and copy to clipboard
+- [x] `T11` — Per-channel regenerate, the headline panel, per-panel undo, and copy to clipboard
   - Files: `src/components/drafts/CaptionPanels.tsx`, `src/components/drafts/CaptionPanel.tsx`, `src/components/drafts/HeadlinePanel.tsx` (new)
   - Estimate: medium
   - Kind: impl
