@@ -48,6 +48,7 @@ export function HeadlinePanel({
   const headingId = useId()
   const helpId = useId()
   const errorId = useId()
+  const counterId = useId()
   const stored = headline ?? ''
   const [value, setValue] = useState(stored)
   const [saved, setSaved] = useState(true)
@@ -170,7 +171,7 @@ export function HeadlinePanel({
         <>
           <Input
             aria-labelledby={headingId}
-            aria-describedby={error ? `${errorId} ${helpId}` : helpId}
+            aria-describedby={error ? `${errorId} ${helpId} ${counterId}` : `${helpId} ${counterId}`}
             aria-invalid={error ? true : undefined}
             value={value}
             onChange={(e) => {
@@ -195,6 +196,7 @@ export function HeadlinePanel({
               The text on the image. Regenerate the design to use a changed headline.
             </p>
             <span
+              id={counterId}
               className={`shrink-0 text-ui-xs ${over ? 'font-semibold text-status-failed' : 'text-fg-muted'}`}
             >
               {count(value.length)} / {count(HEADLINE_MAX)}

@@ -206,7 +206,7 @@ Waves 2 and 3 add UX and wording only.
     - **"Copy <Label> caption"** uses `navigator.clipboard.writeText`, with the toast "Caption copied". On error, toast "Couldn't copy. Select the text and copy it manually."
     - **`HeadlinePanel`:** an `Input` `aria-labelledby` its h3, the `n / 100` counter, the helper text, "Generate headline" / "Regenerate headline", and a PATCH on blur with the inline 400 message.
 
-- [ ] `T12` — Notices, the WhatsApp guide, and the counters
+- [x] `T12` — Notices, the WhatsApp guide, and the counters
   - Files: `src/components/drafts/CaptionPanel.tsx`, `src/components/drafts/HeadlinePanel.tsx`
   - Estimate: small
   - Kind: impl

@@ -69,7 +69,8 @@ export interface CaptionPanelProps {
 
 // One channel's caption (012 FR-18/FR-19): its h3 with the tail (save state,
 // Undo, Copy, Generate/Regenerate), the ruled textarea named by that heading
-// and saved on blur, the per-registry counter, a FAILED notice, and a skeleton
+// and saved on blur, the per-registry counter with its limit or guide warning,
+// the review / FAILED / last-regenerate-failed notices, and a skeleton
 // only while the row is PENDING. Empty text on a row that is not PENDING always
 // shows the editable field (TC-ASYNC-10).
 export function CaptionPanel({
@@ -83,6 +84,11 @@ export function CaptionPanel({
 }: CaptionPanelProps) {
   const spec = captionSpec(caption.channel)
   const headingId = useId()
+  const reviewId = useId()
+  const failureId = useId()
+  const helpId = useId()
+  const counterId = useId()
+  const warningId = useId()
   const [value, setValue] = useState(caption.text)
   const [saved, setSaved] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -133,6 +139,33 @@ export function CaptionPanel({
 
   const length = captionLength(value)
   const over = spec.hardLimit !== null && length > spec.hardLimit
+  // The soft guide (WhatsApp) only warns: saving is never blocked.
+  const guide = spec.softLimit
+  const counter =
+    spec.hardLimit !== null
+      ? `${count(length)} / ${count(spec.hardLimit)} (${spec.label})`
+      : guide !== null
+        ? `${count(length)} / ${count(guide)} guide`
+        : `${count(length)} characters`
+  const warning = over
+    ? `Over the ${spec.label} limit`
+    : guide !== null && length > guide
+      ? `Longer than the ${count(guide)}-character guide`
+      : null
+  // A channel Studio can't publish to (WhatsApp) is posted by hand.
+  const helper = spec.publishable ? null : `Not published from Studio yet. Copy it and post it in ${spec.label}.`
+  const lastFailed = caption.status === 'READY' && caption.failureReason !== null
+  // The field's description: the notices about it, the helper, the counter
+  // and any limit warning.
+  const describedBy = [
+    caption.needsReview && reviewId,
+    (caption.status === 'FAILED' || lastFailed) && failureId,
+    helper && helpId,
+    counterId,
+    warning && warningId,
+  ]
+    .filter(Boolean)
+    .join(' ')
   const verb = value === '' ? 'Generate' : 'Regenerate'
 
   async function save() {
@@ -211,14 +244,42 @@ export function CaptionPanel({
         </Button>
       </SectionHead>
 
+      {/* Gone once the row is edited or regenerated: both clear needsReview. */}
+      {caption.needsReview && (
+        <Notice
+          id={reviewId}
+          tone="warning"
+          role="status"
+          className="mb-3"
+          icon={<AlertTriangle {...ICON} className="mt-0.5 flex-shrink-0" aria-hidden />}
+        >
+          {
+            "Migrated from the old single caption, which wasn't split by channel. Review this caption before publishing it."
+          }
+        </Notice>
+      )}
+
       {caption.status === 'FAILED' && (
         <Notice
+          id={failureId}
           tone="error"
           className="mb-3"
           icon={<AlertTriangle {...ICON} className="mt-0.5 flex-shrink-0" aria-hidden />}
         >
           The {spec.label} caption failed to generate ({caption.failureReason ?? 'no reason given'}). Write it
           below, or use Generate.
+        </Notice>
+      )}
+
+      {/* A failed regenerate keeps the READY text (A7) and records why. */}
+      {lastFailed && (
+        <Notice
+          id={failureId}
+          tone="warning"
+          className="mb-3"
+          icon={<AlertTriangle {...ICON} className="mt-0.5 flex-shrink-0" aria-hidden />}
+        >
+          The last regenerate failed: {caption.failureReason}. The caption below is unchanged.
         </Notice>
       )}
 
@@ -236,6 +297,7 @@ export function CaptionPanel({
         <>
           <textarea
             aria-labelledby={headingId}
+            aria-describedby={describedBy}
             value={value}
             onChange={(e) => {
               setValue(e.target.value)
@@ -248,13 +310,28 @@ export function CaptionPanel({
             className={RULED_TEXTAREA}
             placeholder={`Write the ${spec.label} caption…`}
           />
-          <div className="mt-2 flex justify-end">
-            <span className={`text-ui-xs ${over ? 'font-semibold text-status-failed' : 'text-fg-muted'}`}>
-              {spec.hardLimit !== null
-                ? `${count(length)} / ${count(spec.hardLimit)} (${spec.label})`
-                : `${count(length)} characters`}
+          <div className="mt-2 flex items-baseline gap-4">
+            {helper && (
+              <p id={helpId} className="min-w-0 text-ui-xs text-fg-muted">
+                {helper}
+              </p>
+            )}
+            <span
+              id={counterId}
+              className={`ml-auto shrink-0 text-ui-xs ${over ? 'font-semibold text-status-failed' : 'text-fg-muted'}`}
+            >
+              {counter}
             </span>
           </div>
+          {/* Never blocks the save: a hard limit is enforced at publish (FR-14). */}
+          {warning && (
+            <p
+              id={warningId}
+              className={`mt-1 text-right text-ui-xs font-semibold ${over ? 'text-status-failed' : 'text-status-scheduled'}`}
+            >
+              {warning}
+            </p>
+          )}
         </>
       )}
     </div>
