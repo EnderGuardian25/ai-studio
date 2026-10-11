@@ -669,11 +669,12 @@ test.describe('Labels: campaigns and projects (T14)', () => {
 
 // AC-11 rows 26–27: the field is named by the visible section heading it points
 // at. The numeral ("i.", "ii.") is aria-hidden and outside the heading, so the
-// name is the heading text alone.
+// name is the heading text alone. Since 012 the captions are named by their
+// channel's h3 inside the "Captions" section, so the heading level is a parameter.
 async function expectNamedByHeading(
   page: Page,
   name: string,
-  opts: { tag: 'INPUT' | 'TEXTAREA'; placeholder: string },
+  opts: { tag: 'INPUT' | 'TEXTAREA'; placeholder: string; headingTag?: 'H2' | 'H3' },
 ) {
   const field = page.getByRole('textbox', { name, exact: true })
   await expect(field, `"${name}" names exactly one field`).toHaveCount(1)
@@ -681,7 +682,7 @@ async function expectNamedByHeading(
   const labelledBy = await field.getAttribute('aria-labelledby')
   expect(labelledBy, `the "${name}" field has aria-labelledby`).toBeTruthy()
   const heading = page.locator(`[id="${labelledBy}"]`)
-  await expect(heading).toHaveJSProperty('tagName', 'H2')
+  await expect(heading).toHaveJSProperty('tagName', opts.headingTag ?? 'H2')
   await expect(heading, `the "${name}" heading is visible`).toBeVisible()
   await expect(heading).toHaveText(name)
   const byPlaceholder = page.getByPlaceholder(opts.placeholder, { exact: true })
@@ -706,8 +707,14 @@ test.describe('Labels: draft page (T15)', () => {
     await page.goto(`/drafts/${draft.id}`)
     await expect(page.getByRole('button', { name: 'View full screen', exact: true })).toBeVisible({ timeout: 20_000 })
 
-    // Row 26.
-    await expectNamedByHeading(page, 'Copy', { tag: 'TEXTAREA', placeholder: 'Post copy…' })
+    // Row 26: each caption (012) is named by its channel's h3.
+    for (const label of ['Instagram', 'LinkedIn', 'WhatsApp']) {
+      await expectNamedByHeading(page, label, {
+        tag: 'TEXTAREA',
+        placeholder: `Write the ${label} caption…`,
+        headingTag: 'H3',
+      })
+    }
     // Row 27.
     await expectNamedByHeading(page, 'Refine Design', { tag: 'INPUT', placeholder: 'e.g. Make the logo larger…' })
   })

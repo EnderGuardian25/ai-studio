@@ -49,3 +49,18 @@ export const prisma: PrismaClient | null = databaseUrl
 /** Skip-guard message helper for specs that require DB access. */
 export const NO_DB_MSG =
   'Test DB not reachable from the runner (set DATABASE_URL or run with .env.test loaded)'
+
+/**
+ * Turn a draft into the pre-012 shape (012 AC-23): no DraftCaption rows, the
+ * legacy caption in the "copyText" column, no headline and no recorded
+ * migration outcome. Direct SQL, so nothing in the app's write path is used;
+ * the next read (or the backfill) materializes it.
+ */
+export async function makeLegacyDraft(draftId: string, legacyText: string): Promise<void> {
+  if (!prisma) throw new Error(NO_DB_MSG)
+  await prisma.$executeRaw`DELETE FROM "DraftCaption" WHERE "draftId" = ${draftId}`
+  await prisma.$executeRaw`
+    UPDATE "Draft"
+    SET "copyText" = ${legacyText}, "headline" = NULL, "captionMigration" = NULL
+    WHERE "id" = ${draftId}`
+}

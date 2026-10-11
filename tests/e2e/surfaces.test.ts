@@ -609,11 +609,11 @@ test.describe('Draft review (T9)', () => {
     // FR-12: every control the page had, by role and name.
     await expect(page.getByRole('link', { name: 'Library' }).first()).toBeVisible()
     const regenDesign = page.getByRole('button', { name: 'Regenerate design' })
-    for (const name of ['Regenerate design', 'Edit inline', 'Re-export', 'Regenerate']) {
+    for (const name of ['Regenerate design', 'Edit inline', 'Re-export', 'Regenerate all']) {
       await expect(page.getByRole('button', { name, exact: true })).toBeVisible()
     }
     await expect(page.getByRole('button', { name: /^publish$/i })).toBeVisible()
-    await expect(page.getByPlaceholder('Post copy…')).toBeVisible()
+    await expect(page.getByPlaceholder('Write the Instagram caption…')).toBeVisible()
     for (const name of ['Make the background darker', 'Move the headline to top', 'Increase font size']) {
       await expect(page.getByRole('button', { name, exact: true })).toBeVisible()
     }

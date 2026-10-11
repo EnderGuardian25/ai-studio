@@ -182,7 +182,7 @@ Waves 2 and 3 add UX and wording only.
     - **`seed-teams.mjs`** creates native fixture drafts: three `READY` rows (`<topic> — seeded fixture <Label> caption.`), a `headline`, and no `copyText`.
     - **The down.sql** is design "Data Model Changes". The runbook text goes into the handoff in T16.
 
-- [ ] `T10` — Wave-1 E2E: the §W captions suite and the existing-case updates (wave-1 gate)
+- [x] `T10` — Wave-1 E2E: the §W captions suite and the existing-case updates (wave-1 gate)
   - Files: `tests/e2e/captions.test.ts` (new), `tests/e2e/async-actions.test.ts`, `tests/e2e/team-isolation.test.ts`, `tests/e2e/surfaces.test.ts`, `tests/e2e/a11y.test.ts`, `tests/helpers/db.ts` (helpers only, if needed)
   - Estimate: large
   - Kind: test
