@@ -5,7 +5,7 @@ This repo contains planning documents for **bistec-studio**, an internal marketi
 ## ✅ Outstanding work — START HERE (updated 2026-10-11)
 
 - **⏸️ 2026-10-11 — PICK UP HERE: 013 and 014 are verified PASS; 012 (per-channel captions) is building, with T1–T7 of 16 committed. Resume at T8.** Full detail: [`docs/handoff.md`](docs/handoff.md) top section.
-  - **First:** `git push origin v2`. The 012 T1–T7 commits are local only.
+  - Everything is pushed to `origin/v2`.
   - **Then** resume `/specclaw:build 012-per-channel-captions` at **T8**, subagent-driven: one task at a time, an implementer then a `specclaw:code-reviewer`, and the orchestrator commits.
     - **T8:** MCP/ACP outputs. It carries two items from the T7 review: MCP `getDraft` still returns `copyText`, and MCP/ACP `publish_post` needs the up-front resolver check.
     - **T9:** the `legacyCaptionText @map("copyText")` rename.

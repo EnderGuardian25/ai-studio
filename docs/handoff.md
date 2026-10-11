@@ -9,7 +9,7 @@
 
 ## ⏸️ 2026-10-11 — PICK UP HERE: 013 and 014 verified PASS; 012 is building, with 7 of 16 tasks committed; resume at T8
 
-Everything is pushed to `origin/v2` through the 014 verify (`fbd58748`). **012 T1–T7 are committed locally on `v2`** (`d2e782dc` … `5b1514a2`). Push `v2` before starting.
+Everything is pushed to `origin/v2` through the 014 verify (`fbd58748`). **012 T1–T7 are committed and pushed** (`d2e782dc` … `5b1514a2`; this handoff is `d6369881`).
 
 ### State of each change
 
@@ -67,7 +67,7 @@ Everything is pushed to `origin/v2` through the 014 verify (`fbd58748`). **012 T
 
 ### Do this next, in order
 
-1. **`git push origin v2`.** The 012 T1–T7 commits are local only.
+1. **`git pull`** on any other machine. Everything is pushed to `origin/v2`.
 2. **Resume `/specclaw:build 012-per-channel-captions` at T8.** Use the same subagent-driven loop: implementer, then `specclaw:code-reviewer`, then the orchestrator fixes any WARN and commits. Run one task at a time.
    - **T8:** MCP/ACP and `generate/copy` outputs. Two items were handed over from the T7 review:
      - MCP `getDraft` still returns the legacy `copyText`;
