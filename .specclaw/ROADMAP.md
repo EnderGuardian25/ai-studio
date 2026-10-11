@@ -1,7 +1,9 @@
 # bistec-studio roadmap — changes 004–012
 
 **Updated:** 2026-09-23 · **Branch:** all of this lands on `v2` (see Branching at the bottom); handoff in `docs/handoff.md` top section.
-**Status (2026-10-03):** **004** is done: 24/24 built, verify PARTIAL only because its Phase 0 waits on PR #42 + the Coolify token. **005** is built (9/10) on `v2`; T6 waits on one operator check (AC-16, an in-image CLI vision run with the user’s own token), then `/specclaw:verify`. Item 2 (COPY route) stays deferred to 008. **006–012** are proposals. Handoff: `docs/handoff.md` top section.
+**Status (2026-10-11):** **004**, **005**, **011**, **013** (fork CI, checks only) and **014** (UI accessibility, shared primitives and consistency) are verified PASS. **012** (per-channel captions) is building on `v2`, with T1–T7 of 16 committed; resume at T8. **006–010** are proposals. Handoff: `docs/handoff.md` top section.
+
+**(Superseded) Status (2026-10-03):** **004** is done: 24/24 built, verify PARTIAL only because its Phase 0 waits on PR #42 + the Coolify token. **005** is built (9/10) on `v2`; T6 waits on one operator check (AC-16, an in-image CLI vision run with the user’s own token), then `/specclaw:verify`. Item 2 (COPY route) stays deferred to 008. **006–012** are proposals. Handoff: `docs/handoff.md` top section.
 
 This file sequences the open changes. Each change's own `proposal.md` is the source of truth for its scope. This file only records **order, dependencies, and the boundaries between changes that touch the same code**.
 

@@ -2,9 +2,36 @@
 
 This repo contains planning documents for **bistec-studio**, an internal marketing post generation tool for the Bistec marketing team.
 
-## ✅ Outstanding work — START HERE (updated 2026-10-09)
+## ✅ Outstanding work — START HERE (updated 2026-10-11)
 
-- **🧭 2026-10-09 — 011 verified PASS; fork `main` merged into `v2`; 013 (fork CI, checks only) is building.** Full detail: [`docs/handoff.md`](docs/handoff.md) top section.
+- **⏸️ 2026-10-11 — PICK UP HERE: 013 and 014 are verified PASS; 012 (per-channel captions) is building, with T1–T7 of 16 committed. Resume at T8.** Full detail: [`docs/handoff.md`](docs/handoff.md) top section.
+  - **First:** `git push origin v2`. The 012 T1–T7 commits are local only.
+  - **Then** resume `/specclaw:build 012-per-channel-captions` at **T8**, subagent-driven: one task at a time, an implementer then a `specclaw:code-reviewer`, and the orchestrator commits.
+    - **T8:** MCP/ACP outputs. It carries two items from the T7 review: MCP `getDraft` still returns `copyText`, and MCP/ACP `publish_post` needs the up-front resolver check.
+    - **T9:** the `legacyCaptionText @map("copyText")` rename.
+    - **T10:** the wave-1 E2E and gate. T6 listed the E2E cases it expects to break.
+    - **T11–T16:** the panels, then the wording and docs.
+    - Then `/specclaw:verify 012`.
+  - **Done since 2026-10-09:**
+    - **013** fork CI is checks only: `docker-publish.yml` is deleted, Actions are ON, and `v2` CI is green.
+    - **004** is PASS.
+    - **014** UI a11y, shared `PageHead`/`SectionHead`/`Notice`/`FieldLabel` primitives and consistency: 18 tasks, verify PASS 21/21. The final E2E was **349/3/0/0**, with unit 1769 and `test:render` 15/15.
+  - **012 binding decisions** (proposal Decisions, the panel rulings, A1–A10):
+    - `DraftCaption` is keyed on `Channel`, with WHATSAPP added. A publish to a channel with no publisher fails closed.
+    - A required, fenced `Draft.headline`, with a Topic fallback for migrated drafts.
+    - Contracts keep their names.
+    - `copyText` is preserved as `legacyCaptionText @map`, alongside the boot backfill and the lazy loader.
+  - **Follow-ups to propose after 012:**
+    - `POST /api/posts` returns 201 for a FAILED immediate publish;
+    - a per-claim token for draft actions;
+    - the floating Create post button overlapping content at some widths.
+  - **Gotchas:**
+    - Exactly one :3001 listener before an E2E run.
+    - Never `npm run build` while `next dev` is serving.
+    - Never run the caption backfill script without an explicit test-DB `DATABASE_URL`.
+    - Resume usage-limited subagents with `SendMessage`.
+
+- **🧭 2026-10-09 (superseded by 2026-10-11 above) — 011 verified PASS; fork `main` merged into `v2`; 013 (fork CI, checks only) is building.** Full detail: [`docs/handoff.md`](docs/handoff.md) top section.
   - **The user's decisions:**
     - **The fork runs checks only:** no GHCR push and no redeploy. `docker-publish.yml` is deleted (013 T1); the user will write their own deploy workflow later. `e2e.yml` (typecheck, lint, E2E, unit, build, `docker build .` with no push) runs on PRs and on pushes to `v2` and `main`.
     - **The 011 theme-toggle exception to FR-12 is approved.**

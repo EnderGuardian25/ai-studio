@@ -1,13 +1,115 @@
 # bistec-studio — Session Handoff
 
-**Date:** 2026-10-09 (latest: **011 verified PASS; fork `main` merged into `v2`; 013 fork CI (checks only) building; 014 and 012 approved**). Previous: 2026-10-08 (011 built 13/13 on `v2` in the fork). Previous: 2026-10-07 (005 verified PASS; 011 planned, wave 1 built; the move to the fork). Previous: 2026-10-03 (004 finished and verified PARTIAL, Phase 0 only; 005 built 9/10, waiting on one operator check). Before that: 2026-09-28 (build session — 004 Waves 1–3 built, MinIO → silo, PR #42 + draft PR #43). Before that: 2026-09-23 (later, later the same day: proposal **012** per-channel captions + copy→caption rename, a floating **Create post** button folded into 011, and a launch-video legibility pass. Before that: planning session — proposals 008–011 + roadmap, 004 re-planned to 24 tasks incl. Phase 0, and the deploy pipeline found broken: Coolify 401 since 2026-09-15). Previous: 2026-07-28 (copy-edit status clobber fix).
+**Date:** 2026-10-11 (latest: **013 and 014 verified PASS; 012 per-channel captions building, T1–T7 of 16 committed; resume at T8**). Previous: 2026-10-09 (011 verified PASS; fork `main` merged into `v2`; 013 fork CI, checks only, building; 014 and 012 approved). Previous: 2026-10-08 (011 built 13/13 on `v2` in the fork). Previous: 2026-10-07 (005 verified PASS; 011 planned, wave 1 built; the move to the fork). Previous: 2026-10-03 (004 finished and verified PARTIAL, Phase 0 only; 005 built 9/10, waiting on one operator check). Before that: 2026-09-28 (build session — 004 Waves 1–3 built, MinIO → silo, PR #42 + draft PR #43). Before that: 2026-09-23 (later, later the same day: proposal **012** per-channel captions + copy→caption rename, a floating **Create post** button folded into 011, and a launch-video legibility pass. Before that: planning session — proposals 008–011 + roadmap, 004 re-planned to 24 tasks incl. Phase 0, and the deploy pipeline found broken: Coolify 401 since 2026-09-15). Previous: 2026-07-28 (copy-edit status clobber fix).
 **Repo (since 2026-10-07):** https://github.com/EnderGuardian25/ai-studio — a public GitHub **fork** of the company repo `bistec-oss/studio`. All development continues here. The company repo is left as it is and receives nothing from this work. See the 2026-10-07 fork section below.
 **Branch:** work continues on **`v2`**, the fork's default branch. Fork `main` = `671ad6e9`, the company `main` at fork time. `v2` has contained fork `main` since the merge at `2506de0b` (2026-10-09).
 **Production:** none for the fork. `https://studio.bistecglobal.com` is the **company's** prod. It runs company `main` and is not ours to deploy.
 
 ---
 
-## ⏸️ 2026-10-09 — PICK UP HERE: 011 verified PASS; `main` merged into `v2`; 013 (fork CI, checks only) is building
+## ⏸️ 2026-10-11 — PICK UP HERE: 013 and 014 verified PASS; 012 is building, with 7 of 16 tasks committed; resume at T8
+
+Everything is pushed to `origin/v2` through the 014 verify (`fbd58748`). **012 T1–T7 are committed locally on `v2`** (`d2e782dc` … `5b1514a2`). Push `v2` before starting.
+
+### State of each change
+
+| Change                                             | State                                | Evidence                                                                                                                                                                                         |
+| -------------------------------------------------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **011** app visual redesign (Folio)                | ✅ verified PASS, 20/20 (2026-10-09) | `.specclaw/changes/011-app-visual-redesign/verify-report.md`. The theme-toggle exception to FR-12 is approved.                                                                                   |
+| **013** fork CI, checks only                       | ✅ verified PASS, 7/7                | `docker-publish.yml` is deleted, so there is no GHCR push and no deploy. `e2e.yml` runs on PRs and on pushes to `v2` and `main`. **Actions are ON.** The first `v2` run, 37886671270, was green. |
+| **004** design fidelity                            | ✅ now PASS                          | Phase 0 is closed in the fork: AC-P0-3, P0-4 and P0-5 pass; AC-P0-1 and P0-2 are superseded by 013 (no deploy target).                                                                           |
+| **014** UI a11y, shared primitives and consistency | ✅ verified PASS, 21/21 (2026-10-11) | 18 tasks in 3 waves. The final gate at `32404ff9`: E2E **349/3/0/0**, unit 1769, build, `test:render` 15/15. See `.specclaw/changes/014-ui-a11y-consistency-pass/verify-report.md`.              |
+| **012** per-channel captions                       | 🔨 **building: T1–T7 of 16 done**    | The plan, decisions and panel report are in `.specclaw/changes/012-per-channel-captions/`. Each task has a report and a review under `reports/` and `reviews/`.                                  |
+
+### The user's decisions (2026-10-09 and 2026-10-10), all recorded in the proposals
+
+- **Fork CI:** checks only, with no image push and no redeploy. The user will write a deploy workflow later.
+- **014:** built as one change, with one E2E run per wave and the shared primitive first. Scroll regions follow a static rule (always focusable and labelled). All 27 fields are labelled. Every field label is small caps. `axe-core` is a devDependency. The A5 micro-drift is accepted. §8.17 records that there is no More menu.
+- **012** (proposal Decisions plus the deep panel rulings, and spec assumptions A1–A10, all approved):
+  - **Storage and scope:**
+    - a `DraftCaption` table keyed on `Channel`, with **WHATSAPP added to `Channel`**;
+    - a publish to a channel with no publisher **fails closed** and terminally;
+    - WhatsApp is never selectable in a publish or queue picker until 010;
+    - full scope: three captions, per-channel regenerate plus "Regenerate all", and per-panel undo.
+  - **Headline:**
+    - a required `Draft.headline` for new generations (A6: a missing headline fails the draft);
+    - migrated drafts fall back to the brief Topic, and the fallback is logged;
+    - the headline enters the design prompts only fenced as untrusted content.
+  - **Contracts keep their names:** the `regenerate-copy` and `generate/copy` routes, `DraftAction.REGENERATE_COPY`, and the MCP/ACP field names. MCP/ACP keep `copyText` as a deprecated alias holding the Instagram caption, plus a `captions: [{channel,text,status}]` list and `headline` (A4).
+  - **The old caption text is preserved:**
+    - it becomes `legacyCaptionText @map("copyText")`, a rename in code only (A1);
+    - it is dropped only in a later change;
+    - each draft records how it migrated (`split` / `unsplit-fallback` / `empty`);
+    - fallback drafts get a "review this caption" notice;
+    - the boot-time backfill runs under an advisory lock (A8);
+    - the same planner also runs lazily in the loader.
+  - **Behaviour:**
+    - single-flight is per draft (A2);
+    - all three captions are always written (A5);
+    - a failed regenerate keeps good text as READY (A7);
+    - "Regenerate all" leaves the headline alone (A9);
+    - `POST /api/posts` returns 422 `CAPTION_UNPUBLISHABLE` with no Post row (A10);
+    - the WhatsApp counter is a soft 1,000-character guide.
+
+### 012 progress
+
+| Task | Commit     | What                                                                                                                                                                                                                                                                                                    |
+| ---- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T1   | `d2e782dc` | WHATSAPP in `Channel` (migration `20261011120000_channel_whatsapp`), the per-channel registry in `src/lib/channels.ts`, and every channel input limited to publishable channels                                                                                                                         |
+| T2   | `8ec62b6a` | `buildCaptionPrompt`, the strict extractor `src/lib/captions/extract.ts` (exactly one object, requested keys only, fails closed) and `headline.ts`                                                                                                                                                      |
+| T3   | `1fdcfce0` | The pure migration planner (`migrationPlan.ts`) and publish resolver (`resolve.ts`)                                                                                                                                                                                                                     |
+| T4   | `f0ce3533` | The `DraftCaption` schema (migration `20261011130000_draft_captions`, with the named CHECK), `store.ts`, the boot backfill (`backfill.ts`, `src/scripts/backfill-captions.ts`, the entrypoint and the Dockerfile bundle)                                                                                |
+| T5   | `f0ca83b5` | The writers (`captions/generate.ts`), the mock caption seam (`buildMockCaptionReply` plus drop sentinels), the fenced headline in the Path A, Path B and background prompts (`PROMPT_VERSION` `2026-10-11.1`), and the async, sync and retry flows                                                      |
+| T6   | `09c75f18` | The draft API: GET (captions plus headline), PATCH (`{channel,text}` or `{headline}`, which never writes status) and `regenerate-copy` (`{}` / `{channel}` / `{headline:true}`, an empty body counts as `{}`). Also claim and settle, the sweep, and the base `CaptionPanels`; `CopyEditor` is deleted. |
+| T7   | `5b1514a2` | Every publish path goes through the one resolver, before the export is signed. The job runner treats terminal errors as such, `POST /api/posts` returns 422, and the posts GET routes return `draft.caption`. **This fixes the live combined-caption bug.**                                             |
+
+**Unit tests at T7:** 2007/2007, with tsc and lint clean. **No E2E has run since the 014 gate.** 012 T5–T9 are knowingly mid-change, as the tasks.md mid-wave note says. T10 owns every wave-1 E2E edit and runs the wave-1 gate.
+
+### Do this next, in order
+
+1. **`git push origin v2`.** The 012 T1–T7 commits are local only.
+2. **Resume `/specclaw:build 012-per-channel-captions` at T8.** Use the same subagent-driven loop: implementer, then `specclaw:code-reviewer`, then the orchestrator fixes any WARN and commits. Run one task at a time.
+   - **T8:** MCP/ACP and `generate/copy` outputs. Two items were handed over from the T7 review:
+     - MCP `getDraft` still returns the legacy `copyText`;
+     - MCP/ACP `publish_post` needs the **up-front** resolver check, so a refusal creates no Post row, matching `POST /api/posts`.
+   - **T9:** the legacy rename `legacyCaptionText @map("copyText")`; no more placeholder `copyText: ''` writes; the read-only guard; the fixture seed; the rollback file.
+   - **T10:** the wave-1 E2E: the §W captions suite, the existing-case updates, then the **wave-1 gate**. T6 listed the cases it expects to break:
+     - `async-actions`: TC-ASYNC-02, the stale sweep, the "not ready" message, and TC-ASYNC-10's `{copyText}` PATCH;
+     - `team-isolation`: the cross-team PATCH body;
+     - the `surfaces` T9 draft case: the placeholder, and the "Regenerate" button now named "Regenerate all";
+     - `a11y` row 26;
+     - the publish cases.
+
+     The backfill's npm scripts use `tsx --env-file=.env`, which errors without a `.env`. If CI runs them, use `--env-file-if-exists` or call tsx directly.
+
+   - **T11–T13 (wave 2):** per-channel regenerate, the headline panel, per-panel undo, copy to clipboard, the notices and counters, and the wave-2 E2E gate.
+   - **T14–T16 (wave 3):** the "copy" → "caption" UI strings and their guard, the export and import scripts, and the docs.
+   - Then `/specclaw:verify 012-per-channel-captions`.
+3. **Follow-ups to propose after 012**, each as its own change:
+   - **`POST /api/posts` returns 201 for an immediate publish that ends FAILED,** and `PublishDialog` shows it as a success. This predates 012.
+   - **A per-claim token for draft actions.** The settle guards key on state, not on the claim, so a stale worker after the 15-minute sweep plus a new claim could overwrite the newer run. This was the 004 ruling, and it was logged again by the 012 T6 review.
+   - **The floating Create post button covers trailing content at some widths:** the draft refine input at 1440 px, and the team badge and settings text at 375 px. This predates 014.
+   - **Small items:**
+     - a trailing `---` separator stays in split sections (012 T3);
+     - the caption check runs before the duplicate 409 in `POST /api/posts` (012 T7);
+     - per-post caption loads in the posts list GET (012 T7);
+     - the 014 verify gaps 5–8.
+4. **The operator run of 005 AC-16:** `scripts/cli-sandbox-check.mjs` in the rebuilt image, with a real OAuth token. 🔴 **Revoke the token pasted into chat on 2026-10-06 first.**
+
+### Gotchas from this session
+
+- **Usage limits stopped subagents about 5 times.** Resume the same agent with `SendMessage`: its working-tree edits survive. Check `git status` and port 3001 first.
+- **A finished gate agent restarted a detached `next dev` on :3001** after its background task died, and it collided with the next gate. **Before every full E2E, confirm exactly one :3001 listener**, the one you started after `rm -rf .next` and the DB reset. This is logged in `.specclaw/learnings.md`.
+- **Never run `npm run build` while `next dev` is serving :3001.** It corrupts the dev `.next`. `specclaw-build finalize` and `specclaw-verify collect` both run the build, so stop the server first and `rm -rf .next` afterwards.
+- **`specclaw-build setup` acquires a change lock.** `.specclaw/changes/*/.lock/` is now gitignored, after a lock got committed once. `finalize` releases it; a stale build lock blocks verify until then.
+- **012 T4's implementer ran the backfill once against the dev DB by accident.** `@prisma/client` loads `.env` even when `DATABASE_URL` is unset. It failed with P2022 before writing anything, because the dev DB doesn't have the migration yet. **Never run `src/scripts/backfill-captions.ts` without an explicit test-DB `DATABASE_URL`.**
+- **Local MinIO now runs `pgsty/silo:RELEASE.2026-09-16T00-00-00Z`** on the same volume, with no data change. The rollback image is `local/minio-rollback:pre-silo`, and the volume backups are in the 2026-10-09 session scratchpad.
+- **The 012 migrations exist only as SQL files:** `20261011120000_channel_whatsapp` and `20261011130000_draft_captions`. They are applied when the wave gate recreates the test DB. Run `npx prisma migrate deploy` on the dev DB only when you want the dev app to run 012 code.
+- **GitHub moves `ubuntu-latest` to Ubuntu 26 from 2026-10-19.** Watch the first CI run after that date.
+
+---
+
+## ⏸️ 2026-10-09 — superseded by 2026-10-11 above (kept for history): 011 verified PASS; `main` merged into `v2`; 013 (fork CI, checks only) is building
 
 ### The user's decisions (2026-10-09)
 

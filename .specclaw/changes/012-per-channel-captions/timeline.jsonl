@@ -1,0 +1,15 @@
+{"ev":"start","span":"W1","kind":"wave","label":"wave 1","at":"2026-10-10T22:55:18Z","ts":1791672918}
+{"ev":"start","span":"T1","kind":"task","label":"WHATSAPP + registry","parent":"W1","model":"claude","attempt":"1","at":"2026-10-10T22:55:18Z","ts":1791672918}
+{"ev":"stop","span":"T1","at":"2026-10-10T23:01:45Z","ts":1791673305,"status":"ok"}
+{"ev":"start","span":"T2","kind":"task","label":"prompt+extractor+headline","parent":"W1","model":"claude","attempt":"1","at":"2026-10-10T23:01:46Z","ts":1791673306}
+{"ev":"stop","span":"T2","at":"2026-10-10T23:09:26Z","ts":1791673766,"status":"ok"}
+{"ev":"start","span":"T3","kind":"task","label":"migration planner + publish resolver","parent":"W1","model":"claude","attempt":"1","at":"2026-10-10T23:09:26Z","ts":1791673766}
+{"ev":"stop","span":"T3","at":"2026-10-10T23:16:16Z","ts":1791674176,"status":"ok"}
+{"ev":"start","span":"T4","kind":"task","label":"DraftCaption schema + store + backfill","parent":"W1","model":"claude","attempt":"1","at":"2026-10-10T23:16:16Z","ts":1791674176}
+{"ev":"stop","span":"T4","at":"2026-10-10T23:31:18Z","ts":1791675078,"status":"ok"}
+{"ev":"start","span":"T5","kind":"task","label":"writers + mock seam + headline in prompts","parent":"W1","model":"claude","attempt":"1","at":"2026-10-10T23:31:18Z","ts":1791675078}
+{"ev":"stop","span":"T5","at":"2026-10-10T23:46:20Z","ts":1791675980,"status":"ok"}
+{"ev":"start","span":"T6","kind":"task","label":"draft API + base CaptionPanels","parent":"W1","model":"claude","attempt":"1","at":"2026-10-10T23:46:20Z","ts":1791675980}
+{"ev":"stop","span":"T6","at":"2026-10-11T03:41:59Z","ts":1791690119,"status":"ok"}
+{"ev":"start","span":"T7","kind":"task","label":"publish resolver + terminal job runner","parent":"W1","model":"claude","attempt":"1","at":"2026-10-11T03:42:00Z","ts":1791690120}
+{"ev":"stop","span":"T7","at":"2026-10-11T04:41:31Z","ts":1791693691,"status":"ok"}
