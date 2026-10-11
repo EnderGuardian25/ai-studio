@@ -4,6 +4,7 @@ import { generateDraftForBrief, NoBrandKitError } from '@/lib/agent/generateDraf
 import { resolveExportUrl } from '@/lib/storage/minio'
 import { getSystemUserId } from '@/mcp/systemUser'
 import { withClaudeAuth } from '@/lib/agent/userToken'
+import { loadDraftCaptions } from '@/lib/captions/store'
 
 interface GeneratePostArgs {
   topic: string
@@ -86,7 +87,13 @@ export async function generatePost(args: GeneratePostArgs) {
     const { draft } = await withClaudeAuth(null, teamId, () =>
       generateDraftForBrief(brief, { userId: null, teamId })
     )
-    return { draftId: draft.id, exportUrl: await resolveExportUrl(draft.exportUrl), htmlContent: draft.htmlContent }
+    return {
+      draftId: draft.id,
+      exportUrl: await resolveExportUrl(draft.exportUrl),
+      htmlContent: draft.htmlContent,
+      headline: draft.headline,
+      captions: await captionList(draft.id),
+    }
   } catch (err) {
     if (err instanceof NoBrandKitError) {
       throw new Error(
@@ -97,16 +104,32 @@ export async function generatePost(args: GeneratePostArgs) {
   }
 }
 
+// The external caption list (012 FR-17): one `{channel, text, status}` per
+// registry channel, in registry order, WhatsApp included. Read through the
+// loader, so a legacy draft is migrated first.
+async function captionList(draftId: string) {
+  const loaded = await loadDraftCaptions(draftId)
+  return (loaded?.captions ?? []).map(({ channel, text, status }) => ({ channel, text, status }))
+}
+
 export async function getDraft(args: { id: string; teamId: string }) {
   const draft = await prisma.draft.findUnique({
     where: { id: args.id },
-    select: { copyText: true, imageUrl: true, exportUrl: true, status: true, teamId: true },
+    select: { headline: true, imageUrl: true, exportUrl: true, status: true, teamId: true },
   })
   // Task 13 (reviewer follow-up): same team-bound guard as publishPost — a
   // draft belonging to a different team (or the pre-tenancy null) reads as
   // "not found" rather than leaking its existence/content across tenants.
   if (!draft || draft.teamId !== args.teamId) throw new Error(`Draft ${args.id} not found`)
+  const captions = await captionList(args.id)
   // exportUrl is stored as an EXPORTS object key — sign it for the caller.
   const { teamId: _teamId, ...rest } = draft
-  return { ...rest, exportUrl: await resolveExportUrl(draft.exportUrl) }
+  return {
+    // Deprecated alias (A4): the Instagram caption, so pre-012 callers still
+    // get a caption, never the combined legacy text.
+    copyText: captions.find((c) => c.channel === 'INSTAGRAM')?.text ?? '',
+    ...rest,
+    captions,
+    exportUrl: await resolveExportUrl(draft.exportUrl),
+  }
 }

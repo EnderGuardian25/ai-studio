@@ -45,6 +45,8 @@ export async function publishPost(args: { draftId: string; channel: string; team
   })
 
   // The FAILED row is recorded either way; surface the failure to the caller.
+  // A refused caption (012 FR-17) is one of these: publishToChannel refuses it
+  // before signing the export, and the row carries the resolver's reason.
   if (error) {
     throw new Error(`Publish failed (${error.reason}) — recorded as post ${post.id} with status FAILED`)
   }

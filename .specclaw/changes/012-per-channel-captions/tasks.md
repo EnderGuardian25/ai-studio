@@ -157,7 +157,7 @@ Waves 2 and 3 add UX and wording only.
     - **The mock publishers** return `mockPlatformId(channel, caption)`. Keep the `mock-<channel>-<timestamp>` prefix, so existing `toBeTruthy` checks hold.
     - **`generationRunner` is unchanged** (FR-16 is satisfied by the resolver). Confirm with its existing unit test.
 
-- [ ] `T8` — MCP/ACP and `generate/copy` outputs
+- [x] `T8` — MCP/ACP and `generate/copy` outputs
   - Files: `src/mcp/tools/generate.ts`, `src/mcp/tools/publish.ts`, `src/app/api/generate/copy/route.ts`, `tests/unit/mcpGetDraft.test.ts`
   - Estimate: small
   - Kind: impl
