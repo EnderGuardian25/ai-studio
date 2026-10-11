@@ -157,3 +157,20 @@ describe('PublishError', () => {
     expect(err.message).toBe('[WHATSAPP] no publisher')
   })
 })
+
+// --- 012 FR-21: the mock publishers' platformId carries the caption hash ---
+describe('mockPlatformId', () => {
+  it('keeps the mock-<channel>-<timestamp> prefix and ends in sha256(caption)[0:12]', async () => {
+    const { createHash } = await import('node:crypto')
+    const { mockPlatformId } = await import('@/lib/testHooks')
+    const sha = (s: string) => createHash('sha256').update(s).digest('hex').slice(0, 12)
+
+    const li = mockPlatformId('LINKEDIN', 'LinkedIn caption')
+    expect(li).toMatch(/^mock-linkedin-\d+-[0-9a-f]{12}$/)
+    expect(li.endsWith(`-${sha('LinkedIn caption')}`)).toBe(true)
+
+    const ig = mockPlatformId('INSTAGRAM', 'Instagram caption')
+    expect(ig).toMatch(/^mock-instagram-\d+-/)
+    expect(ig.split('-').at(-1)).not.toBe(li.split('-').at(-1))
+  })
+})

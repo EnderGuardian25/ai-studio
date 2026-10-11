@@ -6,6 +6,7 @@ import { postVisibilityWhere } from '@/lib/authz/visibility'
 import { resolveExportUrl } from '@/lib/storage/minio'
 import { createAndPublishPost, findLivePost } from '@/lib/publish/publishDraft'
 import { isPublishableChannel, PUBLISHABLE_CHANNELS } from '@/lib/channels'
+import { loadCaptionForPublish, loadCaptionText } from '@/lib/captions/store'
 
 // Permissive schema: only guards the JSON parse. The manual checks below keep
 // their exact error messages (asserted by tests).
@@ -35,6 +36,14 @@ export const POST = withTeamAdmin(async (req: NextRequest, _ctx, auth) => {
 
   if (!draft.exportUrl) {
     return NextResponse.json({ error: 'Draft has no export URL' }, { status: 422 })
+  }
+
+  // The caption check (012 A10), up front for both paths so a refused caption
+  // never leaves a row. The scheduler re-checks at publish time, because the
+  // caption can change in between.
+  const caption = await loadCaptionForPublish(draftId, channel)
+  if (!caption.ok) {
+    return NextResponse.json({ error: caption.reason, code: 'CAPTION_UNPUBLISHABLE' }, { status: 422 })
   }
 
   const scheduledAtDate = scheduledAt ? new Date(scheduledAt) : null
@@ -97,7 +106,7 @@ export const GET = withTeamAuth(async (req: NextRequest, _ctx, user) => {
     prisma.post.findMany({
       where,
       include: {
-        draft: { select: { id: true, copyText: true, exportUrl: true } },
+        draft: { select: { id: true, exportUrl: true } },
       },
       orderBy: { createdAt: 'desc' },
       skip: (page - 1) * pageSize,
@@ -107,10 +116,15 @@ export const GET = withTeamAuth(async (req: NextRequest, _ctx, user) => {
   ])
 
   // draft.exportUrl is stored as an EXPORTS object key — sign for the browser.
+  // draft.caption is the text for the post's own channel (012 FR-13).
   const signedPosts = await Promise.all(
     posts.map(async (p) => ({
       ...p,
-      draft: { ...p.draft, exportUrl: await resolveExportUrl(p.draft.exportUrl) },
+      draft: {
+        ...p.draft,
+        caption: await loadCaptionText(p.draft.id, p.channel),
+        exportUrl: await resolveExportUrl(p.draft.exportUrl),
+      },
     }))
   )
 

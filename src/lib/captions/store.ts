@@ -27,6 +27,7 @@ import { CAPTION_CHANNELS, type CaptionTarget } from '@/lib/channels'
 import { planCaptionMigration, type CaptionMigrationOutcome } from '@/lib/captions/migrationPlan'
 import type { FieldResult } from '@/lib/captions/extract'
 import { settleCaptionRow } from '@/lib/captions/actionTargets'
+import { resolveCaptionForPublish, type CaptionResolution } from '@/lib/captions/resolve'
 
 export interface CaptionRow {
   channel: Channel
@@ -178,6 +179,30 @@ export async function loadDraftCaptions(
     rows = await findRows(draftId, db)
   }
   return { captions: orderByRegistry(rows), deferred: false, captionMigration }
+}
+
+// ── Publishing (FR-14) ──────────────────────────────────────────────────────
+
+// The publish-time decision for one channel: the draft's row for it, through
+// the loader (so a legacy draft materializes first), run through the pure
+// resolver. A missing draft has no row, so it is refused like one.
+export async function loadCaptionForPublish(
+  draftId: string,
+  channel: Channel,
+  db: PrismaClient = prisma,
+): Promise<CaptionResolution> {
+  const loaded = await loadDraftCaptions(draftId, db)
+  return resolveCaptionForPublish(channel, loaded?.captions.find((r) => r.channel === channel))
+}
+
+// The text the posts routes show for a post's channel, or '' (FR-13).
+export async function loadCaptionText(
+  draftId: string,
+  channel: Channel,
+  db: PrismaClient = prisma,
+): Promise<string> {
+  const loaded = await loadDraftCaptions(draftId, db)
+  return loaded?.captions.find((r) => r.channel === channel)?.text ?? ''
 }
 
 // ── REVIEW lines (FR-04) ────────────────────────────────────────────────────

@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
-import { CHANNEL_LABELS } from '@/lib/channels'
+import { loadCaptionForPublish } from '@/lib/captions/store'
+import { unavailableReason } from '@/lib/captions/resolve'
 import * as instagramPublisher from '@/lib/social/instagram'
 import * as linkedinPublisher from '@/lib/social/linkedin'
 import { PublishError } from '@/lib/social/types'
@@ -9,7 +10,8 @@ import type { Channel, Post } from '@prisma/client'
 // The one channel → publisher map. Every publish surface (immediate API path,
 // FAILED-retry, scheduler tick, ACP tool) goes through this module so a new
 // channel or telemetry change is a single edit.
-// A channel with no entry (WhatsApp, until 010) fails closed and terminally.
+// A channel with no entry (WhatsApp, until 010) fails closed and terminally,
+// with the resolver's rule-1 reason.
 export const publishers: Partial<
   Record<Channel, { publish(url: string, caption: string, teamId: string): Promise<{ platformId: string }> }>
 > = {
@@ -28,28 +30,31 @@ export async function findLivePost(draftId: string, channel: Channel): Promise<P
   })
 }
 
-// Signs the stored EXPORTS object key and pushes the image + caption to the
-// channel. Throws PublishError('draft export missing') when the draft lost its
-// export between scheduling and publish — callers surface it as errorReason.
+// Resolves this channel's caption (012 FR-14), then signs the stored EXPORTS
+// object key and pushes the image + caption to the channel. The caption is
+// decided first, so a refused publish never signs the export: a refusal throws
+// a terminal PublishError with the resolver's reason, which retrying can't fix.
+// Throws a retryable PublishError('draft export missing') when the draft lost
+// its export between scheduling and publish — callers surface it as errorReason.
 export async function publishToChannel(
   channel: Channel,
   exportKey: string | null | undefined,
-  copyText: string,
+  draftId: string,
   teamId: string
 ): Promise<{ platformId: string }> {
   const publisher = publishers[channel]
   if (!publisher) {
-    throw new PublishError(
-      channel,
-      `${CHANNEL_LABELS[channel]} publishing isn't available yet. Copy the caption and post it by hand.`,
-      { terminal: true }
-    )
+    throw new PublishError(channel, unavailableReason(channel), { terminal: true })
+  }
+  const caption = await loadCaptionForPublish(draftId, channel)
+  if (!caption.ok) {
+    throw new PublishError(channel, caption.reason, { terminal: true })
   }
   const signedExportUrl = await resolveExportUrl(exportKey)
   if (!signedExportUrl) {
     throw new PublishError(channel, 'draft export missing')
   }
-  return publisher.publish(signedExportUrl, copyText, teamId)
+  return publisher.publish(signedExportUrl, caption.text, teamId)
 }
 
 // Immediate-publish state machine shared by the API POST /api/posts path and
@@ -67,7 +72,7 @@ export async function createAndPublishPost(opts: {
   // draft's team at creation (draft.teamId is the source of truth here).
   const draft = await prisma.draft.findUniqueOrThrow({
     where: { id: opts.draftId },
-    select: { exportUrl: true, copyText: true, teamId: true },
+    select: { exportUrl: true, teamId: true },
   })
 
   const post = await prisma.post.create({
@@ -84,7 +89,7 @@ export async function createAndPublishPost(opts: {
   try {
     // draft.teamId is NOT NULL as of Task 15 (Migration B) — no more
     // pre-tenancy null rows to coerce.
-    const { platformId } = await publishToChannel(opts.channel, draft.exportUrl, draft.copyText ?? '', draft.teamId)
+    const { platformId } = await publishToChannel(opts.channel, draft.exportUrl, opts.draftId, draft.teamId)
     const updated = await prisma.post.update({
       where: { id: post.id },
       data: { status: 'PUBLISHED', publishedAt: new Date(), platformId },

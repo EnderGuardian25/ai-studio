@@ -1,7 +1,7 @@
 import { PublishError } from "./types"
 import { prisma } from "@/lib/prisma"
 import { decrypt } from "@/lib/crypto"
-import { MOCK_SOCIAL, shouldMockPublishFail } from "@/lib/testHooks"
+import { MOCK_SOCIAL, mockPlatformId, shouldMockPublishFail } from "@/lib/testHooks"
 
 // Team-scoped lookup — no env-var fallback. A team with no connected
 // Instagram channel simply can't publish; there is no shared/global credential.
@@ -23,7 +23,7 @@ export async function publish(
   // FAILED/retry coverage deterministically.
   if (MOCK_SOCIAL) {
     if (shouldMockPublishFail(copyText)) throw new PublishError("INSTAGRAM", "Mock Instagram publish failure")
-    return { platformId: `mock-instagram-${Date.now()}` }
+    return { platformId: mockPlatformId("INSTAGRAM", copyText) }
   }
 
   const { accessToken, businessAccountId } = await resolveCredentials(teamId)

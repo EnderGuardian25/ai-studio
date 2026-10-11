@@ -9,7 +9,7 @@ export const POST = withTeamAdmin<{ id: string }>(async (_req, { params }, user)
   const post = await prisma.post.findUnique({
     where: { id: params.id },
     include: {
-      draft: { select: { exportUrl: true, copyText: true } },
+      draft: { select: { exportUrl: true } },
     },
   })
 
@@ -30,7 +30,9 @@ export const POST = withTeamAdmin<{ id: string }>(async (_req, { params }, user)
   }
 
   try {
-    const { platformId } = await publishToChannel(post.channel, draft.exportUrl, draft.copyText ?? '', user.teamId)
+    // A refused caption (012 FR-14) is a terminal PublishError: the post
+    // stays FAILED with the new reason, as below.
+    const { platformId } = await publishToChannel(post.channel, draft.exportUrl, post.draftId, user.teamId)
     const updated = await prisma.post.update({
       where: { id: post.id },
       data: {

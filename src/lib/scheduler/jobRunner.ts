@@ -3,7 +3,8 @@ import { PublishError } from "../social/types"
 import { publishToChannel } from "../publish/publishDraft"
 
 // A transient failure is retried up to MAX_RETRIES times with exponential
-// backoff before the post is marked terminally FAILED.
+// backoff before the post is marked terminally FAILED. A terminal PublishError
+// (a refused caption, a channel with no publisher) fails it on the spot.
 const MAX_RETRIES = 5
 // Max rows a single tick will claim — bounds work per tick under a backlog.
 const CLAIM_BATCH = 25
@@ -60,7 +61,6 @@ export async function runScheduledJobs(): Promise<void> {
       draft: {
         select: {
           exportUrl: true,
-          copyText: true,
         },
       },
     },
@@ -68,13 +68,15 @@ export async function runScheduledJobs(): Promise<void> {
 
   for (const post of posts) {
     try {
-      // Shared sign+publish (throws PublishError 'draft export missing' when the
-      // draft lost its export between scheduling and this tick).
+      // Shared resolve+sign+publish. The caption is decided now, so an edit made
+      // after scheduling counts (012 FR-16). Throws a terminal PublishError on a
+      // refused caption, and a retryable one ('draft export missing') when the
+      // draft lost its export between scheduling and this tick.
       // post.teamId is NOT NULL as of Task 15 (Migration B).
       const { platformId } = await publishToChannel(
         post.channel,
         post.draft.exportUrl,
-        post.draft.copyText,
+        post.draftId,
         post.teamId
       )
 
@@ -96,7 +98,20 @@ export async function runScheduledJobs(): Promise<void> {
       const reason = err instanceof PublishError ? err.reason : String(err)
       const nextRetry = post.retryCount + 1
 
-      if (nextRetry <= MAX_RETRIES) {
+      // Retrying can't fix a terminal refusal: FAILED now, retryCount as is.
+      if (err instanceof PublishError && err.terminal) {
+        await prisma.post.update({
+          where: { id: post.id },
+          data: {
+            status: "FAILED",
+            errorReason: reason,
+            nextRetryAt: null,
+          },
+        })
+        console.log(
+          `[scheduler] post ${post.id} → FAILED (terminal) (${post.channel}): ${reason}`
+        )
+      } else if (nextRetry <= MAX_RETRIES) {
         const when = new Date(Date.now() + backoffMs(nextRetry))
         await prisma.post.update({
           where: { id: post.id },

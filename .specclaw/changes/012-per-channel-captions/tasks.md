@@ -142,7 +142,7 @@ Waves 2 and 3 add UX and wording only.
 
     - **Use only `ui` primitives** (`SectionHead`, `Notice`, `Button`). The `uiTokenGuard` stays green.
 
-- [ ] `T7` — Publishing through the one resolver; the terminal failure in the job runner
+- [x] `T7` — Publishing through the one resolver; the terminal failure in the job runner
   - Files: `src/lib/publish/publishDraft.ts`, `src/lib/scheduler/jobRunner.ts`, `src/app/api/posts/route.ts`, `src/app/api/posts/[id]/route.ts`, `src/app/api/posts/[id]/publish/route.ts`, `src/lib/social/{instagram,linkedin}.ts`, `src/lib/testHooks.ts`, `src/lib/captions/store.ts` (`loadCaptionForPublish`), `tests/unit/jobRunner.test.ts` (new), `tests/unit/channels.test.ts`
   - Estimate: medium
   - Kind: impl

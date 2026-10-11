@@ -19,6 +19,12 @@ export type CaptionResolution = { ok: true; text: string } | { ok: false; reason
 
 const count = (n: number) => n.toLocaleString('en-US')
 
+// Rule 1's reason: the channel is not publishable, or has no publisher. Shared
+// with publishToChannel's publisher-map miss so both refusals read the same.
+export function unavailableReason(channel: Channel): string {
+  return `${channelLabel(channel)} publishing isn't available yet. Copy the caption and post it by hand.`
+}
+
 // The first matching rule wins. A ready caption returns its stored text
 // unchanged; it is already validated model output or the user's own text.
 export function resolveCaptionForPublish(
@@ -27,12 +33,7 @@ export function resolveCaptionForPublish(
 ): CaptionResolution {
   const label = channelLabel(channel)
 
-  if (!isPublishableChannel(channel)) {
-    return {
-      ok: false,
-      reason: `${label} publishing isn't available yet. Copy the caption and post it by hand.`,
-    }
-  }
+  if (!isPublishableChannel(channel)) return { ok: false, reason: unavailableReason(channel) }
   if (!row) return { ok: false, reason: `This draft has no ${label} caption.` }
   if (row.status === 'PENDING') {
     return {

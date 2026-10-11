@@ -11,6 +11,8 @@
  *   MOCK_SOCIAL_FAIL — make the mock publishers throw (for FAILED/retry coverage)
  */
 
+import { createHash } from 'node:crypto'
+import type { Channel } from '@prisma/client'
 import type { ConstrainTarget, InstructionClass } from '@/lib/agent/instructionClasses'
 // Type-only — erased at compile time (tsconfig isolatedModules), so this does
 // not create a runtime import cycle with refineVerify.ts, which imports this
@@ -105,6 +107,16 @@ export function shouldMockPublishFail(caption: string): boolean {
     return true
   }
   return false
+}
+
+/**
+ * The mock publishers' platformId (012 FR-21): `mock-<channel>-<Date.now()>-`
+ * then the first 12 hex of sha256(caption), so an E2E can prove which text a
+ * channel received. The `mock-<channel>-<timestamp>` prefix is unchanged.
+ */
+export function mockPlatformId(channel: Channel, caption: string): string {
+  const hash = createHash('sha256').update(caption).digest('hex').slice(0, 12)
+  return `mock-${channel.toLowerCase()}-${Date.now()}-${hash}`
 }
 
 // Per-prompt record so a __FAIL_GEN_ONCE__ generation fails its first attempt
