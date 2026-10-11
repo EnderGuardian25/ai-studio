@@ -28,6 +28,12 @@ export interface DraftRecoveryPlan {
   failStuckGeneration: boolean
   /** Stale in-flight async action → cleared with STUCK_ACTION_REASON. */
   clearStuckAction: boolean
+  /**
+   * Caption rows left PENDING by the run being swept (a stuck generation, or a
+   * stale REGENERATE_COPY) → settled as a failed write (012 FR-11), with
+   * STUCK_REASON or STUCK_ACTION_REASON. Nothing else writes PENDING rows.
+   */
+  settlePendingCaptions: boolean
 }
 
 // A draft that already holds a rendered design was never a generation in
@@ -75,9 +81,13 @@ export function isStatusClobbered(draft: RecoverableDraft): boolean {
 export function planDraftRecovery(draft: RecoverableDraft, now: number = Date.now()): DraftRecoveryPlan {
   const stale = now - draft.updatedAt.getTime() >= STUCK_GENERATION_MS
   const healStatus = isStatusClobbered(draft)
+  const failStuckGeneration = !healStatus && draft.status === 'IN_PROGRESS' && stale
+  const clearStuckAction = draft.pendingAction !== null && stale
   return {
     healStatus,
-    failStuckGeneration: !healStatus && draft.status === 'IN_PROGRESS' && stale,
-    clearStuckAction: draft.pendingAction !== null && stale,
+    failStuckGeneration,
+    clearStuckAction,
+    settlePendingCaptions:
+      failStuckGeneration || (clearStuckAction && draft.pendingAction === 'REGENERATE_COPY'),
   }
 }

@@ -9,6 +9,9 @@ import { resolveExportUrl } from '@/lib/storage/minio'
 import { planDraftRecovery, STUCK_ACTION_REASON, STUCK_REASON } from '@/lib/drafts/recovery'
 import { COMMITTED_REVISION, resolveNotAppliedOutcome } from '@/lib/drafts/revisions'
 import { backgroundSkippedFor } from '@/lib/drafts/backgroundNotice'
+import { parseCaptionPatch } from '@/lib/captions/requests'
+import { validateHeadline } from '@/lib/captions/headline'
+import { loadDraftCaptions, saveCaptionEdit, saveHeadlineEdit, settlePendingCaptions } from '@/lib/captions/store'
 
 type Params = { id: string }
 
@@ -44,6 +47,16 @@ async function recoverIfStuck(draft: DraftRecoveryRow): Promise<{
     failureReason: draft.failureReason,
     pendingAction,
     pendingActionError: draft.pendingActionError,
+  }
+
+  // Caption rows the swept run left PENDING settle as a failed write, keeping
+  // any text they had (012 FR-11). Done BEFORE the run is failed or its claim
+  // cleared: until then no new run can mark rows PENDING, so only the swept
+  // run's rows are settled.
+  if (plan.settlePendingCaptions) {
+    await settlePendingCaptions(id, plan.failStuckGeneration ? STUCK_REASON : STUCK_ACTION_REASON).catch(() => {
+      /* best-effort recovery */
+    })
   }
 
   // A live post whose status was clobbered by the old copy-edit flip — restore
@@ -121,6 +134,10 @@ async function loadDraft(id: string) {
   // recovery.
   const effective = await recoverIfStuck(draft)
 
+  // The one caption reader (012 FR-13): a legacy draft is materialized here,
+  // after the sweep, so a draft it just un-stuck is no longer deferred.
+  const captions = await loadDraftCaptions(id)
+
   // Surface a refine brand-kit conflict to the poll WITHOUT the stored
   // pendingHtml — it can be huge and is server-side only (the Override path
   // reads it from the DB).
@@ -143,7 +160,9 @@ async function loadDraft(id: string) {
     data: {
     id: draft.id,
     briefId: draft.briefId,
-    copyText: draft.copyText,
+    headline: draft.headline,
+    captionMigration: captions?.captionMigration ?? null,
+    captions: captions?.captions ?? [],
     imageUrl: draft.imageUrl,
     htmlContent: draft.htmlContent,
     // exportUrl is stored as an EXPORTS object key — sign it for the browser.
@@ -189,10 +208,6 @@ export const GET = withTeamAuth<Params>(async (_req, { params }, user) => {
   return NextResponse.json(result.data)
 })
 
-// Permissive schema + manual type check so the error message stays exactly
-// 'copyText is required' (asserted by tests).
-const patchSchema = z.object({}).passthrough()
-
 // Team tenancy fix: this handler used to run under plain withAuth + the
 // old ownership helper (a platform-role-only check with no team dimension —
 // it let any admin/super-admin bypass ownership entirely), so an admin of
@@ -201,17 +216,18 @@ const patchSchema = z.object({}).passthrough()
 // canAccessContent, matching the GET handler above (the old helper,
 // forbiddenIfNotOwner, has since been deleted from src/lib/auth.ts — this
 // was its last real caller).
+//
+// 012 FR-12: the body is exactly one of { channel, text } (one caption,
+// stored as typed) or { headline } (validated). A legacy { copyText } is 400.
 export const PATCH = withTeamAuth<Params>(async (req, { params }, user) => {
-  const body = await parseBody(req, patchSchema)
+  const body = await parseBody(req, z.unknown())
   if (body.response) return body.response
-  const { copyText } = body.data as { copyText?: unknown }
-  if (typeof copyText !== 'string') {
-    return NextResponse.json({ error: 'copyText is required' }, { status: 400 })
-  }
+  const patch = parseCaptionPatch(body.data)
+  if (!patch.ok) return NextResponse.json({ error: patch.error }, { status: 400 })
 
   const existing = await prisma.draft.findUnique({
     where: { id: params.id },
-    select: { status: true, teamId: true, brief: { select: { userId: true, campaignId: true } } },
+    select: { status: true, pendingAction: true, teamId: true, brief: { select: { userId: true, campaignId: true } } },
   })
   if (
     !existing ||
@@ -220,32 +236,56 @@ export const PATCH = withTeamAuth<Params>(async (req, { params }, user) => {
     return NextResponse.json({ error: 'Draft not found' }, { status: 404 })
   }
 
-  // The published caption lives only on the draft — editing it after publish
+  // The published captions live only on the draft — editing them after publish
   // would silently desynchronize the record from what was actually posted.
   if (existing.status === 'PUBLISHED') {
     return NextResponse.json(
-      { error: 'This draft has been published — its copy can no longer be edited' },
+      { error: 'This draft has been published — its captions can no longer be edited' },
       { status: 409 }
     )
   }
 
-  // Copy and design are independent artifacts — the copy is the post CAPTION,
-  // the export is the rendered image — so a copy edit must NOT touch
-  // Draft.status. This used to flip EXPORTED → IN_PROGRESS to signal "the export
-  // is stale", but IN_PROGRESS means "generation is running", and every consumer
-  // read it that way: the draft dropped out of the library (it filters on
-  // EXPORTED), Refine design and Edit inline vanished, Regenerate copy answered
-  // 409 'Draft is not ready for copy regeneration', clearing the copy entirely
-  // left the page stuck on an eternal "Writing the copy…" skeleton with no way
+  const beingGenerated = () => NextResponse.json({ error: 'This caption is being generated' }, { status: 409 })
+  if ('headline' in patch.value) {
+    const headline = validateHeadline(patch.value.headline)
+    if (!headline.ok) {
+      return NextResponse.json({ error: `The headline was not saved (${headline.reason})` }, { status: 400 })
+    }
+    // Refused while anything may be writing the headline — a caption action,
+    // or a generation (IN_PROGRESS, retry included) — so neither overwrites
+    // the other.
+    if (
+      existing.pendingAction === 'REGENERATE_COPY' ||
+      existing.status === 'IN_PROGRESS' ||
+      !(await saveHeadlineEdit(params.id, headline.text))
+    ) {
+      return beingGenerated()
+    }
+  } else {
+    // Load first, so a legacy draft is materialized and every registry channel
+    // has its row; a PENDING row (or a deferred legacy draft's synthesized one)
+    // is being written and is refused.
+    const { channel, text } = patch.value
+    const loaded = await loadDraftCaptions(params.id)
+    const row = loaded?.captions.find((c) => c.channel === channel)
+    if (!row || row.status === 'PENDING' || !(await saveCaptionEdit(params.id, channel, text))) {
+      return beingGenerated()
+    }
+  }
+
+  // Captions and design are independent artifacts — a caption is what is
+  // posted, the export is the rendered image — so a caption edit must NOT
+  // touch Draft.status (TC-ASYNC-10). The pre-012 copy edit used to flip
+  // EXPORTED → IN_PROGRESS to signal "the export is stale", but IN_PROGRESS
+  // means "generation is running", and every consumer read it that way: the
+  // draft dropped out of the library (it filters on EXPORTED), Refine design
+  // and Edit inline vanished, Regenerate answered 409 'Draft is not ready', a
+  // cleared caption left the page stuck on an eternal skeleton with no way
   // back, and after 15 minutes the lazy sweep marked the draft FAILED. Nothing
   // was regenerating, so the only escape was to regenerate the whole post.
-  // regenerate-copy already leaves status alone (§Q TC-ASYNC-02) — this handler
-  // was the straggler. A "your export predates this copy" nudge belongs in the
-  // UI, not in the status field.
-  await prisma.draft.update({
-    where: { id: params.id },
-    data: { copyText },
-  })
+  // regenerate-copy leaves status alone too (§Q TC-ASYNC-02). A "your export
+  // predates this caption" nudge belongs in the UI, not in the status field.
+  // Editing the headline does not re-render the design either.
 
   const result = await loadDraft(params.id)
   return NextResponse.json(result?.data)
@@ -254,7 +294,8 @@ export const PATCH = withTeamAuth<Params>(async (req, { params }, user) => {
 // Admin-only hard delete: removes the draft with its publish history (Post rows —
 // a SCHEDULED post is thereby cancelled), revisions, and the parent Brief when no
 // other draft references it. No cascades exist on these relations, so children
-// are deleted first, all in one transaction.
+// are deleted first, all in one transaction — except the caption rows
+// (DraftCaption), which cascade with the draft (012 D11).
 export const DELETE = withTeamAdmin<Params>(async (_req, { params }, user) => {
   const draft = await prisma.draft.findUnique({
     where: { id: params.id },

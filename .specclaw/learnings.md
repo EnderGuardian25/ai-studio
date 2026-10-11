@@ -328,3 +328,20 @@ A finished gate agent restarted a detached :3001 next dev minutes later (after i
 Gate agents must not restart servers after hand-back; the next gate checks for exactly one :3001 listener before E2E
 
 ---
+
+## [L20] design_gap — Caption settle guards key on state (row PENDING / pending...
+
+**When:** 2026-10-11 03:41 UTC
+**Category:** design_gap
+**Priority:** medium
+**Status:** pending
+
+### Detail
+
+Caption settle guards key on state (row PENDING / pendingAction=REGENERATE_COPY), not a per-claim token; a stale worker after the 15-min sweep + a new claim could overwrite the newer run (same as 004's ruling)
+
+### Action
+
+Follow-up change: thread a pendingActionClaimId through claim/settle for all draft actions
+
+---

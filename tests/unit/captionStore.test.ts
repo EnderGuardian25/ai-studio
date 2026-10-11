@@ -34,7 +34,11 @@ const {
   loadDraftCaptions,
   materializeStep,
   migrateDraft,
+  saveCaptionEdit,
   saveGenerationCaptions,
+  saveHeadlineEdit,
+  settleCaptionAction,
+  settlePendingCaptions,
 } = await import('@/lib/captions/store')
 
 const T = new Date('2026-10-11T00:00:00Z')
@@ -63,7 +67,7 @@ beforeEach(() => {
   for (const fn of Object.values(h)) fn.mockReset()
   // Batch form: each op is the value its builder returned.
   h.transaction.mockImplementation(async (ops: unknown) =>
-    typeof ops === 'function' ? ops({ draft: { updateMany: h.draftUpdateMany }, draftCaption: { updateMany: h.captionUpdateMany } }) : Promise.all(ops as unknown[]),
+    typeof ops === 'function' ? ops({ draft: { updateMany: h.draftUpdateMany }, draftCaption: { findMany: h.captionFindMany, updateMany: h.captionUpdateMany } }) : Promise.all(ops as unknown[]),
   )
   h.captionCreateMany.mockResolvedValue({ count: 3 })
   h.draftUpdateMany.mockResolvedValue({ count: 1 })
@@ -169,6 +173,8 @@ describe('loadDraftCaptions — the materializer', () => {
     expect(h.captionCreateMany).toHaveBeenCalledWith(expect.objectContaining({ skipDuplicates: true }))
     expect(result).toEqual({
       deferred: false,
+      // The outcome this read just recorded, not the stale null it loaded.
+      captionMigration: 'SPLIT',
       captions: [row('INSTAGRAM', 'ig text'), row('LINKEDIN', 'li text'), row('WHATSAPP')],
     })
   })
@@ -207,6 +213,7 @@ describe('loadDraftCaptions — the materializer', () => {
     const result = await loadDraftCaptions('d1')
 
     expect(result?.deferred).toBe(true)
+    expect(result?.captionMigration).toBeNull()
     expect(result?.captions.map((c) => [c.channel, c.status, c.text])).toEqual([
       ['INSTAGRAM', 'PENDING', ''],
       ['LINKEDIN', 'PENDING', ''],
@@ -228,6 +235,7 @@ describe('loadDraftCaptions — the materializer', () => {
     expect(h.transaction).not.toHaveBeenCalled()
     expect(h.captionCreateMany).not.toHaveBeenCalled()
     expect(result?.captions.map((c) => c.text)).toEqual(['a', 'b', 'c'])
+    expect(result?.captionMigration).toBeNull()
   })
 
   it('never re-migrates a draft with a recorded outcome; a missing channel gets an empty READY row', async () => {
@@ -309,5 +317,117 @@ describe('claimCaptionAction', () => {
   it('a headline-only claim marks no row', async () => {
     expect(await claimCaptionAction('d1', ['HEADLINE'])).toBe(true)
     expect(h.captionUpdateMany).not.toHaveBeenCalled()
+  })
+})
+
+// T6 review NOTE 3: the claim takes the same db injection as the store's
+// other functions.
+describe('claimCaptionAction — db injection', () => {
+  it('runs on the injected client, not the global one', async () => {
+    const updateMany = vi.fn().mockResolvedValue({ count: 1 })
+    const db = { $transaction: (fn: (tx: unknown) => unknown) => fn({ draft: { updateMany }, draftCaption: { updateMany } }) }
+    expect(await claimCaptionAction('d1', ['INSTAGRAM'], db as never)).toBe(true)
+    expect(updateMany).toHaveBeenCalledTimes(2)
+    expect(h.transaction).not.toHaveBeenCalled()
+  })
+})
+
+describe('settleCaptionAction (FR-11, design §5)', () => {
+  it('settles only the PENDING target rows, each write guarded on PENDING, per settleCaptionRow', async () => {
+    h.captionFindMany.mockResolvedValue([
+      { channel: 'INSTAGRAM', text: 'old ig' },
+      { channel: 'LINKEDIN', text: '' },
+      { channel: 'WHATSAPP', text: 'old wa' },
+    ])
+    await settleCaptionAction('d1', ['INSTAGRAM', 'LINKEDIN', 'WHATSAPP'], {
+      INSTAGRAM: { ok: true, text: 'new ig' },
+      LINKEDIN: { ok: false, reason: 'missing' },
+      WHATSAPP: { ok: false, reason: 'empty' },
+    })
+
+    expect(h.captionFindMany).toHaveBeenCalledWith({
+      where: { draftId: 'd1', status: 'PENDING', channel: { in: ['INSTAGRAM', 'LINKEDIN', 'WHATSAPP'] } },
+      select: { channel: true, text: true },
+    })
+    expect(h.captionUpdateMany.mock.calls.map(([a]) => a)).toEqual([
+      {
+        where: { draftId: 'd1', channel: 'INSTAGRAM', status: 'PENDING' },
+        data: { status: 'READY', text: 'new ig', failureReason: null, needsReview: false },
+      },
+      {
+        where: { draftId: 'd1', channel: 'LINKEDIN', status: 'PENDING' },
+        data: { status: 'FAILED', text: '', failureReason: 'missing' },
+      },
+      {
+        // A7: good text survives a failed regenerate.
+        where: { draftId: 'd1', channel: 'WHATSAPP', status: 'PENDING' },
+        data: { status: 'READY', text: 'old wa', failureReason: 'Regenerate failed: empty' },
+      },
+    ])
+    // No headline was requested.
+    expect(h.draftUpdateMany).not.toHaveBeenCalled()
+  })
+
+  it('writes a validated headline, guarded on the caption claim; a failed one changes nothing', async () => {
+    h.captionFindMany.mockResolvedValue([])
+    await settleCaptionAction('d1', ['HEADLINE'], { HEADLINE: { ok: true, text: 'New line' } })
+    expect(h.draftUpdateMany).toHaveBeenCalledWith({
+      where: { id: 'd1', pendingAction: 'REGENERATE_COPY' },
+      data: { headline: 'New line' },
+    })
+
+    h.draftUpdateMany.mockClear()
+    await settleCaptionAction('d1', ['HEADLINE'], { HEADLINE: { ok: false, reason: 'empty' } })
+    expect(h.draftUpdateMany).not.toHaveBeenCalled()
+  })
+
+  it('never writes a headline that was not requested, even if the reply carried one', async () => {
+    h.captionFindMany.mockResolvedValue([])
+    await settleCaptionAction('d1', ['INSTAGRAM'], { HEADLINE: { ok: true, text: 'Sneaky' } })
+    expect(h.draftUpdateMany).not.toHaveBeenCalled()
+  })
+})
+
+describe('settlePendingCaptions (the stale sweep)', () => {
+  it('settles every PENDING row of the draft as failed with the sweep reason, keeping text', async () => {
+    h.captionFindMany.mockResolvedValue([
+      { channel: 'INSTAGRAM', text: 'kept' },
+      { channel: 'LINKEDIN', text: '' },
+    ])
+    await settlePendingCaptions('d1', 'Generation was interrupted. Please retry.')
+    expect(h.captionFindMany).toHaveBeenCalledWith({
+      where: { draftId: 'd1', status: 'PENDING' },
+      select: { channel: true, text: true },
+    })
+    expect(h.captionUpdateMany.mock.calls.map(([a]) => a.data)).toEqual([
+      { status: 'READY', text: 'kept', failureReason: 'Regenerate failed: Generation was interrupted. Please retry.' },
+      { status: 'FAILED', text: '', failureReason: 'Generation was interrupted. Please retry.' },
+    ])
+  })
+})
+
+describe('saveCaptionEdit / saveHeadlineEdit (FR-12)', () => {
+  it('stores the text exactly as typed, READY, flags cleared, refused on a PENDING row', async () => {
+    expect(await saveCaptionEdit('d1', 'LINKEDIN', '  **as typed**  ')).toBe(true)
+    expect(h.captionUpdateMany).toHaveBeenCalledWith({
+      where: { draftId: 'd1', channel: 'LINKEDIN', status: { not: 'PENDING' } },
+      data: { text: '  **as typed**  ', status: 'READY', failureReason: null, needsReview: false },
+    })
+    h.captionUpdateMany.mockResolvedValue({ count: 0 })
+    expect(await saveCaptionEdit('d1', 'LINKEDIN', 'x')).toBe(false)
+  })
+
+  it('saves the headline only while no caption action or generation may be writing it', async () => {
+    expect(await saveHeadlineEdit('d1', 'Line')).toBe(true)
+    expect(h.draftUpdateMany).toHaveBeenCalledWith({
+      where: {
+        id: 'd1',
+        status: { not: 'IN_PROGRESS' },
+        OR: [{ pendingAction: null }, { pendingAction: { not: 'REGENERATE_COPY' } }],
+      },
+      data: { headline: 'Line' },
+    })
+    h.draftUpdateMany.mockResolvedValue({ count: 0 })
+    expect(await saveHeadlineEdit('d1', 'Line')).toBe(false)
   })
 })

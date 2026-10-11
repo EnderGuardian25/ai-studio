@@ -9,7 +9,6 @@ import {
   captionLength,
   captionSpec,
   channelLabel,
-  channelCopyLimit,
   isPublishableChannel,
 } from '@/lib/channels'
 import { PublishError } from '@/lib/social/types'
@@ -89,20 +88,6 @@ describe('channelLabel', () => {
   it('falls back to the raw string for unknown values', () => {
     expect(channelLabel('tiktok')).toBe('tiktok')
     expect(channelLabel('')).toBe('')
-  })
-})
-
-describe('channelCopyLimit', () => {
-  it('INSTAGRAM is 2200, LINKEDIN is 3000 (any casing)', () => {
-    expect(channelCopyLimit('INSTAGRAM')).toBe(2200)
-    expect(channelCopyLimit('instagram')).toBe(2200)
-    expect(channelCopyLimit('LINKEDIN')).toBe(3000)
-    expect(channelCopyLimit('linkedin')).toBe(3000)
-  })
-
-  it('returns undefined for unknown channels and for WhatsApp (soft guide only)', () => {
-    expect(channelCopyLimit('tiktok')).toBeUndefined()
-    expect(channelCopyLimit('WHATSAPP')).toBeUndefined()
   })
 })
 

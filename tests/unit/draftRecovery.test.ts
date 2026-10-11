@@ -139,6 +139,35 @@ describe('planDraftRecovery', () => {
       healStatus: false,
       failStuckGeneration: false,
       clearStuckAction: false,
+      settlePendingCaptions: false,
     })
+  })
+})
+
+// 012 AC-07 (FR-11): the sweep's caption half. An interrupted run leaves
+// caption rows PENDING with nothing writing them; they settle as a failed
+// write. Only a sweep of a run that writes captions qualifies.
+describe('planDraftRecovery — settlePendingCaptions', () => {
+  it('is true for a stale REGENERATE_COPY', () => {
+    expect(planDraftRecovery(draft({ pendingAction: 'REGENERATE_COPY', updatedAt: ancient }), NOW).settlePendingCaptions).toBe(true)
+  })
+
+  it('is true for a swept stuck generation', () => {
+    const plan = planDraftRecovery(
+      draft({ status: 'IN_PROGRESS', updatedAt: ancient, exportUrl: null, htmlContent: null, currentRevisionNumber: null }),
+      NOW,
+    )
+    expect(plan.failStuckGeneration).toBe(true)
+    expect(plan.settlePendingCaptions).toBe(true)
+  })
+
+  it('is false for a stale REGENERATE_DESIGN or REFINE (they write no caption)', () => {
+    expect(planDraftRecovery(draft({ pendingAction: 'REGENERATE_DESIGN', updatedAt: ancient }), NOW).settlePendingCaptions).toBe(false)
+    expect(planDraftRecovery(draft({ pendingAction: 'REFINE', updatedAt: ancient }), NOW).settlePendingCaptions).toBe(false)
+  })
+
+  it('is false for a fresh REGENERATE_COPY (still running) and for a healed clobbered status', () => {
+    expect(planDraftRecovery(draft({ pendingAction: 'REGENERATE_COPY' }), NOW).settlePendingCaptions).toBe(false)
+    expect(planDraftRecovery(draft({ status: 'IN_PROGRESS', updatedAt: ancient }), NOW).settlePendingCaptions).toBe(false)
   })
 })

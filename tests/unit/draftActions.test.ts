@@ -190,6 +190,51 @@ describe('startDraftAction', () => {
   })
 })
 
+// 012 design §5: a caption action settles the rows it marked PENDING when its
+// work throws, BEFORE the claim is released (so no newer run can have marked
+// rows PENDING yet), and a failing onError never strands the claim.
+describe('startDraftAction — onError', () => {
+  it('runs onError with the thrown error before the release', async () => {
+    const order: string[] = []
+    h.updateMany.mockImplementation(async () => {
+      order.push('release')
+      return { count: 1 }
+    })
+    const onError = vi.fn(async (err: unknown) => {
+      order.push('onError:' + (err as Error).message)
+    })
+    await startDraftAction('draft-1', 'user-1', 'team-1', 'REGENERATE_COPY', async () => {
+      throw new Error('provider timed out')
+    }, onError)
+    await waitForRelease(1)
+    expect(order).toEqual(['onError:provider timed out', 'release'])
+    expect(h.updateMany).toHaveBeenCalledWith({
+      where: { id: 'draft-1', pendingAction: 'REGENERATE_COPY' },
+      data: { pendingAction: null, pendingActionError: 'provider timed out' },
+    })
+  })
+
+  it('still releases with the original error when onError itself fails', async () => {
+    await startDraftAction('draft-1', 'user-1', 'team-1', 'REGENERATE_COPY', async () => {
+      throw new Error('provider timed out')
+    }, async () => {
+      throw new Error('db down')
+    })
+    await waitForRelease(1)
+    expect(h.updateMany).toHaveBeenCalledWith({
+      where: { id: 'draft-1', pendingAction: 'REGENERATE_COPY' },
+      data: { pendingAction: null, pendingActionError: 'provider timed out' },
+    })
+  })
+
+  it('is not called when the work succeeds', async () => {
+    const onError = vi.fn(async () => {})
+    await startDraftAction('draft-1', 'user-1', 'team-1', 'REGENERATE_COPY', async () => {}, onError)
+    await waitForRelease(1)
+    expect(onError).not.toHaveBeenCalled()
+  })
+})
+
 // F2 (change 004 final fix wave): a late settle from a run the stale sweep
 // already cleared must not touch a NEWER action's claim or outcome. Every
 // settle write is guarded on the action THIS run claimed.

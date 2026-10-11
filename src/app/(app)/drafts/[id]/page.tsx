@@ -21,12 +21,11 @@ import { Button } from '@/components/ui/Button'
 import { Panel } from '@/components/ui/Panel'
 import { StatusChip } from '@/components/ui/StatusChip'
 import { PublishDialog } from '@/components/library/PublishDialog'
-import { CopyEditor } from '@/components/drafts/CopyEditor'
+import { CaptionPanels } from '@/components/drafts/CaptionPanels'
 import { RefinementPanel } from '@/components/drafts/RefinementPanel'
 import { InlineEditModal } from '@/components/drafts/InlineEditModal'
 import { BackgroundNotice } from '@/components/drafts/BackgroundNotice'
 import { PageTitle } from '@/components/ui/PageHead'
-import { SectionHead } from '@/components/ui/SectionHead'
 import { EYEBROW, FOCUS, ICON, SMALL_CAPS, SUB_HEAD } from '@/components/ui/folio'
 import { apiFetch } from '@/lib/apiFetch'
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser'
@@ -206,13 +205,6 @@ export default function DraftDetailPage() {
   const designActionPending =
     draft?.pendingAction === 'REGENERATE_DESIGN' || draft?.pendingAction === 'REFINE'
   const isFailed = draft?.status === 'FAILED'
-  // Copy resolves independently of the image: show it the moment it's written,
-  // even while the design is still rendering. The skeleton stands in for copy
-  // that hasn't been WRITTEN YET, which only happens before the design exists
-  // (generation writes copy first) — a draft that already has a design has
-  // finished generating, so empty copy there is a deliberate deletion and must
-  // show the editable field, never a skeleton the user can't type into.
-  const copyPending = isGenerating && !draft?.copyText && !draft?.htmlContent
   const ready = draft?.status === 'EXPORTED' || draft?.status === 'PUBLISHED'
 
   if (loading) {
@@ -510,25 +502,13 @@ export default function DraftDetailPage() {
             </p>
           )}
 
-          {/* The copy desk (§8.14): ruled sections. The caption (012) and the
+          {/* The copy desk (§8.14): ruled sections. The captions (012) and the
               refine panel (008) stay self-contained components. */}
           <div className="divide-y divide-line-subtle">
-            {copyPending ? (
-              <section className="pt-[22px] pb-1.5">
-                <SectionHead numeral="i." title="Copy" className="mb-3" />
-                <div className="animate-pulse space-y-2.5" aria-label="Generating copy" role="status">
-                  <div className="h-4 w-3/4 rounded-ui-sm bg-line-subtle" />
-                  <div className="h-4 w-full rounded-ui-sm bg-line-subtle" />
-                  <div className="h-4 w-5/6 rounded-ui-sm bg-line-subtle" />
-                  <div className="h-4 w-2/3 rounded-ui-sm bg-line-subtle" />
-                </div>
-                <p className="mt-3 flex items-center gap-1.5 text-ui-xs text-fg-muted">
-                  <Loader2 {...ICON} className="animate-spin" /> Writing the copy…
-                </p>
-              </section>
-            ) : (
-              <CopyEditor draft={draft} onSaved={() => fetchDraft()} onActionStarted={fetchDraft} />
-            )}
+            {/* Captions resolve independently of the image, each panel by its own
+                row: a skeleton only while that row is PENDING, so empty text on a
+                written row is always an editable field (TC-ASYNC-10). */}
+            <CaptionPanels draft={draft} onSaved={() => fetchDraft()} onActionStarted={fetchDraft} />
             {/* Refinement only makes sense once there's a rendered design to refine. */}
             {ready && (
               <RefinementPanel

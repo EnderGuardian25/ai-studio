@@ -119,7 +119,7 @@ Waves 2 and 3 add UX and wording only.
     - **`regenerate-design`** uses `designHeadline`.
     - **The mock:** `buildMockCaptionReply` plus the four drop sentinels (drop only in all-channel replies). The registry's mock provider returns it.
 
-- [ ] `T6` — The draft API (GET, PATCH, regenerate-copy, sweep) and the base `CaptionPanels`
+- [x] `T6` — The draft API (GET, PATCH, regenerate-copy, sweep) and the base `CaptionPanels`
   - Files: `src/app/api/drafts/[id]/route.ts`, `src/app/api/drafts/[id]/regenerate-copy/route.ts`, `src/lib/captions/actionTargets.ts` (new), `src/lib/captions/store.ts`, `src/lib/drafts/recovery.ts`, `src/lib/drafts/draftActions.ts`, `src/lib/api-types.ts`, `src/lib/channels.ts` (remove `channelCopyLimit`), `src/components/drafts/CopyEditor.tsx` (delete), `src/components/drafts/CaptionPanels.tsx` (new), `src/components/drafts/CaptionPanel.tsx` (new), `src/app/(app)/drafts/[id]/page.tsx`, `tests/unit/draftRecovery.test.ts`, `tests/unit/captionActionTargets.test.ts` (new), `tests/unit/draftActions.test.ts`
   - Estimate: large
   - Kind: impl

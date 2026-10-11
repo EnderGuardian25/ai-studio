@@ -7,16 +7,35 @@ import { resolveBrandKit } from '@/lib/brandkit/resolve'
 import { getActiveCampaignBriefing } from '@/lib/campaign/briefing'
 import { buildBriefInput } from '@/lib/agent/briefInput'
 import { writeCaptions } from '@/lib/captions/generate'
-import { claimDraftAction, startDraftAction } from '@/lib/drafts/draftActions'
+import { parseRegenerateBody } from '@/lib/captions/requests'
+import { failedCaptionFields } from '@/lib/captions/actionTargets'
+import { claimCaptionAction, loadDraftCaptions, settleCaptionAction } from '@/lib/captions/store'
+import { releaseDraftAction, startDraftAction } from '@/lib/drafts/draftActions'
 
-// Regenerates the post copy for a draft by re-running the resolved copy provider
-// against the brief. Validation runs synchronously, then the model work runs
-// in-process fire-and-forget (the F1 pattern — see draftActions.ts) and the
-// route returns 202; the draft page polls pendingAction/pendingActionError to
-// completion (the client captures the previous copy for Undo before firing).
-// The design HTML/PNG is untouched — copy and design regenerate independently,
-// and Draft.status never changes.
-export const POST = withTeamAuth<{ id: string }>(async (_req, { params }, user) => {
+// Regenerates captions for a draft (012 FR-11; the route name is a kept
+// contract): body {} → the three captions ("Regenerate all"), { channel } →
+// that caption, { headline: true } → the headline. Validation runs
+// synchronously, then the model work runs in-process fire-and-forget (the F1
+// pattern — see draftActions.ts) and the route returns 202; the draft page
+// polls pendingAction and the rows' status to completion. The design HTML/PNG
+// is untouched — captions and design regenerate independently, and
+// Draft.status never changes.
+export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) => {
+  // An empty or absent body is {} ("Regenerate all"), as before 012, when the
+  // route took no body. Malformed JSON is still a 400.
+  let raw: unknown = {}
+  const text = await req.text()
+  if (text.trim() !== '') {
+    try {
+      raw = JSON.parse(text)
+    } catch {
+      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+    }
+  }
+  const parsed = parseRegenerateBody(raw)
+  if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 400 })
+  const targets = parsed.value
+
   const draft = await prisma.draft.findUnique({
     where: { id: params.id },
     include: { brief: true },
@@ -28,43 +47,81 @@ export const POST = withTeamAuth<{ id: string }>(async (_req, { params }, user) 
     return NextResponse.json({ error: 'Draft not found' }, { status: 404 })
   }
 
-  // Copy regeneration needs existing content to replace — a draft still
-  // generating (or one whose generation failed) has none.
+  // Regeneration needs existing content to replace — a draft still generating
+  // (or one whose generation failed) has none.
   if (draft.status !== 'EXPORTED' && draft.status !== 'PUBLISHED') {
-    return NextResponse.json({ error: 'Draft is not ready for copy regeneration' }, { status: 409 })
+    return NextResponse.json({ error: 'Draft is not ready for caption regeneration' }, { status: 409 })
+  }
+
+  // Everything fallible that needs no claim runs first, so its failure (422)
+  // leaves nothing claimed.
+  let provider: Awaited<ReturnType<typeof resolveCopyProvider>>
+  let kit: Awaited<ReturnType<typeof resolveBrandKit>>
+  let campaignBriefing: Awaited<ReturnType<typeof getActiveCampaignBriefing>>
+  try {
+    provider = await resolveCopyProvider(draft.brief.teamId, draft.brief.copyProviderKey ?? undefined)
+    // Brand voice follows the same kit precedence as design generation.
+    kit = await resolveBrandKit(draft.teamId, draft.brief.campaignId ?? undefined, draft.brief.brandKitId ?? undefined)
+    campaignBriefing = await getActiveCampaignBriefing(draft.brief.campaignId)
+
+    // Materialize a legacy draft's rows BEFORE the claim marks them PENDING:
+    // on a draft with no rows yet the claim would mark nothing, and the settle
+    // would have no row to write.
+    await loadDraftCaptions(draft.id)
+  } catch (err) {
+    return copyError(err)
+  }
+
+  // One draft-level claim for every caption action (A2), with the target rows
+  // marked PENDING in the same transaction.
+  const claimed = await claimCaptionAction(draft.id, targets)
+  if (!claimed) {
+    return NextResponse.json({ error: 'Another action is already running on this draft' }, { status: 409 })
   }
 
   try {
-    const provider = await resolveCopyProvider(draft.brief.teamId, draft.brief.copyProviderKey ?? undefined)
-    // Brand voice follows the same kit precedence as design generation.
-    const kit = await resolveBrandKit(draft.teamId, draft.brief.campaignId ?? undefined, draft.brief.brandKitId ?? undefined)
-    const campaignBriefing = await getActiveCampaignBriefing(draft.brief.campaignId)
-
-    const claimed = await claimDraftAction(draft.id, 'REGENERATE_COPY')
-    if (!claimed) {
-      return NextResponse.json({ error: 'Another action is already running on this draft' }, { status: 409 })
-    }
-
     // CLI mode bills the acting user's personal Claude token when connected
     // (the team token otherwise) — startDraftAction resolves it before the
-    // request unwinds and pins it onto the background run. A throw below is
-    // recorded on Draft.pendingActionError; the previous copy is left untouched.
-    await startDraftAction(draft.id, user.userId, user.teamId, 'REGENERATE_COPY', async () => {
-      // Interim (012 T5 → T6): the legacy single string, now from the
-      // Instagram caption. T6 replaces this closure with the per-row write.
-      const fields = await writeCaptions(provider, buildBriefInput(draft.brief, kit, campaignBriefing), ['INSTAGRAM'])
-      const instagram = fields.INSTAGRAM
-      if (!instagram?.ok) throw new Error(`The caption reply was unusable (${instagram?.reason ?? 'missing'})`)
-      const copyText = instagram.text
-      await prisma.draft.update({
-        where: { id: draft.id },
-        data: { copyText },
-      })
-    })
-
-    return NextResponse.json({ ok: true }, { status: 202 })
+    // request unwinds and pins it onto the background run. Each row settles per
+    // settleCaptionRow (a failure keeps good text, A7); a throw settles every
+    // target row as failed (onError) and is recorded on pendingActionError.
+    await startDraftAction(
+      draft.id,
+      user.userId,
+      user.teamId,
+      'REGENERATE_COPY',
+      async () => {
+        const fields = await writeCaptions(provider, buildBriefInput(draft.brief, kit, campaignBriefing), targets)
+        await settleCaptionAction(draft.id, targets, fields)
+        // A headline has no row to carry a failure, so it is reported on
+        // pendingActionError; the stored headline is unchanged.
+        const headline = fields.HEADLINE
+        if (targets.includes('HEADLINE') && !headline?.ok) {
+          throw new Error(`Regenerate headline failed: ${headline?.reason ?? 'missing'}`)
+        }
+      },
+      (err) => settleCaptionAction(draft.id, targets, failedCaptionFields(targets, errorMessage(err))),
+    )
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err)
-    return NextResponse.json({ code: 'COPY_ERROR', message }, { status: 422 })
+    // The run never started (e.g. the credential lookup threw): settle the rows
+    // this request marked PENDING and give the claim back, so the panels don't
+    // wait for the 15-minute sweep. Settle first, while the claim still holds.
+    // Best-effort: if this fails too, the stale sweep still recovers the draft.
+    const message = errorMessage(err)
+    try {
+      await settleCaptionAction(draft.id, targets, failedCaptionFields(targets, message))
+      await releaseDraftAction(draft.id, 'REGENERATE_COPY', message)
+    } catch (e) {
+      console.error(`[draft-action] draft ${draft.id}: releasing the unstarted caption action failed:`, e)
+    }
+    return copyError(err)
   }
+
+  return NextResponse.json({ ok: true }, { status: 202 })
 })
+
+const errorMessage = (err: unknown) => (err instanceof Error ? err.message : String(err))
+
+function copyError(err: unknown) {
+  return NextResponse.json({ code: 'COPY_ERROR', message: errorMessage(err) }, { status: 422 })
+}

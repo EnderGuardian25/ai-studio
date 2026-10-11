@@ -8,8 +8,9 @@
 // T9 renames it to `legacyCaptionText @map("copyText")` and makes it nullable.
 // The materializer reads it under its current name.
 //
-// What to write is decided by pure modules (migrationPlan.ts here; T6 adds the
-// settle rules in actionTargets.ts). This file only issues the queries.
+// What to write is decided by pure modules (migrationPlan.ts for a legacy
+// draft, actionTargets.ts for a caption write's settle). This file only issues
+// the queries.
 
 import type {
   CaptionMigration,
@@ -25,6 +26,7 @@ import { prisma } from '@/lib/prisma'
 import { CAPTION_CHANNELS, type CaptionTarget } from '@/lib/channels'
 import { planCaptionMigration, type CaptionMigrationOutcome } from '@/lib/captions/migrationPlan'
 import type { FieldResult } from '@/lib/captions/extract'
+import { settleCaptionRow } from '@/lib/captions/actionTargets'
 
 export interface CaptionRow {
   channel: Channel
@@ -40,6 +42,8 @@ export interface DraftCaptions {
   captions: CaptionRow[]
   /** True while a legacy draft waits to be migrated; its captions are synthesized. */
   deferred: boolean
+  /** The legacy migration outcome, including one this read just recorded. */
+  captionMigration: CaptionMigration | null
 }
 
 const ROW_SELECT = {
@@ -145,11 +149,17 @@ export async function loadDraftCaptions(
     status: draft.status,
     pendingAction: draft.pendingAction,
   })
-  if (step === 'defer') return { captions: synthesizePending(draft.updatedAt), deferred: true }
+  if (step === 'defer') {
+    return { captions: synthesizePending(draft.updatedAt), deferred: true, captionMigration: null }
+  }
 
   let rows = draft.captions
+  let captionMigration = draft.captionMigration
   if (step === 'migrate') {
     const { outcome, written } = await migrateDraft(draftId, draft.copyText, db)
+    // A racing reader that recorded it first planned the same text, so the
+    // outcome is the same either way.
+    captionMigration = outcome
     if (written) {
       console.info(`[captions] draft ${draftId} migrated on read: ${outcome}`)
       if (outcome === 'UNSPLIT_FALLBACK') await logCaptionReview({ id: draftId }, db)
@@ -167,7 +177,7 @@ export async function loadDraftCaptions(
     })
     rows = await findRows(draftId, db)
   }
-  return { captions: orderByRegistry(rows), deferred: false }
+  return { captions: orderByRegistry(rows), deferred: false, captionMigration }
 }
 
 // ── REVIEW lines (FR-04) ────────────────────────────────────────────────────
@@ -277,14 +287,18 @@ export async function saveGenerationCaptions(
 // Claim the draft-level caption action (A2, design §5): REGENERATE_COPY,
 // guarded on no action in flight, and the target rows marked PENDING in the
 // same transaction. False when another action holds the draft (the caller
-// answers 409). Released by startDraftAction as today; the per-row settle
-// (settleCaptionAction) and the stale sweep's settlePendingCaptions land in T6.
+// answers 409). Released by startDraftAction as today.
+//
+// The rows must exist: call loadDraftCaptions first, so a legacy draft is
+// materialized before its rows are claimed. Otherwise the PENDING update finds
+// nothing and the settle has no row to write.
 export async function claimCaptionAction(
   draftId: string,
   targets: readonly CaptionTarget[],
+  db: PrismaClient = prisma,
 ): Promise<boolean> {
-  const channels = targets.filter((t): t is Channel => t !== 'HEADLINE')
-  return prisma.$transaction(async (tx) => {
+  const channels = targetChannels(targets)
+  return db.$transaction(async (tx) => {
     const { count } = await tx.draft.updateMany({
       where: { id: draftId, pendingAction: null },
       data: { pendingAction: 'REGENERATE_COPY' },
@@ -298,4 +312,98 @@ export async function claimCaptionAction(
     }
     return true
   })
+}
+
+function targetChannels(targets: readonly CaptionTarget[]): Channel[] {
+  return targets.filter((t): t is Channel => t !== 'HEADLINE')
+}
+
+// Settle the PENDING rows (all of the draft's, or only `channels`) per
+// settleCaptionRow. Each write is guarded on PENDING, so a row an edit or a
+// newer write already settled is left alone, and a deleted draft is a no-op.
+async function settlePendingRows(
+  tx: Prisma.TransactionClient,
+  draftId: string,
+  channels: Channel[] | null,
+  fieldFor: (channel: Channel) => FieldResult,
+): Promise<void> {
+  const rows = await tx.draftCaption.findMany({
+    where: { draftId, status: 'PENDING', ...(channels ? { channel: { in: channels } } : {}) },
+    select: { channel: true, text: true },
+  })
+  for (const row of rows) {
+    await tx.draftCaption.updateMany({
+      where: { draftId, channel: row.channel, status: 'PENDING' },
+      data: settleCaptionRow(row, fieldFor(row.channel)),
+    })
+  }
+}
+
+// A caption action's write (FR-11, design §5): each target row per its field
+// result, and the headline when it was requested and validated, in one
+// transaction. The headline write is guarded on the caption claim, so a run the
+// stale sweep already cleared cannot overwrite it late. A failed headline
+// leaves the column unchanged; the caller reports it.
+export async function settleCaptionAction(
+  draftId: string,
+  targets: readonly CaptionTarget[],
+  fields: Partial<Record<CaptionTarget, FieldResult>>,
+  db: PrismaClient = prisma,
+): Promise<void> {
+  const headline = targets.includes('HEADLINE') ? fields.HEADLINE : undefined
+  await db.$transaction(async (tx) => {
+    await settlePendingRows(tx, draftId, targetChannels(targets), (channel) => fields[channel] ?? { ok: false, reason: 'missing' })
+    if (headline?.ok) {
+      await tx.draft.updateMany({
+        where: { id: draftId, pendingAction: 'REGENERATE_COPY' },
+        data: { headline: headline.text },
+      })
+    }
+  })
+}
+
+// The stale sweep's caption half (FR-11): an interrupted generation or caption
+// action leaves rows PENDING with nothing writing them. They settle as a failed
+// write with the sweep's reason, keeping any text they had (A7).
+export async function settlePendingCaptions(
+  draftId: string,
+  reason: string,
+  db: PrismaClient = prisma,
+): Promise<void> {
+  await db.$transaction((tx) => settlePendingRows(tx, draftId, null, () => ({ ok: false, reason })))
+}
+
+// A user's edit to one caption (FR-12): stored exactly as typed, READY, the
+// failure and review flags cleared. Refused (false) while the row is PENDING,
+// so an edit never races the write that claimed it.
+export async function saveCaptionEdit(
+  draftId: string,
+  channel: Channel,
+  text: string,
+  db: PrismaClient = prisma,
+): Promise<boolean> {
+  const { count } = await db.draftCaption.updateMany({
+    where: { draftId, channel, status: { not: 'PENDING' } },
+    data: { text, status: 'READY', failureReason: null, needsReview: false },
+  })
+  return count === 1
+}
+
+// A user's edit to the headline (FR-12). Refused (false) while a caption
+// action holds the draft or a generation is running, since either may be
+// writing the headline.
+export async function saveHeadlineEdit(
+  draftId: string,
+  headline: string,
+  db: PrismaClient = prisma,
+): Promise<boolean> {
+  const { count } = await db.draft.updateMany({
+    where: {
+      id: draftId,
+      status: { not: 'IN_PROGRESS' },
+      OR: [{ pendingAction: null }, { pendingAction: { not: 'REGENERATE_COPY' } }],
+    },
+    data: { headline },
+  })
+  return count === 1
 }

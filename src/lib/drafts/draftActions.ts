@@ -109,21 +109,29 @@ export type DraftActionCompletion = 'not-applied'
 // releases clean (completeDraftAction), a 'not-applied' completion releases
 // clean but keeps the outcome it recorded, a throw releases with the error
 // message. The work closure must NOT call releaseDraftAction itself.
+//
+// `onError` (optional) runs on a throw BEFORE the release, while the claim is
+// still held — a caption action uses it to settle the rows it marked PENDING
+// (012 design §5). Its own failure is logged and never skips the release.
 export async function startDraftAction(
   draftId: string,
   userId: string,
   teamId: string,
   action: DraftAction,
-  work: () => Promise<void | DraftActionCompletion>
+  work: () => Promise<void | DraftActionCompletion>,
+  onError?: (err: unknown) => Promise<void>,
 ): Promise<void> {
   const auth = await resolveClaudeAuth(userId, teamId)
   void runWithClaudeAuth(auth, work)
     .then((completion) => (completion === 'not-applied' ? releaseDraftAction(draftId, action) : completeDraftAction(draftId, action)))
-    .catch((err) => {
+    .catch(async (err) => {
       // Logged as well as recorded: the next run to settle overwrites
       // pendingActionError, so without this a crashed run can vanish without
       // trace.
       console.error(`[draft-action] draft ${draftId} failed:`, err)
+      if (onError) {
+        await onError(err).catch((e) => console.error(`[draft-action] onError for draft ${draftId} failed:`, e))
+      }
       return releaseDraftAction(draftId, action, err instanceof Error ? err.message : String(err))
     })
     // Belt-and-braces: a release failure (e.g. DB down) must not become an

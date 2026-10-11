@@ -113,9 +113,3 @@ export function channelLabel(value: string): string {
   const normalized = value.toUpperCase() as Channel
   return CHANNEL_LABELS[normalized] ?? value
 }
-
-// Last consumer is CopyEditor; removed with it (012 T6).
-export function channelCopyLimit(value: string): number | undefined {
-  const normalized = value.toUpperCase() as Channel
-  return CHANNEL_CAPTION_LIMITS[normalized]
-}

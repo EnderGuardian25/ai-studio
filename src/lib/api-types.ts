@@ -250,10 +250,25 @@ export interface DraftNotApplied {
 // server-side pendingHtml. `notApplied` is a SEPARATE outcome channel (FR-14)
 // — distinct from both a settled success and `pendingActionError` (a crashed
 // run): it means the run completed cleanly but the edit itself was rejected.
+// One channel's caption (012 FR-13). `failureReason` is set when the last write
+// failed, including a failed regenerate that kept good text READY (A7).
+export interface DraftCaptionDetail {
+  channel: Channel
+  text: string
+  status: 'PENDING' | 'READY' | 'FAILED'
+  failureReason: string | null
+  needsReview: boolean
+  updatedAt: string
+}
+
 export interface DraftDetail {
   id: string
   briefId: string
-  copyText: string
+  // The on-image headline; null only on a draft migrated from the single caption.
+  headline: string | null
+  captionMigration: 'SPLIT' | 'UNSPLIT_FALLBACK' | 'EMPTY' | null
+  // Always one per registry channel, in registry order.
+  captions: DraftCaptionDetail[]
   imageUrl: string | null
   htmlContent: string | null
   exportUrl: string | null
