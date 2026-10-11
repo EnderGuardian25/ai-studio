@@ -216,7 +216,7 @@ Waves 2 and 3 add UX and wording only.
     - **Notices use `Notice`** with the tones in spec FR-19. The review notice carries `role="status"`.
     - **Counter wording is exact:** `1,234 / 2,200 (Instagram)` and `412 / 1,000 guide`. The warning colours are the existing `--status-scheduled` and `--status-failed` tokens, already checked by `contrast.test.ts`.
 
-- [ ] `T13` — Wave-2 E2E: the panel cases (wave-2 gate)
+- [x] `T13` — Wave-2 E2E: the panel cases (wave-2 gate)
   - Files: `tests/e2e/captions.test.ts`
   - Estimate: medium
   - Kind: test

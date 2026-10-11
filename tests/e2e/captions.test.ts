@@ -1,4 +1,4 @@
-import { test, expect, type Locator } from '@playwright/test'
+import { test, expect, type Locator, type Page } from '@playwright/test'
 import { createHash } from 'node:crypto'
 import { spawnSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
@@ -9,7 +9,7 @@ import { prisma, dbAvailable, readEnvTest, makeLegacyDraft } from '../helpers/db
 import { ADMIN_EMAIL, ADMIN_PASSWORD, pageLogin } from '../helpers/ui'
 
 // §W — Per-channel captions (change 012, wave 1: AC-12 → AC-20, AC-22, AC-23,
-// AC-26). Wave 2 (T13) adds AC-21 and AC-24 here.
+// AC-26; wave 2, T13: AC-21 and AC-24, at the end of this file).
 //
 // Contract (spec FR-08 → FR-17):
 //   GET /api/drafts/[id] → headline, captionMigration, captions[] (one per
@@ -721,5 +721,267 @@ test.describe('§W — captions on the ACP surface', () => {
     expect(pub.status()).toBe(400)
     expect((await pub.json()).error).toBeTruthy()
     expect(await prisma!.post.count({ where: { draftId: output.draftId } })).toBe(0)
+  })
+})
+
+// ── Wave 2 (T13): AC-21 (Regenerate all, the headline) and AC-24 (the panels) ─
+
+const REVIEW_NOTICE =
+  "Migrated from the old single caption, which wasn't split by channel. Review this caption before publishing it."
+const LABELS = { INSTAGRAM: 'Instagram', LINKEDIN: 'LinkedIn', WHATSAPP: 'WhatsApp' } as const
+const n = (x: number) => x.toLocaleString('en-US')
+const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+const startsWith = (s: string) => new RegExp(`^${escapeRe(s)}`)
+const mentions = (s: string) => new RegExp(escapeRe(s))
+
+// 014's AC-19 axe rules (a11y.test.ts, T18), run here over the draft page in
+// the caption states 014's own scan never sees: notices, warnings, a FAILED row
+// (NFR-07). The list is copied, not imported: importing a spec file would
+// register its tests a second time.
+const AXE_RULES = [
+  'label',
+  'select-name',
+  'aria-input-field-name',
+  'aria-toggle-field-name',
+  'button-name',
+  'link-name',
+  'page-has-heading-one',
+  'scrollable-region-focusable',
+  'target-size',
+  'aria-allowed-attr',
+  'aria-valid-attr-value',
+  'aria-required-attr',
+]
+async function expectNoAxeViolations(page: Page, what: string) {
+  if (!(await page.evaluate(() => 'axe' in window))) {
+    await page.addScriptTag({ path: require.resolve('axe-core/axe.min.js') })
+  }
+  const violations = await page.evaluate(async (rules) => {
+    const { axe } = window as unknown as { axe: typeof import('axe-core') }
+    const result = await axe.run(document, { runOnly: { type: 'rule', values: rules } })
+    return result.violations.flatMap((v) => v.nodes.map((node) => `${v.id}: ${node.target.join(' ')}`))
+  }, AXE_RULES)
+  expect(violations, `axe (014 AC-19) on ${what}`).toEqual([])
+}
+
+test.describe('§W — wave 2: Regenerate all, the headline and the caption panels', () => {
+  let api: ApiClient
+  test.beforeEach(async ({ request }) => {
+    api = await loginAs(request, ADMIN_EMAIL, ADMIN_PASSWORD)
+  })
+  test.afterEach(async () => {
+    await api.dispose()
+  })
+
+  const openDraft = async (page: Page, id: unknown) => {
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await pageLogin(page)
+    await page.goto(`/drafts/${id}`)
+    await expect(page.getByRole('button', { name: 'View full screen', exact: true })).toBeVisible({ timeout: 20_000 })
+  }
+  const field = (page: Page, channel: Caption['channel']) =>
+    page.getByRole('textbox', { name: LABELS[channel], exact: true })
+  const read = async (id: unknown) => (await api.get(`/api/drafts/${id}`)).json()
+
+  // TC-CAP-15 — AC-21 (FR-11): {} regenerates the three captions, never the
+  // headline or the design.
+  test('Regenerate all rewrites the three captions and leaves the headline and the revision alone', async () => {
+    if (!MOCKED()) { test.skip(); return }
+    const topic = `Cap Regen All ${Date.now()}`
+    const draft = await exportedDraft(api, topic)
+    const before = captionsOf(draft)
+    // A hand-set headline: the mock headline is the same on every run, so only
+    // a value the mock would never produce can show it was left alone.
+    const handHeadline = `Hand headline ${Date.now()}`
+    expect((await api.patch(`/api/drafts/${draft.id}`, { headline: handHeadline })).status()).toBe(200)
+
+    const res = await api.post(`/api/drafts/${draft.id}/regenerate-copy`, {})
+    expect(res.status()).toBe(202)
+    const done = await waitForAction(api, draft.id as string)
+    expect(done.pendingActionError).toBeNull()
+
+    const after = captionsOf(done)
+    expect(after.map((c) => c.channel)).toEqual(['INSTAGRAM', 'LINKEDIN', 'WHATSAPP'])
+    for (const c of after) {
+      const was = before.find((b) => b.channel === c.channel)!
+      expect(c.status, c.channel).toBe('READY')
+      expect(c.failureReason, c.channel).toBeNull()
+      expect(c.text, c.channel).toContain(topic)
+      expect(Date.parse(c.updatedAt), `${c.channel} updatedAt moved`).toBeGreaterThan(Date.parse(was.updatedAt))
+    }
+    expect(done.headline).toBe(handHeadline)
+    expect(done.currentRevisionNumber).toBe(draft.currentRevisionNumber)
+  })
+
+  // TC-CAP-16 — AC-21 (FR-11): {headline:true} sets the headline and touches
+  // no caption. A migrated draft starts with no headline, so "set" is visible.
+  test('a headline-only regenerate sets the headline and leaves every caption row unchanged', async () => {
+    if (!MOCKED()) { test.skip(); return }
+    test.skip(!dbAvailable, 'requires test DB access')
+    const topic = `Cap Regen HL ${Date.now()}`
+    const draft = await exportedDraft(api, topic)
+    await makeLegacyDraft(draft.id as string, SPLIT_LEGACY)
+    const migrated = await read(draft.id)
+    expect(migrated.headline).toBeNull()
+
+    const res = await api.post(`/api/drafts/${draft.id}/regenerate-copy`, { headline: true })
+    expect(res.status()).toBe(202)
+    const done = await waitForAction(api, draft.id as string)
+    expect(done.pendingActionError).toBeNull()
+
+    expect(done.headline).toBe(`Mock headline ${topic}`)
+    expect(done.captions).toEqual(migrated.captions) // text, status, updatedAt: every field
+    expect(done.currentRevisionNumber).toBe(migrated.currentRevisionNumber)
+  })
+
+  // TC-CAP-17 — AC-24 (FR-18, FR-19): the desk's structure, names, counters
+  // and limit warnings; neither warning blocks the save.
+  test('the caption desk: headings, names, counters, the WhatsApp guide and the Instagram limit', async ({ page }) => {
+    if (!MOCKED()) { test.skip(); return }
+    const draft = await exportedDraft(api, `Cap Panels ${Date.now()}`)
+    await openDraft(page, draft.id)
+
+    // "Captions" (h2), then the h3s, in registry order.
+    const desk = page
+      .locator('section')
+      .filter({ has: page.getByRole('heading', { name: 'Captions', level: 2, exact: true }) })
+      .last()
+    await expect(desk.getByRole('heading', { level: 3 })).toHaveText(['Headline', 'Instagram', 'LinkedIn', 'WhatsApp'])
+    await expect(desk.getByRole('textbox', { name: 'Headline', exact: true })).toHaveCount(1)
+
+    // Each caption textarea is named by its own h3, and its counter is exact.
+    const counters = {
+      INSTAGRAM: (len: number) => `${n(len)} / 2,200 (Instagram)`,
+      LINKEDIN: (len: number) => `${n(len)} / 3,000 (LinkedIn)`,
+      WHATSAPP: (len: number) => `${n(len)} / 1,000 guide`,
+    }
+    for (const c of captionsOf(draft)) {
+      const box = desk.getByRole('textbox', { name: LABELS[c.channel], exact: true })
+      await expect(box).toHaveJSProperty('tagName', 'TEXTAREA')
+      const heading = page.locator(`[id="${await box.getAttribute('aria-labelledby')}"]`)
+      await expect(heading).toHaveJSProperty('tagName', 'H3')
+      await expect(heading).toHaveText(LABELS[c.channel])
+      await expect(box).toHaveValue(c.text)
+      await expect(desk.getByText(counters[c.channel](c.text.length), { exact: true })).toBeVisible()
+    }
+
+    // WhatsApp past the 1,000 guide: a warning, and the blur still saves.
+    const longWa = 'w'.repeat(1001)
+    await field(page, 'WHATSAPP').fill(longWa)
+    await expect(desk.getByText('1,001 / 1,000 guide', { exact: true })).toBeVisible()
+    await expect(desk.getByText('Longer than the 1,000-character guide', { exact: true })).toBeVisible()
+    await field(page, 'WHATSAPP').blur()
+    await expect.poll(async () => captionOf(await read(draft.id), 'WHATSAPP').text).toBe(longWa)
+
+    // Instagram past its hard 2,200: "Over the Instagram limit", still saved.
+    const longIg = 'i'.repeat(2201)
+    await field(page, 'INSTAGRAM').fill(longIg)
+    await expect(desk.getByText('2,201 / 2,200 (Instagram)', { exact: true })).toBeVisible()
+    await expect(desk.getByText('Over the Instagram limit', { exact: true })).toBeVisible()
+    await field(page, 'INSTAGRAM').blur()
+    await expect.poll(async () => captionOf(await read(draft.id), 'INSTAGRAM').text).toBe(longIg)
+    // Only the channel past its limit warns.
+    await expect(desk.getByText(/^Over the .* limit$/)).toHaveCount(1)
+
+    await expectNoAxeViolations(page, '/drafts/[id] with the guide and limit warnings showing')
+  })
+
+  // TC-CAP-18 — AC-24 (FR-19): Copy caption, and a per-panel Undo.
+  test('Copy LinkedIn caption fills the clipboard, and Undo after a WhatsApp regenerate restores only WhatsApp', async ({ page }) => {
+    if (!MOCKED()) { test.skip(); return }
+    await page.context().grantPermissions(['clipboard-read', 'clipboard-write'])
+    const topic = `Cap Copy Undo ${Date.now()}`
+    const draft = await exportedDraft(api, topic)
+    await openDraft(page, draft.id)
+
+    // Copy: the clipboard holds exactly the LinkedIn text.
+    const liText = captionOf(draft, 'LINKEDIN').text
+    await page.getByRole('button', { name: 'Copy LinkedIn caption', exact: true }).click()
+    await expect(page.getByText('Caption copied', { exact: true })).toBeVisible()
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(liText)
+
+    // A hand edit, so the regenerate (which writes the mock text) is visible.
+    const handWa = 'A hand-written WhatsApp caption.'
+    await field(page, 'WHATSAPP').fill(handWa)
+    await field(page, 'WHATSAPP').blur()
+    await expect.poll(async () => captionOf(await read(draft.id), 'WHATSAPP').text).toBe(handWa)
+    const beforeRegen = await read(draft.id)
+
+    await page.getByRole('button', { name: 'Regenerate WhatsApp caption', exact: true }).click()
+    await expect(field(page, 'WHATSAPP')).toHaveValue(`Mock *WhatsApp* caption [${topic}]`, { timeout: 20_000 })
+    const undo = page.getByRole('button', { name: 'Undo WhatsApp caption', exact: true })
+    await expect(undo).toBeEnabled({ timeout: 20_000 })
+    // Only the regenerated panel has an Undo.
+    await expect(page.getByRole('button', { name: /^Undo (Instagram|LinkedIn) caption$/ })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Undo headline', exact: true })).toHaveCount(0)
+
+    await undo.click()
+    await expect(field(page, 'WHATSAPP')).toHaveValue(handWa)
+    await expect(undo).toHaveCount(0)
+    const after = await read(draft.id)
+    expect(captionOf(after, 'WHATSAPP').text).toBe(handWa)
+    // Instagram and LinkedIn were never written: same text, same updatedAt.
+    for (const channel of ['INSTAGRAM', 'LINKEDIN'] as const) {
+      expect(captionOf(after, channel)).toEqual(captionOf(beforeRegen, channel))
+    }
+    expect(after.headline).toBe(beforeRegen.headline)
+    await expect(field(page, 'INSTAGRAM')).toHaveValue(captionOf(beforeRegen, 'INSTAGRAM').text)
+    await expect(field(page, 'LINKEDIN')).toHaveValue(liText)
+  })
+
+  // TC-CAP-19 — AC-24 (FR-19): the review notice on a migrated fallback draft.
+  // T12 review R1: the notice goes only once the panel's caption prop
+  // refreshes after the blur-save, so this asserts it on the same page, with
+  // no reload.
+  test('a header-less migrated draft shows the review notice on Instagram and LinkedIn, and editing Instagram clears only its own', async ({ page }) => {
+    if (!MOCKED()) { test.skip(); return }
+    test.skip(!dbAvailable, 'requires test DB access')
+    const draft = await exportedDraft(api, `Cap Review ${Date.now()}`)
+    await makeLegacyDraft(draft.id as string, FALLBACK_LEGACY)
+    await openDraft(page, draft.id) // the page's GET migrates it: UNSPLIT_FALLBACK
+
+    const notices = page.getByRole('status').filter({ hasText: REVIEW_NOTICE })
+    await expect(notices).toHaveCount(2)
+    await expect(field(page, 'INSTAGRAM')).toHaveAccessibleDescription(startsWith(REVIEW_NOTICE))
+    await expect(field(page, 'LINKEDIN')).toHaveAccessibleDescription(startsWith(REVIEW_NOTICE))
+    await expect(field(page, 'WHATSAPP')).not.toHaveAccessibleDescription(mentions(REVIEW_NOTICE))
+    await expectNoAxeViolations(page, '/drafts/[id] with the review notices showing')
+
+    await field(page, 'INSTAGRAM').fill('Reviewed for Instagram.')
+    await field(page, 'INSTAGRAM').blur()
+    await expect(notices).toHaveCount(1)
+    await expect(field(page, 'INSTAGRAM')).not.toHaveAccessibleDescription(mentions(REVIEW_NOTICE))
+    await expect(field(page, 'LINKEDIN')).toHaveAccessibleDescription(startsWith(REVIEW_NOTICE))
+
+    const after = await read(draft.id)
+    expect(captionOf(after, 'INSTAGRAM')).toMatchObject({ text: 'Reviewed for Instagram.', needsReview: false })
+    expect(captionOf(after, 'LINKEDIN')).toMatchObject({ text: FALLBACK_LEGACY, needsReview: true })
+  })
+
+  // TC-CAP-20 — AC-24 (FR-19): a FAILED row shows its error notice and Generate.
+  test('a FAILED LinkedIn row shows the error notice and a Generate button that fills it', async ({ page }) => {
+    if (!MOCKED()) { test.skip(); return }
+    const topic = `Cap Failed Panel __DROP_CAPTION_LINKEDIN__ ${Date.now()}`
+    const draft = await exportedDraft(api, topic)
+    const li = captionOf(draft, 'LINKEDIN')
+    expect(li.status).toBe('FAILED')
+    await openDraft(page, draft.id)
+
+    const failed = `The LinkedIn caption failed to generate (${li.failureReason}).`
+    await expect(page.getByText(failed, { exact: false })).toBeVisible()
+    await expect(field(page, 'LINKEDIN')).toHaveValue('')
+    await expect(field(page, 'LINKEDIN')).toBeEditable()
+    await expect(field(page, 'LINKEDIN')).toHaveAccessibleDescription(startsWith(failed))
+    const generate = page.getByRole('button', { name: 'Generate LinkedIn caption', exact: true })
+    await expect(generate).toHaveText('Generate')
+    await expect(generate).toBeEnabled()
+    // The READY panels keep "Regenerate".
+    await expect(page.getByRole('button', { name: 'Regenerate Instagram caption', exact: true })).toBeVisible()
+    await expectNoAxeViolations(page, '/drafts/[id] with a FAILED caption')
+
+    await generate.click()
+    await expect(field(page, 'LINKEDIN')).toHaveValue(`Mock LinkedIn caption [${topic}]`, { timeout: 20_000 })
+    await expect(page.getByText(failed, { exact: false })).toHaveCount(0)
+    expect(captionOf(await read(draft.id), 'LINKEDIN').status).toBe('READY')
   })
 })
