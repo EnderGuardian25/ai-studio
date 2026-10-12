@@ -12,3 +12,4 @@
 {"ev":"start","span":"W2","kind":"wave","label":"wave 2","at":"2026-10-12T02:19:57Z","ts":1791771597}
 {"ev":"stop","span":"T3","at":"2026-10-12T02:29:28Z","ts":1791772168,"status":"ok"}
 {"ev":"stop","span":"W2","at":"2026-10-12T02:29:28Z","ts":1791772168,"status":"ok"}
+{"ev":"start","span":"verify-1791772245","kind":"phase","label":"verify","at":"2026-10-12T02:30:45Z","ts":1791772245}
