@@ -84,7 +84,7 @@ The fix makes both settles state-based. The proposal holds the full investigatio
 
 ## Edge Cases
 
-- **Refetch failure.** If the awaited post-202 refetch itself fails, the settle is still armed, and the next 4 s poll resolves the row. That poll runs only while `pendingAction` is non-null, so if the first successful fetch already shows `null`, the effect resolves on that state.
+- **Refetch failure.** `fetchDraft` never rejects. If the request fails, it sets the page's `error` and the page swaps to its error view (`page.tsx:218`), which unmounts the panel. The panel is therefore never left armed against stale state. Arming straight after the awaited refetch is safe on every path. (Corrected during T2, which read the code; the planned wording assumed the next poll would resolve the row.)
 - **Override and "Use anyway"** are synchronous and do not use the resolution path. They stay unchanged.
 - **Two refines in a row.** The input is disabled until the first resolves (`awaitingResolution`), so there is never more than one pending resolution. That is unchanged.
 - **The caption/headline undo-clear edge, out of scope.** A regenerate that fails faster than the refetch leaves an Undo that restores identical text. This is harmless, so it is logged as a follow-up rather than fixed here. The fix there would need the same "armed after the awaited refetch" flag inside `CaptionPanels`.

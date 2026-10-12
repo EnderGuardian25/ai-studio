@@ -30,7 +30,7 @@ import { EYEBROW, FOCUS, ICON, SMALL_CAPS, SUB_HEAD } from '@/components/ui/foli
 import { apiFetch } from '@/lib/apiFetch'
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser'
 import { useUndoableAction } from '@/lib/hooks/useUndoableAction'
-import type { DraftAction, DraftDetail } from '@/lib/api-types'
+import type { DraftDetail } from '@/lib/api-types'
 import { ASPECT_LABELS, aspectClassFor, dimensionsFor } from '@/lib/aspectRatio'
 import { channelLabel } from '@/lib/channels'
 import { formatDateTime } from '@/lib/format'
@@ -119,16 +119,20 @@ export default function DraftDetailPage() {
     return () => clearInterval(timer)
   }, [draft?.status, draft?.pendingAction, fetchDraft])
 
-  // When a background action completes (pendingAction non-null → null) it may
-  // have created a new revision — refresh the revision list.
-  const prevPendingActionRef = useRef<DraftAction | null>(null)
+  // The revision list follows the draft: whenever the current revision is not
+  // in the loaded list (a background refine or regenerate created it),
+  // refetch the list. State, not a pendingAction non-null → null edge — an
+  // action that finishes before its post-202 refetch is served is never seen
+  // running, so that edge never comes (change 015). One request per missing
+  // number, so a list that still lacks it can't loop.
+  const requestedRevisionRef = useRef<number | null>(null)
   useEffect(() => {
-    const prev = prevPendingActionRef.current
-    prevPendingActionRef.current = draft?.pendingAction ?? null
-    if (prev != null && draft?.pendingAction == null) {
-      fetchRevisions()
-    }
-  }, [draft?.pendingAction, fetchRevisions])
+    const current = draft?.currentRevisionNumber
+    if (current == null || revisions.some((r) => r.revisionNumber === current)) return
+    if (requestedRevisionRef.current === current) return
+    requestedRevisionRef.current = current
+    fetchRevisions()
+  }, [draft?.currentRevisionNumber, revisions, fetchRevisions])
 
   function refreshAfterChange() {
     fetchDraft()

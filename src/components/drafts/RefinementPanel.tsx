@@ -62,8 +62,9 @@ export interface RefinementPanelProps {
   notApplied: DraftNotApplied | null
   currentRevisionNumber: number | null
   /** Called right after an async action is accepted (202) so the parent can
-   *  refetch the draft and start polling `pendingAction`. */
-  onActionStarted: () => void
+   *  refetch the draft and start polling `pendingAction`. Awaited: the row
+   *  settles only on state read after this refetch (change 015). */
+  onActionStarted: () => void | Promise<unknown>
   onRefined: () => void
 }
 
@@ -91,22 +92,26 @@ export function RefinementPanel({
   const [adopting, setAdopting] = useState(false)
   const [conflictCard, setConflictCard] = useState<ConflictState | null>(null)
   const resolutionRef = useRef<PendingResolution | null>(null)
-  const prevActionRef = useRef<DraftAction | null>(pendingAction)
+  // Set once the post-202 refetch has landed: from then on the polled props
+  // describe this refine, never the state from before it was sent.
+  const [settleArmed, setSettleArmed] = useState(false)
   const listRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: 'smooth' })
   }, [messages])
 
-  // Resolve the pending chat message when the polled pendingAction transitions
-  // REFINE → null: a NEW conflict (different id than at send) → conflict card;
-  // an action error → error; a moved revision pointer → applied.
+  // Resolve the pending chat message once the post-202 refetch has landed and
+  // the polled pendingAction is null: a NEW conflict (different id than at
+  // send) → conflict card; an action error → error; a moved revision pointer →
+  // applied. This settles on state, not on an observed REFINE → null edge: a
+  // refine that finishes before the refetch is served is never seen running,
+  // and the edge never comes (change 015).
   useEffect(() => {
-    const prev = prevActionRef.current
-    prevActionRef.current = pendingAction
     const res = resolutionRef.current
-    if (!res || prev !== 'REFINE' || pendingAction !== null) return
+    if (!res || !settleArmed || pendingAction !== null) return
     resolutionRef.current = null
+    setSettleArmed(false)
     const setStatus = (status: RefineMessage['status'], detail?: string) =>
       setMessages((msgs) => msgs.map((m) => (m.id === res.msgId ? { ...m, status, detail } : m)))
     if (conflict && conflict.conflictId !== res.conflictIdAtSend) {
@@ -129,7 +134,7 @@ export function RefinementPanel({
       // spinning forever.
       setStatus('error', 'The refinement finished without producing a new revision.')
     }
-  }, [pendingAction, pendingActionError, conflict, notApplied, currentRevisionNumber, onRefined])
+  }, [settleArmed, pendingAction, pendingActionError, conflict, notApplied, currentRevisionNumber, onRefined])
 
   async function send(instruction: string, overrideConflictId?: string) {
     if (!instruction.trim() && !overrideConflictId) return
@@ -164,9 +169,11 @@ export function RefinementPanel({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ instruction }),
         })
-        // Refetch immediately so the parent picks up pendingAction and polls;
-        // the message stays 'pending' until the resolution effect fires.
-        onActionStarted()
+        // Refetch so the parent picks up pendingAction and polls; the message
+        // stays 'pending' until the resolution effect settles it. The refetch
+        // never throws: on failure the page swaps to its error view.
+        await onActionStarted()
+        setSettleArmed(true)
       }
     } catch (e: unknown) {
       resolutionRef.current = null

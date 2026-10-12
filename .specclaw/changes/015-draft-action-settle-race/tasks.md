@@ -27,7 +27,7 @@ Each task is implemented by a subagent, reviewed by `specclaw:code-reviewer`, an
     - **Cases:** two, one for refine and one for Regenerate design. Assert the AC-01 and AC-02 outcomes, and assert that the delay actually happened (`expect(delayed).toBe(true)`).
     - **Run against the unfixed code:** both cases must FAIL, for the stated cause. Record the failure lines in the report.
 
-- [ ] `T2` — Settle on state: RefinementPanel and the revision list
+- [x] `T2` — Settle on state: RefinementPanel and the revision list
   - Files: `src/components/drafts/RefinementPanel.tsx`, `src/app/(app)/drafts/[id]/page.tsx`
   - Estimate: small
   - Kind: impl
