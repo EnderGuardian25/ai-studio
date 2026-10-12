@@ -1,7 +1,7 @@
 # bistec-studio roadmap — changes 004–012
 
 **Updated:** 2026-09-23 · **Branch:** all of this lands on `v2` (see Branching at the bottom); handoff in `docs/handoff.md` top section.
-**Status (2026-10-11, later):** **004**, **005**, **011**, **013** (fork CI, checks only) and **014** (UI accessibility, shared primitives and consistency) are verified PASS. **012** (per-channel captions) is **built, 16/16**, on `v2` and pushed; **`/specclaw:verify` is next**. **012 → 010 stays a hard dependency:** 010 consumes the `DraftCaption` WhatsApp row. **006–010** are proposals. Handoff: `docs/handoff.md` top section.
+**Status (2026-10-11, later):** **004**, **005**, **011**, **013** (fork CI, checks only) and **014** (UI accessibility, shared primitives and consistency) are verified PASS. **012** (per-channel captions) is **built, 16/16, and verified PASS** (2026-10-12) on `v2`. **012 → 010 stays a hard dependency:** 010 consumes the `DraftCaption` WhatsApp row. **006–010** are proposals. Handoff: `docs/handoff.md` top section.
 
 **(Superseded) Status (2026-10-11, earlier):** 004, 005, 011, 013 and 014 verified PASS; 012 building, T1–T7 of 16 committed.
 
@@ -21,7 +21,7 @@ This file sequences the open changes. Each change's own `proposal.md` is the sou
 | 009 | [Hero imagery](changes/009-hero-image-design/)                                    | Image model makes the hero subject, not wallpaper; layout archetypes; reference images      | large        | 📋 proposal (new)                          |
 | 010 | [WhatsApp Channel posting](changes/010-whatsapp-channel-posting/)                 | WhatsApp as a channel, with assisted handoff (Meta has no official Channel posting API)     | medium       | 📋 proposal (new)                          |
 | 011 | [App visual redesign](changes/011-app-visual-redesign/)                           | New visual direction; opaque surfaces; floating bottom-right **Create post** button         | large        | 🔨 wave 1 built (T1–T2) — awaiting pick    |
-| 012 | [Per-channel captions](changes/012-per-channel-captions/)                         | Instagram / LinkedIn / WhatsApp captions, each published to its own channel; copy → caption | medium       | ✅ built 16/16 — verify next               |
+| 012 | [Per-channel captions](changes/012-per-channel-captions/)                         | Instagram / LinkedIn / WhatsApp captions, each published to its own channel; copy → caption | medium       | ✅ verified PASS (28/28)                   |
 
 ## Hard dependencies
 

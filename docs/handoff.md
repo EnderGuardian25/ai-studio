@@ -1,13 +1,13 @@
 # bistec-studio — Session Handoff
 
-**Date:** 2026-10-11, later (latest: **012 per-channel captions BUILT 16/16 and pushed; next is `/specclaw:verify 012-per-channel-captions`; fork CI on `v2` is red since 014 wave 1**). Previous: 2026-10-11, earlier (013 and 014 verified PASS; 012 building, T1–T7 of 16 committed). Previous: 2026-10-09 (011 verified PASS; fork `main` merged into `v2`; 013 fork CI, checks only, building; 014 and 012 approved). Previous: 2026-10-08 (011 built 13/13 on `v2` in the fork). Previous: 2026-10-07 (005 verified PASS; 011 planned, wave 1 built; the move to the fork). Previous: 2026-10-03 (004 finished and verified PARTIAL, Phase 0 only; 005 built 9/10, waiting on one operator check). Before that: 2026-09-28 (build session — 004 Waves 1–3 built, MinIO → silo, PR #42 + draft PR #43). Before that: 2026-09-23 (later, later the same day: proposal **012** per-channel captions + copy→caption rename, a floating **Create post** button folded into 011, and a launch-video legibility pass. Before that: planning session — proposals 008–011 + roadmap, 004 re-planned to 24 tasks incl. Phase 0, and the deploy pipeline found broken: Coolify 401 since 2026-09-15). Previous: 2026-07-28 (copy-edit status clobber fix).
+**Date:** 2026-10-11, later (latest: **012 per-channel captions BUILT 16/16 and VERIFIED PASS (2026-10-12); fork CI on `v2` is red since 014 wave 1**). Previous: 2026-10-11, earlier (013 and 014 verified PASS; 012 building, T1–T7 of 16 committed). Previous: 2026-10-09 (011 verified PASS; fork `main` merged into `v2`; 013 fork CI, checks only, building; 014 and 012 approved). Previous: 2026-10-08 (011 built 13/13 on `v2` in the fork). Previous: 2026-10-07 (005 verified PASS; 011 planned, wave 1 built; the move to the fork). Previous: 2026-10-03 (004 finished and verified PARTIAL, Phase 0 only; 005 built 9/10, waiting on one operator check). Before that: 2026-09-28 (build session — 004 Waves 1–3 built, MinIO → silo, PR #42 + draft PR #43). Before that: 2026-09-23 (later, later the same day: proposal **012** per-channel captions + copy→caption rename, a floating **Create post** button folded into 011, and a launch-video legibility pass. Before that: planning session — proposals 008–011 + roadmap, 004 re-planned to 24 tasks incl. Phase 0, and the deploy pipeline found broken: Coolify 401 since 2026-09-15). Previous: 2026-07-28 (copy-edit status clobber fix).
 **Repo (since 2026-10-07):** https://github.com/EnderGuardian25/ai-studio — a public GitHub **fork** of the company repo `bistec-oss/studio`. All development continues here. The company repo is left as it is and receives nothing from this work. See the 2026-10-07 fork section below.
 **Branch:** work continues on **`v2`**, the fork's default branch. Fork `main` = `671ad6e9`, the company `main` at fork time. `v2` has contained fork `main` since the merge at `2506de0b` (2026-10-09).
 **Production:** none for the fork. `https://studio.bistecglobal.com` is the **company's** prod. It runs company `main` and is not ours to deploy.
 
 ---
 
-## ⏸️ 2026-10-11 (later) — PICK UP HERE: 012 is BUILT 16/16 and pushed; verify next; fork CI on `v2` is red
+## ⏸️ 2026-10-11 (later) — PICK UP HERE: 012 is BUILT 16/16 and VERIFIED PASS (2026-10-12); fork CI on `v2` is red
 
 **012 per-channel captions is built: 16 of 16 tasks, all on `origin/v2`.** The next step is **`/specclaw:verify 012-per-channel-captions`**. Every task has a report and a review in `.specclaw/changes/012-per-channel-captions/reports/` and `reviews/`. The deploy, backfill and rollback steps are in the **012 runbook** section just below.
 
@@ -45,7 +45,7 @@
 
 ### Do this next, in order
 
-1. **`/specclaw:verify 012-per-channel-captions`.** Stop the :3001 server before it: verify runs `npm run build`.
+1. ~~**`/specclaw:verify 012-per-channel-captions`.**~~ **Done 2026-10-12: PASS, 28/28 gating ACs** (`.specclaw/changes/012-per-channel-captions/verify-report.md`). A fresh full mock E2E at HEAD `3d645899` gave 369/3/0/0, unit 2025/2025, lint 0 errors, build, `test:render` 15/15. Gaps noted but not blocking: AC-25 points 2–3 rest on code plus the static guard, not a running test; AC-03 "discarded text logged" is proven in two halves; AC-29 (optional operator live check) not run; the T6 settle-guard WARN was accepted as the per-claim-token follow-up, not fixed. Next: `/specclaw:pr` only if the user wants a PR (`v2` is the integration branch), or go straight to the follow-ups.
 2. **Follow-ups after 012, each its own change:**
    1. **The red-CI refine race,** together with the refine "Applying…" follow-up (`/specclaw:debug`).
    2. **`import-posts.mjs` never sets `teamId`,** so a real import has been broken since team tenancy (2026-07-21); `--dry-run` never calls `create` and hides it (learning L22). Needs a `--team` remap, then a real import into a scratch test DB.

@@ -4,7 +4,7 @@ This repo contains planning documents for **bistec-studio**, an internal marketi
 
 ## ✅ Outstanding work — START HERE (updated 2026-10-11, later)
 
-- **⏸️ 2026-10-11 (later) — PICK UP HERE: 012 (per-channel captions) is BUILT 16/16 on `v2`, all pushed. Next: `/specclaw:verify 012-per-channel-captions`.** Full detail: [`docs/handoff.md`](docs/handoff.md) top section; deploy/backfill/rollback steps in its **012 runbook** section.
+- **⏸️ 2026-10-11 (later) — PICK UP HERE: 012 (per-channel captions) is BUILT 16/16 and VERIFIED PASS (28/28 gating ACs, 2026-10-12), all pushed. Next: the follow-ups below, starting with the red-CI refine race (`/specclaw:debug`).** Verify: [`verify-report.md`](.specclaw/changes/012-per-channel-captions/verify-report.md) — fresh E2E at HEAD 369/3/0/0, unit 2025, `test:render` 15/15. Full detail: [`docs/handoff.md`](docs/handoff.md) top section; deploy/backfill/rollback steps in its **012 runbook** section.
   - **Commits this session:** T8 `1f00261d`, T9 `9cf986eb`, T10 `05e8b021`, T11 `932104ec`, T12 `44b28c83`, T13 `29ed3c8e`, T14 `b522046e`, T15 `c9386ae0`, T16 `1b7186f7`.
   - **Gates** (each a full clean mock E2E after a dropped and recreated test DB): wave 1 **363/3/0/0**, wave 2 **369/3/0/0**, wave 3 **369/3/0/0** (passed/skipped/failed/flaky). Unit **2025**.
   - **User decisions this session:**
@@ -38,7 +38,7 @@ This repo contains planning documents for **bistec-studio**, an internal marketi
     - **T9:** the `legacyCaptionText @map("copyText")` rename.
     - **T10:** the wave-1 E2E and gate. T6 listed the E2E cases it expects to break.
     - **T11–T16:** the panels, then the wording and docs.
-    - Then `/specclaw:verify 012`.
+    - ~~Then `/specclaw:verify 012`.~~ **Done 2026-10-12: PASS.**
   - **Done since 2026-10-09:**
     - **013** fork CI is checks only: `docker-publish.yml` is deleted, Actions are ON, and `v2` CI is green.
     - **004** is PASS.
