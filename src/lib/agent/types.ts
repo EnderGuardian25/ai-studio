@@ -22,11 +22,10 @@ export interface DesignAgentOptions {
   systemPrompt: string
   userMessage: string
   briefId: string
-  model?: string
+  // The model and the loop's wall-clock budget are not options here (008
+  // FR-07, FR-12): each runner takes a required ResolvedModel, and the budget
+  // is that model's surface timeout.
   maxToolCalls?: number
-  // Wall-clock budget for the whole tool-use loop (default 300s, matching the
-  // CLI runner's timeout). Checked before each model turn.
-  deadlineMs?: number
   // Output canvas size. The real (API) path relies on the prompt to instruct the
   // model to call renderHtml with these dimensions; the mock path renders at them
   // directly. Default 1080×1080 keeps existing square behaviour.

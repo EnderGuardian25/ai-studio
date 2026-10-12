@@ -205,7 +205,7 @@ Wave 2 adds per-post and per-chat pickers only.
     - **The OpenAI image provider:** `new OpenAI({ apiKey, timeout: IMAGE_GENERATION_TIMEOUT_MS, maxRetries: 0 })`, with the constant (120,000) exported from `providers/imageCapabilities.ts` and shared with Gemini where it already uses 120 s.
     - **AC-10's order assertions** use the mocked Prisma call log. No timers.
 
-- [ ] `T10` — Close the boundary: `model` required, the old resolvers deleted, the literal guard and the boundary test
+- [x] `T10` — Close the boundary: `model` required, the old resolvers deleted, the literal guard and the boundary test
   - Files: `src/lib/agent/claudeCli.ts`, `src/lib/agent/config.ts`, `src/lib/drafts/refineVerify.ts`, `src/lib/agent/designAgentCli.ts`, `src/lib/agent/designAgent.ts`, `src/lib/agent/types.ts`, `src/lib/drafts/refineAttempt.ts`, `tests/unit/modelLiteralGuard.test.ts` (new), `tests/unit/modelBoundary.test.ts` (new), `tests/unit/claudeCliArgs.test.ts`, `scripts/cli-sandbox-check.mjs`, `tests/unit/visionCli.test.ts`
   - Estimate: medium
   - Kind: refactor

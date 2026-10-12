@@ -36,6 +36,9 @@ process.env.CLAUDE_CLI_DEBUG = '0'
 const { isClaudeUsageLimit, isClaudeAuthFailure, ClaudeCliError, runClaudeCli, runClaudeCliStreamJson } =
   await import('@/lib/agent/claudeCli')
 const { runWithClaudeAuth } = await import('@/lib/agent/claudeAuth')
+const { internalModel } = await import('@/lib/models/resolve')
+// 008 T10: `model` is a required ResolvedModel; these cases are not about the model.
+const MODEL = internalModel('INTERNAL_TOKEN_PING', 'cli')
 
 // A fake value — never a real credential.
 const TOKEN = 'sk-ant-oat01-FAKE-unit-test-token'
@@ -80,7 +83,7 @@ describe('AC-08: isClaudeUsageLimit — true cases', () => {
     h.stdout =
       JSON.stringify({ type: 'result', subtype: 'success', is_error: true, result: 'API Error: 429', api_error_status: 429 }) +
       '\n'
-    const err = await inAuth(() => runClaudeCliStreamJson([{ type: 'text', text: 'hi' }])).catch((e: unknown) => e)
+    const err = await inAuth(() => runClaudeCliStreamJson([{ type: 'text', text: 'hi' }], { model: MODEL })).catch((e: unknown) => e)
     expect(isClaudeUsageLimit(err)).toBe(true)
   })
 })
@@ -96,7 +99,7 @@ describe('AC-08: isClaudeUsageLimit — false cases', () => {
     h.stdout =
       JSON.stringify({ type: 'assistant', message: { content: [{ type: 'text', text: HOSTILE }] } }) + '\n' +
       `not json: ${HOSTILE}\n`
-    const err = await inAuth(() => runClaudeCliStreamJson([{ type: 'text', text: 'hi' }])).catch((e: unknown) => e)
+    const err = await inAuth(() => runClaudeCliStreamJson([{ type: 'text', text: 'hi' }], { model: MODEL })).catch((e: unknown) => e)
     expect(err).toBeInstanceOf(ClaudeCliError)
     // The finalizer keeps model text in the human-only diagnostic…
     expect((err as InstanceType<typeof ClaudeCliError>).diagnostic).toContain('usage limit reached')
@@ -110,7 +113,7 @@ describe('AC-08: isClaudeUsageLimit — false cases', () => {
       JSON.stringify({ type: 'assistant', message: { content: [{ type: 'text', text: HOSTILE }] } }) + '\n' +
       JSON.stringify({ type: 'result', subtype: 'success', is_error: true, result: 'API Error: 529 Overloaded', api_error_status: 529 }) +
       '\n'
-    const err = await inAuth(() => runClaudeCliStreamJson([{ type: 'text', text: 'hi' }])).catch((e: unknown) => e)
+    const err = await inAuth(() => runClaudeCliStreamJson([{ type: 'text', text: 'hi' }], { model: MODEL })).catch((e: unknown) => e)
     expect(isClaudeUsageLimit(err)).toBe(false)
   })
 
@@ -136,7 +139,7 @@ describe('AC-08: isClaudeUsageLimit — false cases', () => {
 
   it('a successful text-mode reply that merely mentions a usage limit is not an error at all', async () => {
     h.stdout = HOSTILE
-    await expect(inAuth(() => runClaudeCli('p'))).resolves.toBe(HOSTILE)
+    await expect(inAuth(() => runClaudeCli('p', { model: MODEL }))).resolves.toBe(HOSTILE)
   })
 
   it.each([

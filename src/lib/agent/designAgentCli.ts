@@ -83,11 +83,9 @@ export async function runDesignAgentCli(options: CliAgentOptions): Promise<Desig
 // missed attempt leaves no orphaned export. runDesignAgentCli above is
 // untouched (AC-20: regenerate-design, generation and Path A use it).
 export async function runDesignAgentCliRefine(
-  options: Pick<CliAgentOptions, "systemPrompt" | "userMessage"> & { model?: ResolvedModel | string },
+  options: Pick<CliAgentOptions, "systemPrompt" | "userMessage" | "model">,
 ): Promise<string> {
   const { systemPrompt, userMessage, model } = options
-  // 008 (transitional, T7 → T10): a ResolvedModel REFINE model runs on its own
-  // surface timeout; the pre-008 string keeps today's 300 s. T10 deletes the string.
-  const timeoutMs = typeof model === "object" ? undefined : 300_000
-  return runClaudeCli(`${systemPrompt}\n\n${userMessage}`, { timeoutMs, label: "refine", model })
+  // The REFINE model runs on its own surface timeout (008 FR-12).
+  return runClaudeCli(`${systemPrompt}\n\n${userMessage}`, { label: "refine", model })
 }

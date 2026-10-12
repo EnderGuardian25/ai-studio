@@ -42,7 +42,8 @@ const h = vi.hoisted(() => ({
   onSpawn: null as ((cwd: string | undefined) => void) | null,
   // 008 T5: per-spawn overrides, consumed in order (e.g. an auth failure then a
   // success); a child that never exits (to drive the timeout); and a value
-  // env.CLAUDE_CLI_MODEL reads as (undefined ⇒ the real, unset one).
+  // env.CLAUDE_CLI_MODEL reads as (undefined ⇒ the real, unset one). Since T10
+  // the boundary never reads it: setting it proves that.
   queue: [] as Array<{ exitCode: number | null; stdout?: string; stderr?: string }>,
   hang: false,
   envCliModel: undefined as string | undefined,
@@ -127,13 +128,13 @@ const { ClaudeCliCopyProvider } = await import('@/providers/implementations/copy
 const { runDesignAgentCli, runDesignAgentCliRefine } = await import('@/lib/agent/designAgentCli')
 const { runBriefingModel } = await import('@/lib/campaign/briefingAssistant')
 const { validateClaudeToken } = await import('@/lib/agent/userToken')
-const { modelFor, modelForBackground } = await import('@/lib/agent/config')
 const { decideModel, internalModel } = await import('@/lib/models/resolve')
+const { SYSTEM_DEFAULTS, entryFor } = await import('@/lib/models/catalogue')
 const { setModelCallSink } = await import('@/lib/models/modelCalls')
 
-// 008 T6: the copy and design call sites now pass a ResolvedModel (the
-// system default here: no policy row, CLI mode, team credential).
-function siteModel(surface: 'CAPTION' | 'DESIGN_FREEFORM' | 'ASSISTANT_BRIEFING') {
+// 008: every call site passes a ResolvedModel (the system default here: no
+// policy row, CLI mode, team credential). T10 made it required.
+function siteModel(surface: 'CAPTION' | 'DESIGN_FREEFORM' | 'REFINE' | 'ASSISTANT_BRIEFING' | 'ASSISTANT_BRANDKIT') {
   const r = decideModel(surface, {
     policy: { allowed: ['HAIKU', 'SONNET', 'OPUS'], defaults: {}, gateOn: false },
     credential: 'team',
@@ -142,6 +143,10 @@ function siteModel(surface: 'CAPTION' | 'DESIGN_FREEFORM' | 'ASSISTANT_BRIEFING'
   if (!r.ok) throw new Error(r.message)
   return r.resolved
 }
+
+// The model for the cases that are not about the model (isolation, env, size
+// guards, decoding): any resolved model will do.
+const ANY = siteModel('CAPTION')
 
 type ClaudeCliOptions = import('@/lib/agent/claudeCli').ClaudeCliOptions
 type ClaudeCliAuth = import('@/lib/agent/claudeAuth').ClaudeCliAuth
@@ -185,10 +190,12 @@ describe('AC-13: every text-mode call site spawns with --tools "" and never --al
   const sites: Array<[string, ClaudeCliOptions]> = [
     ['copy', { model: siteModel('CAPTION'), label: 'copy' }],
     ['design', { label: 'design', model: siteModel('DESIGN_FREEFORM') }],
-    ['refine', { timeoutMs: 300_000, label: 'refine', model: 'sonnet' }],
+    // 008 T7/T10: refine runs the REFINE model on its own surface timeout.
+    ['refine', { label: 'refine', model: siteModel('REFINE') }],
     // 008 T7: the verifier runs its internal model (FR-15); no pin, the timeout is the model's.
     ['verifier', { label: 'verify', model: internalModel('INTERNAL_VERIFIER', 'cli') }],
-    ['background', { label: 'background', model: modelForBackground('cli'), timeoutMs: 90_000 }],
+    // 008 T6: the background decision runs its internal model (FR-15).
+    ['background', { label: 'background', model: internalModel('INTERNAL_BACKGROUND', 'cli') }],
     // 008 T8: the assistant text call and the token ping run a ResolvedModel; the timeout is the model's.
     ['briefing', { label: 'briefing', model: siteModel('ASSISTANT_BRIEFING') }],
     ['token-validate', { model: internalModel('INTERNAL_TOKEN_PING', 'cli'), label: 'token-validate', authToken: TOKEN }],
@@ -215,7 +222,7 @@ describe('AC-13: every text-mode call site spawns with --tools "" and never --al
   it('an allowedTools smuggled past the type is ignored — the option no longer exists', async () => {
     setPlatform('linux')
     // @ts-expect-error allowedTools was removed from ClaudeCliOptions (FR-08)
-    await inAuth(() => runClaudeCli('prompt', { allowedTools: ['Read'] }))
+    await inAuth(() => runClaudeCli('prompt', { model: ANY, allowedTools: ['Read'] }))
     expectNoTools(h.spawnCalls[0].args, '')
     expect(h.spawnCalls[0].args).not.toContain('Read')
   })
@@ -245,7 +252,7 @@ describe('AC-13: every text-mode call site spawns with --tools "" and never --al
     })
 
     it('refine — runDesignAgentCliRefine', async () => {
-      await inAuth(() => runDesignAgentCliRefine({ systemPrompt: 's', userMessage: 'u', model: 'sonnet' }))
+      await inAuth(() => runDesignAgentCliRefine({ systemPrompt: 's', userMessage: 'u', model: siteModel('REFINE') }))
       expectNoTools(h.spawnCalls[0].args, '')
     })
 
@@ -354,7 +361,7 @@ describe('AC-14: buildChildEnv is exactly the FR-10 allowlist plus the token', (
     Object.assign(process.env, SECRETS)
     try {
       setPlatform(platform)
-      await inAuth(() => runClaudeCli('prompt'))
+      await inAuth(() => runClaudeCli('prompt', { model: ANY }))
       const childEnv = h.spawnCalls[0].env
       expect(childEnv).toEqual(buildChildEnv(process.env, platform, TOKEN))
       expect(childEnv.CLAUDE_CODE_OAUTH_TOKEN).toBe(TOKEN)
@@ -388,7 +395,7 @@ describe('AC-25: claudeCommand per platform and CLAUDE_CLI_PATH', () => {
     // claudeCommand is the single source the spawn uses; with shell:false the
     // empty argv element reaches the binary intact.
     setPlatform('linux')
-    await inAuth(() => runClaudeCli('prompt'))
+    await inAuth(() => runClaudeCli('prompt', { model: ANY }))
     expect(h.spawnCalls[0]).toMatchObject({ cmd: 'claude', shell: false })
     expectNoTools(h.spawnCalls[0].args, '')
   })
@@ -397,10 +404,10 @@ describe('AC-25: claudeCommand per platform and CLAUDE_CLI_PATH', () => {
 describe('the 600k guard measures the stdin payload', () => {
   it('the payload written to stdin is the prompt, and an oversized one never spawns', async () => {
     setPlatform('linux')
-    await inAuth(() => runClaudeCli('hello prompt'))
+    await inAuth(() => runClaudeCli('hello prompt', { model: ANY }))
     expect(h.spawnCalls[0].stdin).toBe('hello prompt')
     h.spawnCalls.length = 0
-    await expect(inAuth(() => runClaudeCli('x'.repeat(600_001)))).rejects.toThrow('Prompt too large')
+    await expect(inAuth(() => runClaudeCli('x'.repeat(600_001), { model: ANY }))).rejects.toThrow('Prompt too large')
     expect(h.spawnCalls).toHaveLength(0)
   })
 })
@@ -419,8 +426,8 @@ describe('T6: every spawn is isolated from settings, hooks, plugins and project 
   // The flags every spawn carries after `-p --strict-mcp-config --tools <EMPTY>`.
   const isolation = (empty: string) => ['--no-session-persistence', '--safe-mode', '--setting-sources', empty]
   const modes = [
-    ['text', () => runClaudeCli('prompt')],
-    ['stream-json', () => runClaudeCliStreamJson([{ type: 'text', text: 'hi' }])],
+    ['text', () => runClaudeCli('prompt', { model: ANY })],
+    ['stream-json', () => runClaudeCliStreamJson([{ type: 'text', text: 'hi' }], { model: ANY })],
   ] as const
 
   it.each(modes)('%s mode, POSIX: --no-session-persistence --safe-mode --setting-sources ""', async (_m, run) => {
@@ -445,8 +452,8 @@ describe('T6: every spawn is isolated from settings, hooks, plugins and project 
     const { statSync, readdirSync, realpathSync } = await import('node:fs')
     setPlatform('linux')
     h.stdout = RESULT_OK('ok')
-    await inAuth(() => runClaudeCli('one'))
-    await inAuth(() => runClaudeCliStreamJson([{ type: 'text', text: 'two' }]))
+    await inAuth(() => runClaudeCli('one', { model: ANY }))
+    await inAuth(() => runClaudeCliStreamJson([{ type: 'text', text: 'two' }], { model: ANY }))
     const [a, b] = h.spawnCalls.map((c) => c.cwd)
     expect(a).toBeTruthy()
     expect(b).toBe(a)
@@ -462,17 +469,17 @@ describe('T6: every spawn is isolated from settings, hooks, plugins and project 
   it('re-creates the cached temp cwd when it has vanished (tmp cleaner) instead of spawning into it', async () => {
     const { rmSync, existsSync } = await import('node:fs')
     setPlatform('linux')
-    await inAuth(() => runClaudeCli('one'))
+    await inAuth(() => runClaudeCli('one', { model: ANY }))
     const first = h.spawnCalls[0].cwd!
     rmSync(first, { recursive: true, force: true })
     let existedAtSpawn = false
     h.onSpawn = (cwd) => (existedAtSpawn = !!cwd && existsSync(cwd))
-    await expect(inAuth(() => runClaudeCli('two'))).resolves.toBe('ok')
+    await expect(inAuth(() => runClaudeCli('two', { model: ANY }))).resolves.toBe('ok')
     const second = h.spawnCalls[1].cwd!
     expect(second).not.toBe(first)
     expect(existedAtSpawn).toBe(true)
     // …and the fresh dir is the one reused from then on.
-    await inAuth(() => runClaudeCli('three'))
+    await inAuth(() => runClaudeCli('three', { model: ANY }))
     expect(h.spawnCalls[2].cwd).toBe(second)
   })
 
@@ -483,21 +490,21 @@ describe('T6: every spawn is isolated from settings, hooks, plugins and project 
     // with the ENOENT a missing cwd produces.
     h.onSpawn = (cwd) => cwd && rmSync(cwd, { recursive: true, force: true })
     h.spawnErrorCode = 'ENOENT'
-    const err = await inAuth(() => runClaudeCli('p')).catch((e: unknown) => e)
+    const err = await inAuth(() => runClaudeCli('p', { model: ANY })).catch((e: unknown) => e)
     expect((err as Error).message).not.toMatch(/not found on PATH/)
     expect((err as Error).message).toMatch(/working directory/i)
     expect(isClaudeAuthFailure(err)).toBe(false)
     const gone = h.spawnCalls[0].cwd
     h.onSpawn = null
     h.spawnErrorCode = null
-    await expect(inAuth(() => runClaudeCli('p'))).resolves.toBe('ok')
+    await expect(inAuth(() => runClaudeCli('p', { model: ANY }))).resolves.toBe('ok')
     expect(h.spawnCalls[1].cwd).not.toBe(gone)
   })
 
   it('a spawn ENOENT with the cwd intact keeps the friendly not-found message (a genuinely missing binary)', async () => {
     setPlatform('linux')
     h.spawnErrorCode = 'ENOENT'
-    await expect(inAuth(() => runClaudeCli('p'))).rejects.toThrow(
+    await expect(inAuth(() => runClaudeCli('p', { model: ANY }))).rejects.toThrow(
       'Claude CLI not found on PATH. Install Claude Code or set CLAUDE_CLI_PATH.',
     )
   })
@@ -511,33 +518,34 @@ describe('T6: every spawn is isolated from settings, hooks, plugins and project 
   })
 })
 
+// 008 T10: the checked value is the ResolvedModel's `arg` (FR-07). A catalogue
+// arg always passes; the check is defence in depth for the win32 shell join.
 describe('T6: the model name is charset-checked before it can reach argv', () => {
   const bad = ['sonnet; rm -rf /', 'sonnet && calc', 'a b', '$(id)', 'x"y', 'm|n', '%PATH%', 'h^aiku', 'o>p', '`id`']
-  it.each(bad)('refuses %j and never spawns', async (model) => {
+  it.each(bad)('refuses %j and never spawns', async (arg) => {
     setPlatform('win32')
-    await expect(inAuth(() => runClaudeCli('p', { model }))).rejects.toThrow(/Invalid Claude model name/)
-    await expect(inAuth(() => runClaudeCli('p', { model, pinModel: true }))).rejects.toThrow(
-      /Invalid Claude model name/,
-    )
+    await expect(inAuth(() => runClaudeCli('p', { model: { ...ANY, arg } }))).rejects.toThrow(/Invalid Claude model name/)
     expect(h.spawnCalls).toHaveLength(0)
   })
 
   it.each(['haiku', 'claude-sonnet-4-6', 'claude-sonnet-4-6[1m]', 'us.anthropic.claude-sonnet:1', 'claude_x.y'])(
     'accepts %j verbatim',
-    async (model) => {
+    async (arg) => {
       setPlatform('linux')
-      await inAuth(() => runClaudeCli('p', { model }))
+      await inAuth(() => runClaudeCli('p', { model: { ...ANY, arg } }))
       const args = h.spawnCalls[0].args
-      expect(args[args.indexOf('--model') + 1]).toBe(model)
+      expect(args[args.indexOf('--model') + 1]).toBe(arg)
     },
   )
 
-  it('"default" and an empty model still omit --model', async () => {
+  it('--model is never omitted: "default" is not special any more, and an empty arg throws', async () => {
     setPlatform('linux')
-    await inAuth(() => runClaudeCli('p', { model: 'default' }))
-    await inAuth(() => runClaudeCli('p', { model: '' }))
-    expect(h.spawnCalls).toHaveLength(2)
-    for (const c of h.spawnCalls) expect(c.args).not.toContain('--model')
+    await inAuth(() => runClaudeCli('p', { model: { ...ANY, arg: 'default' } }))
+    expect(h.spawnCalls[0].args.slice(-2)).toEqual(['--model', 'default'])
+    await expect(inAuth(() => runClaudeCli('p', { model: { ...ANY, arg: '' } }))).rejects.toThrow(
+      /Invalid Claude model name/,
+    )
+    expect(h.spawnCalls).toHaveLength(1)
   })
 })
 
@@ -548,7 +556,7 @@ describe('T6: a missing CLI on win32 (shell:true) gets the friendly not-found er
     h.stdout = ''
     h.stderr = "'claude' is not recognized as an internal or external command,\r\noperable program or batch file.\r\n"
     const onAuthFailure = vi.fn(async () => {})
-    const err = await runWithClaudeAuth({ ...auth, onAuthFailure }, () => runClaudeCli('p')).catch((e: unknown) => e)
+    const err = await runWithClaudeAuth({ ...auth, onAuthFailure }, () => runClaudeCli('p', { model: ANY })).catch((e: unknown) => e)
     expect((err as Error).message).toBe('Claude CLI not found on PATH. Install Claude Code or set CLAUDE_CLI_PATH.')
     expect(err).not.toBeInstanceOf(ClaudeCliError)
     expect(isClaudeAuthFailure(err)).toBe(false)
@@ -562,7 +570,7 @@ describe('T6: stdout is decoded as UTF-8 across chunk boundaries', () => {
     setPlatform('linux')
     const bytes = Buffer.from('සිංහල පෝස්ට්', 'utf8')
     h.chunks = [bytes.subarray(0, 4), bytes.subarray(4, 11), bytes.subarray(11)]
-    await expect(inAuth(() => runClaudeCli('p'))).resolves.toBe('සිංහල පෝස්ට්')
+    await expect(inAuth(() => runClaudeCli('p', { model: ANY }))).resolves.toBe('සිංහල පෝස්ට්')
   })
 
   it('and in stream-json mode', async () => {
@@ -570,7 +578,7 @@ describe('T6: stdout is decoded as UTF-8 across chunk boundaries', () => {
     const bytes = Buffer.from(RESULT_OK('සිංහල'), 'utf8')
     const cut = bytes.indexOf(Buffer.from('සිං', 'utf8')) + 1 // inside the first codepoint
     h.chunks = [bytes.subarray(0, cut), bytes.subarray(cut)]
-    await expect(inAuth(() => runClaudeCliStreamJson([{ type: 'text', text: 'hi' }]))).resolves.toBe('සිංහල')
+    await expect(inAuth(() => runClaudeCliStreamJson([{ type: 'text', text: 'hi' }], { model: ANY }))).resolves.toBe('සිංහල')
   })
 })
 
@@ -582,18 +590,18 @@ describe('T6: stream-json size guards — text only for 600k, 5 MB per image, a 
 
   it('a 2 MB image passes (the 600k guard no longer counts base64)', async () => {
     await expect(
-      inAuth(() => runClaudeCliStreamJson([img(2 * MB), { type: 'text', text: 'colour?' }])),
+      inAuth(() => runClaudeCliStreamJson([img(2 * MB), { type: 'text', text: 'colour?' }], { model: ANY })),
     ).resolves.toBe('ok')
     expect(h.spawnCalls).toHaveLength(1)
   })
 
   it('an image of exactly 5 MB passes', async () => {
-    await expect(inAuth(() => runClaudeCliStreamJson([img(5 * MB), { type: 'text', text: 'x' }]))).resolves.toBe('ok')
+    await expect(inAuth(() => runClaudeCliStreamJson([img(5 * MB), { type: 'text', text: 'x' }], { model: ANY }))).resolves.toBe('ok')
   })
 
   it('a 6 MB image is refused, naming its index and size, and never spawns', async () => {
     const err = await inAuth(() =>
-      runClaudeCliStreamJson([img(1 * MB), img(6 * MB), { type: 'text', text: 'x' }]),
+      runClaudeCliStreamJson([img(1 * MB), img(6 * MB), { type: 'text', text: 'x' }], { model: ANY }),
     ).catch((e: unknown) => e)
     expect((err as Error).message).toMatch(/image 2 of 2 is 6\.0 MB/i)
     expect((err as Error).message).toMatch(/5 MB/)
@@ -603,7 +611,7 @@ describe('T6: stream-json size guards — text only for 600k, 5 MB per image, a 
 
   it('a 700k-char text block is refused and never spawns', async () => {
     await expect(
-      inAuth(() => runClaudeCliStreamJson([img(1000), { type: 'text', text: 'x'.repeat(700_000) }])),
+      inAuth(() => runClaudeCliStreamJson([img(1000), { type: 'text', text: 'x'.repeat(700_000) }], { model: ANY })),
     ).rejects.toThrow(/Prompt too large for CLI mode \(700000 chars > 600000\)/)
     expect(h.spawnCalls).toHaveLength(0)
   })
@@ -614,14 +622,14 @@ describe('T6: stream-json size guards — text only for 600k, 5 MB per image, a 
         runClaudeCliStreamJson([
           { type: 'text', text: 'x'.repeat(300_000) },
           { type: 'text', text: 'y'.repeat(300_001) },
-        ]),
+        ], { model: ANY }),
       ),
     ).rejects.toThrow(/600001 chars/)
   })
 
   it('the serialized stdin line is capped in total (7 × 4.5 MB images) and never spawns', async () => {
     const content = [...Array.from({ length: 7 }, () => img(4.5 * MB)), { type: 'text' as const, text: 'x' }]
-    await expect(inAuth(() => runClaudeCliStreamJson(content))).rejects.toThrow(/too large for CLI mode .* MB > 32 MB/)
+    await expect(inAuth(() => runClaudeCliStreamJson(content, { model: ANY }))).rejects.toThrow(/too large for CLI mode .* MB > 32 MB/)
     expect(h.spawnCalls).toHaveLength(0)
   })
 })
@@ -629,12 +637,17 @@ describe('T6: stream-json size guards — text only for 600k, 5 MB per image, a 
 describe('T6: scripts/cli-sandbox-check.mjs (AC-16) mirrors the real stream-json spawn', () => {
   // The in-image check cannot import claudeCli.ts (the runner image has only
   // Next's bundled chunks), so it restates the spawn. Pin the two together.
+  // 008 T10 (FR-15): VISION_MODEL is the ASSISTANT_BRANDKIT system default's
+  // cliArg — the model the brand-kit assistant's vision call runs on with no
+  // team default — so a catalogue change shows up here as a drift.
   it('the same argv as a POSIX vision spawn, and the same child env', async () => {
     const { sandboxArgs, VISION_MODEL } = await import('../../scripts/cli-sandbox-check.mjs')
-    expect(VISION_MODEL).toBe(modelFor('B', 'cli'))
+    const vision = siteModel('ASSISTANT_BRANDKIT')
+    expect(VISION_MODEL).toBe(entryFor(SYSTEM_DEFAULTS.ASSISTANT_BRANDKIT)!.cliArg)
+    expect(VISION_MODEL).toBe(vision.arg)
     setPlatform('linux')
     h.stdout = RESULT_OK('ok')
-    await inAuth(() => runClaudeCliStreamJson([{ type: 'text', text: 'x' }], { model: modelFor('B', 'cli') }))
+    await inAuth(() => runClaudeCliStreamJson([{ type: 'text', text: 'x' }], { model: vision }))
     expect(sandboxArgs()).toEqual(h.spawnCalls[0].args)
   })
 
@@ -695,9 +708,9 @@ describe('T6: scripts/cli-sandbox-check.mjs leakProblems', () => {
   })
 })
 
-// ─── 008 T5: the ResolvedModel boundary (FR-07, transitional until T10) ────────
+// ─── 008 T5/T10: the ResolvedModel boundary (FR-04, FR-07) ─────────────────────
 
-describe('008 T5: a ResolvedModel at the CLI boundary', () => {
+describe('008 T5/T10: a ResolvedModel at the CLI boundary', () => {
   function resolved(surface: 'CAPTION' | 'DESIGN_FREEFORM', key: 'HAIKU' | 'SONNET' | 'OPUS') {
     const r = decideModel(surface, {
       requested: key,
@@ -736,19 +749,26 @@ describe('008 T5: a ResolvedModel at the CLI boundary', () => {
     }
   })
 
-  it('the string path is unchanged: CLAUDE_CLI_MODEL still overrides it (the T3 interim mapping)', async () => {
-    h.envCliModel = 'OPUS'
-    await inAuth(() => runClaudeCli('p', { model: 'sonnet' }))
-    expect(modelArg(h.spawnCalls[0].args)).toEqual(['--model', 'opus'])
-    // …and a pinned string still beats it.
-    await inAuth(() => runClaudeCli('p', { model: 'haiku', pinModel: true }))
-    expect(modelArg(h.spawnCalls[1].args)).toEqual(['--model', 'haiku'])
-  })
-
-  it('a ResolvedModel with a pinModel flag still runs its own arg', async () => {
+  // T10 rewrite of "the string path is unchanged: CLAUDE_CLI_MODEL still
+  // overrides it": there is no string path and no override (FR-04).
+  it('CLAUDE_CLI_MODEL never reaches the boundary: claudeCli.ts does not read it, and Haiku stays Haiku under OPUS', async () => {
+    const { readFileSync } = await import('node:fs')
+    const src = readFileSync('src/lib/agent/claudeCli.ts', 'utf8')
+    expect(src).not.toMatch(/env.CLAUDE_CLI_MODEL|process.env.CLAUDE_CLI_MODEL/)
     const haiku = internalModel('INTERNAL_VERIFIER', 'cli')
     h.envCliModel = 'OPUS'
+    await inAuth(() => runClaudeCli('p', { model: haiku }))
+    expect(modelArg(h.spawnCalls[0].args)).toEqual(['--model', haiku.arg])
+  })
+
+  // T10 rewrite of "a ResolvedModel with a pinModel flag still runs its own
+  // arg": the option is gone, so a stray flag is a type error and inert.
+  it('pinModel no longer exists: a flag smuggled past the type changes nothing', async () => {
+    const haiku = internalModel('INTERNAL_VERIFIER', 'cli')
+    h.envCliModel = 'OPUS'
+    // @ts-expect-error pinModel was removed from ClaudeCliOptions (008 T10)
     await inAuth(() => runClaudeCli('p', { model: haiku, pinModel: true }))
+    // @ts-expect-error pinModel was removed from ClaudeCliOptions (008 T10)
     await inAuth(() => runClaudeCli('p', { model: SONNET, pinModel: false }))
     expect(modelArg(h.spawnCalls[0].args)).toEqual(['--model', haiku.arg])
     expect(modelArg(h.spawnCalls[1].args)).toEqual(['--model', SONNET.arg])
@@ -813,10 +833,15 @@ describe('008 T5: a ResolvedModel at the CLI boundary', () => {
     for (const c of h.spawnCalls) expect(modelArg(c.args)).toEqual(['--model', SONNET.arg])
   })
 
-  it('a string or absent model records nothing (the pre-008 path)', async () => {
-    await inAuth(() => runClaudeCli('p', { model: 'sonnet' }))
-    await inAuth(() => runClaudeCli('p'))
-    expect(h.spawnCalls).toHaveLength(2)
+  // T10 rewrite of "a string or absent model records nothing (the pre-008
+  // path)": `model` is a required ResolvedModel, and anything else smuggled
+  // past the type is refused before a spawn or a record.
+  it.each(modes)('%s mode: a plain string or a missing model is refused — no spawn, no record', async (_m, run) => {
+    // @ts-expect-error a plain string is no longer a model (008 T10)
+    await expect(inAuth(() => run({ model: 'sonnet' }))).rejects.toThrow(/Invalid Claude model name/)
+    // @ts-expect-error model is required (008 T10)
+    await expect(inAuth(() => run({}))).rejects.toThrow(/Invalid Claude model name/)
+    expect(h.spawnCalls).toHaveLength(0)
     expect(records).toHaveLength(0)
   })
 })

@@ -2,8 +2,8 @@
 //
 // Structural classes (replace / remove / constrain) are checked with ZERO model
 // calls (AC-12). Only `add` spends a verifier call — exactly one (AC-13), pinned
-// to Haiku whatever the caller or the CLAUDE_CLI_MODEL global override says
-// (FR-14b / AC-20b). Anything but a parseable verdict is `unavailable`, and
+// to Haiku whatever the caller or CLAUDE_CLI_MODEL says (FR-14b / AC-20b;
+// 008: INTERNAL_VERIFIER, and the CLI boundary never reads the env). Anything but a parseable verdict is `unavailable`, and
 // `isAccepted` is true for `pass` only, so unavailable routes exactly like a
 // miss (FR-10 / AC-14).
 //
@@ -84,8 +84,9 @@ vi.mock('@/lib/testHooks', async (importOriginal) => {
   }
 })
 
-// env.ts snapshots process.env at load: set the GLOBAL CLI model override to
-// Opus before anything imports it. The verifier must ignore it.
+// env.ts snapshots process.env at load: set CLAUDE_CLI_MODEL (since 008 the
+// system default for user surfaces) to Opus before anything imports it. The
+// verifier must ignore it.
 process.env.CLAUDE_CLI_MODEL = 'opus'
 process.env.CLAUDE_CLI_DEBUG = '0'
 
@@ -278,11 +279,21 @@ describe('add: exactly one verifier call, pinned to Haiku (AC-13, FR-14b, AC-20b
     expect(args).not.toContain('opus')
   })
 
-  it('the override IS live in this suite — an unpinned CLI call runs on opus (so the pin test is not vacuous)', async () => {
-    const { runClaudeCli } = await import('@/lib/agent/claudeCli')
-    await inAuth(() => runClaudeCli('hi', { model: 'haiku' }))
-    const args = h.spawnCalls[0].args
-    expect(args[args.indexOf('--model') + 1]).toBe('opus')
+  // 008 T10 rewrite of "the override IS live — an unpinned CLI call runs on
+  // opus": there is no override at the boundary any more. CLAUDE_CLI_MODEL is
+  // the resolver's system default, so the non-vacuity check is that it would
+  // put a user surface on Opus here.
+  it('CLAUDE_CLI_MODEL=opus IS live in this suite — a user surface would resolve to Opus (so the Haiku test is not vacuous)', async () => {
+    const { env } = await import('@/lib/env')
+    const { decideModel } = await import('@/lib/models/resolve')
+    expect(env.CLAUDE_CLI_MODEL).toBe('OPUS')
+    const r = decideModel('DESIGN_FREEFORM', {
+      policy: { allowed: ['HAIKU', 'SONNET', 'OPUS'], defaults: {}, gateOn: false },
+      credential: 'personal',
+      mode: 'cli',
+      envDefault: env.CLAUDE_CLI_MODEL,
+    })
+    expect(r.ok && r.resolved.key).toBe('OPUS')
   })
 
   it('API mode: one messages.create (via createMessage) on claude-haiku-4-5, SDK retries disabled, bounded by the model timeout', async () => {
@@ -294,7 +305,9 @@ describe('add: exactly one verifier call, pinned to Haiku (AC-13, FR-14b, AC-20b
     expect(h.anthropicCreate.mock.calls[0][0]).toMatchObject({ model: HAIKU_ID, max_tokens: 300 })
     // createMessage's deadline: an AbortSignal on the request.
     expect(h.anthropicCreate.mock.calls[0][1]?.signal).toBeInstanceOf(AbortSignal)
-    expect(h.anthropicCtor.mock.calls[0][0]).toMatchObject({ apiKey: 'sk-ant-api-test', maxRetries: 0, timeout: 60_000 })
+    expect(h.anthropicCtor.mock.calls[0][0]).toMatchObject({ apiKey: 'sk-ant-api-test', maxRetries: 0 })
+    // 008 T10: no client-level timeout — createMessage's signal is the one bound.
+    expect(h.anthropicCtor.mock.calls[0][0]).not.toHaveProperty('timeout')
     expect(h.resolveAnthropicApiKey).toHaveBeenCalledWith('team-1')
   })
 

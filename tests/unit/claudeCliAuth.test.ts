@@ -47,6 +47,9 @@ const { runClaudeCli, runClaudeCliOnce, ClaudeCliError, isClaudeAuthFailure } = 
   '@/lib/agent/claudeCli'
 )
 const { runWithClaudeAuth, currentClaudeAuth } = await import('@/lib/agent/claudeAuth')
+const { internalModel } = await import('@/lib/models/resolve')
+// 008 T10: `model` is a required ResolvedModel; these cases are not about the model.
+const MODEL = internalModel('INTERNAL_TOKEN_PING', 'cli')
 type ClaudeCliAuth = import('@/lib/agent/claudeAuth').ClaudeCliAuth
 
 const AUTH_STDERR = 'API Error: 401 OAuth token is invalid'
@@ -152,21 +155,21 @@ describe('isClaudeAuthFailure', () => {
 
 describe('no-credential guard (env + dev-session tiers are deleted)', () => {
   it('runClaudeCliOnce throws the no-credential ClaudeCliError when ALS is empty and no override is passed', async () => {
-    await expect(runClaudeCliOnce('prompt', {}, undefined)).rejects.toThrow(NO_CREDENTIAL_MESSAGE)
+    await expect(runClaudeCliOnce('prompt', { model: MODEL }, undefined)).rejects.toThrow(NO_CREDENTIAL_MESSAGE)
     expect(h.spawnCalls).toHaveLength(0)
   })
 
   it('the thrown error is a ClaudeCliError (not classified as an auth failure — nothing to retry)', async () => {
-    await expect(runClaudeCliOnce('prompt', {}, undefined)).rejects.toBeInstanceOf(ClaudeCliError)
+    await expect(runClaudeCliOnce('prompt', { model: MODEL }, undefined)).rejects.toBeInstanceOf(ClaudeCliError)
     try {
-      await runClaudeCliOnce('prompt', {}, undefined)
+      await runClaudeCliOnce('prompt', { model: MODEL }, undefined)
     } catch (err) {
       expect(isClaudeAuthFailure(err)).toBe(false)
     }
   })
 
   it('runClaudeCli surfaces the same guard end-to-end with no auth context and no spawn', async () => {
-    await expect(runClaudeCli('prompt')).rejects.toThrow(NO_CREDENTIAL_MESSAGE)
+    await expect(runClaudeCli('prompt', { model: MODEL })).rejects.toThrow(NO_CREDENTIAL_MESSAGE)
     expect(h.spawnCalls).toHaveLength(0)
   })
 })
@@ -175,7 +178,7 @@ describe('runClaudeCli auth orchestration', () => {
   it('personal auth context → single attempt runs under the personal token', async () => {
     h.scripts.push({ exitCode: 0, stdout: 'hello' })
     const auth = userAuth()
-    await expect(runWithClaudeAuth(auth, () => runClaudeCli('prompt'))).resolves.toBe('hello')
+    await expect(runWithClaudeAuth(auth, () => runClaudeCli('prompt', { model: MODEL }))).resolves.toBe('hello')
     expect(h.spawnCalls).toHaveLength(1)
     expect(h.spawnCalls[0].env.CLAUDE_CODE_OAUTH_TOKEN).toBe(auth.token)
     // Stray API keys are always stripped from the child env.
@@ -187,7 +190,7 @@ describe('runClaudeCli auth orchestration', () => {
   it('team-only auth context (no personal token) → single attempt runs under the team token', async () => {
     h.scripts.push({ exitCode: 0, stdout: 'hello' })
     const auth = teamAuth()
-    await expect(runWithClaudeAuth(auth, () => runClaudeCli('prompt'))).resolves.toBe('hello')
+    await expect(runWithClaudeAuth(auth, () => runClaudeCli('prompt', { model: MODEL }))).resolves.toBe('hello')
     expect(h.spawnCalls).toHaveLength(1)
     expect(h.spawnCalls[0].env.CLAUDE_CODE_OAUTH_TOKEN).toBe(auth.token)
   })
@@ -198,7 +201,7 @@ describe('runClaudeCli auth orchestration', () => {
     const fallback = teamAuth()
     const auth = userAuth({ resolveFallback: vi.fn(async () => fallback) })
 
-    await expect(runWithClaudeAuth(auth, () => runClaudeCli('prompt'))).resolves.toBe('recovered')
+    await expect(runWithClaudeAuth(auth, () => runClaudeCli('prompt', { model: MODEL }))).resolves.toBe('recovered')
 
     expect(h.spawnCalls).toHaveLength(2)
     expect(h.spawnCalls[0].env.CLAUDE_CODE_OAUTH_TOKEN).toBe(auth.token)
@@ -212,7 +215,7 @@ describe('runClaudeCli auth orchestration', () => {
     h.scripts.push({ exitCode: 1, stderr: AUTH_STDERR })
     const auth = userAuth({ resolveFallback: vi.fn(async () => null) })
 
-    await expect(runWithClaudeAuth(auth, () => runClaudeCli('prompt'))).rejects.toThrow(
+    await expect(runWithClaudeAuth(auth, () => runClaudeCli('prompt', { model: MODEL }))).rejects.toThrow(
       'Claude CLI exited with code 1'
     )
     expect(h.spawnCalls).toHaveLength(1)
@@ -223,7 +226,7 @@ describe('runClaudeCli auth orchestration', () => {
     h.scripts.push({ exitCode: 1, stderr: AUTH_STDERR })
     const auth = userAuth() // resolveFallback undefined
 
-    await expect(runWithClaudeAuth(auth, () => runClaudeCli('prompt'))).rejects.toThrow(
+    await expect(runWithClaudeAuth(auth, () => runClaudeCli('prompt', { model: MODEL }))).rejects.toThrow(
       'Claude CLI exited with code 1'
     )
     expect(h.spawnCalls).toHaveLength(1)
@@ -236,7 +239,7 @@ describe('runClaudeCli auth orchestration', () => {
     const fallback = teamAuth()
     const auth = userAuth({ resolveFallback: vi.fn(async () => fallback) })
 
-    await expect(runWithClaudeAuth(auth, () => runClaudeCli('prompt'))).rejects.toThrow(
+    await expect(runWithClaudeAuth(auth, () => runClaudeCli('prompt', { model: MODEL }))).rejects.toThrow(
       'Claude CLI exited with code 1'
     )
     expect(h.spawnCalls).toHaveLength(2)
@@ -248,7 +251,7 @@ describe('runClaudeCli auth orchestration', () => {
     h.scripts.push({ exitCode: 1, stderr: 'renderer crashed' })
     const auth = userAuth({ resolveFallback: vi.fn(async () => teamAuth()) })
 
-    await expect(runWithClaudeAuth(auth, () => runClaudeCli('prompt'))).rejects.toThrow(
+    await expect(runWithClaudeAuth(auth, () => runClaudeCli('prompt', { model: MODEL }))).rejects.toThrow(
       'Claude CLI exited with code 1'
     )
     expect(h.spawnCalls).toHaveLength(1)
@@ -267,7 +270,7 @@ describe('runClaudeCli auth orchestration', () => {
       resolveFallback: vi.fn(async () => fallback),
     })
 
-    await expect(runWithClaudeAuth(auth, () => runClaudeCli('prompt'))).resolves.toBe('recovered')
+    await expect(runWithClaudeAuth(auth, () => runClaudeCli('prompt', { model: MODEL }))).resolves.toBe('recovered')
     expect(h.spawnCalls).toHaveLength(2)
   })
 
@@ -276,7 +279,7 @@ describe('runClaudeCli auth orchestration', () => {
     const auth = userAuth({ resolveFallback: vi.fn(async () => teamAuth()) })
 
     await expect(
-      runWithClaudeAuth(auth, () => runClaudeCli('ping', { authToken: 'sk-ant-oat01-CANDIDATE' }))
+      runWithClaudeAuth(auth, () => runClaudeCli('ping', { model: MODEL, authToken: 'sk-ant-oat01-CANDIDATE' }))
     ).rejects.toThrow('Claude CLI exited with code 1')
 
     expect(h.spawnCalls).toHaveLength(1)
@@ -286,7 +289,7 @@ describe('runClaudeCli auth orchestration', () => {
   })
 
   it('prompt-size guard throws before any spawn', async () => {
-    await expect(runClaudeCli('x'.repeat(600_001))).rejects.toThrow('Prompt too large')
+    await expect(runClaudeCli('x'.repeat(600_001), { model: MODEL })).rejects.toThrow('Prompt too large')
     expect(h.spawnCalls).toHaveLength(0)
   })
 })

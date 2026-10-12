@@ -37,7 +37,17 @@ vi.mock('@/lib/testHooks', async (importOriginal) => {
 
 const { runRefineAttempts, settleRefine, reconcileTokens, MAX_REFINE_ATTEMPTS } = await import('@/lib/drafts/refineAttempt')
 const { verifyRefine } = await import('@/lib/drafts/refineVerify')
-const { internalModel } = await import('@/lib/models/resolve')
+const { internalModel, decideModel } = await import('@/lib/models/resolve')
+
+// 008 T10: the route's REFINE model is a ResolvedModel (no string any more).
+const routeResolved = decideModel('REFINE', {
+  requested: 'OPUS',
+  policy: { allowed: ['HAIKU', 'SONNET', 'OPUS'], defaults: {}, gateOn: false },
+  credential: 'n/a',
+  mode: 'api',
+})
+if (!routeResolved.ok) throw new Error(routeResolved.message)
+const ROUTE_MODEL = routeResolved.resolved
 const { rejectionDiagnosticsSchema } = await import('@/lib/drafts/revisions')
 type Deps = import('@/lib/drafts/refineAttempt').RefineAttemptDeps<{ conflict: true }>
 type VerifyResult = import('@/lib/drafts/refineVerify').VerifyResult
@@ -85,7 +95,7 @@ function fakes(replies: string[], verdicts: VerifyResult[] = []) {
   return { deps, runs, verifies }
 }
 
-const input = (inlineAssets: Record<string, string> = ASSETS) => ({ model: 'claude-opus-4-1', inlineAssets })
+const input = (inlineAssets: Record<string, string> = ASSETS) => ({ model: ROUTE_MODEL, inlineAssets })
 const MISS: VerifyResult = { kind: 'miss', reasons: ['add: no new figure appears in the AFTER facts'] }
 const UNAVAILABLE: VerifyResult = { kind: 'unavailable', reason: 'verifier call failed: timeout' }
 
@@ -110,7 +120,7 @@ describe('runRefineAttempts — accept / retry / not applied', () => {
     const r = await runRefineAttempts(input(), f.deps)
     expect(r.kind).toBe('accepted')
     expect(f.runs.map((x) => x.attempt)).toEqual([1, 2])
-    expect(f.runs.map((x) => x.model)).toEqual(['claude-opus-4-1', 'claude-opus-4-1'])
+    expect(f.runs.map((x) => x.model)).toEqual([ROUTE_MODEL, ROUTE_MODEL])
     expect(f.runs[0].retryReasons).toBeUndefined()
     expect(f.runs[1].retryReasons).toEqual(MISS.kind === 'miss' ? MISS.reasons : [])
     expect(f.verifies.map((x) => x.attempt)).toEqual([1, 2])
@@ -395,7 +405,7 @@ describe('with the real verifyRefine (API mode; SDK + DOM extraction mocked)', (
     const counter = { calls: 0 }
     const f = fakes(replies)
     f.deps.verify = realVerify(counter)
-    const r = await runRefineAttempts({ model: 'claude-opus-4-1', inlineAssets: {} }, f.deps)
+    const r = await runRefineAttempts({ model: ROUTE_MODEL, inlineAssets: {} }, f.deps)
     return { r, f, counter }
   }
 
@@ -432,7 +442,7 @@ describe('with the real verifyRefine (API mode; SDK + DOM extraction mocked)', (
     expect(h.anthropicCreate).toHaveBeenCalledTimes(2)
     // 008 FR-15: the verifier's internal model, never the route's.
     for (const [args] of h.anthropicCreate.mock.calls) expect(args.model).toBe(internalModel('INTERNAL_VERIFIER', 'api').arg)
-    expect(f.runs.map((x) => x.model)).toEqual(['claude-opus-4-1', 'claude-opus-4-1'])
+    expect(f.runs.map((x) => x.model)).toEqual([ROUTE_MODEL, ROUTE_MODEL])
     if (r.kind === 'not-applied') expect(r.diagnostics).toMatchObject({ refineCalls: 2, verifierCalls: 2 })
   })
 

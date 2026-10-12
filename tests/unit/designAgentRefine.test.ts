@@ -36,9 +36,9 @@ vi.mock('@/lib/agent/tools', () => ({
 vi.mock('@anthropic-ai/sdk', () => ({
   default: class {
     messages = {
-      create: (args: { tools: unknown[] }) => {
+      create: (args: { tools: unknown[] }, opts?: unknown) => {
         h.tools = args.tools
-        return h.create(args)
+        return h.create(args, opts)
       },
     }
   },
@@ -49,6 +49,20 @@ const { runDesignAgentCliRefine } = await import('@/lib/agent/designAgentCli')
 const { buildMockHtml, buildMockConflict } = await import('@/lib/testHooks')
 const puppeteer = await import('@/lib/renderer/puppeteer')
 const minio = await import('@/lib/storage/minio')
+const { decideModel } = await import('@/lib/models/resolve')
+
+// 008: both refine runners take a required ResolvedModel (T10).
+function resolvedFor(surface: 'DESIGN_FREEFORM' | 'REFINE', key: 'HAIKU' | 'SONNET' | 'OPUS') {
+  const r = decideModel(surface, {
+    requested: key,
+    policy: { allowed: ['HAIKU', 'SONNET', 'OPUS'], defaults: {}, gateOn: false },
+    credential: 'n/a',
+    mode: 'api',
+  })
+  if (!r.ok) throw new Error(r.message)
+  return r.resolved
+}
+const REFINE = resolvedFor('REFINE', 'SONNET')
 
 const base = {
   systemPrompt: 'SYSTEM #0f2d4e',
@@ -57,6 +71,7 @@ const base = {
   width: 1080,
   height: 1350,
   refine: { attempt: 1 as const, instruction: 'make it pop', slimHtml: '<html>x</html>' },
+  model: REFINE,
 }
 const usage = { input_tokens: 1, output_tokens: 1 }
 
@@ -74,8 +89,9 @@ describe('runDesignAgentCliRefine', () => {
   it('returns the raw CLI reply verbatim — no cut, no restore, no render, no upload', async () => {
     const raw = 'narration\n```json\n{"classes":["add"]}\n```\n<!DOCTYPE html><html><body>__INLINE_ASSET_0__</body></html>'
     h.runClaudeCli.mockResolvedValue(raw)
-    expect(await runDesignAgentCliRefine({ systemPrompt: 'S', userMessage: 'U', model: 'sonnet' })).toBe(raw)
-    expect(h.runClaudeCli).toHaveBeenCalledWith('S\n\nU', expect.objectContaining({ model: 'sonnet', label: 'refine' }))
+    expect(await runDesignAgentCliRefine({ systemPrompt: 'S', userMessage: 'U', model: REFINE })).toBe(raw)
+    // 008 T10: no timeoutMs — the CLI boundary takes the REFINE model's own.
+    expect(h.runClaudeCli).toHaveBeenCalledWith('S\n\nU', { label: 'refine', model: REFINE })
     expect(puppeteer.renderHtmlToPng).not.toHaveBeenCalled()
     expect(minio.uploadObject).not.toHaveBeenCalled()
   })
@@ -139,20 +155,9 @@ describe('runDesignAgentRefine — the real tool loop', () => {
 // ── 008 T6: the runners on a ResolvedModel (FR-07, FR-12, FR-16) ─────────────
 
 const { runDesignAgent } = await import('@/lib/agent/designAgent')
-const { decideModel } = await import('@/lib/models/resolve')
 const { setModelCallSink } = await import('@/lib/models/modelCalls')
 
 describe('008: runDesignAgent / runDesignAgentRefine on a ResolvedModel', () => {
-  function resolvedFor(surface: 'DESIGN_FREEFORM' | 'REFINE', key: 'HAIKU' | 'SONNET' | 'OPUS') {
-    const r = decideModel(surface, {
-      requested: key,
-      policy: { allowed: ['HAIKU', 'SONNET', 'OPUS'], defaults: {}, gateOn: false },
-      credential: 'n/a',
-      mode: 'api',
-    })
-    if (!r.ok) throw new Error(r.message)
-    return r.resolved
-  }
   const OPUS = resolvedFor('DESIGN_FREEFORM', 'OPUS')
   let records: Array<Record<string, unknown>>
 
@@ -192,19 +197,15 @@ describe('008: runDesignAgent / runDesignAgentRefine on a ResolvedModel', () => 
     expect((await runDesignAgent({ ...base, model: OPUS })).htmlContent).toBe('<html>t</html>')
   })
 
-  it('refine with a ResolvedModel goes through createMessage and the mock records it; a string keeps the old call', async () => {
-    const REFINE = resolvedFor('REFINE', 'SONNET')
+  // T10: the "a string keeps the old call" half is gone with the string path.
+  it('refine goes through createMessage on the ResolvedModel, and the mock records it', async () => {
     h.create.mockResolvedValue({ content: [{ type: 'text', text: 'final' }], stop_reason: 'end_turn', usage })
     await runDesignAgentRefine({ ...base, model: REFINE })
     expect(h.create.mock.calls[0][0]).toMatchObject({ model: 'claude-sonnet-5-5', max_tokens: 16000 })
+    expect(h.create.mock.calls[0][1]?.signal).toBeInstanceOf(AbortSignal)
     expect(records).toEqual([expect.objectContaining({ surface: 'REFINE', label: 'refine' })])
 
-    h.create.mockClear()
     records = []
-    await runDesignAgentRefine({ ...base, model: 'legacy-model-name' })
-    expect(h.create.mock.calls[0][0]).toMatchObject({ model: 'legacy-model-name', max_tokens: 8192 })
-    expect(records).toEqual([])
-
     h.mockAi = true
     await runDesignAgentRefine({ ...base, model: REFINE })
     expect(records).toEqual([expect.objectContaining({ surface: 'REFINE', label: 'refine' })])

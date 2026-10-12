@@ -155,81 +155,39 @@ async function spawnCwd(): Promise<string> {
   return spawnCwdPromise === cached ? freshSpawnCwd() : spawnCwd()
 }
 
-// Model the spawned `claude -p` runs under. Precedence:
-//   1. CLAUDE_CLI_MODEL env — a GLOBAL override across every `claude -p` call
-//      (handy for testing all stages on one model).
-//   2. the per-call `model` passed by the caller — this is where the per-path
-//      split lives (Path A design → "haiku", Path B design → "sonnet"; see the
-//      design call sites), matching the API path (runDesignAgent).
-//   3. fallback "haiku" for calls that pass no model (e.g. copy).
-// Accepts a CLI alias ("sonnet"/"opus"/"haiku") or a full model id. A value of
-// "default" (from either source) omits --model and uses the account default
-// (the costly Opus tier) — the reason we never want that implicitly.
+// The model the spawned `claude -p` runs under (008 FR-07): always exactly the
+// ResolvedModel's `arg`. Every spawn passes `--model <arg>` — there is no
+// account-default path, no env override and no fallback model. CLAUDE_CLI_MODEL
+// is the resolver's system default (FR-04), applied before the call reaches
+// here, so this module never reads it.
 //
-// Any other value must match MODEL_NAME_RE or the call throws before spawning
-// (005 T6): on win32 argv is joined into a cmd.exe command line with no quoting,
-// so a model string is the one argv value a user may one day choose (008) that
-// could carry shell syntax. Aliases, full ids, `[1m]` suffixes and
-// provider-prefixed ids (`us.anthropic.…:1`) all pass.
+// The arg must match MODEL_NAME_RE or the call throws before spawning (005 T6),
+// as defence in depth: on win32 argv is joined into a cmd.exe command line with
+// no quoting. Catalogue IDs, aliases, `[1m]` suffixes and provider-prefixed ids
+// (`us.anthropic.…:1`) all pass.
 const MODEL_NAME_RE = /^[A-Za-z0-9._:\-[\]]+$/
 
-function invalidModelName(model: string): Error {
-  return new Error(
-    `Invalid Claude model name ${JSON.stringify(model.slice(0, 80))}: only letters, digits and . _ : - [ ] are allowed.`,
-  )
-}
-
-// 008 T5 (transitional until T10): a ResolvedModel is told apart from the
-// legacy string by shape. T10 deletes the string branch and makes it required.
-function isResolvedModel(model: ResolvedModel | string | undefined): model is ResolvedModel {
-  return typeof model === "object" && model !== null
-}
-
-// A ResolvedModel (008 FR-07) runs exactly its `arg`: CLAUDE_CLI_MODEL and
-// pinModel are ignored — the resolver has already applied the system default
-// (FR-04) — and there is no "default" branch. MODEL_NAME_RE stays as defence in
-// depth for the win32 shell join.
-function claudeModelArgs(model?: ResolvedModel | string, pinned = false): string[] {
-  if (isResolvedModel(model)) {
-    if (!MODEL_NAME_RE.test(model.arg)) throw invalidModelName(model.arg)
-    return ["--model", model.arg]
+function claudeModelArgs(model: ResolvedModel): string[] {
+  // The typeof check catches a plain string or a missing model smuggled past
+  // the type: `.test(undefined)` would pass, as the string "undefined".
+  const arg: unknown = model?.arg
+  if (typeof arg !== "string" || !MODEL_NAME_RE.test(arg)) {
+    throw new Error(
+      `Invalid Claude model name ${JSON.stringify(String(arg).slice(0, 80))}: only letters, digits and . _ : - [ ] are allowed.`,
+    )
   }
-  return legacyModelArgs(model, pinned)
-}
-
-// The pre-008 string path, unchanged (T10 deletes it).
-function legacyModelArgs(explicitModel?: string, pinned = false): string[] {
-  // A pinned call (the refine add-verifier, change 004 FR-14b) runs on exactly
-  // the model it names: the global override must not route it elsewhere.
-  const pinnedModel = pinned ? explicitModel?.trim() : undefined
-  // 008 T3 interim (T5/T10 delete this read): env.CLAUDE_CLI_MODEL is now a
-  // validated ModelKey; its lower-case form is the CLI family alias, which is
-  // what the override passed before. A full-ID value now passes as its alias.
-  const override = env.CLAUDE_CLI_MODEL?.toLowerCase() ?? ""
-  const model = pinnedModel || override || (explicitModel ?? "haiku").trim()
-  if (!model || (!pinnedModel && model.toLowerCase() === "default")) return []
-  if (!MODEL_NAME_RE.test(model)) throw invalidModelName(model)
-  return ["--model", model]
+  return ["--model", arg]
 }
 
 export interface ClaudeCliOptions {
-  // Defaults to the ResolvedModel's surface timeout when `model` is one, else
-  // to spawnClaude's 180 s.
+  // Defaults to the model's surface timeout (008 FR-12).
   timeoutMs?: number
   maxBuffer?: number
   // Short tag for log lines so concurrent/sequential CLI calls are distinguishable
   // (e.g. "copy", "design:pathB"). Purely diagnostic.
   label?: string
-  // The model to run. A ResolvedModel (008 FR-07) passes `--model <arg>`,
-  // ignores CLAUDE_CLI_MODEL and pinModel, and is recorded before each spawn.
-  // A string (CLI alias or full id) is the pre-008 path, kept until each call
-  // site moves onto the resolver (T6–T8); it is overridden by CLAUDE_CLI_MODEL
-  // when that env var is set. T10 makes this a required ResolvedModel.
-  model?: ResolvedModel | string
-  // String path only: `model` is used verbatim and CLAUDE_CLI_MODEL does NOT
-  // override it — the refine add-verifier is pinned to Haiku (change 004
-  // FR-14b). Ignored for a ResolvedModel, which never consults the env.
-  pinModel?: boolean
+  // The model to run (008 FR-07): `--model <arg>`, recorded before each spawn.
+  model: ResolvedModel
   // There is deliberately NO tools option (005 FR-08): every spawn passes
   // `--tools ""`, so no caller can opt a headless run — which executes with the
   // server's privileges — back into a tool without a reviewed code change.
@@ -377,7 +335,7 @@ function assertPromptSize(chars: number, hint: string): void {
   }
 }
 
-export async function runClaudeCli(prompt: string, opts: ClaudeCliOptions = {}): Promise<string> {
+export async function runClaudeCli(prompt: string, opts: ClaudeCliOptions): Promise<string> {
   return withAuthRetry(opts, (token) => runClaudeCliOnce(prompt, opts, token))
 }
 
@@ -435,15 +393,14 @@ export async function runClaudeCliOnce(
 ): Promise<string> {
   assertPromptSize(prompt.length, "This usually means the brand template is too big — use a smaller template or Path B.")
   const command = claudeCommand()
-  const args = [...baseArgs(command.shell), ...claudeModelArgs(opts.model, opts.pinModel)]
-  return spawnClaude(args, prompt, { ...resolvedSpawnOpts(opts), command, tokenOverride })
+  const args = [...baseArgs(command.shell), ...claudeModelArgs(opts.model)]
+  recordModelCall(modelCallFor(opts.model, "cli", opts.label))
+  return spawnClaude(args, prompt, { ...opts, command, tokenOverride })
 }
 
-// The 008 FR-07 boundary, shared by both input modes and run once per spawn —
-// so withAuthRetry's second attempt records a second call, which is correct:
-// two spawns happened. For a ResolvedModel, timeoutMs defaults to the entry's
-// surface timeout, and the call is recorded just before the spawn. A string or
-// absent model passes through unchanged (the pre-008 path).
+// The 008 FR-07 boundary: both input modes record the call just before each
+// spawn — so withAuthRetry's second attempt records a second call, which is
+// correct: two spawns happened.
 //
 // Known edge case (spec Edge Cases): resolution happens once, before the call,
 // with the acting user's credential tier. If withAuthRetry then falls back from
@@ -451,11 +408,6 @@ export async function runClaudeCliOnce(
 // the already-resolved model — so a personalTokenGated model admitted on
 // 'personal' can run once on the team token. Accepted: it is one call, the
 // personal token is marked INVALID, and the user's next resolution is 'team'.
-function resolvedSpawnOpts(opts: ClaudeCliOptions): ClaudeCliOptions {
-  if (!isResolvedModel(opts.model)) return opts
-  recordModelCall(modelCallFor(opts.model, "cli", opts.label))
-  return { ...opts, timeoutMs: opts.timeoutMs ?? opts.model.timeoutMs }
-}
 
 // ─── stream-json mode (005 FR-09) ────────────────────────────────────────────
 //
@@ -527,7 +479,7 @@ function streamJsonLine(content: ContentBlock[]): string {
   return line
 }
 
-export async function runClaudeCliStreamJson(content: ContentBlock[], opts: ClaudeCliOptions = {}): Promise<string> {
+export async function runClaudeCliStreamJson(content: ContentBlock[], opts: ClaudeCliOptions): Promise<string> {
   const line = streamJsonLine(content)
   return withAuthRetry(opts, (token) => runClaudeCliStreamJsonOnce(line, opts, token))
 }
@@ -545,9 +497,10 @@ async function runClaudeCliStreamJsonOnce(
     "--output-format",
     "stream-json",
     "--verbose",
-    ...claudeModelArgs(opts.model, opts.pinModel),
+    ...claudeModelArgs(opts.model),
   ]
-  return spawnClaude(args, line, { ...resolvedSpawnOpts(opts), command, tokenOverride, finalize: finalizeStreamJson })
+  recordModelCall(modelCallFor(opts.model, "cli", opts.label))
+  return spawnClaude(args, line, { ...opts, command, tokenOverride, finalize: finalizeStreamJson })
 }
 
 interface StreamJsonResultEvent {
@@ -688,7 +641,8 @@ async function spawnClaude(args: string[], stdinPayload: string, opts: SpawnClau
   const {
     command,
     tokenOverride,
-    timeoutMs = 180_000,
+    model,
+    timeoutMs = model.timeoutMs,
     maxBuffer = 16 * 1024 * 1024,
     label = "",
     finalize = finalizeText,
@@ -719,18 +673,12 @@ async function spawnClaude(args: string[], stdinPayload: string, opts: SpawnClau
   const childEnv = buildChildEnv(process.env, process.platform, oauthToken)
   const cwd = await spawnCwd()
 
-  const modelIdx = args.indexOf("--model")
-  const resolvedModel = isResolvedModel(opts.model)
-    ? `${opts.model.arg} (source=${opts.model.source})`
-    : modelIdx >= 0
-      ? args[modelIdx + 1]
-      : "(account default)"
   const startedAt = Date.now()
   const elapsed = () => `${((Date.now() - startedAt) / 1000).toFixed(1)}s`
 
   cliLog(
     label,
-    `spawn ${cmd} ${args.join(" ")} · model=${resolvedModel} · stdin=${stdinPayload.length} chars · timeout=${timeoutMs}ms`,
+    `spawn ${cmd} ${args.join(" ")} · model=${model.arg} (source=${model.source}) · stdin=${stdinPayload.length} chars · timeout=${timeoutMs}ms`,
   )
 
   return new Promise<string>((resolve, reject) => {

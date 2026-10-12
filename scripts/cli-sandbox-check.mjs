@@ -82,9 +82,11 @@ export function sandboxChildEnv(parentEnv, token) {
 }
 
 // claudeCli.ts runClaudeCliStreamJsonOnce argv on POSIX (shell:false, so the
-// empty values are bare "" argv elements). `sonnet` = modelFor('B', 'cli'),
-// the model CLI vision runs on.
-export const VISION_MODEL = "sonnet"
+// empty values are bare "" argv elements). VISION_MODEL is the catalogue's
+// ASSISTANT_BRANDKIT system-default cliArg (src/lib/models/catalogue.ts, 008
+// FR-15) — the model the brand-kit assistant's vision call runs on with no
+// team default. A drift test (claudeCliArgs.test.ts) pins the two together.
+export const VISION_MODEL = "claude-sonnet-5-5"
 export function sandboxArgs(model = VISION_MODEL) {
   return [
     "-p",

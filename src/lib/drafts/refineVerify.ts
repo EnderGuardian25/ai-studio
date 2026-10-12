@@ -26,8 +26,8 @@
 // ── The verifier is pinned to Haiku (FR-14b / AC-20b) ────────────────────────
 // 008 FR-15: it runs internalModel('INTERNAL_VERIFIER', mode) — a fixed system
 // step that never reads the team policy (A14) — and the input takes no model,
-// so no picker can route it elsewhere. A ResolvedModel never consults
-// CLAUDE_CLI_MODEL (T5), so the CLI call needs no pin.
+// so no picker can route it elsewhere. The CLI boundary never reads
+// CLAUDE_CLI_MODEL (FR-04), so no env value can either.
 //
 // ── No retries here ──────────────────────────────────────────────────────────
 // One verifier call per verifyRefine() invocation, maximum. The Anthropic SDK's
@@ -376,13 +376,13 @@ async function callVerifierModel(prompt: VerifierPrompt, instruction: string, te
     return buildMockVerifierReply(instruction)
   }
   if (mode === 'cli') {
-    // The 60 s bound is the model's surface timeout; a ResolvedModel needs no pin (T5).
+    // The 60 s bound is the model's surface timeout.
     return runClaudeCli(`${prompt.system}\n\n${prompt.user}`, { label: 'verify', model })
   }
   const apiKey = await resolveAnthropicApiKey(teamId)
   // maxRetries: 0 — one verifier call, never re-asked (see the header).
-  // createMessage bounds it by the model's surface timeout.
-  const client = new Anthropic({ apiKey: apiKey ?? undefined, maxRetries: 0, timeout: model.timeoutMs })
+  // createMessage bounds it by the model's surface timeout (its AbortSignal).
+  const client = new Anthropic({ apiKey: apiKey ?? undefined, maxRetries: 0 })
   const message = await createMessage(
     client,
     {

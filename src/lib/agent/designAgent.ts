@@ -92,8 +92,8 @@ async function executeTool(
 
 // 008 FR-07: the design loop runs exactly the DESIGN_* model its caller
 // resolved (required — there is no default model), and its wall-clock budget
-// is that model's surface timeout (FR-12): deadlineMs is not an option here.
-export type RunDesignAgentOptions = Omit<DesignAgentOptions, "model" | "deadlineMs"> & {
+// is that model's surface timeout (FR-12).
+export type RunDesignAgentOptions = DesignAgentOptions & {
   model: ResolvedModel
 }
 
@@ -284,14 +284,12 @@ const REFINE_TOOL_DEFINITIONS = TOOL_DEFINITIONS.filter((t) => t.name !== "rende
 const textOf = (content: Anthropic.Messages.ContentBlock[]) =>
   content.flatMap((b) => (b.type === "text" ? [b.text] : [])).join("\n")
 
-// 008 (transitional, T7 → T10): `model` is a ResolvedModel (the REFINE model
-// the route resolved: through createMessage, bounded by its surface timeout,
-// recorded by the mock seam) or the pre-008 string (today's direct SDK call
-// and 300 s budget, unchanged). T7 moves the refine route onto the resolver;
-// T10 deletes the string and the default below.
+// 008 FR-07: `model` is the REFINE model the route resolved (required — there
+// is no default model). Every turn goes through createMessage, bounded by its
+// surface timeout (FR-12), and the mock seam records it.
 export async function runDesignAgentRefine(
-  options: Omit<DesignAgentOptions, "inlineAssets" | "model"> & {
-    model?: ResolvedModel | string
+  options: Omit<DesignAgentOptions, "inlineAssets"> & {
+    model: ResolvedModel
     refine: RefineModeOptions
   },
 ): Promise<string> {
@@ -299,23 +297,21 @@ export async function runDesignAgentRefine(
     systemPrompt,
     userMessage,
     briefId,
-    model = "claude-sonnet-4-6",
+    model,
     maxToolCalls = 15,
     width = 1080,
     height = 1080,
     actor,
     refine,
   } = options
-  const resolved = typeof model === "object" ? model : null
-  const deadlineMs = options.deadlineMs ?? resolved?.timeoutMs ?? 300_000
-  const modelLabel = resolved ? resolved.arg : model
+  const deadlineMs = model.timeoutMs
 
   // Test seam: the same failure and conflict sentinels as runDesignAgent's
   // mock branch, then the deterministic envelope reply (T20). With no refine
   // sentinel the reply is exactly the document runDesignAgent's mock returns.
   if (MOCK_AI) {
-    // 008 FR-16: a ResolvedModel short-circuited here is recorded first.
-    if (resolved) recordModelCall(modelCallFor(resolved, pipelineMode(), "refine"))
+    // 008 FR-16: the model short-circuited here is recorded first.
+    recordModelCall(modelCallFor(model, pipelineMode(), "refine"))
     if (shouldMockGenerateFail(userMessage)) {
       throw new Error("Mock generation failure (__FAIL_GEN_ALWAYS__ sentinel)")
     }
@@ -346,11 +342,9 @@ export async function runDesignAgentRefine(
       tools: REFINE_TOOL_DEFINITIONS,
       messages,
     }
-    const response = resolved
-      ? await createMessage(client, params, resolved, { deadlineAt, label: "refine" })
-      : await client.messages.create({ ...params, model: model as string })
+    const response = await createMessage(client, params, model, { deadlineAt, label: "refine" })
     console.log(
-      `[designAgent:refine#${refine.attempt}] turn ${iteration} (${modelLabel}): ` +
+      `[designAgent:refine#${refine.attempt}] turn ${iteration} (${model.arg}, ${model.source}): ` +
         `in=${response.usage.input_tokens} out=${response.usage.output_tokens} tokens, ` +
         `stop=${response.stop_reason}, elapsed=${Math.round((Date.now() - startedAt) / 1000)}s`
     )
