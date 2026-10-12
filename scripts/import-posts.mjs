@@ -24,6 +24,13 @@
  * (legacyCaptionText, @map("copyText")) with no caption rows, so the caption
  * loader materializes it on first read (src/lib/captions/store.ts).
  *
+ * Model stamps (change 008 FR-06/FR-10): the Brief's initial request
+ * (captionModel / designModel, ModelKey values) and the eight stamp columns
+ * (Draft.headlineModel / designModel, DraftCaption.model, DraftRevision.model,
+ * each with its …SubstitutedFrom) are copied verbatim — stamps are plain text,
+ * keys are enum values valid on both machines. A pre-008 bundle has none of
+ * them; they import as null ("unknown", the 004 render-stamp rule).
+ *
  * Post rows: only terminal statuses (PUBLISHED / FAILED / CANCELLED) are
  * imported. PENDING / SCHEDULED / PUBLISHING rows are skipped so this
  * machine's publish scheduler doesn't unexpectedly act on imported work.
@@ -87,6 +94,17 @@ const CONTENT_TYPES = {
   ".otf": "font/otf",
   ".pdf": "application/pdf",
 }
+
+// 008: the model stamps / initial requests, copied verbatim. Absent from a
+// pre-008 bundle, where they read as null ("unknown").
+const pick = (row, keys) => Object.fromEntries(keys.map((k) => [k, row[k] ?? null]))
+const BRIEF_MODEL_FIELDS = ["captionModel", "designModel"]
+const DRAFT_MODEL_FIELDS = ["headlineModel", "headlineModelSubstitutedFrom", "designModel", "designModelSubstitutedFrom"]
+const ROW_MODEL_FIELDS = ["model", "modelSubstitutedFrom"]
+const stampText = (fields) =>
+  Object.entries(fields)
+    .map(([k, v]) => `${k} ${v ?? "null"}`)
+    .join(", ")
 
 // A draft's caption fields, from either bundle version (see the header).
 function draftCaptionFields(d) {
@@ -264,9 +282,11 @@ async function main() {
       additionalImageUrl: b.additionalImageUrl,
       briefImages: b.briefImages ?? undefined,
       referenceTemplateId,
+      ...pick(b, BRIEF_MODEL_FIELDS),
       createdAt: b.createdAt,
     }
-    if (!args.dryRun) await prisma.brief.create({ data })
+    if (args.dryRun) console.log(`  brief ${b.id}: ${stampText(pick(b, BRIEF_MODEL_FIELDS))}`)
+    else await prisma.brief.create({ data })
     stats.briefs.created++
   }
 
@@ -286,6 +306,7 @@ async function main() {
       pendingConflict: d.pendingConflict ?? undefined,
       currentRevisionNumber: d.currentRevisionNumber,
       promptVersion: d.promptVersion,
+      ...pick(d, DRAFT_MODEL_FIELDS),
       status: d.status,
       failureReason: d.failureReason,
       createdAt: d.createdAt,
@@ -296,7 +317,7 @@ async function main() {
       const rows = captions.filter((c) => c.draftId === d.id).map((c) => c.channel)
       console.log(
         `  draft ${d.id}: headline ${JSON.stringify(data.headline)}, captionMigration ${data.captionMigration}, ` +
-          `legacy caption ${legacy}, caption rows [${rows.join(", ")}]`
+          `legacy caption ${legacy}, caption rows [${rows.join(", ")}], ${stampText(pick(d, DRAFT_MODEL_FIELDS))}`
       )
     } else await prisma.draft.create({ data })
     stats.drafts.created++
@@ -324,6 +345,7 @@ async function main() {
       status: c.status,
       failureReason: c.failureReason,
       needsReview: c.needsReview,
+      ...pick(c, ROW_MODEL_FIELDS),
       createdAt: c.createdAt,
       updatedAt: c.updatedAt,
     }))
@@ -332,7 +354,8 @@ async function main() {
     for (const c of newCaptions)
       console.log(
         `  caption ${c.draftId}/${c.channel}: ${c.status}, ${c.text.length} chars` +
-          (c.needsReview ? ", needsReview" : "")
+          (c.needsReview ? ", needsReview" : "") +
+          `, ${stampText(pick(c, ROW_MODEL_FIELDS))}`
       )
   } else if (newCaptions.length > 0) {
     stats.captions.created = (await prisma.draftCaption.createMany({ data: newCaptions, skipDuplicates: true })).count
@@ -357,9 +380,11 @@ async function main() {
       instruction: r.instruction,
       htmlSnapshot: r.htmlSnapshot,
       exportUrl: r.exportUrl,
+      ...pick(r, ROW_MODEL_FIELDS),
       createdAt: r.createdAt,
     }
-    if (!args.dryRun) await prisma.draftRevision.create({ data })
+    if (args.dryRun) console.log(`  revision ${r.draftId} v${r.revisionNumber}: ${stampText(pick(r, ROW_MODEL_FIELDS))}`)
+    else await prisma.draftRevision.create({ data })
     stats.revisions.created++
   }
 

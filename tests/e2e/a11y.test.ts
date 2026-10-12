@@ -1194,6 +1194,11 @@ test.describe('axe scan (T18)', () => {
     await expect(page.getByRole('heading', { name: 'AI Providers' })).toBeVisible()
     await page.getByRole('button', { name: /^(Register Provider|Register image key)$/ }).click()
     await expect(page.getByRole('heading', { name: 'Register new provider', level: 3 })).toBeVisible()
+    // 008 AC-22: the scan covers /team → Models too. It loads two queries of
+    // its own, so wait for its form rather than relying on networkidle.
+    await expect(
+      page.getByRole('region', { name: 'Models', exact: true }).getByRole('button', { name: 'Save', exact: true }),
+    ).toBeVisible()
     await expectNoAxeViolations(page, '/team (register form open)')
   })
 })

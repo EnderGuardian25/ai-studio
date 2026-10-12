@@ -14,6 +14,13 @@
  *   <out>/manifest.json          — rows + remap hints (owner username, campaign/kit names)
  *   <out>/objects/<bucket>/<key> — every referenced MinIO object (exports, images, brand assets)
  *
+ * Model stamps (change 008): every row is exported with all its scalar columns,
+ * so Brief.captionModel / designModel and the eight stamp columns
+ * (Draft.headlineModel / designModel, DraftCaption.model, DraftRevision.model,
+ * each with its …SubstitutedFrom) travel as they are. The bundle stays version
+ * 2: a pre-008 importer ignores the extra keys and the stamps read as null
+ * ("unknown") there, which loses provenance but no content.
+ *
  * What is NOT exported: users, brand kits, campaigns, scheduled generations —
  * the importer re-links those by name/username on the target (or falls back).
  *
@@ -194,6 +201,8 @@ async function main() {
   console.log(
     `  ${rows.drafts.length} drafts, ${rows.briefs.length} briefs, ${rows.revisions.length} revisions, ${rows.captions.length} captions, ${rows.posts.length} posts`
   )
+  const stamped = rows.drafts.filter((d) => d.designModel || d.headlineModel).length
+  console.log(`  ${stamped}/${rows.drafts.length} drafts carry model stamps (008)`)
   console.log(`  ${downloaded}/${assets.length} MinIO objects (${(totalBytes / 1024 / 1024).toFixed(1)} MB)`)
   if (missing.length > 0) {
     console.log(`  ⚠ ${missing.length} referenced objects were missing in MinIO (listed in manifest.missingObjects)`)

@@ -572,6 +572,113 @@ TC-CAP-17, -19 and -20 run 014's 12 AC-19 axe rules over the caption states 014'
 
 ---
 
+### Y. Model selection (`model-selection.test.ts`, change 008 T12 — wave 1, AC-15 → AC-23)
+
+Every model call resolves through one resolver (request > stamp > team default > system default > fallback), and each tier is checked against the team's effective set **at call time**. What ran is recorded in two places:
+
+- **the stamps**, on the row each call wrote: `captions[].model`, `headlineModel`, and `designModel` (which mirrors the current revision's `DraftRevision.model`), each with a `…SubstitutedFrom`;
+- **the recorder**, which is test-only.
+
+The mock E2E runs **API mode**, so every stamp and every recorded `arg` is the full apiId (`claude-haiku-4-5`, `claude-sonnet-5-5`, `claude-opus-5-5`). The CLI boundary is proven by the unit test AC-12 alone, because CLI mode never runs under `MOCK_AI`.
+
+Each case uses a unique topic and `waitForDraft` / `waitForAction`, with one kit (holding a square template) and one campaign per worker. The suite needs `MOCK_AI` + `MOCK_PUPPETEER` and test-DB access. **Every case deletes the team's `TeamModelPolicy` row before and after** (`beforeEach` / `afterEach`). That is the exact "never saved" state, so no later suite inherits a changed team.
+
+**Seams (all dormant in production):**
+
+- **`GET` / `DELETE /api/test/model-calls`** (008 FR-16): the recorder's ring buffer.
+  - It holds 200 records on `globalThis`, shared across `next dev` route modules, newest last.
+  - It is gated like `/api/test/scheduler-tick`: 404 in production, 404 unless `MOCK_AI`, and admin-only.
+  - Each record is `{ surface, key, arg, mode, source, substitutedFrom, label }`. Every `MOCK_AI` branch on a model surface records the `ResolvedModel` it was handed before returning its mock.
+  - Each case `DELETE`s before the action it asserts on.
+- **Stamps are seeded through the test DB** (`prisma.draft.update` / `draftCaption.update`), as §W does.
+- **The verifier is reached with an _add_ instruction** ("Include a human character"). A bare mock document defaults to the add class, whose post-condition is the verifier (004 TC-FID-09).
+- **The rollback check (TC-MODEL-12)** builds a scratch DB, `bistec_studio_test_008_rollback`, with `prisma migrate deploy`, as TC-CAP-13 does. A `TEMPLATE` copy is refused while the test server holds the source. The literal `TEMPLATE` run of AC-23 is a scripted step with the server stopped, recorded in `.specclaw/changes/008-model-selection/reports/T12.md`.
+
+**Cases:**
+
+- **TC-MODEL-01 — Path B on system defaults (AC-15).**
+  - The draft is EXPORTED. The three `captions[].model` and `headlineModel` are Haiku, `designModel` is Sonnet, and every `…SubstitutedFrom` is null.
+  - Revision 1's `model` is Sonnet, in the DB and in the revisions list.
+  - Recorder: `CAPTION` → Haiku and `DESIGN_FREEFORM` → Sonnet, both `system`, mode `api`.
+- **TC-MODEL-02 — Path A (AC-15).** `designModel` and revision 1 are Haiku. The recorder has `DESIGN_TEMPLATE` → Haiku (`system`) and no `DESIGN_FREEFORM` record.
+- **TC-MODEL-03 — A team default reaches generation (AC-16 a).**
+  - PUT `defaults.DESIGN_FREEFORM = 'OPUS'` → 200, with `saved: true` and unset surfaces `null`.
+  - The next generation's `designModel` and revision 1 are Opus.
+  - Recorder: `DESIGN_FREEFORM` → Opus (`team`); `CAPTION` stays Haiku (`system`).
+- **TC-MODEL-04 — Validation, permissions and the picker view (AC-16 b–d, FR-13, FR-16).**
+  - `allowed: ['OPUS']` → 400 "Template fill needs Haiku or Sonnet allowed".
+  - A default outside `allowed` → 400. A lowercase key and an unknown field (`teamId`) → 400. Nothing is saved.
+  - **As the editor:**
+    - PUT and GET `/api/team/model-policy` → 403;
+    - `GET /api/models` → 200, with `mode: 'api'`, `credential: 'n/a'`, tiers `$` / `$$` / `$$$`, and Opus without `DESIGN_TEMPLATE`. No `claude-` string and no price appears anywhere in the JSON;
+    - the recorder seam → 403.
+- **TC-MODEL-05 — Team isolation (AC-16 e).**
+  - ClientX's admin saves `DESIGN_FREEFORM: OPUS` and `CAPTION: SONNET`.
+  - Bistec's policy stays unsaved. A Bistec generation designs on Sonnet and captions on Haiku, both `system`.
+  - ClientX's row is deleted in `finally`.
+- **TC-MODEL-06 — A removal applies to stored stamps (AC-17, security BLOCK).**
+  - **Setup:** a draft seeded with `designModel` = Opus and LinkedIn `model` = Opus, then PUT `allowed: ['HAIKU','SONNET']`.
+  - `regenerate-design` → revision 2 and the draft are Sonnet, with `…SubstitutedFrom` = Opus.
+  - `regenerate-copy {channel:'LINKEDIN'}` → LinkedIn is Haiku, with `modelSubstitutedFrom` = Opus. The IG and WA rows deep-equal their seeded read.
+  - **Recorder:** no Opus record after the PUT. The two records are `[Sonnet, system, Opus]` and `[Haiku, system, Opus]`.
+  - **Mutation-checked:** letting the stamp tier skip the effective set makes this case fail (Opus received).
+- **TC-MODEL-07 — Regenerate all is like for like (AC-18).**
+  - **(a)** Stamps `[S,S,S]`, then `{}` → three Sonnet rows; recorder `stamp`.
+  - **(b)** Mixed stamps `[S,O,S]` with a team `CAPTION: HAIKU` → three Haiku rows; `team`; `modelSubstitutedFrom` null.
+  - **(c)** Null stamps and no team default → three Haiku rows; `system`.
+  - The headline and `headlineModel` are never touched.
+- **TC-MODEL-08 — Refine and the verifier (AC-19).**
+  - A Path B refine ("Include a human character") → revision 2 and `designModel` are Sonnet. Recorder: `REFINE` → Sonnet (`system`) and `INTERNAL_VERIFIER` → Haiku (label `verify`).
+  - A Path A refine → revision 2 is Haiku.
+  - A team `REFINE: OPUS` → revision 3 is Opus (`team`); the verifier is still Haiku.
+  - Restoring revision 1 → `designModel` is Sonnet again.
+- **TC-MODEL-09 — Non-interactive callers (AC-20).** The team sets `DESIGN_FREEFORM: OPUS`.
+  - **The scheduler:** a HOLD queue entry is made due through the test DB, then `POST /api/test/generation-tick`. The entry is COMPLETED with `errorReason` null. Its draft and revision 1 are Opus; recorder `team`.
+  - **ACP `generate_post`,** on a minted team key. The input also carries an ignored `model: 'HAIKU'`. Result: `designModel` is Opus and the captions are Haiku. The key is revoked in `finally`.
+- **TC-MODEL-10 — The assistants and the stamp-less surfaces (AC-21).**
+  - The surfaces:
+    - `ASSISTANT_BRIEFING` (label `briefing`): the campaign briefing chat, campaign Enhance and post-brief Enhance;
+    - `ASSISTANT_BRANDKIT`: the brand-kit chat (`brandkit`), image → template (`image-template`), and both voice drafts, generate and improve (`brand-voice`).
+  - Each returns 200 and records **exactly one** call: Sonnet (`system`). After a team default of Haiku on both assistant surfaces, each records Haiku (`team`).
+- **TC-MODEL-11 — `/team` → Models (AC-22).** Every query is scoped to `region "Models"`.
+  - **Structure:**
+    - the h2;
+    - "Allowed models" holds 3 checkboxes named `Haiku 4.5 · $ · fast`, `Sonnet 5.5 · $$ · medium` and `Opus 5.5 · $$$ · slow`;
+    - "Defaults" holds 6 named comboboxes. Each one's first option is `System default (<name>)`, and Template fill never lists Opus;
+    - the switch "Opus requires a personal token" is **disabled** (API mode), and is described by the helper text plus "Only applies in CLI mode.".
+  - Axe (014's 12 rules).
+  - **Untick Opus + Save** → "Models saved". The GET `allowed` is `['HAIKU','SONNET']` with `newModels: ['OPUS']`, and there is one "New" chip.
+  - **Only Opus ticked** → Template fill reads "System default (none allowed)". Save → `role="alert"` "Template fill needs Haiku or Sonnet allowed", and nothing is saved.
+  - Axe again, with the error showing.
+- **TC-MODEL-12 — The migration round trip (AC-23).** On the scratch DB:
+  1. The forward shape equals the test DB's own. The shape is: the 10 added columns plus both tables' columns, each with type and nullability; both tables; both enum types; and the `20261012120000_model_selection` row.
+  2. Rows are seeded in every added object: a policy with a default, a Brief with both keys, and a stamped Draft, caption and revision.
+  3. `prisma db execute --file prisma/rollback/008-model-selection.down.sql` → nothing of 008 is left (`{columns: [], tables: [], types: [], migration: 0}`), and the Draft row is kept.
+  4. A second `prisma migrate deploy` re-applies the migration by itself, and the shape equals the forward one again.
+- **AC-22's axe half on the full page** is also covered by 014's `a11y.test.ts` "AC-19: /team with the register form open", which now waits for the Models section's Save button before scanning.
+
+**Existing cases edited by 008** (reasons in `.specclaw/changes/008-model-selection/reports/T12.md`):
+
+- `a11y` "AC-19: /team with the register form open" waits for the Models section before its scan;
+- `surfaces` "/team at 375px" scopes the social-channel Save count to its section (the Models section adds a third Save) and lists the Models h2.
+
+**AC → case map (change 008, wave 1).** The unit side is AC-01 → AC-13: `modelCatalogue`, `modelResolve`, `envModel`, `modelPolicy`, `regenerateStamp`, `captionStore` / `renderStamps` / `draftActions`, `usageLimit`, `actionBudget`, the heartbeat cases, `modelLiteralGuard`, `modelBoundary` and `anthropicCall`. AC-14 is the operator's T2.
+
+| AC                                                     | E2E                                                  |
+| ------------------------------------------------------ | ---------------------------------------------------- |
+| AC-15 generation stamps on system defaults             | TC-MODEL-01, TC-MODEL-02                             |
+| AC-16 the team policy                                  | TC-MODEL-03, TC-MODEL-04, TC-MODEL-05                |
+| AC-17 a removal applies to stored values               | TC-MODEL-06                                          |
+| AC-18 regenerate is like for like                      | TC-MODEL-07                                          |
+| AC-19 refine and the verifier                          | TC-MODEL-08                                          |
+| AC-20 non-interactive callers use the team default     | TC-MODEL-09                                          |
+| AC-21 the assistants and the stamp-less surfaces       | TC-MODEL-10                                          |
+| AC-22 `/team` → Models                                 | TC-MODEL-11, `a11y` "AC-19: /team …"                 |
+| AC-23 the migration and rollback                       | TC-MODEL-12 + the scripted TEMPLATE run (T12 report) |
+| AC-24 wave 1's full clean mock E2E, 0 failed / 0 flaky | the wave-1 gate                                      |
+
+---
+
 ## 7. Fixes required to the existing specs (before/while implementing)
 
 1. `path-a.test.ts` — assert `{draftId,exportUrl}` then `GET /api/drafts/[id]` for `status`/`htmlContent`/`imageUrl`.
@@ -634,5 +741,6 @@ CI gate: **`.github/workflows/e2e.yml`** runs the whole suite (§A–§W, includ
 | Change 004 refine fidelity (AC-08 → AC-20b)                 | §U TC-REJ-01…04, §V TC-FID-01…17, T18/T19 in `refine-not-applied.test.ts` (see §V map) |
 | Change 005 skipped-background notice (AC-01, AC-08 → AC-11) | §BG TC-BG-01…10, TC-GEN-05 (see §BG map)                                               |
 | Change 012 per-channel captions (AC-12 → AC-24)             | §W TC-CAP-01…20, TC-ASYNC-10 (see §W map)                                              |
+| Change 008 model selection, wave 1 (AC-15 → AC-23)          | §Y TC-MODEL-01…12, `a11y` /team axe (see §Y map)                                       |
 
 > Items with no behavioral surface (M2 init race, M3 stdin, M7 polling, M8 crypto guards, M13 dead code) are best covered by unit tests; M7 polling can optionally be a UI test (draft auto-refresh while `IN_PROGRESS`).

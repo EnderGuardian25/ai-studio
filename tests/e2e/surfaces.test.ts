@@ -1101,13 +1101,21 @@ test.describe('Team, settings and admin (T12)', () => {
     await page.goto('/team')
 
     await expect(page.getByRole('heading', { name: 'Team settings', level: 1 })).toBeVisible()
-    for (const name of ['AI Providers', 'Social Channels', 'Team Claude account', 'API keys']) {
+    for (const name of ['AI Providers', 'Social Channels', 'Team Claude account', 'API keys', 'Models']) {
       await expect(page.getByRole('heading', { name, exact: true, level: 2 })).toBeVisible()
     }
     await expect(page.getByRole('heading', { name: 'Image generation', level: 3 })).toBeVisible()
-    // Social channels: both rows, each with its token reveal and Save.
-    await expect(page.getByRole('button', { name: 'Show access token' })).toHaveCount(2)
-    await expect(page.getByRole('button', { name: 'Save', exact: true })).toHaveCount(2)
+    // Social channels: both rows, each with its token reveal and Save. Scoped
+    // to the section since 008 added the Models section's own Save to /team.
+    const channels = page
+      .locator('section')
+      .filter({ has: page.getByRole('heading', { name: 'Social Channels', exact: true, level: 2 }) })
+      .last()
+    await expect(channels.getByRole('button', { name: 'Show access token' })).toHaveCount(2)
+    await expect(channels.getByRole('button', { name: 'Save', exact: true })).toHaveCount(2)
+    await expect(
+      page.getByRole('region', { name: 'Models', exact: true }).getByRole('button', { name: 'Save', exact: true }),
+    ).toBeVisible()
     // The team token, with its guide.
     await expect(page.getByRole('textbox', { name: 'Team Claude OAuth token' })).toBeVisible()
     await expect(page.getByRole('tablist', { name: 'Operating system' }).getByRole('tab')).toHaveText(['Windows', 'macOS', 'Linux'])
