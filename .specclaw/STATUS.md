@@ -1,7 +1,7 @@
 # 🦞 SpecClaw Dashboard
 
 **Project:** bistec-studio
-**Last Updated:** 2026-10-12 02:34 UTC
+**Last Updated:** 2026-10-12 02:53 UTC
 
 ## Active Changes
 
@@ -20,7 +20,7 @@
 
 - 📋 **006-product-observability** — proposal ready, awaiting planning
 - 📋 **007-brandkit-design-system** — proposal ready, awaiting planning
-- 📋 **008-model-selection** — proposal ready, awaiting planning
+- 📋 **008-model-selection** ▣ — proposal ready, awaiting planning
 - 📋 **009-hero-image-design** — proposal ready, awaiting planning
 - 📋 **010-whatsapp-channel-posting** — proposal ready, awaiting planning
 

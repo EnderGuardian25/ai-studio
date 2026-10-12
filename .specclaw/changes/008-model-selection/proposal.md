@@ -97,10 +97,76 @@ One model catalogue, one resolver, three places to choose.
 - **Template fill (`design.template`, Path A) — decided 2026-10-12:** offers Haiku and Sonnet only. Freeform design, refine and the assistants offer all three models.
 - **Caption stamp — decided 2026-10-12:** one stamp per `DraftCaption` row, plus one for the headline. This replaces the single `Draft.captionModel`.
 
+- **Team-token warning — decided 2026-10-12:** in CLI mode, when Opus is picked and the run would use the **team** Claude token (no personal token connected), the picker shows a small non-blocking notice that the run uses the team's allowance.
+- **Regenerate default — decided 2026-10-12:** the picker defaults to the draft's **stamped** model, so a regenerate is like for like unless the user changes it.
+
+### Panel rulings (user, 2026-10-12)
+
+These answer the deep panel's verdict, CHANGES_REQUESTED (`party-report.md`). They override the Proposed Solution text above where the two conflict.
+
+- **Two waves, both in 008.**
+  - **Wave 1**, independently shippable: the catalogue, `resolveModel`, current IDs in both modes, team defaults at `/team`, the stamps, the timeout/sweep reconciliation, and `voiceDraft.ts` plus the internal steps on the catalogue.
+  - **Wave 2:** the pickers (brief wizard, refine, regenerate, assistant chat headers) and the team-token notice.
+- **No per-user remembered choice.** There is no per-user table and no resolver tier for it. New posts and chats pre-select the team default; regenerate pre-selects the draft's stamped model.
+- **No `ScheduledGeneration` model pin.** Scheduled, MCP and ACP runs use the team default at run time.
+- **Team-token protection:** a single `/team` switch, "Opus requires a personal token". Scheduled runs also classify usage-limit failures explicitly in `errorReason`. The 2026-10-12 notice stays. There is no per-credential allow-list.
+
+### Panel resolutions (orchestrator, 2026-10-12)
+
+These are technical answers to the panel's BLOCK and WARN findings. Each has one sensible answer, and planning carries them into `spec.md`.
+
+- **A closed catalogue.** Model choices are stored only as catalogue **keys**, a closed enum validated at every write boundary. Full API IDs live only in the "what ran" stamps. The resolver returns a catalogue entry, and the spawn/SDK site passes only `entry.apiId`.
+- **The allow-list is checked at every tier, at call time.**
+  - A stored value (team default or stamp) that is no longer allowed, or no longer in the catalogue, falls through to the team default, then to the system default. The substitution is recorded on the stamp and logged on non-interactive runs.
+  - Only an explicit request returns 400.
+  - `/team` rejects a policy that leaves any surface with no allowed model.
+- **One owner for regenerate.** The draft's stamps are the server-side default for regenerate. "Regenerate all" with mixed row stamps uses the team default, and a null stamp falls through to the team default. `Brief`'s model fields mean "the initial request" only.
+- **The regenerate pickers and a `model` body field** on `regenerate-copy` (all three forms) and `regenerate-design` are in wave 2.
+- **Timeouts are bounded per action, not per call.** Each action's worst-case chain (generation; refine + verify + retry) is computed from the catalogue and must stay under both 15-minute sweeps, enforced by a unit test. Per-model timeouts are measured placeholders until a real Opus 5.5 run measures them.
+- **`resolveModel` replaces `modelFor` and `modelForBackground`.** `claudeCli.ts` stops reading `CLAUDE_CLI_MODEL`. When set, the variable must be a catalogue key or ID (otherwise it is a boot error), and it acts as the system default. A boot log notes the changed meaning.
+- **Internal steps get fixed, non-selectable catalogue surfaces:** the background decision, the refine verifier and the token ping. A guard test fails on any model literal outside `config.ts`.
+- **Each catalogue entry carries numeric per-MTok prices, with a dated source.** The `$ / $$ / $$$` tier is computed from them.
+- **A boundary seam records the model argument** at the CLI spawn and the SDK call. Tests assert on it for every surface.
+- **The full-ID behaviour of the pinned CLI (2.1.287) is verified** in planning or build, before it is relied on.
+
 ## Open Questions
 
-- In CLI mode Opus draws on the **user's** subscription limits (personal token) or the **team's** (team token). Should the picker warn when the team token is in use, since one user's Opus runs spend everyone's allowance?
-- Should a changed model on **regenerate** default to the draft's stamped model (reproducibility) or to the user's current remembered choice (convenience)?
+**Party panel (deep, 2026-10-12): CHANGES_REQUESTED.** These are the upheld findings, one line each:
+
+- (party-architect, BLOCK) Two stores answer "which model does the next regenerate use", and they diverge after the first per-channel regenerate — see party-report.md
+- (party-architect, BLOCK) A regenerate picker is decided, but no regenerate picker or route-body change is in scope — see party-report.md
+- (party-architect, WARN) The proposal adds `resolveModel` without saying what happens to the existing `modelFor` and the existing `CLAUDE_CLI_MODEL` read, or where the env var now sits — see party-report.md
+- (party-architect, WARN) The allow-list check covers only tier 1; the other model sources are unvalidated, and the allowed set can be empty — see party-report.md
+- (party-architect, WARN) The timeout contract covers single calls, but the sweeps measure the whole chain, and the catalogue's timeout shape is stated two ways — see party-report.md
+- (party-architect, WARN) The proposal adds a `ScheduledGeneration` model pin in its solution but omits it from scope, so its co-changes are unnamed — see party-report.md
+- (party-architect, WARN) No test checks the model ID at the call boundary, and the timeout/sweep reconciliation has no test at all — see party-report.md
+- (party-architect, NOTE) Some call sites inside a surface have no picker, so a user sets their model on a different screen — see party-report.md
+- (party-architect, NOTE) Rebuttal to party-po's per-user-memory NOTE: the stamped-model default cannot stand in for remembered choice on new posts — see party-report.md
+- (party-ba, WARN) The proposal never states what hurts or for whom; "users cannot choose" is asserted as the pain — see party-report.md
+- (party-ba, WARN) The central quality premise is not tied to any acceptance criterion — see party-report.md
+- (party-ba, WARN) The "full ID in both modes" premise rests on an unverified CLI behaviour that the problem section contradicts — see party-report.md
+- (party-ba, WARN) The historic Opus timeout is cited as evidence for a 600s budget, but the cause is not established — see party-report.md
+- (party-ba, WARN) "Team default" and "user's remembered choice" assume behaviours and interactions that are never established — see party-report.md
+- (party-ba, NOTE) "Surface" term shifts: `caption` covers headline, and `assistant.brandkit` spans three different tasks — see party-report.md
+- (party-po, BLOCK) Scope never prices or considers a cheaper variant: the full per-surface, per-user, per-team picker system versus a team-level default plus a few pickers — see party-report.md
+- (party-po, WARN) The ID upgrade and CLI/API version-drift fix have no stated dependence on the picker and ship separately for most of the value — see party-report.md
+- (party-po, WARN) Recurring cost of Opus-for-everyone is unquantified, and the default contradicts the proposal's own risk note — see party-report.md
+- (party-po, WARN) Scope with no stated value: team-defined allow-list, schedule-time model pinning, and Fable-readiness plumbing — see party-report.md
+- (party-po, NOTE) Per-user remembered choice is the first thing to cut and is worth naming as a deferral — see party-report.md
+- (party-security, BLOCK) The allow-list is enforced on tier 1 only, so stored choices get around an admin's removal — see party-report.md
+- (party-security, BLOCK) A resolved model string reaches a CLI process argument, and catalogue membership is never stated as the gate — see party-report.md
+- (party-security, WARN) The design timeout is per call, but the 15-minute sweep measures a multi-call span, so an Opus refine can be marked FAILED while it is still running and billing — see party-report.md
+- (party-security, WARN) What happens when a stored model is no longer valid is unspecified, so it could become a silent substitution or a retry loop — see party-report.md
+- (party-security, WARN) Demoting `CLAUDE_CLI_MODEL` removes an operator's model ceiling without any warning — see party-report.md
+- (party-security, WARN) One editor's Opus runs on the shared team token can starve the scheduler and MCP, and they have no other credential — see party-report.md
+- (party-security, NOTE) Rebuttal to party-visionary's "map it to its successor key": a silent successor mapping is a substitution, and it must still pass the allow-list — see party-report.md
+- (party-visionary, WARN) Preference rows store model identity, so the next model upgrade is a data migration and old drafts regenerate onto a retired ID — see party-report.md
+- (party-visionary, WARN) Per-model timeouts and the two 15-minute sweeps become an ordering invariant kept by hand, and the proposal leaves it undecided — see party-report.md
+- (party-visionary, WARN) "Added later as one entry" is not true: a new model also needs allow-list membership, per-surface eligibility, a cost tier and a timeout, and allow-list semantics for it are undefined — see party-report.md
+- (party-visionary, WARN) Internal steps stay as scattered hard-coded pins, so the next ID upgrade repeats Problem 1 for exactly the sites outside the catalogue — see party-report.md
+- (party-visionary, WARN) Cost tiers are a hand-copied snapshot of Anthropic's price sheet, and 006 will need a second, numeric copy — see party-report.md
+- (party-visionary, WARN) Surface names become a persisted vocabulary that is coarser than the stamps, so the obvious next split (headline vs captions, voice draft vs vision) is a data migration — see party-report.md
+- (party-visionary, NOTE) Rebuttal of party-security's per-credential-tier fix: it adds a third policy axis that every later catalogue change must fill in — see party-report.md
 
 ---
 

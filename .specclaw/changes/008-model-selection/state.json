@@ -1,0 +1,9 @@
+{
+  "change": "008-model-selection",
+  "phase": "proposal",
+  "branch": "",
+  "size": "architectural",
+  "phases": {
+    "proposal": { "status": "approved", "at": "2026-10-12T02:53:20Z" }
+  }
+}
