@@ -103,7 +103,7 @@ Wave 2 adds per-post and per-chat pickers only.
     - **The pin test:** `modelCatalogue.test.ts` asserts that Prisma's `ModelKey` and `ModelSurface` values (from `@prisma/client`) equal the catalogue's unions.
     - **`.env.example`** re-documents the variable: "system default model (haiku | sonnet | opus or a full ID); CLI mode only; no longer overrides team defaults; `default` is rejected".
 
-- [ ] `T4` — The server resolver, the team policy store and the two APIs
+- [x] `T4` — The server resolver, the team policy store and the two APIs
   - Files: `src/lib/models/policy.ts` (new), `src/app/api/team/model-policy/route.ts` (new), `src/app/api/models/route.ts` (new), `src/lib/api-types.ts`, `tests/unit/modelPolicy.test.ts` (new), `tests/unit/envModel.test.ts`
   - Estimate: medium
   - Kind: impl

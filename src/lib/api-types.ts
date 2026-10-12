@@ -8,6 +8,8 @@
 import type { AspectRatio, Channel, DesignMode, TeamRole } from '@prisma/client'
 import type { Role } from '@/lib/auth'
 import type { BackgroundSkipped } from '@/lib/drafts/backgroundNotice'
+import type { ModelKey, ModelSpeed, ModelTier, UserSurface } from '@/lib/models/catalogue'
+import type { CredentialTier, PipelineMode } from '@/lib/models/resolve'
 
 // ── Auth ─────────────────────────────────────────────────────────────────
 
@@ -222,6 +224,42 @@ export interface ProviderInfo {
   providerKey: string
   label: string
   isDefault: boolean
+}
+
+// ── Models (008) ─────────────────────────────────────────────────────────
+
+// GET/PUT /api/team/model-policy (team admins) — the team's model policy
+// (008 FR-05, FR-13). `defaults` names every user surface; null = "use the
+// system default". `saved` is false for a team with no stored row (A2), and
+// `newModels` lists defaultAllowed catalogue entries a SAVED list doesn't
+// include yet — /team labels them "New" (never added silently).
+export interface TeamModelPolicyInfo {
+  allowed: ModelKey[]
+  defaults: Record<UserSurface, ModelKey | null>
+  requirePersonalTokenForGated: boolean
+  saved: boolean
+  newModels: ModelKey[]
+}
+
+// GET /api/models (any team member) — everything a picker needs to run the
+// client-side decideModel. Never a price or an apiId: the boundary is the
+// only consumer of ResolvedModel.arg (FR-13).
+export interface ModelsView {
+  catalogue: Array<{
+    key: ModelKey
+    displayName: string
+    tier: ModelTier
+    speed: ModelSpeed
+    surfaces: UserSurface[]
+    personalTokenGated: boolean
+  }>
+  allowed: ModelKey[]
+  defaults: Partial<Record<UserSurface, ModelKey>>
+  gateOn: boolean
+  mode: PipelineMode
+  credential: CredentialTier
+  /** CLAUDE_CLI_MODEL; null in API mode, where it is ignored (A4). */
+  envDefault: ModelKey | null
 }
 
 // ── Drafts ───────────────────────────────────────────────────────────────
