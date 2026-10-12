@@ -7,7 +7,15 @@
 
 ---
 
-## ⏸️ 2026-10-12 (later) — PICK UP HERE: 008 is approved; finish its plan (a planner subagent was mid-run at the clear)
+## ⏸️ 2026-10-12 (latest) — PICK UP HERE: 008 is PLANNED (spec/design/tasks committed). Get the user to approve the plan, then `/specclaw:build 008-model-selection`
+
+- **The plan:** 19 tasks in 2 waves. Wave 1 is T1–T12: the foundation, shippable on its own, with one full E2E gate at T12. Wave 2 is T13–T19: the pickers and docs.
+- **T2 is operator-gated:** the CLI full-ID check. The ready-to-paste command is in tasks.md.
+- **Spec:** assumptions A1–A14 and open questions 1–4, each with a recommended default.
+- **Design:** §13 maps every upheld panel finding to where it is addressed. One finding is explicitly declined: a separate `CLAUDE_MODEL_ALLOW` operator ceiling.
+- **History:** the 2026-10-12 planner subagent hit a usage limit after writing `spec.md`. The orchestrator reviewed `spec.md` against the code survey and wrote `design.md` and `tasks.md`.
+
+## (superseded) 2026-10-12 (later) — 008 is approved; finish its plan (a planner subagent was mid-run at the clear)
 
 ### State
 
