@@ -1,7 +1,9 @@
 # bistec-studio roadmap — changes 004–012
 
 **Updated:** 2026-09-23 · **Branch:** all of this lands on `v2` (see Branching at the bottom); handoff in `docs/handoff.md` top section.
-**Status (2026-10-11, later):** **004**, **005**, **011**, **013** (fork CI, checks only) and **014** (UI accessibility, shared primitives and consistency) are verified PASS. **012** (per-channel captions) is **built, 16/16, and verified PASS** (2026-10-12) on `v2`. **012 → 010 stays a hard dependency:** 010 consumes the `DraftCaption` WhatsApp row. **006–010** are proposals. Handoff: `docs/handoff.md` top section.
+**Status (2026-10-12, later):** **015** (the draft-page settle race behind the red fork CI) is verified PASS, and fork CI on `v2` is green again. **008** (model selection) is **approved (architectural)** after a deep party panel; its rulings are recorded in its proposal and **planning is in progress**. Work lands directly on `v2`, with no per-change PRs; one `v2`→`main` PR follows later, on request.
+
+**(Superseded) Status (2026-10-11, later):** **004**, **005**, **011**, **013** (fork CI, checks only) and **014** (UI accessibility, shared primitives and consistency) are verified PASS. **012** (per-channel captions) is **built, 16/16, and verified PASS** (2026-10-12) on `v2`. **012 → 010 stays a hard dependency:** 010 consumes the `DraftCaption` WhatsApp row. **006–010** are proposals. Handoff: `docs/handoff.md` top section.
 
 **(Superseded) Status (2026-10-11, earlier):** 004, 005, 011, 013 and 014 verified PASS; 012 building, T1–T7 of 16 committed.
 
@@ -17,7 +19,7 @@ This file sequences the open changes. Each change's own `proposal.md` is the sou
 | 005 | [Provider flexibility + onboarding](changes/005-provider-flexibility-onboarding/) | Guided Claude connect; COPY provider route; `isDefault` image bug; Gemini; CLI sandbox      | medium       | ✅ built 10/10 — verify PASS (2026-10-06)  |
 | 006 | [Product observability](changes/006-product-observability/)                       | Self-hosted PostHog, generation traces, scheduler heartbeat, stale-export badge             | large        | 📋 proposal                                |
 | 007 | [Brand-kit design system](changes/007-brandkit-design-system/)                    | Turn adjectival kit prose into measurable rules; typography dataset                         | medium-large | 📋 proposal                                |
-| 008 | [Model selection](changes/008-model-selection/)                                   | Choose Haiku / Sonnet / Opus per caption, design, refine and assistant chat                 | medium       | 📋 proposal (new)                          |
+| 008 | [Model selection](changes/008-model-selection/)                                   | Choose Haiku / Sonnet / Opus per caption, design, refine and assistant chat                 | medium-large | 📝 approved (architectural), planning      |
 | 009 | [Hero imagery](changes/009-hero-image-design/)                                    | Image model makes the hero subject, not wallpaper; layout archetypes; reference images      | large        | 📋 proposal (new)                          |
 | 010 | [WhatsApp Channel posting](changes/010-whatsapp-channel-posting/)                 | WhatsApp as a channel, with assisted handoff (Meta has no official Channel posting API)     | medium       | 📋 proposal (new)                          |
 | 011 | [App visual redesign](changes/011-app-visual-redesign/)                           | New visual direction; opaque surfaces; floating bottom-right **Create post** button         | large        | 🔨 wave 1 built (T1–T2) — awaiting pick    |

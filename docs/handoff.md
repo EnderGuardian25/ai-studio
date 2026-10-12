@@ -1,13 +1,90 @@
 # bistec-studio — Session Handoff
 
-**Date:** 2026-10-11, later (latest: **2026-10-12: fork CI on `v2` GREEN again. Change 015 fixed the draft-page settle race behind it. 012 per-channel captions BUILT 16/16 and VERIFIED PASS**). Previous: 2026-10-11, earlier (013 and 014 verified PASS; 012 building, T1–T7 of 16 committed). Previous: 2026-10-09 (011 verified PASS; fork `main` merged into `v2`; 013 fork CI, checks only, building; 014 and 012 approved). Previous: 2026-10-08 (011 built 13/13 on `v2` in the fork). Previous: 2026-10-07 (005 verified PASS; 011 planned, wave 1 built; the move to the fork). Previous: 2026-10-03 (004 finished and verified PARTIAL, Phase 0 only; 005 built 9/10, waiting on one operator check). Before that: 2026-09-28 (build session — 004 Waves 1–3 built, MinIO → silo, PR #42 + draft PR #43). Before that: 2026-09-23 (later, later the same day: proposal **012** per-channel captions + copy→caption rename, a floating **Create post** button folded into 011, and a launch-video legibility pass. Before that: planning session — proposals 008–011 + roadmap, 004 re-planned to 24 tasks incl. Phase 0, and the deploy pipeline found broken: Coolify 401 since 2026-09-15). Previous: 2026-07-28 (copy-edit status clobber fix).
+**Date:** 2026-10-12, later (latest: **008 model selection APPROVED (architectural) after a deep party panel; a planner subagent was writing its spec/design/tasks at the context clear. 015 verified PASS, and fork CI on `v2` is GREEN**). Previous: 2026-10-12 (015 fixed the draft-page settle race behind the red CI; 012 per-channel captions BUILT 16/16 and VERIFIED PASS). Previous: 2026-10-11, earlier (013 and 014 verified PASS; 012 building, T1–T7 of 16 committed). Previous: 2026-10-09 (011 verified PASS; fork `main` merged into `v2`; 013 fork CI, checks only, building; 014 and 012 approved). Previous: 2026-10-08 (011 built 13/13 on `v2` in the fork). Previous: 2026-10-07 (005 verified PASS; 011 planned, wave 1 built; the move to the fork). Previous: 2026-10-03 (004 finished and verified PARTIAL, Phase 0 only; 005 built 9/10, waiting on one operator check). Before that: 2026-09-28 (build session — 004 Waves 1–3 built, MinIO → silo, PR #42 + draft PR #43). Before that: 2026-09-23 (later, later the same day: proposal **012** per-channel captions + copy→caption rename, a floating **Create post** button folded into 011, and a launch-video legibility pass. Before that: planning session — proposals 008–011 + roadmap, 004 re-planned to 24 tasks incl. Phase 0, and the deploy pipeline found broken: Coolify 401 since 2026-09-15). Previous: 2026-07-28 (copy-edit status clobber fix).
 **Repo (since 2026-10-07):** https://github.com/EnderGuardian25/ai-studio — a public GitHub **fork** of the company repo `bistec-oss/studio`. All development continues here. The company repo is left as it is and receives nothing from this work. See the 2026-10-07 fork section below.
 **Branch:** work continues on **`v2`**, the fork's default branch. Fork `main` = `671ad6e9`, the company `main` at fork time. `v2` has contained fork `main` since the merge at `2506de0b` (2026-10-09).
 **Production:** none for the fork. `https://studio.bistecglobal.com` is the **company's** prod. It runs company `main` and is not ours to deploy.
 
 ---
 
-## ⏸️ 2026-10-11 (later) — PICK UP HERE: 012 is BUILT 16/16 and VERIFIED PASS (2026-10-12); fork CI on `v2` was red, ✅ GREEN since 015 (2026-10-12)
+## ⏸️ 2026-10-12 (later) — PICK UP HERE: 008 is approved; finish its plan (a planner subagent was mid-run at the clear)
+
+### State
+
+| Change                                  | State                                                     | Evidence                                                                                                                                                                                         |
+| --------------------------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **012** per-channel captions            | ✅ verified PASS, 28/28                                   | `.specclaw/changes/012-per-channel-captions/verify-report.md`                                                                                                                                    |
+| **015** draft-page settle race (red CI) | ✅ verified PASS, 8/8                                     | `.specclaw/changes/015-draft-action-settle-race/verify-report.md`. CI run 38195143494 at `df27ff49` passed every job (E2E 371/3, unit, build). It was the first green `v2` run since 2026-10-09. |
+| **008** model selection                 | 📝 **approved (architectural); planning was in progress** | `proposal.md` (with **Panel rulings** and **Panel resolutions**) and `party-report.md` (deep, CHANGES_REQUESTED: 5 BLOCK / 23 WARN / 6 NOTE upheld, 1 withdrawn). Committed at `a1272922`.       |
+
+**At the clear:**
+
+- A planner subagent was writing `.specclaw/changes/008-model-selection/spec.md`, `design.md` and `tasks.md`. **These are uncommitted.**
+- The specclaw **plan lock** on 008 has been held since **2026-10-12T02:53Z**. It goes stale after 120 minutes.
+
+### Resume, in order
+
+1. **Check the planner's output.** Run `ls .specclaw/changes/008-model-selection/`.
+   - **All three files present and complete:** review them. Check them against the proposal's two ruling sections, the design.md "Panel findings → where addressed" table (every upheld finding must be addressed or explicitly declined), and the task format, which `specclaw-parse-tasks` must parse with files, depends, estimate and kind. Fix gaps.
+     - Then run `specclaw-set-phase .specclaw 008-model-selection spec done`, then `design done`, then `tasks done`.
+     - Then `specclaw-change-lock .specclaw release 008-model-selection`.
+     - Commit and push to `v2`.
+   - **Missing or half-written:** run `specclaw-change-lock .specclaw release 008-model-selection`, then re-run `/specclaw:plan 008-model-selection`. The proposal holds every input; the planner brief is described below.
+2. **Present the plan to the user** for approval: the FR/AC/task counts, the A1… assumptions, the open questions and the pricing used. Then run `/specclaw:build 008-model-selection` subagent-driven: implementer → `specclaw:code-reviewer` → the orchestrator commits, one task at a time, with a full clean mock E2E per wave.
+
+### What the 008 planner was told (re-use it if planning must be re-run)
+
+- **The proposal's "Panel rulings" and "Panel resolutions" sections are binding** and override the older Proposed Solution text.
+- **Survey every model call site in the current code**, because the line numbers have drifted since 2026-09-23. Grep for every model literal in `src`.
+- **Pricing comes from the `claude-api` skill, not memory:** numeric per-MTok prices plus a dated source, with the tier derived from them.
+- **Do NOT run any real model call.**
+  - The pinned CLI 2.1.287's full-model-ID acceptance becomes an operator-gated wave-1 task, with a fallback to aliases.
+  - Opus 5.5 timeouts are measured placeholders, with the per-action budget unit test as the hard gate.
+- **Format:** copy 012's tasks.md exactly (plain `- Files:` keys) and its per-task and per-wave gate Summary.
+- **Migrations:** hand-written SQL with a `prisma/rollback/` file that also un-records the migration (lesson L24).
+- **Plan a mock seam** so the E2E can see the resolved model.
+
+### 008 decisions (summary; the authority is `proposal.md`)
+
+- **Catalogue:** Haiku 4.5, Sonnet 5.5 and Opus 5.5; no Fable. Choices are stored as **closed catalogue keys**; full API IDs appear only in the "what ran" stamps.
+- **Two waves inside 008.**
+  - **Wave 1** (the foundation, shippable on its own): the catalogue; `resolveModel` replacing `modelFor`/`modelForBackground`; current IDs on every call site, `voiceDraft.ts` included; internal surfaces (background, verifier, token ping) plus a model-literal guard test; `TeamModelPolicy` (team defaults, the allow-list, and the "Opus requires a personal token" switch) at `/team`; the stamps `DraftCaption.model`, `Draft.headlineModel`, `Draft.designModel` and `DraftRevision.model`; `Brief` fields meaning only the initial request; a per-action time budget kept under both 15-minute sweeps; a boundary seam recording the model passed in; and `CLAUDE_CLI_MODEL` as a validated system default (a boot error if it isn't a catalogue value, plus a boot log).
+  - **Wave 2:** the pickers (the brief wizard Review step, refine, every regenerate control on the caption panels, the headline and design regenerate, and the assistant chat headers), the `model` body fields on `regenerate-copy` (all three forms) and `regenerate-design`, and the team-token notice.
+- **Defaults:**
+  - There is no per-user remembered choice. New posts and chats pre-select the team default.
+  - Regenerate pre-selects the draft's stamp. Mixed or null stamps fall back to the team default.
+  - There is no `ScheduledGeneration` pin: scheduled, MCP and ACP runs use the team default.
+- **Allow-list:** checked at every tier, at call time. A stored value that is disallowed or retired falls back to the team default, then the system default, and is recorded as a substitution. Only an explicit request returns 400. `/team` rejects a policy that leaves any surface with no model.
+- **UI and errors:**
+  - Cost tiers `$`/`$$`/`$$$`.
+  - Path A gets Haiku and Sonnet only.
+  - The team-token notice shows when Opus would run on the team token.
+  - Scheduled runs label usage-limit failures explicitly in `errorReason`.
+
+### Still open after 008 (each its own change)
+
+1. **`import-posts.mjs` never sets `teamId` (L22).** A real import has been broken since team tenancy, and `--dry-run` hides it.
+2. **The ACP manifest's `generate_post` output schema** is missing `headline` and `captions`.
+3. **`POST /api/posts` returns 201 for an immediate publish that ends FAILED.**
+4. **A per-claim token for draft actions.**
+5. **The floating Create post button overlaps content** at some widths.
+6. **The caption/headline undo-clear uses the observed-edge pattern** (a 015 follow-up). After a fast failed regenerate, an Undo can linger that restores identical text.
+7. **The 015 revision-list guard doesn't retry after a transient `fetchRevisions` failure.**
+8. **Small items:** the trailing `---` in split sections (012 T3); the caption check runs before the duplicate-post 409 (012 T7/T8); per-post caption loads in the posts list (012 T7); the axe rule list copied into `captions.test.ts` (012 T13); the 014 verify gaps 5–8.
+9. **The 005 AC-16 operator run.** 🔴 Revoke the OAuth token pasted into chat on 2026-10-06 first.
+
+### Rules and gotchas in force
+
+- **All work lands directly on `v2`.** No per-change PRs (user, 2026-10-12). The whole of `v2` goes to `main` in one PR later, and only on request.
+- **After every push, check `gh run list --branch v2 --repo EnderGuardian25/ai-studio`,** not just the local gate (L21).
+- **`npm run test:e2e:db` does not drop the test DB.** For a clean gate, first run `docker exec designer-postgres-1 psql -U bistec -d postgres -c "DROP DATABASE IF EXISTS bistec_studio_test WITH (FORCE);"`, then `rm -rf .next`, then the setup, then exactly one fresh :3001 server.
+- **Never run `npm run build`** (or `specclaw-build finalize` / `specclaw-verify collect`) **while `next dev` is serving.** Afterwards, run `rm -rf .next` and `git checkout -- next-env.d.ts`.
+- **A stale specclaw lock** blocks `setup`. Clear it with `specclaw-change-lock .specclaw release <change>`; `setup --force` doesn't parse.
+- **Never settle async UI on an observed edge of polled state** (L25). Arm it after an awaited refetch instead. To force a race in E2E, delay the refetch with `page.route`.
+
+---
+
+## ⏸️ 2026-10-11 (later) — superseded by 2026-10-12 (later) above (kept for history): 012 is BUILT 16/16 and VERIFIED PASS (2026-10-12); fork CI on `v2` was red, ✅ GREEN since 015 (2026-10-12)
 
 **012 per-channel captions is built: 16 of 16 tasks, all on `origin/v2`.** The next step is **`/specclaw:verify 012-per-channel-captions`**. Every task has a report and a review in `.specclaw/changes/012-per-channel-captions/reports/` and `reviews/`. The deploy, backfill and rollback steps are in the **012 runbook** section just below.
 

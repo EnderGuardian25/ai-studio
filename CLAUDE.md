@@ -2,9 +2,31 @@
 
 This repo contains planning documents for **bistec-studio**, an internal marketing post generation tool for the Bistec marketing team.
 
-## ✅ Outstanding work — START HERE (updated 2026-10-11, later)
+## ✅ Outstanding work — START HERE (updated 2026-10-12, later)
 
-- **✅ 2026-10-12 — PICK UP HERE: fork CI on `v2` is GREEN again. Change 015 (draft-page settle race) is built and VERIFIED PASS (8/8).** CI run 38195143494 passed on every job (E2E 371 passed / 3 skipped, unit, build), the first green since 013. Local full gate: 371/3/0/0.
+- **⏸️ 2026-10-12 (later) — PICK UP HERE: 008 model selection is APPROVED (architectural) and was being PLANNED by a subagent when the chat was cleared. Finish the plan first.** Full detail: [`docs/handoff.md`](docs/handoff.md) top section.
+  - **State at the clear:**
+    - 015 verified PASS and fork CI is green.
+    - 008's proposal is approved (`a1272922`), with a deep party panel (CHANGES_REQUESTED: 5 BLOCK / 23 WARN / 6 NOTE, see `party-report.md`) and all rulings recorded.
+    - A planner subagent was writing `.specclaw/changes/008-model-selection/{spec,design,tasks}.md`. **These are uncommitted.**
+    - **The plan lock on 008 has been held since 2026-10-12T02:53Z.**
+  - **Resume:**
+    1. **Check the plan files.** Run `ls .specclaw/changes/008-model-selection/`. If `spec.md`, `design.md` and `tasks.md` are all there and complete, review them against the proposal's **"Panel rulings (user, 2026-10-12)"** and **"Panel resolutions (orchestrator, 2026-10-12)"** sections, and against design.md's "Panel findings → where addressed" table.
+    2. **Record the phases.** Run `specclaw-parse-tasks .specclaw/changes/008-model-selection/tasks.md`, then `specclaw-set-phase .specclaw 008-model-selection spec done`, then `design done`, then `tasks done`.
+    3. **Release and commit.** Run `specclaw-change-lock .specclaw release 008-model-selection`, then commit and push to `v2`.
+    4. **Get approval.** Present the plan summary, the A1… assumptions and the open questions to the user, then `/specclaw:build 008-model-selection`.
+    5. **If any plan file is missing or half-written:** release the lock and re-run `/specclaw:plan 008-model-selection`. The proposal holds everything the plan needs.
+  - **008 binding decisions (all in `proposal.md`):**
+    - **Catalogue:** Haiku 4.5, Sonnet 5.5 and Opus 5.5, with no Fable. They are stored as **closed catalogue keys**; full API IDs appear only in stamps.
+    - **Two waves.** Wave 1, independently shippable: catalogue, `resolveModel` (replacing `modelFor`/`modelForBackground`), current IDs everywhere, `TeamModelPolicy` with defaults, allow-list and the "Opus requires a personal token" switch at `/team`, and the stamps (`DraftCaption.model`, `Draft.headlineModel`, `Draft.designModel`, `DraftRevision.model`). It also covers the per-action time budget under both 15-minute sweeps, the boundary seam, the model-literal guard and `CLAUDE_CLI_MODEL` as a validated system default. Wave 2: the pickers (wizard Review, refine, every regenerate control, chat headers), the `model` body fields and the team-token notice.
+    - **No per-user remembered choice.** New posts and chats pre-select the team default. Regenerate pre-selects the draft's stamp; mixed or null stamps fall to the team default.
+    - **No `ScheduledGeneration` pin.**
+    - **The allow-list is checked at every tier at call time.** A stored value that is no longer allowed falls to the team default, recorded as a substitution. Only an explicit request returns 400.
+    - **Cost tiers** `$`/`$$`/`$$$` are computed from numeric per-MTok prices.
+    - **Path A** gets Haiku and Sonnet only.
+  - **Never run real model calls while planning or testing.** The pinned CLI 2.1.287's full-ID check and the Opus 5.5 timings are operator-gated tasks.
+
+- **✅ 2026-10-12 — superseded by 2026-10-12 (later) above: fork CI on `v2` is GREEN again. Change 015 (draft-page settle race) is built and VERIFIED PASS (8/8).** CI run 38195143494 passed on every job (E2E 371 passed / 3 skipped, unit, build), the first green since 013. Local full gate: 371/3/0/0.
   - **Root cause** (`/specclaw:debug`, deterministic repro): `RefinementPanel` settled a refine row, and the draft page refreshed its version list, only on an _observed_ `pendingAction` transition. A refine that finished before the post-202 refetch was served went from `null` to `null` as far as the client could see, so the row hung on "Applying…" with the input disabled and History stuck at v1. The slower runner always lost that race. This was also the old 011 "Applying…" follow-up.
   - **The fix:** settle on state, not on an edge. The panel awaits the refetch, then resolves once `pendingAction` is null, with unchanged outcome logic. The page refetches revisions whenever the current revision is missing from the list. New `tests/e2e/settle-race.test.ts` (§X) forces the race by holding the post-202 GET for 3 s, for refine and for Regenerate design. A mutation check showed each half of the fix guards its own case. `surfaces.test.ts` is untouched.
   - **User rule (2026-10-12):** all work lands directly on `v2`; no per-change PRs. The whole of `v2` goes to `main` as one PR later, on request.
