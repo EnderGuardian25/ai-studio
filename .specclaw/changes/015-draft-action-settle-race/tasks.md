@@ -17,22 +17,22 @@ Each task is implemented by a subagent, reviewed by `specclaw:code-reviewer`, an
 ### Wave 1 — Test, then fix
 
 - [ ] `T1` — The forced-race E2E cases, failing on the current code
-  - **Files:** `tests/e2e/settle-race.test.ts` (new)
-  - **Estimate:** small
-  - **Kind:** test
-  - **Depends:** none
-  - **Notes:**
+  - Files: `tests/e2e/settle-race.test.ts` (new)
+  - Estimate: small
+  - Kind: test
+  - Depends: none
+  - Notes:
     - **Covers:** FR-03. **ACs:** AC-01, AC-02 (written now), AC-03 (the "fails before" half).
     - **The race:** hold the first `GET /api/drafts/<id>` (the exact path, not `/revisions`) for about 3 s after the action POST, using `page.route`. Use the shape of the parked repro at `<scratchpad>/refine-race-repro.test.ts`.
     - **Cases:** two, one for refine and one for Regenerate design. Assert the AC-01 and AC-02 outcomes, and assert that the delay actually happened (`expect(delayed).toBe(true)`).
     - **Run against the unfixed code:** both cases must FAIL, for the stated cause. Record the failure lines in the report.
 
 - [ ] `T2` — Settle on state: RefinementPanel and the revision list
-  - **Files:** `src/components/drafts/RefinementPanel.tsx`, `src/app/(app)/drafts/[id]/page.tsx`
-  - **Estimate:** small
-  - **Kind:** impl
-  - **Depends:** T1
-  - **Notes:**
+  - Files: `src/components/drafts/RefinementPanel.tsx`, `src/app/(app)/drafts/[id]/page.tsx`
+  - Estimate: small
+  - Kind: impl
+  - Depends: T1
+  - Notes:
     - **Covers:** FR-01, FR-02, FR-04. **ACs:** AC-01, AC-02, AC-03 (the "passes after" half), AC-04, AC-07, AC-08.
     - **Follow spec `## Approach` exactly.** The outcome logic is unchanged and only the trigger moves.
     - **FR-02's no-loop guard is required.**
@@ -45,11 +45,11 @@ Each task is implemented by a subagent, reviewed by `specclaw:code-reviewer`, an
 ### Wave 2 — Gate and CI
 
 - [ ] `T3` — Full gate, fork CI green, handoff
-  - **Files:** `docs/handoff.md`, `CLAUDE.md`
-  - **Estimate:** small
-  - **Kind:** docs
-  - **Depends:** T2
-  - **Notes:**
+  - Files: `docs/handoff.md`, `CLAUDE.md`
+  - Estimate: small
+  - Kind: docs
+  - Depends: T2
+  - Notes:
     - **Covers ACs:** AC-05, AC-06.
     - **Run the standard full clean mock E2E,** then push `v2` and watch the `E2E` run with `gh run watch`. It must conclude `success`.
     - **Then update the handoff and CLAUDE.md:**
