@@ -1,7 +1,7 @@
 # 🦞 SpecClaw Dashboard
 
 **Project:** bistec-studio
-**Last Updated:** 2026-10-12 01:57 UTC
+**Last Updated:** 2026-10-12 02:08 UTC
 
 ## Active Changes
 
@@ -14,6 +14,7 @@
 - 🔍 **012-per-channel-captions** ▣ — verify PASS | 16/16 tasks (100%) | 0 failed | 26h43m
 - 🔍 **013-fork-ci-checks-only** ▫ — verify PASS | 3/3 tasks (100%) | 0 failed | 13h13m
 - 🔍 **014-ui-a11y-consistency-pass** ▣ — verify PASS | 18/18 tasks (100%) | 0 failed | 42h45m
+- 📝 **015-draft-action-settle-race** ▫ — tasks done | 0/3 tasks (0%) | 0 failed | 1m
 
 ## Pending Proposals
 
@@ -29,6 +30,6 @@ _None._
 
 ## Stats
 
-- **Total changes:** 9
-- **Active:** 9
+- **Total changes:** 10
+- **Active:** 10
 - **Completed:** 0

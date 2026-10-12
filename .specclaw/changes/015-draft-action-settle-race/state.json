@@ -1,0 +1,11 @@
+{
+  "change": "015-draft-action-settle-race",
+  "phase": "tasks",
+  "branch": "",
+  "size": "bounded",
+  "phases": {
+    "proposal": { "status": "approved", "at": "2026-10-12T02:06:51Z" },
+    "spec": { "status": "done", "at": "2026-10-12T02:08:35Z" },
+    "tasks": { "status": "done", "at": "2026-10-12T02:08:36Z" }
+  }
+}
