@@ -145,7 +145,7 @@ Wave 2 adds per-post and per-chat pickers only.
     - **Mock branches record** (design §7: the registry mock provider, the `runDesignAgent` mock, the background seam). The mock caption reply's stamp is `model.arg`.
     - **`retry/route.ts` is untouched:** retry re-enters `runGenerationForDraft`, which resolves from `Brief`.
 
-- [ ] `T7` — Draft actions on the resolver: regenerate-copy, regenerate-design, refine and the verifier, plus every remaining stamp writer
+- [~] `T7` — Draft actions on the resolver: regenerate-copy, regenerate-design, refine and the verifier, plus every remaining stamp writer
   - Files: `src/app/api/drafts/[id]/regenerate-copy/route.ts`, `src/app/api/drafts/[id]/regenerate-design/route.ts`, `src/app/api/drafts/[id]/refine/route.ts`, `src/app/api/drafts/[id]/inline-edit/route.ts`, `src/app/api/drafts/[id]/revisions/[rev]/restore/route.ts`, `src/app/api/drafts/[id]/rejected/[revisionId]/adopt/route.ts`, `src/app/api/drafts/[id]/retry/route.ts`, `src/app/api/drafts/[id]/route.ts`, `src/lib/drafts/refineVerify.ts`, `src/lib/drafts/revisions.ts`, `src/lib/captions/store.ts`, `src/lib/api-types.ts`, `src/lib/testHooks.ts`, `tests/unit/draftRevisions.test.ts`, `tests/unit/renderStamps.test.ts`, `tests/unit/captionStore.test.ts`, `tests/unit/refineVerify.test.ts`, `tests/unit/captionRoutes.test.ts`
   - Estimate: large
   - Kind: impl
@@ -206,7 +206,7 @@ Wave 2 adds per-post and per-chat pickers only.
     - **AC-10's order assertions** use the mocked Prisma call log. No timers.
 
 - [ ] `T10` — Close the boundary: `model` required, the old resolvers deleted, the literal guard and the boundary test
-  - Files: `src/lib/agent/claudeCli.ts`, `src/lib/agent/config.ts`, `src/lib/drafts/refineVerify.ts`, `src/lib/agent/designAgentCli.ts`, `src/lib/agent/designAgent.ts`, `src/lib/agent/types.ts`, `tests/unit/modelLiteralGuard.test.ts` (new), `tests/unit/modelBoundary.test.ts` (new), `tests/unit/claudeCliArgs.test.ts`, `scripts/cli-sandbox-check.mjs`, `tests/unit/visionCli.test.ts`
+  - Files: `src/lib/agent/claudeCli.ts`, `src/lib/agent/config.ts`, `src/lib/drafts/refineVerify.ts`, `src/lib/agent/designAgentCli.ts`, `src/lib/agent/designAgent.ts`, `src/lib/agent/types.ts`, `src/lib/drafts/refineAttempt.ts`, `tests/unit/modelLiteralGuard.test.ts` (new), `tests/unit/modelBoundary.test.ts` (new), `tests/unit/claudeCliArgs.test.ts`, `scripts/cli-sandbox-check.mjs`, `tests/unit/visionCli.test.ts`
   - Estimate: medium
   - Kind: refactor
   - Depends: T6, T7, T8, T9

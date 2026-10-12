@@ -1,12 +1,13 @@
 {
   "change": "008-model-selection",
-  "phase": "tasks",
-  "branch": "",
+  "phase": "build",
+  "branch": "v2",
   "size": "architectural",
   "phases": {
     "proposal": { "status": "approved", "at": "2026-10-12T02:53:20Z" },
     "spec": { "status": "done", "at": "2026-10-12T07:17:03Z" },
     "design": { "status": "done", "at": "2026-10-12T07:17:04Z" },
-    "tasks": { "status": "done", "at": "2026-10-12T07:17:05Z" }
+    "tasks": { "status": "done", "at": "2026-10-12T07:17:05Z" },
+    "build": { "status": "in-progress", "at": "2026-10-12T09:11:44Z" }
   }
 }

@@ -4,7 +4,15 @@ This repo contains planning documents for **bistec-studio**, an internal marketi
 
 ## ✅ Outstanding work — START HERE (updated 2026-10-12, later)
 
-- **⏸️ 2026-10-12 (latest) — PICK UP HERE: 008 is PLANNED and waiting for the user to approve the plan; then `/specclaw:build 008-model-selection`.** The earlier planner subagent died on a usage limit after writing `spec.md`; the orchestrator reviewed it and wrote `design.md` and `tasks.md`. **19 tasks in 2 waves:** wave 1 = T1–T12, shippable alone, one full E2E gate; wave 2 = T13–T19, the pickers.
+- **⏸️ 2026-10-12 (evening) — PICK UP HERE: 008 BUILD in progress.** Full detail: [`docs/handoff.md`](docs/handoff.md) top section.
+  - **Committed:** T1, T3–T6 (each reviewed) and **T7, which is UNREVIEWED.** The review was stopped to save usage; the gates were verified (unit 2285/2285).
+  - **Next:**
+    1. review T7, then mark it complete;
+    2. T8 → T12 (the wave-1 gate);
+    3. wave 2, T13–T19.
+  - **T2 (operator CLI full-ID check) is waiting on the user.** The command is in `tasks.md` T2.
+  - **Process:** one task at a time: an implementer subagent → `specclaw:code-reviewer` → the orchestrator re-runs tsc/lint/unit and commits. No real model calls.
+- **(superseded) 2026-10-12 (latest) — 008 is PLANNED and waiting for the user to approve the plan; then `/specclaw:build 008-model-selection`.** The earlier planner subagent died on a usage limit after writing `spec.md`; the orchestrator reviewed it and wrote `design.md` and `tasks.md`. **19 tasks in 2 waves:** wave 1 = T1–T12, shippable alone, one full E2E gate; wave 2 = T13–T19, the pickers.
   - **T2 is an operator step:** the pinned CLI 2.1.287 must accept the full model IDs. It gates the wave-1 gate (T12), not T3–T11.
   - **Read first:** `spec.md` Assumptions A1–A14 and open questions 1–4; `design.md` §5 (timeouts are placeholders; the budget unit test is the gate) and §13 (every panel finding → where it is addressed).
   - **Build order:** subagent-driven, one task at a time: an implementer, then a `specclaw:code-reviewer`, then the orchestrator commits. No real model calls.
