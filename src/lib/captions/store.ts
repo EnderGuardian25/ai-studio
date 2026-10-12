@@ -25,7 +25,7 @@ import { prisma } from '@/lib/prisma'
 import { CAPTION_CHANNELS, type CaptionTarget } from '@/lib/channels'
 import { planCaptionMigration, type CaptionMigrationOutcome } from '@/lib/captions/migrationPlan'
 import type { FieldResult } from '@/lib/captions/extract'
-import { settleCaptionRow } from '@/lib/captions/actionTargets'
+import { settleCaptionRow, type CaptionStamp } from '@/lib/captions/actionTargets'
 import { resolveCaptionForPublish, type CaptionResolution } from '@/lib/captions/resolve'
 
 export interface CaptionRow {
@@ -35,6 +35,9 @@ export interface CaptionRow {
   failureReason: string | null
   needsReview: boolean
   updatedAt: Date
+  /** 008 FR-08: the model whose output this row's text is (null = unknown / none). */
+  model: string | null
+  modelSubstitutedFrom: string | null
 }
 
 export interface DraftCaptions {
@@ -53,6 +56,8 @@ const ROW_SELECT = {
   failureReason: true,
   needsReview: true,
   updatedAt: true,
+  model: true,
+  modelSubstitutedFrom: true,
 } satisfies Prisma.DraftCaptionSelect
 
 // ── Materialization (FR-04) ─────────────────────────────────────────────────
@@ -115,6 +120,8 @@ function synthesizePending(updatedAt: Date): CaptionRow[] {
     failureReason: null,
     needsReview: false,
     updatedAt,
+    model: null,
+    modelSubstitutedFrom: null,
   }))
 }
 
@@ -264,13 +271,8 @@ async function logCaptionReview(
 
 // ── Writers ─────────────────────────────────────────────────────────────────
 
-// The model that wrote a caption reply (008 FR-08): the arg that crossed the
-// boundary (or a non-Claude provider's own ID), and the refused value the
-// resolver substituted away from, or null. writeCaptions produces it.
-export interface CaptionStamp {
-  model: string
-  substitutedFrom: string | null
-}
+// The caption stamp (008 FR-08) is defined beside the pure settle rule.
+export type { CaptionStamp }
 
 export interface GenerationCaptionData {
   channel: Channel
@@ -391,11 +393,15 @@ function targetChannels(targets: readonly CaptionTarget[]): Channel[] {
 // Settle the PENDING rows (all of the draft's, or only `channels`) per
 // settleCaptionRow. Each write is guarded on PENDING, so a row an edit or a
 // newer write already settled is left alone, and a deleted draft is a no-op.
+// A caption action's reply stamp is written on the rows whose field validated
+// only; with none (the stale sweep, a failed run) no stamp field is written,
+// so a row keeps the stamp of the text it keeps (008 FR-08).
 async function settlePendingRows(
   tx: Prisma.TransactionClient,
   draftId: string,
   channels: Channel[] | null,
   fieldFor: (channel: Channel) => FieldResult,
+  stamp: CaptionStamp | null = null,
 ): Promise<void> {
   const rows = await tx.draftCaption.findMany({
     where: { draftId, status: 'PENDING', ...(channels ? { channel: { in: channels } } : {}) },
@@ -404,7 +410,7 @@ async function settlePendingRows(
   for (const row of rows) {
     await tx.draftCaption.updateMany({
       where: { draftId, channel: row.channel, status: 'PENDING' },
-      data: settleCaptionRow(row, fieldFor(row.channel)),
+      data: settleCaptionRow(row, fieldFor(row.channel), stamp),
     })
   }
 }
@@ -414,19 +420,31 @@ async function settlePendingRows(
 // transaction. The headline write is guarded on the caption claim, so a run the
 // stale sweep already cleared cannot overwrite it late. A failed headline
 // leaves the column unchanged; the caller reports it.
+//
+// 008 FR-08: `stamp` is the reply's model (writeCaptions). It goes on each
+// target whose field validated — the row's model, or headlineModel in the
+// headline's guarded write — and never on a failed one, which keeps its stamp
+// with its text (A7). The failure settles (onError, an unstarted run) pass none.
 export async function settleCaptionAction(
   draftId: string,
   targets: readonly CaptionTarget[],
   fields: Partial<Record<CaptionTarget, FieldResult>>,
+  stamp: CaptionStamp | null = null,
   db: PrismaClient = prisma,
 ): Promise<void> {
   const headline = targets.includes('HEADLINE') ? fields.HEADLINE : undefined
   await db.$transaction(async (tx) => {
-    await settlePendingRows(tx, draftId, targetChannels(targets), (channel) => fields[channel] ?? { ok: false, reason: 'missing' })
+    await settlePendingRows(
+      tx,
+      draftId,
+      targetChannels(targets),
+      (channel) => fields[channel] ?? { ok: false, reason: 'missing' },
+      stamp,
+    )
     if (headline?.ok) {
       await tx.draft.updateMany({
         where: { id: draftId, pendingAction: 'REGENERATE_COPY' },
-        data: { headline: headline.text },
+        data: { headline: headline.text, ...(stamp ? headlineStampFields(stamp) : {}) },
       })
     }
   })

@@ -294,8 +294,12 @@ import {
   TX_MAX_WAIT_MS,
   currentRenderStamp,
   restoredRenderStamp,
+  modelStampOf,
+  draftModelStamp,
   type RejectionDiagnostics,
 } from '@/lib/drafts/revisions'
+import { internalModel, decideModel } from '@/lib/models/resolve'
+import { DEFAULT_POLICY } from '@/lib/models/policyRules'
 import { PROMPT_VERSION } from '@/lib/agent/prompts/shared'
 
 let seq = 0
@@ -410,16 +414,18 @@ describe('listCommittedRevisions (version-switch list)', () => {
     expect(list.every((x) => typeof x.revisionNumber === 'number')).toBe(true)
   })
 
-  it('selects only the listing fields (no htmlSnapshot)', async () => {
-    db.rows = [committed('d1', 1)]
+  it('selects only the listing fields (no htmlSnapshot) — 008 FR-16 adds the model', async () => {
+    db.rows = [{ ...committed('d1', 1), model: 'claude-sonnet-5-5', modelSubstitutedFrom: 'OPUS' }]
     const [row] = await listCommittedRevisions('d1')
     expect(Object.keys(row).sort()).toEqual([
       'createdAt',
       'exportUrl',
       'id',
       'instruction',
+      'model',
       'revisionNumber',
     ])
+    expect(row.model).toBe('claude-sonnet-5-5')
   })
 })
 
@@ -1330,5 +1336,96 @@ describe('F3 adopt: "Use anyway" carries the rejected render\'s OWN stamp', () =
     db.ops = []
     await adopt(r)
     expect(db.ops).toEqual(['revision.create', 'revision.updateMany', 'revision.updateMany', 'draft.updateMany'])
+  })
+})
+
+// ── 008 T7 (FR-08, A6, AC-07): the model in every revision writer ───────────
+
+describe('008 FR-08: commitDraftRevision / recordRejectedRender record the model', () => {
+  // A REFINE model resolved with a substitution (Opus refused → Sonnet).
+  const refineModel = (() => {
+    const r = decideModel('REFINE', {
+      policy: { ...DEFAULT_POLICY, allowed: ['HAIKU', 'SONNET'] },
+      credential: 'n/a',
+      mode: 'api',
+      storedRequest: 'OPUS',
+      designPath: 'B',
+    })
+    if (!r.ok) throw new Error(r.message)
+    return r.resolved
+  })()
+
+  it('modelStampOf maps a ResolvedModel to arg + substitutedFrom, passes a stamp through, null → unknown', () => {
+    expect(modelStampOf(refineModel)).toEqual({ model: 'claude-sonnet-5-5', modelSubstitutedFrom: 'OPUS' })
+    expect(modelStampOf({ model: 'x', modelSubstitutedFrom: null })).toEqual({ model: 'x', modelSubstitutedFrom: null })
+    expect(modelStampOf(null)).toEqual({ model: null, modelSubstitutedFrom: null })
+    expect(draftModelStamp({ designModel: 'm', designModelSubstitutedFrom: 's' })).toEqual({ model: 'm', modelSubstitutedFrom: 's' })
+    expect(draftModelStamp({})).toEqual({ model: null, modelSubstitutedFrom: null })
+  })
+
+  it('a refine commit stamps the new revision AND the draft with the refine model', async () => {
+    db.rows = [committed('d1', 1)]
+    const { revisionId } = await commitDraftRevision({
+      draftId: 'd1', instruction: 'darker', html: '<html>n</html>', width: 1080, height: 1080, model: refineModel,
+    })
+    expect(db.rows.find((r) => r.id === revisionId)).toMatchObject({
+      model: 'claude-sonnet-5-5',
+      modelSubstitutedFrom: 'OPUS',
+    })
+    expect(db.draftUpdates.at(-1)!.data).toMatchObject({
+      designModel: 'claude-sonnet-5-5',
+      designModelSubstitutedFrom: 'OPUS',
+    })
+  })
+
+  it('A6: a carried-forward stamp (inline edit) is written as-is, on the CAS path too', async () => {
+    db.rows = [committed('d1', 1)]
+    db.currentRevisionNumber = 1
+    const carried = draftModelStamp({ designModel: 'claude-opus-5-5', designModelSubstitutedFrom: null })
+    const { revisionId } = await commitDraftRevision({
+      draftId: 'd1', instruction: 'el', html: '<html>c</html>', width: 1080, height: 1080, exportKey: 'k',
+      expectedRevisionNumber: 1, model: carried,
+    })
+    expect(db.rows.find((r) => r.id === revisionId)).toMatchObject({ model: 'claude-opus-5-5', modelSubstitutedFrom: null })
+    expect(db.draftUpdates.at(-1)!.data).toMatchObject({ designModel: 'claude-opus-5-5' })
+  })
+
+  it('no model given reads as unknown (null), never a stale value', async () => {
+    db.rows = [committed('d1', 1)]
+    const { revisionId } = await commitDraftRevision({
+      draftId: 'd1', instruction: 'x', html: '<html/>', width: 1080, height: 1080, exportKey: 'k',
+    })
+    expect(db.rows.find((r) => r.id === revisionId)).toMatchObject({ model: null, modelSubstitutedFrom: null })
+    expect(db.draftUpdates.at(-1)!.data).toMatchObject({ designModel: null, designModelSubstitutedFrom: null })
+  })
+
+  it("an adopt ignores a passed model: the rejected row's own stamp wins", async () => {
+    db.rows = [committed('d1', 1)]
+    const r = { ...rejected('d1'), model: 'claude-haiku-4-5', modelSubstitutedFrom: null }
+    db.rows.push(r)
+    db.notAppliedRevisionId = r.id
+    const { revisionId } = await commitDraftRevision({
+      draftId: 'd1', instruction: 'Use anyway', html: r.htmlSnapshot, width: 1080, height: 1080,
+      exportKey: r.exportUrl!, adoptRejectedRevisionId: r.id, model: refineModel,
+    })
+    expect(db.rows.find((x) => x.id === revisionId)).toMatchObject({ model: 'claude-haiku-4-5' })
+    expect(db.draftUpdates.at(-1)!.data).toMatchObject({ designModel: 'claude-haiku-4-5' })
+  })
+
+  it("recordRejectedRender stamps the rejected row with the attempt's model; the draft's design stamp is untouched", async () => {
+    db.rows = [committed('d1', 1)]
+    const { revisionId } = await recordRejectedRender({ ...rejectArgs(), model: refineModel })
+    expect(db.rows.find((r) => r.id === revisionId)).toMatchObject({
+      model: 'claude-sonnet-5-5',
+      modelSubstitutedFrom: 'OPUS',
+    })
+    const data = db.draftUpdates.at(-1)!.data
+    expect(data).not.toHaveProperty('designModel')
+    expect(data).not.toHaveProperty('designModelSubstitutedFrom')
+  })
+
+  it('currentRenderStamp takes the internal / resolved model as its arg, never the key', () => {
+    const m = internalModel('INTERNAL_VERIFIER', 'api')
+    expect(currentRenderStamp(m)).toMatchObject({ model: m.arg, modelSubstitutedFrom: null })
   })
 })

@@ -12,7 +12,7 @@ import { failedCaptionFields } from '@/lib/captions/actionTargets'
 import { claimCaptionAction, loadDraftCaptions, settleCaptionAction } from '@/lib/captions/store'
 import { releaseDraftAction, startDraftAction } from '@/lib/drafts/draftActions'
 import { resolveModel } from '@/lib/models/policy'
-import type { ResolvedModel } from '@/lib/models/resolve'
+import { regenerateStampTier, type ResolvedModel } from '@/lib/models/resolve'
 
 // Regenerates captions for a draft (012 FR-11; the route name is a kept
 // contract): body {} → the three captions ("Regenerate all"), { channel } →
@@ -62,10 +62,20 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
   let campaignBriefing: Awaited<ReturnType<typeof getActiveCampaignBriefing>>
   let model: ResolvedModel
   try {
-    // 008 (T6, interim): writeCaptions now needs the CAPTION model. Resolved
-    // before the claim, team → system; T7 adds the FR-09 stamp tier and the
-    // stamp writes in the settle.
-    const resolved = await resolveModel('CAPTION', { userId: user.userId, teamId: draft.teamId })
+    // Materialize a legacy draft's rows BEFORE the claim marks them PENDING:
+    // on a draft with no rows yet the claim would mark nothing, and the settle
+    // would have no row to write. The rows also carry the stamps below.
+    const loaded = await loadDraftCaptions(draft.id)
+
+    // 008 FR-09: the regenerate default is the stamp of what is being replaced
+    // — the row's model, the headline's, or for "Regenerate all" the common
+    // stamp (mixed or any null → no stamp tier, so the team default). Resolved
+    // before the claim, so a team with nothing allowed claims nothing (422).
+    const stamp = regenerateStampTier(targets, {
+      captions: loaded?.captions ?? [],
+      headlineModel: draft.headlineModel ?? null,
+    })
+    const resolved = await resolveModel('CAPTION', { stamp, userId: user.userId, teamId: draft.teamId })
     if (!resolved.ok) throw new Error(resolved.message)
     model = resolved.resolved
 
@@ -73,11 +83,6 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
     // Brand voice follows the same kit precedence as design generation.
     kit = await resolveBrandKit(draft.teamId, draft.brief.campaignId ?? undefined, draft.brief.brandKitId ?? undefined)
     campaignBriefing = await getActiveCampaignBriefing(draft.brief.campaignId)
-
-    // Materialize a legacy draft's rows BEFORE the claim marks them PENDING:
-    // on a draft with no rows yet the claim would mark nothing, and the settle
-    // would have no row to write.
-    await loadDraftCaptions(draft.id)
   } catch (err) {
     return copyError(err)
   }
@@ -95,19 +100,21 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
     // request unwinds and pins it onto the background run. Each row settles per
     // settleCaptionRow (a failure keeps good text, A7); a throw settles every
     // target row as failed (onError) and is recorded on pendingActionError.
+    // 008 FR-08: the reply's stamp goes on the fields that validated only; the
+    // failure settles pass none, so a row keeps the stamp of the text it keeps.
     await startDraftAction(
       draft.id,
       user.userId,
       user.teamId,
       'REGENERATE_COPY',
       async () => {
-        const { fields } = await writeCaptions(
+        const { fields, stamp } = await writeCaptions(
           provider,
           buildBriefInput(draft.brief, kit, campaignBriefing),
           targets,
           model,
         )
-        await settleCaptionAction(draft.id, targets, fields)
+        await settleCaptionAction(draft.id, targets, fields, stamp)
         // A headline has no row to carry a failure, so it is reported on
         // pendingActionError; the stored headline is unchanged.
         const headline = fields.HEADLINE

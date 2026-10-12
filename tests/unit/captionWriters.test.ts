@@ -475,6 +475,9 @@ describe('retry route (FR-10)', () => {
       status: 'IN_PROGRESS',
       failureReason: null,
       headline: null,
+      // 008 FR-08 (T7): the headline's stamp is cleared with it.
+      headlineModel: null,
+      headlineModelSubstitutedFrom: null,
       captions: {
         updateMany: { where: {}, data: { status: 'PENDING', failureReason: null } },
         createMany: {

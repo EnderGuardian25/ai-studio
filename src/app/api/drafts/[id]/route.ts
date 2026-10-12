@@ -161,6 +161,11 @@ async function loadDraft(id: string) {
     id: draft.id,
     briefId: draft.briefId,
     headline: draft.headline,
+    // 008 FR-16: the stamps (additive; captions[] carry their own).
+    headlineModel: draft.headlineModel,
+    headlineModelSubstitutedFrom: draft.headlineModelSubstitutedFrom,
+    designModel: draft.designModel,
+    designModelSubstitutedFrom: draft.designModelSubstitutedFrom,
     captionMigration: captions?.captionMigration ?? null,
     captions: captions?.captions ?? [],
     imageUrl: draft.imageUrl,

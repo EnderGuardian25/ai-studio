@@ -17,6 +17,8 @@ const h = vi.hoisted(() => ({
   saveHeadlineEdit: vi.fn(),
   startDraftAction: vi.fn(),
   releaseDraftAction: vi.fn(),
+  resolveModel: vi.fn(),
+  writeCaptions: vi.fn(),
 }))
 
 vi.mock('@/lib/prisma', () => ({ prisma: { draft: { findUnique: h.draftFindUnique } } }))
@@ -36,12 +38,13 @@ vi.mock('@/lib/brandkit/resolve', () => ({ resolveBrandKit: async () => null }))
 vi.mock('@/lib/campaign/briefing', () => ({ getActiveCampaignBriefing: async () => null }))
 vi.mock('@/lib/storage/minio', () => ({ resolveExportUrl: async () => null }))
 vi.mock('@/lib/drafts/revisions', () => ({ COMMITTED_REVISION: {}, resolveNotAppliedOutcome: async () => null }))
-vi.mock('@/lib/captions/generate', () => ({ writeCaptions: vi.fn() }))
-// 008 T6: the route resolves the CAPTION model before its claim; writeCaptions
-// is faked above, so any resolved value will do.
-vi.mock('@/lib/models/policy', () => ({
-  resolveModel: async () => ({ ok: true, resolved: { surface: 'CAPTION', key: 'HAIKU', arg: 'claude-haiku-4-5' } }),
-}))
+vi.mock('@/lib/captions/generate', () => ({ writeCaptions: h.writeCaptions }))
+// 008: the route resolves the CAPTION model before its claim. The I/O wrapper
+// is a spy; by default it runs the REAL pure decideModel on a policy the test
+// sets (API mode, so the credential is 'n/a'), so FR-09's tiers are exercised.
+let policy: { allowed: string[]; defaults: Record<string, string>; gateOn: boolean }
+vi.mock('@/lib/models/policy', () => ({ resolveModel: h.resolveModel }))
+const { decideModel } = await import('@/lib/models/resolve')
 vi.mock('@/lib/captions/store', () => ({
   loadDraftCaptions: h.loadDraftCaptions,
   claimCaptionAction: h.claimCaptionAction,
@@ -78,6 +81,10 @@ function exportedDraft(over: Record<string, unknown> = {}) {
 
 beforeEach(() => {
   for (const fn of Object.values(h)) fn.mockReset()
+  policy = { allowed: ['HAIKU', 'SONNET', 'OPUS'], defaults: {}, gateOn: false }
+  h.resolveModel.mockImplementation(async (surface: never, opts: { stamp?: string | null }) =>
+    decideModel(surface, { stamp: opts.stamp, policy: policy as never, credential: 'n/a', mode: 'api' }),
+  )
   h.draftFindUnique.mockResolvedValue(exportedDraft())
   h.resolveCopyProvider.mockResolvedValue({})
   h.loadDraftCaptions.mockResolvedValue({ captions: [], deferred: false, captionMigration: null })
@@ -173,5 +180,117 @@ describe('PATCH { headline } — refused while something may write the headline'
     expect(res.status).toBe(409)
     expect(await res.json()).toEqual({ error: 'This caption is being generated' })
     expect(h.saveHeadlineEdit).not.toHaveBeenCalled()
+  })
+})
+
+// ── 008 T7 (FR-09, FR-08): the regenerate default is the stamps' ────────────
+
+describe('regenerate-copy — 008 FR-09 stamp tier, resolved before the claim', () => {
+  const SONNET = 'claude-sonnet-5-5'
+  const OPUS = 'claude-opus-5-5'
+  const HAIKU = 'claude-haiku-4-5'
+
+  function rows(ig: string | null, li: string | null, wa: string | null) {
+    return {
+      deferred: false,
+      captionMigration: null,
+      captions: [
+        { channel: 'INSTAGRAM', text: 'ig', status: 'READY', model: ig, modelSubstitutedFrom: null },
+        { channel: 'LINKEDIN', text: 'li', status: 'READY', model: li, modelSubstitutedFrom: null },
+        { channel: 'WHATSAPP', text: 'wa', status: 'READY', model: wa, modelSubstitutedFrom: null },
+      ],
+    }
+  }
+  // The ResolvedModel the run was handed (writeCaptions' 4th argument).
+  const ranWith = () => h.writeCaptions.mock.calls[0][3]
+
+  beforeEach(() => {
+    // Run the background work inline so the closure's writes are observable.
+    h.startDraftAction.mockImplementation(async (_d: string, _u: string, _t: string, _a: string, work: () => Promise<unknown>) => {
+      await work()
+    })
+    h.writeCaptions.mockImplementation(async (_p: unknown, _b: unknown, targets: string[], model: { arg: string; substitutedFrom: string | null }) => ({
+      fields: Object.fromEntries(targets.map((t) => [t, { ok: true, text: `new ${t}` }])),
+      stamp: { model: model.arg, substitutedFrom: model.substitutedFrom },
+    }))
+  })
+
+  it('{channel}: the stamp tier is THAT row\'s model only', async () => {
+    h.loadDraftCaptions.mockResolvedValue(rows(SONNET, OPUS, SONNET))
+    expect((await post(JSON.stringify({ channel: 'LINKEDIN' }))).status).toBe(202)
+    expect(h.resolveModel).toHaveBeenCalledWith('CAPTION', { stamp: OPUS, userId: 'u1', teamId: 'team1' })
+    expect(ranWith()).toMatchObject({ key: 'OPUS', source: 'stamp', substitutedFrom: null })
+  })
+
+  it('{headline:true}: the stamp tier is Draft.headlineModel', async () => {
+    h.draftFindUnique.mockResolvedValue(exportedDraft({ headlineModel: HAIKU }))
+    h.loadDraftCaptions.mockResolvedValue(rows(SONNET, SONNET, SONNET))
+    await post(JSON.stringify({ headline: true }))
+    expect(h.resolveModel.mock.calls[0][1]).toMatchObject({ stamp: HAIKU })
+    expect(ranWith()).toMatchObject({ key: 'HAIKU', source: 'stamp' })
+  })
+
+  it('{} with three equal stamps → that stamp (like for like)', async () => {
+    h.loadDraftCaptions.mockResolvedValue(rows(SONNET, SONNET, SONNET))
+    await post('{}')
+    expect(h.resolveModel.mock.calls[0][1]).toMatchObject({ stamp: SONNET })
+    expect(ranWith()).toMatchObject({ key: 'SONNET', source: 'stamp' })
+  })
+
+  it.each([
+    ['mixed', [SONNET, OPUS, SONNET]],
+    ['one null', [SONNET, null, SONNET]],
+  ] as const)('{} with %s stamps → no stamp tier: the team default, recorded as NO substitution', async (_n, s) => {
+    policy.defaults = { CAPTION: 'HAIKU' }
+    h.loadDraftCaptions.mockResolvedValue(rows(s[0], s[1], s[2]))
+    await post('{}')
+    expect(h.resolveModel.mock.calls[0][1]).toMatchObject({ stamp: null })
+    expect(ranWith()).toMatchObject({ key: 'HAIKU', source: 'team', substitutedFrom: null })
+  })
+
+  it('a null-stamp draft with no team default → the system default', async () => {
+    h.loadDraftCaptions.mockResolvedValue(rows(null, null, null))
+    await post('{}')
+    expect(ranWith()).toMatchObject({ source: 'system', substitutedFrom: null })
+  })
+
+  it('a stamp since disallowed falls through and is recorded on the new stamp (AC-17)', async () => {
+    policy.allowed = ['HAIKU', 'SONNET']
+    h.loadDraftCaptions.mockResolvedValue(rows(SONNET, OPUS, SONNET))
+    await post(JSON.stringify({ channel: 'LINKEDIN' }))
+    expect(ranWith()).toMatchObject({ key: 'HAIKU', source: 'system', substitutedFrom: OPUS })
+    // The settle receives the reply's stamp, substitution included.
+    expect(h.settleCaptionAction).toHaveBeenCalledWith(
+      'd1',
+      ['LINKEDIN'],
+      { LINKEDIN: { ok: true, text: 'new LINKEDIN' } },
+      { model: HAIKU, substitutedFrom: OPUS },
+    )
+  })
+
+  it('resolves after the rows are loaded (they carry the stamps) and BEFORE the claim', async () => {
+    h.loadDraftCaptions.mockResolvedValue(rows(SONNET, SONNET, SONNET))
+    await post('{}')
+    expect(h.loadDraftCaptions.mock.invocationCallOrder[0]).toBeLessThan(h.resolveModel.mock.invocationCallOrder[0])
+    expect(h.resolveModel.mock.invocationCallOrder[0]).toBeLessThan(h.claimCaptionAction.mock.invocationCallOrder[0])
+  })
+
+  it('a failed resolution is the 422 COPY_ERROR shape and claims nothing', async () => {
+    policy.allowed = []
+    const res = await post('{}')
+    expect(res.status).toBe(422)
+    expect((await res.json()).code).toBe('COPY_ERROR')
+    expect(h.claimCaptionAction).not.toHaveBeenCalled()
+    expect(h.startDraftAction).not.toHaveBeenCalled()
+  })
+
+  it('the onError settle passes no stamp (a failed run keeps every row stamp)', async () => {
+    h.loadDraftCaptions.mockResolvedValue(rows(SONNET, SONNET, SONNET))
+    await post(JSON.stringify({ channel: 'LINKEDIN' }))
+    const onError = h.startDraftAction.mock.calls[0][5] as (e: unknown) => Promise<void>
+    h.settleCaptionAction.mockClear()
+    await onError(new Error('boom'))
+    expect(h.settleCaptionAction).toHaveBeenCalledWith('d1', ['LINKEDIN'], { LINKEDIN: { ok: false, reason: 'boom' } })
+    expect(h.settleCaptionAction.mock.calls[0]).toHaveLength(3)
   })
 })

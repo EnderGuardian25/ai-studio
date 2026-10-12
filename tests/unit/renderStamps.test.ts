@@ -164,7 +164,7 @@ describe('regenerate-design', () => {
     expect(db.draftWrites.at(-1)!.data).toMatchObject({ ...STAMP, ...DRAFT_FREEFORM })
   })
 
-  it('008 (T6 interim): resolves DESIGN_FREEFORM from the team default before the claim', async () => {
+  it('008: with no design stamp, resolves DESIGN_FREEFORM from the team default before the claim', async () => {
     db.policy = {
       allowedModels: ['HAIKU', 'SONNET', 'OPUS'],
       requirePersonalTokenForGated: false,
@@ -196,6 +196,7 @@ describe('regenerate-design', () => {
     db.draft = {
       id: 'd1', teamId: 'team1', brief, headline: 'h', htmlContent: '<html>legacy</html>', exportUrl: 'exports/l.png',
       currentRevisionNumber: null, promptVersion: 'pv-old', fontSet: 'fonts-old',
+      designModel: 'claude-sonnet-4-6', designModelSubstitutedFrom: 'HAIKU',
     }
     await regenerateDesign(req, ctx)
     expect(db.revisionCreates).toHaveLength(2)
@@ -203,6 +204,9 @@ describe('regenerate-design', () => {
       instruction: 'Design before regenerate',
       promptVersion: 'pv-old',
       fontSet: 'fonts-old',
+      // 008 FR-08: the model of that render, too.
+      model: 'claude-sonnet-4-6',
+      modelSubstitutedFrom: 'HAIKU',
     })
     expect(db.revisionCreates[1]).toMatchObject({ instruction: 'Regenerated design', ...STAMP })
   })
@@ -215,6 +219,44 @@ describe('regenerate-design', () => {
     await regenerateDesign(req, ctx)
     expect(db.revisionCreates[0]).toHaveProperty('promptVersion', null)
     expect(db.revisionCreates[0]).toHaveProperty('fontSet', null)
+    expect(db.revisionCreates[0]).toHaveProperty('model', null)
+    expect(db.revisionCreates[0]).toHaveProperty('modelSubstitutedFrom', null)
+  })
+
+  // ── 008 FR-09: like for like — Draft.designModel is the stamp tier ────────
+  const stamped = (designModel: string | null) => ({
+    id: 'd1', teamId: 'team1', brief, headline: 'h', htmlContent: '<html>v1</html>', exportUrl: 'exports/v1.png',
+    currentRevisionNumber: 1, promptVersion: 'pv', fontSet: 'f', designModel, designModelSubstitutedFrom: null,
+  })
+
+  it("the draft's design stamp wins over the team default (the model that made the current design)", async () => {
+    db.policy = {
+      allowedModels: ['HAIKU', 'SONNET', 'OPUS'],
+      requirePersonalTokenForGated: false,
+      defaults: [{ surface: 'DESIGN_FREEFORM', model: 'SONNET' }],
+    }
+    db.draft = stamped('claude-opus-5-5')
+    await regenerateDesign(req, ctx)
+    expect(db.revisionCreates[0]).toMatchObject({ model: 'claude-opus-5-5', modelSubstitutedFrom: null })
+    expect(db.draftWrites.at(-1)!.data).toMatchObject({ designModel: 'claude-opus-5-5', designModelSubstitutedFrom: null })
+  })
+
+  it('AC-17: a stamp since disallowed falls to the default and is recorded as the substitution', async () => {
+    db.policy = { allowedModels: ['HAIKU', 'SONNET'], requirePersonalTokenForGated: false, defaults: [] }
+    db.draft = stamped('claude-opus-5-5')
+    const res = (await regenerateDesign(req, ctx)) as Response
+    expect(res.status).toBe(202)
+    expect(db.revisionCreates[0]).toMatchObject({ model: 'claude-sonnet-5-5', modelSubstitutedFrom: 'claude-opus-5-5' })
+    expect(db.draftWrites.at(-1)!.data).toMatchObject({
+      designModel: 'claude-sonnet-5-5',
+      designModelSubstitutedFrom: 'claude-opus-5-5',
+    })
+  })
+
+  it('a retired ID maps to its family and is itself recorded as a substitution', async () => {
+    db.draft = stamped('claude-sonnet-4-6')
+    await regenerateDesign(req, ctx)
+    expect(db.revisionCreates[0]).toMatchObject({ model: 'claude-sonnet-5-5', modelSubstitutedFrom: 'claude-sonnet-4-6' })
   })
 })
 

@@ -41,7 +41,10 @@ export const POST = withTeamAuth<Params>(async (_req, { params }, user) => {
       status: 'IN_PROGRESS',
       failureReason: null,
       // A rerun writes a fresh headline; never leave a stale one on a FAILED draft.
+      // Its stamp goes with it (008 FR-08): the rerun stamps the new headline.
       headline: null,
+      headlineModel: null,
+      headlineModelSubstitutedFrom: null,
       captions: {
         updateMany: { where: {}, data: { status: 'PENDING', failureReason: null } },
         createMany: {

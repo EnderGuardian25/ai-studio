@@ -24,9 +24,10 @@
 // enters miss.reasons (it reaches the rejected-render label and the retry).
 //
 // ── The verifier is pinned to Haiku (FR-14b / AC-20b) ────────────────────────
-// VERIFIER_MODEL lives here and the input takes no model: proposal 008's model
-// picker can never route the verifier elsewhere. The CLI call sets pinModel so
-// the CLAUDE_CLI_MODEL global override does not apply to it either.
+// 008 FR-15: it runs internalModel('INTERNAL_VERIFIER', mode) — a fixed system
+// step that never reads the team policy (A14) — and the input takes no model,
+// so no picker can route it elsewhere. A ResolvedModel never consults
+// CLAUDE_CLI_MODEL (T5), so the CLI call needs no pin.
 //
 // ── No retries here ──────────────────────────────────────────────────────────
 // One verifier call per verifyRefine() invocation, maximum. The Anthropic SDK's
@@ -79,6 +80,9 @@ import { runClaudeCli, stripCodeFences } from '@/lib/agent/claudeCli'
 import { isCliMode } from '@/lib/agent/config'
 import { UNTRUSTED_CONTENT_GUARD, fenceUntrusted } from '@/lib/agent/untrusted'
 import { resolveAnthropicApiKey } from '@/providers/registry'
+import { internalModel } from '@/lib/models/resolve'
+import { createMessage, textOf } from '@/lib/models/anthropicCall'
+import { modelCallFor, recordModelCall } from '@/lib/models/modelCalls'
 import { MOCK_AI, buildMockVerifierReply, mockVerifyOutcome } from '@/lib/testHooks'
 
 // ── Public types ─────────────────────────────────────────────────────────────
@@ -126,10 +130,9 @@ export interface VerifyRefineInput {
   onVerifierCall?: () => void
 }
 
-// ── Pinned model and limits ──────────────────────────────────────────────────
+// ── Limits ───────────────────────────────────────────────────────────────────
+// The verifier's time bound is its catalogue entry's INTERNAL_VERIFIER timeout.
 
-export const VERIFIER_MODEL = { api: 'claude-haiku-4-5-20251001', cli: 'haiku' } as const
-const VERIFIER_TIMEOUT_MS = 60_000
 const VERIFIER_MAX_TOKENS = 300
 
 export const MAX_FACTS_CHARS = 16_000
@@ -365,25 +368,32 @@ export function buildVerifierPrompt(
 // here (T20 extends buildMockVerifierReply to force miss / unavailable), so
 // the parse path below always runs.
 async function callVerifierModel(prompt: VerifierPrompt, instruction: string, teamId: string): Promise<string> {
-  if (MOCK_AI) return buildMockVerifierReply(instruction)
-  if (isCliMode()) {
-    return runClaudeCli(`${prompt.system}\n\n${prompt.user}`, {
-      label: 'verify',
-      model: VERIFIER_MODEL.cli,
-      pinModel: true,
-      timeoutMs: VERIFIER_TIMEOUT_MS,
-    })
+  const mode = isCliMode() ? 'cli' : 'api'
+  const model = internalModel('INTERNAL_VERIFIER', mode)
+  if (MOCK_AI) {
+    // 008 FR-16: the short-circuited call is recorded first.
+    recordModelCall(modelCallFor(model, mode, 'verify'))
+    return buildMockVerifierReply(instruction)
+  }
+  if (mode === 'cli') {
+    // The 60 s bound is the model's surface timeout; a ResolvedModel needs no pin (T5).
+    return runClaudeCli(`${prompt.system}\n\n${prompt.user}`, { label: 'verify', model })
   }
   const apiKey = await resolveAnthropicApiKey(teamId)
-  const client = new Anthropic({ apiKey: apiKey ?? undefined, maxRetries: 0, timeout: VERIFIER_TIMEOUT_MS })
-  const message = await client.messages.create({
-    model: VERIFIER_MODEL.api,
-    max_tokens: VERIFIER_MAX_TOKENS,
-    system: prompt.system,
-    messages: [{ role: 'user', content: prompt.user }],
-  })
-  const block = message.content.find((b) => b.type === 'text')
-  return block && block.type === 'text' ? block.text : ''
+  // maxRetries: 0 — one verifier call, never re-asked (see the header).
+  // createMessage bounds it by the model's surface timeout.
+  const client = new Anthropic({ apiKey: apiKey ?? undefined, maxRetries: 0, timeout: model.timeoutMs })
+  const message = await createMessage(
+    client,
+    {
+      max_tokens: VERIFIER_MAX_TOKENS,
+      system: prompt.system,
+      messages: [{ role: 'user', content: prompt.user }],
+    },
+    model,
+    { label: 'verify' },
+  )
+  return textOf(message)
 }
 
 const errorText = (err: unknown) => (err instanceof Error ? err.message : String(err))

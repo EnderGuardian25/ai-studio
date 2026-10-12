@@ -58,6 +58,7 @@ import { reconcileInlineAssets, restoreInlineAssets } from '@/lib/agent/inlineAs
 import { isAccepted, type VerifyResult } from '@/lib/drafts/refineVerify'
 import type { RefineAttemptDiagnostics, RejectionDiagnostics } from '@/lib/drafts/revisions'
 import type { DraftActionCompletion } from '@/lib/drafts/draftActions'
+import type { ResolvedModel } from '@/lib/models/resolve'
 
 export const MAX_REFINE_ATTEMPTS = 2
 
@@ -66,7 +67,8 @@ export type RefineAttemptNumber = 1 | 2
 export interface RefineRunRequest {
   attempt: RefineAttemptNumber
   // The model the route received — the same on the retry (FR-14b / AC-20b).
-  model: string
+  // 008: the route's REFINE ResolvedModel (a string until T10 removes it).
+  model: ResolvedModel | string
   // Attempt 2 only: why attempt 1 was not accepted (the route renders them,
   // fenced, into the retry note — prompts/refine.ts buildRefineRetryNote).
   retryReasons?: string[]
@@ -94,7 +96,7 @@ export interface RefineAttemptDeps<C> {
 }
 
 export interface RefineAttemptInput {
-  model: string
+  model: ResolvedModel | string
   // token → data URI for the document the model was shown (extractInlineAssets).
   inlineAssets: Record<string, string>
 }

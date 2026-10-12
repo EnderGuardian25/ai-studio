@@ -128,7 +128,6 @@ const { runDesignAgentCli, runDesignAgentCliRefine } = await import('@/lib/agent
 const { runBriefingModel } = await import('@/lib/campaign/briefingAssistant')
 const { validateClaudeToken } = await import('@/lib/agent/userToken')
 const { modelFor, modelForBackground } = await import('@/lib/agent/config')
-const { VERIFIER_MODEL } = await import('@/lib/drafts/refineVerify')
 const { decideModel, internalModel } = await import('@/lib/models/resolve')
 const { setModelCallSink } = await import('@/lib/models/modelCalls')
 
@@ -187,7 +186,8 @@ describe('AC-13: every text-mode call site spawns with --tools "" and never --al
     ['copy', { model: siteModel('CAPTION'), label: 'copy' }],
     ['design', { label: 'design', model: siteModel('DESIGN_FREEFORM') }],
     ['refine', { timeoutMs: 300_000, label: 'refine', model: 'sonnet' }],
-    ['verifier', { label: 'verify', model: VERIFIER_MODEL.cli, pinModel: true, timeoutMs: 60_000 }],
+    // 008 T7: the verifier runs its internal model (FR-15); no pin, the timeout is the model's.
+    ['verifier', { label: 'verify', model: internalModel('INTERNAL_VERIFIER', 'cli') }],
     ['background', { label: 'background', model: modelForBackground('cli'), timeoutMs: 90_000 }],
     ['briefing', { timeoutMs: 180_000, label: 'briefing', model: modelFor('B', 'cli') }],
     ['token-validate', { model: 'haiku', timeoutMs: 60_000, label: 'token-validate', authToken: TOKEN }],

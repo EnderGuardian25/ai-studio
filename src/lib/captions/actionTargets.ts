@@ -40,14 +40,45 @@ export interface CaptionRowSettle {
   failureReason: string | null
   /** Set only by a successful write, which clears the migration review flag. */
   needsReview?: false
+  /**
+   * 008 FR-08: the model that wrote the new text — set only by a successful
+   * write given its stamp. A failed write leaves the row's stamp as it was.
+   */
+  model?: string
+  modelSubstitutedFrom?: string | null
+}
+
+// The model that wrote a caption reply (008 FR-08): the arg that crossed the
+// boundary (or a non-Claude provider's own ID), and the refused value the
+// resolver substituted away from, or null. writeCaptions produces it.
+export interface CaptionStamp {
+  model: string
+  substitutedFrom: string | null
 }
 
 // What a caption write leaves in a row (design §5's table). A failure never
 // destroys good text (A7): a row that still has text stays READY with the
 // reason noted, and only a row with no usable text becomes FAILED, with no text
 // (the CHECK `FAILED ⇒ text = ''`). Failed model output is never stored.
-export function settleCaptionRow(row: { text: string }, field: FieldResult): CaptionRowSettle {
-  if (field.ok) return { status: 'READY', text: field.text, failureReason: null, needsReview: false }
+//
+// 008 FR-08: a successful write given the reply's stamp records it as the
+// row's model. A failure writes no stamp field at all, so the row keeps the
+// stamp of the text it keeps (A7) — and the stale sweep and an unstarted run's
+// settle, which pass no stamp, never touch one.
+export function settleCaptionRow(
+  row: { text: string },
+  field: FieldResult,
+  stamp?: CaptionStamp | null,
+): CaptionRowSettle {
+  if (field.ok) {
+    return {
+      status: 'READY',
+      text: field.text,
+      failureReason: null,
+      needsReview: false,
+      ...(stamp ? { model: stamp.model, modelSubstitutedFrom: stamp.substitutedFrom } : {}),
+    }
+  }
   if (row.text.trim() !== '') {
     return { status: 'READY', text: row.text, failureReason: `Regenerate failed: ${field.reason}` }
   }

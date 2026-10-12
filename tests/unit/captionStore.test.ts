@@ -475,3 +475,118 @@ describe('saveCaptionEdit / saveHeadlineEdit (FR-12)', () => {
     expect(await saveHeadlineEdit('d1', 'Line')).toBe(false)
   })
 })
+
+// ── 008 T7 (FR-08, AC-07): the caption action's stamp writes ─────────────────
+
+describe('008 FR-08: settleCaptionAction stamps validated fields only', () => {
+  const STAMP = { model: 'claude-sonnet-5-5', substitutedFrom: 'claude-opus-5-5' }
+  const STAMP_FIELDS = ['model', 'modelSubstitutedFrom', 'headlineModel', 'headlineModelSubstitutedFrom']
+
+  it('an ok field gets the new stamp; a failed field writes no stamp field, so the row keeps its own', async () => {
+    h.captionFindMany.mockResolvedValue([
+      { channel: 'INSTAGRAM', text: 'old ig' },
+      { channel: 'LINKEDIN', text: '' },
+      { channel: 'WHATSAPP', text: 'old wa' },
+    ])
+    await settleCaptionAction(
+      'd1',
+      ['INSTAGRAM', 'LINKEDIN', 'WHATSAPP'],
+      {
+        INSTAGRAM: { ok: true, text: 'new ig' },
+        LINKEDIN: { ok: false, reason: 'missing' },
+        WHATSAPP: { ok: false, reason: 'empty' },
+      },
+      STAMP,
+    )
+    const data = h.captionUpdateMany.mock.calls.map(([a]) => a.data)
+    expect(data[0]).toEqual({
+      status: 'READY',
+      text: 'new ig',
+      failureReason: null,
+      needsReview: false,
+      model: 'claude-sonnet-5-5',
+      modelSubstitutedFrom: 'claude-opus-5-5',
+    })
+    // The FAILED (no text) and the kept-text rows: no stamp key at all.
+    for (const d of data.slice(1)) for (const k of STAMP_FIELDS) expect(d).not.toHaveProperty(k)
+    expect(data[2]).toEqual({ status: 'READY', text: 'old wa', failureReason: 'Regenerate failed: empty' })
+  })
+
+  it('a validated headline writes headlineModel in the same claim-guarded update; a failed one writes nothing', async () => {
+    h.captionFindMany.mockResolvedValue([])
+    await settleCaptionAction('d1', ['HEADLINE'], { HEADLINE: { ok: true, text: 'New line' } }, STAMP)
+    expect(h.draftUpdateMany).toHaveBeenCalledWith({
+      where: { id: 'd1', pendingAction: 'REGENERATE_COPY' },
+      data: {
+        headline: 'New line',
+        headlineModel: 'claude-sonnet-5-5',
+        headlineModelSubstitutedFrom: 'claude-opus-5-5',
+      },
+    })
+    h.draftUpdateMany.mockClear()
+    await settleCaptionAction('d1', ['HEADLINE'], { HEADLINE: { ok: false, reason: 'empty' } }, STAMP)
+    expect(h.draftUpdateMany).not.toHaveBeenCalled()
+  })
+
+  it('the failure settles (no stamp: onError, an unstarted run) and the stale sweep never write a stamp field', async () => {
+    h.captionFindMany.mockResolvedValue([
+      { channel: 'INSTAGRAM', text: 'kept' },
+      { channel: 'LINKEDIN', text: '' },
+    ])
+    await settleCaptionAction('d1', ['INSTAGRAM', 'LINKEDIN'], {
+      INSTAGRAM: { ok: false, reason: 'boom' },
+      LINKEDIN: { ok: false, reason: 'boom' },
+    })
+    await settlePendingCaptions('d1', 'Generation was interrupted. Please retry.')
+    expect(h.captionUpdateMany).toHaveBeenCalledTimes(4)
+    for (const [a] of h.captionUpdateMany.mock.calls) {
+      for (const k of STAMP_FIELDS) expect(a.data).not.toHaveProperty(k)
+    }
+  })
+
+  it('without a stamp, even an ok field writes no stamp field (the pre-008 shape)', async () => {
+    h.captionFindMany.mockResolvedValue([{ channel: 'INSTAGRAM', text: 'x' }])
+    await settleCaptionAction('d1', ['INSTAGRAM'], { INSTAGRAM: { ok: true, text: 'y' } })
+    expect(h.captionUpdateMany.mock.calls[0][0].data).not.toHaveProperty('model')
+  })
+})
+
+describe('008 A6: a user edit writes no stamp field', () => {
+  const STAMP_FIELDS = ['model', 'modelSubstitutedFrom', 'headlineModel', 'headlineModelSubstitutedFrom']
+
+  it('saveCaptionEdit and saveHeadlineEdit leave every stamp column untouched', async () => {
+    await saveCaptionEdit('d1', 'LINKEDIN', 'typed')
+    await saveHeadlineEdit('d1', 'typed')
+    const writes = [...h.captionUpdateMany.mock.calls, ...h.draftUpdateMany.mock.calls].map(([a]) => a.data)
+    expect(writes).toHaveLength(2)
+    for (const d of writes) for (const k of STAMP_FIELDS) expect(d).not.toHaveProperty(k)
+  })
+})
+
+describe('008 FR-09: loadDraftCaptions exposes each row stamp', () => {
+  it('selects model and modelSubstitutedFrom with the row (the regenerate stamp tier reads them)', async () => {
+    h.draftFindUnique.mockResolvedValue({
+      status: 'EXPORTED',
+      pendingAction: null,
+      captionMigration: null,
+      legacyCaptionText: null,
+      updatedAt: T,
+      captions: ['INSTAGRAM', 'LINKEDIN', 'WHATSAPP'].map((c) => ({
+        ...row(c, 't'),
+        model: c === 'LINKEDIN' ? 'claude-opus-5-5' : null,
+        modelSubstitutedFrom: null,
+      })),
+    })
+    const loaded = await loadDraftCaptions('d1')
+    const select = h.draftFindUnique.mock.calls[0][0].select.captions.select
+    expect(select).toMatchObject({ model: true, modelSubstitutedFrom: true })
+    expect(loaded!.captions.map((c) => c.model)).toEqual([null, 'claude-opus-5-5', null])
+  })
+
+  it('a deferred legacy draft synthesizes rows with null stamps', async () => {
+    h.draftFindUnique.mockResolvedValue(legacyDraft({ status: 'IN_PROGRESS' }))
+    const loaded = await loadDraftCaptions('d1')
+    expect(loaded!.deferred).toBe(true)
+    for (const c of loaded!.captions) expect(c).toMatchObject({ model: null, modelSubstitutedFrom: null })
+  })
+})

@@ -10,11 +10,12 @@ import { runDesignAgentRefine } from '@/lib/agent/designAgent'
 import { runDesignAgentCliRefine } from '@/lib/agent/designAgentCli'
 import { extractInlineAssets, restoreInlineAssets } from '@/lib/agent/inlineAssets'
 import { dimensionsFor } from '@/lib/aspectRatio'
-import { modelFor, pathForDesignMode, pipelineMode } from '@/lib/agent/config'
+import { pathForDesignMode, pipelineMode } from '@/lib/agent/config'
+import { resolveModel } from '@/lib/models/policy'
 import { buildRefineSystemPrompt, buildRefineUserMessage } from '@/lib/agent/prompts/refine'
 import { generateBackgroundForRefine } from '@/lib/agent/background'
 import { refineSkipFields } from '@/lib/drafts/backgroundNotice'
-import { commitDraftRevision, recordRejectedRender } from '@/lib/drafts/revisions'
+import { commitDraftRevision, draftModelStamp, recordRejectedRender, type ModelStamp } from '@/lib/drafts/revisions'
 import { claimDraftAction, startDraftAction, touchDraftAction } from '@/lib/drafts/draftActions'
 import { runRefineAttempts, settleRefine } from '@/lib/drafts/refineAttempt'
 import { verifyRefine } from '@/lib/drafts/refineVerify'
@@ -24,6 +25,21 @@ interface PendingConflict {
   conflictId: string
   pendingHtml: string
   explanation: string
+  // 008 A6: the refine model that wrote pendingHtml, so an Override commits
+  // with it. Absent on a conflict stored before 008.
+  model?: string | null
+  modelSubstitutedFrom?: string | null
+}
+
+// The stamp an Override commits with (A6): the model recorded with the
+// conflict, or — a pre-008 conflict, which recorded none — the draft's current
+// design model carried forward, the same rule as an inline edit.
+function overrideModelStamp(
+  pending: PendingConflict,
+  draft: { designModel: string | null; designModelSubstitutedFrom: string | null },
+): ModelStamp {
+  if (pending.model === undefined) return draftModelStamp(draft)
+  return { model: pending.model, modelSubstitutedFrom: pending.modelSubstitutedFrom ?? null }
 }
 
 interface ConflictMarker {
@@ -105,7 +121,14 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
     if (!pending || pending.conflictId !== overrideConflictId) {
       return NextResponse.json({ error: 'Conflict not found or already resolved' }, { status: 409 })
     }
-    return commitRevision(draft.id, instruction || 'Override brand kit conflict', pending.pendingHtml, width, height)
+    return commitRevision(
+      draft.id,
+      instruction || 'Override brand kit conflict',
+      pending.pendingHtml,
+      width,
+      height,
+      overrideModelStamp(pending, draft),
+    )
   }
 
   // Explicit brief kit → campaign → project → system default.
@@ -126,8 +149,20 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
   const hasInlineAssets = Object.keys(inlineAssets).length > 0
 
   const mode = pipelineMode()
-  // Refine uses the same model as the originating path: Path A → haiku, Path B → sonnet.
-  const path = pathForDesignMode(draft.brief.designMode)
+  // 008 FR-09 / A8: refine has no stamp tier (it is not a regenerate). The team
+  // REFINE default applies to both paths; the system default follows the
+  // draft's path (Path A → Haiku, Path B → Sonnet). Resolved before the claim,
+  // so a team with nothing allowed claims nothing; the ResolvedModel then
+  // travels by value into the background run (both attempts, the commit stamp).
+  const resolvedModel = await resolveModel('REFINE', {
+    userId: user.userId,
+    teamId: draft.teamId,
+    designPath: pathForDesignMode(draft.brief.designMode),
+  })
+  if (!resolvedModel.ok) {
+    return NextResponse.json({ code: resolvedModel.code, message: resolvedModel.message }, { status: 422 })
+  }
+  const model = resolvedModel.resolved
 
   const claimed = await claimDraftAction(draft.id, 'REFINE')
   if (!claimed) {
@@ -164,7 +199,7 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
     const beforeFacts = extractDomFacts(slimHtml, { width, height, inlineAssets }).catch(() => undefined)
 
     const result = await runRefineAttempts<ConflictMarker>(
-      { model: modelFor(path, mode), inlineAssets },
+      { model, inlineAssets },
       {
         // Neither runner renders in refine mode: only the document finally
         // kept is rendered (below), so a missed attempt leaves no export.
@@ -177,7 +212,7 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
         //   attempt 1 → attempt 2:  refine 300 s (runClaudeCli timeout)
         //     + after-facts render 60 s (SET_CONTENT_TIMEOUT_MS; the
         //       before-facts render overlaps the refine call)
-        //     + verifier 60 s (VERIFIER_TIMEOUT_MS)            ≈ 420 s
+        //     + verifier 60 s (INTERNAL_VERIFIER timeout)      ≈ 420 s
         //   attempt 2 → settled:  the same 420 s + the final render 60 s
         //     + upload + a commit/record transaction whose connection wait
         //       is capped at 10 s (TX_MAX_WAIT_MS)             ≈ 490 s
@@ -204,7 +239,8 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
                 refine: { attempt, instruction, slimHtml },
               })
         },
-        // The verifier model is pinned to Haiku inside verifyRefine (FR-14b).
+        // The verifier runs on its own fixed internal model inside verifyRefine
+        // (008 FR-15: INTERNAL_VERIFIER), never on the refine's.
         verify: async (req) => {
           let modelCalls = 0
           const verdict = await verifyRefine({
@@ -245,6 +281,8 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
           height,
           backgroundImageUrl,
           backgroundSkip: refineSkipFields(background),
+          // 008 FR-08: the revision and the draft record the refine's model.
+          model,
         })
       },
       conflict: async (conflict) => {
@@ -257,6 +295,9 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
               // if the user clicks Override later.
               pendingHtml: restoreInlineAssets(conflict.pendingHtml, inlineAssets),
               explanation: conflict.explanation,
+              // 008 A6: what wrote pendingHtml, for the Override's stamp.
+              model: model.arg,
+              modelSubstitutedFrom: model.substitutedFrom,
             },
           },
         })
@@ -277,6 +318,8 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
           height,
           reason: notApplied.reason,
           diagnostics: notApplied.diagnostics,
+          // 008 FR-08: the rejected render records the attempt's model.
+          model,
         })
       },
     })
@@ -286,13 +329,21 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
 })
 
 // The synchronous Override commit: renders the withheld HTML (no model call).
-async function commitRevision(draftId: string, instruction: string, newHtml: string, width: number, height: number) {
+async function commitRevision(
+  draftId: string,
+  instruction: string,
+  newHtml: string,
+  width: number,
+  height: number,
+  model: ModelStamp,
+) {
   const { revisionId, exportKey } = await commitDraftRevision({
     draftId,
     instruction,
     html: newHtml,
     width,
     height,
+    model,
   })
 
   return NextResponse.json({

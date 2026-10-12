@@ -5,7 +5,7 @@ import { withTeamAuth, parseBody, type TeamAuthedUser } from '@/lib/api/handler'
 import { canAccessContent } from '@/lib/authz/visibility'
 import { dimensionsFor } from '@/lib/aspectRatio'
 import { resolveExportUrl } from '@/lib/storage/minio'
-import { commitDraftRevision, RevisionConflictError } from '@/lib/drafts/revisions'
+import { commitDraftRevision, draftModelStamp, RevisionConflictError } from '@/lib/drafts/revisions'
 import {
   sanitizeInlineHtml,
   inlineEditBlockReason,
@@ -78,6 +78,8 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
     html: clean,
     width,
     height,
+    // 008 A6: hand-edited HTML is still the current model's output.
+    model: draftModelStamp(draft),
   })
 
   return NextResponse.json({
@@ -183,6 +185,8 @@ async function handleElementEdit(raw: unknown, draftId: string, user: TeamAuthed
       // silently overwritten) and no refine/regenerate claimed the draft
       // meanwhile (single-flight). A miss writes nothing.
       expectedRevisionNumber: baseRevisionNumber,
+      // 008 A6: the edited element is still the current model's output.
+      model: draftModelStamp(draft),
     })
   } catch (err) {
     if (err instanceof RevisionConflictError) {

@@ -36,7 +36,8 @@ vi.mock('@/lib/testHooks', async (importOriginal) => {
 })
 
 const { runRefineAttempts, settleRefine, reconcileTokens, MAX_REFINE_ATTEMPTS } = await import('@/lib/drafts/refineAttempt')
-const { verifyRefine, VERIFIER_MODEL } = await import('@/lib/drafts/refineVerify')
+const { verifyRefine } = await import('@/lib/drafts/refineVerify')
+const { internalModel } = await import('@/lib/models/resolve')
 const { rejectionDiagnosticsSchema } = await import('@/lib/drafts/revisions')
 type Deps = import('@/lib/drafts/refineAttempt').RefineAttemptDeps<{ conflict: true }>
 type VerifyResult = import('@/lib/drafts/refineVerify').VerifyResult
@@ -67,7 +68,7 @@ const REPLIES = {
 // ── Fakes ────────────────────────────────────────────────────────────────────
 
 function fakes(replies: string[], verdicts: VerifyResult[] = []) {
-  const runs: Array<{ attempt: number; model: string; retryReasons?: string[] }> = []
+  const runs: Array<{ attempt: number; model: unknown; retryReasons?: string[] }> = []
   const verifies: Array<{ attempt: number; classes: InstructionClass[]; supersedes: string[]; afterHtml: string }> = []
   const deps: Deps = {
     runRefine: async (req) => {
@@ -429,7 +430,8 @@ describe('with the real verifyRefine (API mode; SDK + DOM extraction mocked)', (
     expect(r.kind).toBe('not-applied')
     expect(counter.calls).toBe(2)
     expect(h.anthropicCreate).toHaveBeenCalledTimes(2)
-    for (const [args] of h.anthropicCreate.mock.calls) expect(args.model).toBe(VERIFIER_MODEL.api)
+    // 008 FR-15: the verifier's internal model, never the route's.
+    for (const [args] of h.anthropicCreate.mock.calls) expect(args.model).toBe(internalModel('INTERNAL_VERIFIER', 'api').arg)
     expect(f.runs.map((x) => x.model)).toEqual(['claude-opus-4-1', 'claude-opus-4-1'])
     if (r.kind === 'not-applied') expect(r.diagnostics).toMatchObject({ refineCalls: 2, verifierCalls: 2 })
   })

@@ -89,8 +89,13 @@ vi.mock('@/lib/testHooks', async (importOriginal) => {
 process.env.CLAUDE_CLI_MODEL = 'opus'
 process.env.CLAUDE_CLI_DEBUG = '0'
 
-const { verifyRefine, isAccepted, parseVerifierVerdict, buildVerifierPrompt, VERIFIER_MODEL, VERIFIER_SYSTEM, MAX_FACTS_CHARS } =
+const { verifyRefine, isAccepted, parseVerifierVerdict, buildVerifierPrompt, VERIFIER_SYSTEM, MAX_FACTS_CHARS } =
   await import('@/lib/drafts/refineVerify')
+const { setModelCallSink } = await import('@/lib/models/modelCalls')
+type ModelCallRecord = import('@/lib/models/modelCalls').ModelCallRecord
+// 008 FR-15: the verifier runs INTERNAL_VERIFIER's fixed entry (Haiku 4.5), whose
+// cliArg = apiId (T2's expected outcome).
+const HAIKU_ID = 'claude-haiku-4-5'
 const { INSTRUCTION_CLASSES } = await import('@/lib/agent/instructionClasses')
 const { runWithClaudeAuth } = await import('@/lib/agent/claudeAuth')
 type VerifyRefineInput = import('@/lib/drafts/refineVerify').VerifyRefineInput
@@ -262,16 +267,15 @@ describe('add: exactly one verifier call, pinned to Haiku (AC-13, FR-14b, AC-20b
     el({ tag: 'img', classes: ['figure'], imageSources: ['https://minio.example.com/images/person.png'], box: { width: 400, height: 600 } }),
   ])
 
-  it('CLI mode: one spawn, --model haiku despite CLAUDE_CLI_MODEL=opus', async () => {
+  it('CLI mode: one spawn, --model claude-haiku-4-5 (INTERNAL_VERIFIER) despite CLAUDE_CLI_MODEL=opus', async () => {
     useFacts(BEFORE, withFigure)
     h.scripts.push({ exitCode: 0, stdout: '{"applied": true, "reason": "a new person image appears"}' })
     const r = await inAuth(() => verifyRefine(input()))
     expect(r).toEqual({ kind: 'pass' })
     expect(h.spawnCalls).toHaveLength(1)
     const args = h.spawnCalls[0].args
-    expect(args[args.indexOf('--model') + 1]).toBe('haiku')
+    expect(args[args.indexOf('--model') + 1]).toBe(HAIKU_ID)
     expect(args).not.toContain('opus')
-    expect(VERIFIER_MODEL.cli).toBe('haiku')
   })
 
   it('the override IS live in this suite — an unpinned CLI call runs on opus (so the pin test is not vacuous)', async () => {
@@ -281,15 +285,16 @@ describe('add: exactly one verifier call, pinned to Haiku (AC-13, FR-14b, AC-20b
     expect(args[args.indexOf('--model') + 1]).toBe('opus')
   })
 
-  it('API mode: one messages.create on claude-haiku-4-5, SDK retries disabled', async () => {
+  it('API mode: one messages.create (via createMessage) on claude-haiku-4-5, SDK retries disabled, bounded by the model timeout', async () => {
     h.cli = false
     useFacts(BEFORE, withFigure)
     const r = await verifyRefine(input())
     expect(r).toEqual({ kind: 'pass' })
     expect(h.anthropicCreate).toHaveBeenCalledTimes(1)
-    expect(h.anthropicCreate.mock.calls[0][0].model).toBe('claude-haiku-4-5-20251001')
-    expect(VERIFIER_MODEL.api).toBe('claude-haiku-4-5-20251001')
-    expect(h.anthropicCtor.mock.calls[0][0]).toMatchObject({ apiKey: 'sk-ant-api-test', maxRetries: 0 })
+    expect(h.anthropicCreate.mock.calls[0][0]).toMatchObject({ model: HAIKU_ID, max_tokens: 300 })
+    // createMessage's deadline: an AbortSignal on the request.
+    expect(h.anthropicCreate.mock.calls[0][1]?.signal).toBeInstanceOf(AbortSignal)
+    expect(h.anthropicCtor.mock.calls[0][0]).toMatchObject({ apiKey: 'sk-ant-api-test', maxRetries: 0, timeout: 60_000 })
     expect(h.resolveAnthropicApiKey).toHaveBeenCalledWith('team-1')
   })
 
@@ -298,11 +303,11 @@ describe('add: exactly one verifier call, pinned to Haiku (AC-13, FR-14b, AC-20b
     const smuggled = { ...input(), model: 'opus', verifierModel: 'claude-opus-4-1' } as VerifyRefineInput
     await inAuth(() => verifyRefine(smuggled))
     const args = h.spawnCalls[0].args
-    expect(args[args.indexOf('--model') + 1]).toBe('haiku')
+    expect(args[args.indexOf('--model') + 1]).toBe(HAIKU_ID)
 
     h.cli = false
     await verifyRefine(smuggled)
-    expect(h.anthropicCreate.mock.calls[0][0].model).toBe('claude-haiku-4-5-20251001')
+    expect(h.anthropicCreate.mock.calls[0][0].model).toBe(HAIKU_ID)
   })
 
   it('an explicit "applied": false is a miss carrying the reason', async () => {
@@ -546,6 +551,28 @@ describe('fix round 1 — design content cannot forge fact rows', () => {
 })
 
 describe('MOCK_AI seam', () => {
+  // 008 FR-16: the verifier mock records the INTERNAL_VERIFIER model it short-circuits.
+  it('the mock verifier call records INTERNAL_VERIFIER on Haiku (system), in either mode', async () => {
+    const calls: ModelCallRecord[] = []
+    setModelCallSink({ record: (r) => calls.push(r), read: () => calls, clear: () => (calls.length = 0) })
+    try {
+      for (const cli of [false, true]) {
+        h.cli = cli
+        h.mockAi = true
+        h.extract.mockResolvedValue(BEFORE)
+        await verifyRefine(input({ instruction: 'include a human character' }))
+      }
+      expect(calls).toHaveLength(2)
+      expect(calls.map((c) => c.mode)).toEqual(['api', 'cli'])
+      for (const c of calls) {
+        expect(c).toMatchObject({ surface: 'INTERNAL_VERIFIER', key: 'HAIKU', arg: HAIKU_ID, source: 'system', substitutedFrom: null, label: 'verify' })
+      }
+      expect(modelCalls()).toBe(0)
+    } finally {
+      setModelCallSink(null)
+    }
+  })
+
   it('returns a deterministic pass through the verdict parser without a model call', async () => {
     h.mockAi = true
     useFacts(BEFORE, BEFORE)

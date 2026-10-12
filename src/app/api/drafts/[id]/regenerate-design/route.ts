@@ -52,10 +52,15 @@ export const POST = withTeamAuth<{ id: string }>(async (_req, { params }, user) 
   // migrated draft has none and falls back to the brief Topic, logged.
   const headline = designHeadline(draft, draft.brief)
 
-  // 008 (T6, interim): runPathBDesign now needs the DESIGN_FREEFORM model.
-  // Resolved before the claim, team → system; T7 adds the FR-09 stamp tier
-  // (draft.designModel).
-  const resolvedModel = await resolveModel('DESIGN_FREEFORM', { userId: user.userId, teamId: draft.teamId })
+  // 008 FR-09: like for like — the stamp tier is the model that made the
+  // current design (after a refine, the refine's), then team → system. A
+  // stamp no longer allowed falls through and is recorded as a substitution.
+  // Resolved before the claim, so a failure (422) claims nothing.
+  const resolvedModel = await resolveModel('DESIGN_FREEFORM', {
+    stamp: draft.designModel ?? null,
+    userId: user.userId,
+    teamId: draft.teamId,
+  })
   if (!resolvedModel.ok) {
     return NextResponse.json({ code: resolvedModel.code, message: resolvedModel.message }, { status: 422 })
   }
@@ -105,9 +110,12 @@ export const POST = withTeamAuth<{ id: string }>(async (_req, { params }, user) 
             htmlSnapshot: draft.htmlContent!,
             exportUrl: draft.exportUrl ?? '',
             // The snapshot IS the draft's current render, so it keeps the
-            // draft's own stamp (null when the draft predates the stamps).
+            // draft's own stamp (null when the draft predates the stamps),
+            // its model included (008 FR-08).
             promptVersion: draft.promptVersion ?? null,
             fontSet: draft.fontSet ?? null,
+            model: draft.designModel ?? null,
+            modelSubstitutedFrom: draft.designModelSubstitutedFrom ?? null,
           },
         })
         return revisionNumber

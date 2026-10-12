@@ -48,16 +48,45 @@ export interface RenderStamp {
   modelSubstitutedFrom: string | null
 }
 
-// The stamp of a render made NOW by `model`. Resolve it once per render and
-// write the same value to the draft and the revision row. null = no resolved
-// model is known for this render (a transitional caller); history reads it as
-// "unknown", the 004 rule.
-export function currentRenderStamp(model: ResolvedModel | null): RenderStamp {
+// The model half of a RenderStamp, as stored. A render made now takes it from
+// its ResolvedModel (modelStampOf); a write that keeps a model's HTML — an
+// inline edit, an Override — carries a stored one forward (A6).
+export interface ModelStamp {
+  model: string | null
+  modelSubstitutedFrom: string | null
+}
+
+const NO_MODEL: ModelStamp = { model: null, modelSubstitutedFrom: null }
+
+// A ResolvedModel as a stamp: the arg that crossed the boundary and the refused
+// value. A ModelStamp passes through; null is "unknown" (the 004 rule).
+export function modelStampOf(model: ResolvedModel | ModelStamp | null | undefined): ModelStamp {
+  if (!model) return NO_MODEL
+  if ('arg' in model) return { model: model.arg, modelSubstitutedFrom: model.substitutedFrom }
+  return { model: model.model ?? null, modelSubstitutedFrom: model.modelSubstitutedFrom ?? null }
+}
+
+// The draft's CURRENT design stamp, carried forward by a write whose HTML is
+// still that model's output (008 A6: inline edit; a pre-008 Override).
+export function draftModelStamp(draft: {
+  designModel?: string | null
+  designModelSubstitutedFrom?: string | null
+}): ModelStamp {
+  return {
+    model: draft.designModel ?? null,
+    modelSubstitutedFrom: draft.designModelSubstitutedFrom ?? null,
+  }
+}
+
+// The stamp of a render made NOW. `model` is the ResolvedModel that wrote its
+// HTML, or the stored stamp a write carries forward (A6). Resolve it once per
+// render and write the same value to the draft and the revision row. null = no
+// model is known for this render; history reads it as "unknown", the 004 rule.
+export function currentRenderStamp(model: ResolvedModel | ModelStamp | null): RenderStamp {
   return {
     promptVersion: PROMPT_VERSION,
     fontSet: getFontSetId(),
-    model: model?.arg ?? null,
-    modelSubstitutedFrom: model?.substitutedFrom ?? null,
+    ...modelStampOf(model),
   }
 }
 
@@ -132,6 +161,8 @@ export async function listCommittedRevisions(draftId: string) {
       instruction: true,
       exportUrl: true,
       createdAt: true,
+      // 008 FR-16: the model whose output the revision's HTML is (additive).
+      model: true,
     },
   })
   return numbered(rows)
@@ -254,6 +285,12 @@ export interface CommitRevisionArgs {
   // commit landing in that window would otherwise be silently overwritten —
   // with element mode's many small edits per session, a real lost update.
   expectedRevisionNumber?: number | null
+  // 008 FR-08 / A6: the model whose output `html` is — the refine's
+  // ResolvedModel, or a stored stamp carried forward (an inline edit carries
+  // the draft's designModel; an Override, pendingConflict's model). Omitted
+  // reads as unknown (null). Ignored by an adopt, which carries the rejected
+  // row's own stamp.
+  model?: ResolvedModel | ModelStamp | null
 }
 
 // Thrown (and never retried — only P2002 is) when the expectedRevisionNumber
@@ -307,12 +344,10 @@ export async function commitDraftRevision(
   // transaction: a plain read takes no lock, so the lock order below is
   // unchanged, and the stamp columns are never updated after insert. An
   // unknown row reads as null here and the guard inside the transaction
-  // refuses it.
-  // 008: until T7 threads the refine's resolved model into the commit, a
-  // fresh commit's model is unknown (null).
+  // refuses it. 008: a fresh commit's model is the caller's (args.model).
   const stamp = adoptRejectedRevisionId
     ? await rejectedRenderStamp(draftId, adoptRejectedRevisionId)
-    : currentRenderStamp(null)
+    : currentRenderStamp(args.model ?? null)
 
   let finalExportKey = args.exportKey
   // Set only when THIS call rendered + uploaded the export — the only object
@@ -636,6 +671,10 @@ export interface RecordRejectedRenderArgs {
   // Human-readable; shown to the user by T18 (capped here).
   reason: string
   diagnostics: Omit<RejectionDiagnostics, 'export'>
+  // 008 FR-08: the model the rejected attempt ran (the refine's ResolvedModel),
+  // so a later "Use anyway" reinstates the render with its model. Omitted
+  // reads as unknown (null).
+  model?: ResolvedModel | null
 }
 
 // Writes the not-applied outcome. A render/upload failure must not mask the
@@ -653,9 +692,8 @@ export async function recordRejectedRender(
   const diagnostics = rejectionDiagnosticsSchema.omit({ export: true }).parse(args.diagnostics)
   // F3: the rejected row carries the stamp of ITS render, so a later "Use
   // anyway" can reinstate it. The draft's stamp is untouched: its current
-  // render did not change. 008: the attempt's model arrives with T7 (null
-  // until then).
-  const stamp = currentRenderStamp(null)
+  // render did not change. 008: with the attempt's model.
+  const stamp = currentRenderStamp(args.model ?? null)
 
   let exportKey: string | null = null
   let exported: RejectionDiagnostics['export'] = 'none'
