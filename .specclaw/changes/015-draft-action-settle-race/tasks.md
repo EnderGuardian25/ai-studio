@@ -16,7 +16,7 @@ Each task is implemented by a subagent, reviewed by `specclaw:code-reviewer`, an
 
 ### Wave 1 — Test, then fix
 
-- [ ] `T1` — The forced-race E2E cases, failing on the current code
+- [x] `T1` — The forced-race E2E cases, failing on the current code
   - Files: `tests/e2e/settle-race.test.ts` (new)
   - Estimate: small
   - Kind: test
