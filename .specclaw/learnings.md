@@ -379,3 +379,37 @@ scripts/import-posts.mjs has never set teamId, which has been required on Brief/
 Follow-up change after 012: add a --team <name|id> remap flag (or match by name) to import-posts.mjs, then prove a real import into a scratch test DB.
 
 ---
+
+## [L23] design_gap — T10 modified package.json (captions:backfill/report to ts...
+
+**When:** 2026-10-12 01:38 UTC
+**Category:** design_gap
+**Priority:** medium
+**Status:** pending
+
+### Detail
+
+T10 modified package.json (captions:backfill/report to tsx --env-file-if-exists=.env) and T9 modified 5 unit tests for the field rename; neither was declared in its task's files list.
+
+### Action
+
+When a task renames a Prisma field or adds a script run in CI, declare the unit tests and package.json it will ripple into.
+
+---
+
+## [L24] spec_gap — FR-06's roll-forward was broken as approved: down.sql res...
+
+**When:** 2026-10-12 01:38 UTC
+**Category:** spec_gap
+**Priority:** high
+**Status:** pending
+
+### Detail
+
+FR-06's roll-forward was broken as approved: down.sql restored copyText NOT NULL but migration 3 stayed recorded in _prisma_migrations, so a 012 redeploy would never re-run DROP NOT NULL and every new draft would fail. Found only while writing the T16 runbook; TC-CAP-13 tested the down direction only. Fixed under T16 (user decision): down.sql deletes migration 3's _prisma_migrations row; TC-CAP-13 proves the roll-forward.
+
+### Action
+
+Every rollback test must also prove the roll-forward. A down script that undoes a migration's effect must also un-record that migration.
+
+---
