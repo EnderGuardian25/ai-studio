@@ -53,7 +53,7 @@ Wave 2 adds per-post and per-chat pickers only.
 
 ### Wave 1 — The foundation (shippable boundary)
 
-- [ ] `T1` — The catalogue and the pure resolver
+- [x] `T1` — The catalogue and the pure resolver
   - Files: `src/lib/models/catalogue.ts` (new), `src/lib/models/resolve.ts` (new), `src/lib/models/policyRules.ts` (new), `tests/unit/modelCatalogue.test.ts` (new), `tests/unit/modelResolve.test.ts` (new), `tests/unit/regenerateStamp.test.ts` (new)
   - Estimate: large
   - Kind: impl
