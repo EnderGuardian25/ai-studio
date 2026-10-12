@@ -26,6 +26,7 @@ import {
 } from '@/components/ui/folio'
 import { TeamClaudeTokenCard } from '@/components/team/TeamClaudeTokenCard'
 import { ApiKeysCard } from '@/components/team/ApiKeysCard'
+import { ModelsCard } from '@/components/team/ModelsCard'
 import { BLOCK, GateNotice, ROW } from '@/components/team/folio'
 import { apiFetch } from '@/lib/apiFetch'
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser'
@@ -629,6 +630,8 @@ export default function TeamSettingsPage() {
         <TeamClaudeTokenCard numeral="iii." />
 
         <ApiKeysCard numeral="iv." />
+
+        <ModelsCard numeral="v." />
       </div>
     </div>
   )

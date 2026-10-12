@@ -229,7 +229,7 @@ Wave 2 adds per-post and per-chat pickers only.
     - **`claudeCliArgs.test.ts`:** the override cases are rewritten to the new contract, and each rewrite is listed in the report.
     - **`scripts/cli-sandbox-check.mjs`:** `VISION_MODEL` becomes the `ASSISTANT_BRANDKIT` system default's `cliArg` (`claude-sonnet-5-5`, or its alias if T2 fell back). Its drift test asserts the value against the catalogue.
 
-- [ ] `T11` — `/team` → Models
+- [x] `T11` — `/team` → Models
   - Files: `src/components/team/ModelsCard.tsx` (new), `src/app/(app)/team/page.tsx`, `tests/unit/uiTokenGuard.test.ts` (only if a new allow-list entry is needed; expected none)
   - Estimate: medium
   - Kind: impl
