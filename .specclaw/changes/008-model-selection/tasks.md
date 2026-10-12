@@ -115,7 +115,7 @@ Wave 2 adds per-post and per-chat pickers only.
     - **Routes:** `GET`/`PUT /api/team/model-policy` use `withTeamAdmin` with a strict zod body (`.strict()`). `GET /api/models` uses `withTeamAuth`, and its shape is FR-13 exactly: no prices and no `apiId`. Response types go into `api-types.ts`.
     - **Unit tests mock Prisma**, the same way `captionStore.test.ts` does.
 
-- [ ] `T5` — The boundary: the CLI, the SDK wrapper, the recorder and the usage-limit classifier
+- [x] `T5` — The boundary: the CLI, the SDK wrapper, the recorder and the usage-limit classifier
   - Files: `src/lib/agent/claudeCli.ts`, `src/lib/models/anthropicCall.ts` (new), `src/lib/models/modelCalls.ts` (new), `src/app/api/test/model-calls/route.ts` (new), `src/lib/agent/generationErrors.ts`, `tests/unit/anthropicCall.test.ts` (new), `tests/unit/usageLimit.test.ts` (new), `tests/unit/claudeCliArgs.test.ts`
   - Estimate: medium
   - Kind: impl

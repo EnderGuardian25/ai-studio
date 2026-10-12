@@ -40,6 +40,12 @@ const h = vi.hoisted(() => ({
   // Runs synchronously inside the fake spawn, before any event (e.g. to delete
   // the cwd the spawn was handed).
   onSpawn: null as ((cwd: string | undefined) => void) | null,
+  // 008 T5: per-spawn overrides, consumed in order (e.g. an auth failure then a
+  // success); a child that never exits (to drive the timeout); and a value
+  // env.CLAUDE_CLI_MODEL reads as (undefined ⇒ the real, unset one).
+  queue: [] as Array<{ exitCode: number | null; stdout?: string; stderr?: string }>,
+  hang: false,
+  envCliModel: undefined as string | undefined,
 }))
 
 vi.mock('child_process', async () => {
@@ -56,7 +62,15 @@ vi.mock('child_process', async () => {
         kill: vi.fn(),
       })
       h.onSpawn?.(opts.cwd)
+      const scripted = h.queue.shift()
+      if (h.hang && !scripted) return child
       setImmediate(() => {
+        if (scripted) {
+          if (scripted.stderr) child.stderr.emit('data', Buffer.from(scripted.stderr))
+          child.stdout.emit('data', Buffer.from(scripted.stdout ?? ''))
+          child.emit('close', scripted.exitCode)
+          return
+        }
         if (h.spawnErrorCode) {
           child.emit('error', Object.assign(new Error(`spawn ${cmd} ${h.spawnErrorCode}`), { code: h.spawnErrorCode }))
           return
@@ -68,6 +82,17 @@ vi.mock('child_process', async () => {
       return child
     }),
   }
+})
+
+// env.ts snapshots process.env at load; this lets a test set CLAUDE_CLI_MODEL
+// (already validated to a ModelKey, 008 T3) without re-importing the graph.
+vi.mock('@/lib/env', async (importOriginal) => {
+  const mod = await importOriginal<typeof import('@/lib/env')>()
+  const env = new Proxy(mod.env, {
+    get: (target, prop, receiver) =>
+      prop === 'CLAUDE_CLI_MODEL' && h.envCliModel !== undefined ? h.envCliModel : Reflect.get(target, prop, receiver),
+  })
+  return { ...mod, env }
 })
 
 // CLI mode for the wrappers that branch on it (briefing, token-validate).
@@ -104,6 +129,8 @@ const { runBriefingModel } = await import('@/lib/campaign/briefingAssistant')
 const { validateClaudeToken } = await import('@/lib/agent/userToken')
 const { modelFor, modelForBackground } = await import('@/lib/agent/config')
 const { VERIFIER_MODEL } = await import('@/lib/drafts/refineVerify')
+const { decideModel, internalModel } = await import('@/lib/models/resolve')
+const { setModelCallSink } = await import('@/lib/models/modelCalls')
 
 type ClaudeCliOptions = import('@/lib/agent/claudeCli').ClaudeCliOptions
 type ClaudeCliAuth = import('@/lib/agent/claudeAuth').ClaudeCliAuth
@@ -126,6 +153,9 @@ beforeEach(() => {
   h.exitCode = 0
   h.spawnErrorCode = null
   h.onSpawn = null
+  h.queue.length = 0
+  h.hang = false
+  h.envCliModel = undefined
 })
 afterEach(() => setPlatform(realPlatform))
 
@@ -647,5 +677,131 @@ describe('T6: scripts/cli-sandbox-check.mjs leakProblems', () => {
   it('the bare prefix alone (no token chars) is not a leak', async () => {
     const { leakProblems } = await import('../../scripts/cli-sandbox-check.mjs')
     expect(leakProblems('tokens look like sk-ant-oat01-…', secrets)).toEqual([])
+  })
+})
+
+// ─── 008 T5: the ResolvedModel boundary (FR-07, transitional until T10) ────────
+
+describe('008 T5: a ResolvedModel at the CLI boundary', () => {
+  function resolved(surface: 'CAPTION' | 'DESIGN_FREEFORM', key: 'HAIKU' | 'SONNET' | 'OPUS') {
+    const r = decideModel(surface, {
+      requested: key,
+      policy: { allowed: ['HAIKU', 'SONNET', 'OPUS'], defaults: {}, gateOn: false },
+      credential: 'personal',
+      mode: 'cli',
+    })
+    if (!r.ok) throw new Error(r.message)
+    return r.resolved
+  }
+  const SONNET = resolved('DESIGN_FREEFORM', 'SONNET')
+  const modelArg = (args: string[]) => args.slice(args.indexOf('--model'), args.indexOf('--model') + 2)
+
+  let records: Array<{ surface: string; arg: string; mode: string; label: string | null }>
+  beforeEach(() => {
+    setPlatform('linux')
+    records = []
+    setModelCallSink({ record: (r) => records.push(r), read: () => records as never, clear: () => (records = []) })
+  })
+  afterEach(() => setModelCallSink(null))
+
+  const modes = [
+    ['text', (opts: ClaudeCliOptions) => runClaudeCli('p', opts)],
+    ['stream-json', (opts: ClaudeCliOptions) => runClaudeCliStreamJson([{ type: 'text', text: 'hi' }], opts)],
+  ] as const
+
+  it.each(modes)('%s mode: --model <arg>, with CLAUDE_CLI_MODEL unset and set', async (_m, run) => {
+    h.stdout = RESULT_OK('ok')
+    await inAuth(() => run({ model: SONNET }))
+    h.envCliModel = 'OPUS'
+    await inAuth(() => run({ model: SONNET }))
+    expect(h.spawnCalls).toHaveLength(2)
+    for (const c of h.spawnCalls) {
+      expect(modelArg(c.args)).toEqual(['--model', SONNET.arg])
+      expect(c.args.filter((a) => a === '--model')).toHaveLength(1)
+    }
+  })
+
+  it('the string path is unchanged: CLAUDE_CLI_MODEL still overrides it (the T3 interim mapping)', async () => {
+    h.envCliModel = 'OPUS'
+    await inAuth(() => runClaudeCli('p', { model: 'sonnet' }))
+    expect(modelArg(h.spawnCalls[0].args)).toEqual(['--model', 'opus'])
+    // …and a pinned string still beats it.
+    await inAuth(() => runClaudeCli('p', { model: 'haiku', pinModel: true }))
+    expect(modelArg(h.spawnCalls[1].args)).toEqual(['--model', 'haiku'])
+  })
+
+  it('a ResolvedModel with a pinModel flag still runs its own arg', async () => {
+    const haiku = internalModel('INTERNAL_VERIFIER', 'cli')
+    h.envCliModel = 'OPUS'
+    await inAuth(() => runClaudeCli('p', { model: haiku, pinModel: true }))
+    await inAuth(() => runClaudeCli('p', { model: SONNET, pinModel: false }))
+    expect(modelArg(h.spawnCalls[0].args)).toEqual(['--model', haiku.arg])
+    expect(modelArg(h.spawnCalls[1].args)).toEqual(['--model', SONNET.arg])
+  })
+
+  it.each(['sonnet; rm -rf /', '$(id)', 'a b', '', '%PATH%'])(
+    'a MODEL_NAME_RE violation in a ResolvedModel arg (%j) still throws, never spawns and never records',
+    async (arg) => {
+      setPlatform('win32')
+      for (const [, run] of modes) {
+        await expect(inAuth(() => run({ model: { ...SONNET, arg } }))).rejects.toThrow(/Invalid Claude model name/)
+      }
+      expect(h.spawnCalls).toHaveLength(0)
+      expect(records).toHaveLength(0)
+    },
+  )
+
+  it('timeoutMs defaults to the ResolvedModel timeout; an explicit timeoutMs still wins', async () => {
+    h.hang = true
+    await expect(inAuth(() => runClaudeCli('p', { model: { ...SONNET, timeoutMs: 30 } }))).rejects.toThrow(
+      'Claude CLI timed out after 30ms',
+    )
+    await expect(
+      inAuth(() => runClaudeCliStreamJson([{ type: 'text', text: 'x' }], { model: { ...SONNET, timeoutMs: 30 } })),
+    ).rejects.toThrow('Claude CLI timed out after 30ms')
+    await expect(
+      inAuth(() => runClaudeCli('p', { model: { ...SONNET, timeoutMs: 60_000 }, timeoutMs: 20 })),
+    ).rejects.toThrow('Claude CLI timed out after 20ms')
+  })
+
+  it('the catalogue timeout is what reaches the spawn when nothing else is given', async () => {
+    // Real catalogue value: the timer is armed with it (seen through a spy, no wait).
+    const spy = vi.spyOn(globalThis, 'setTimeout')
+    try {
+      await inAuth(() => runClaudeCli('p', { model: SONNET }))
+      expect(spy.mock.calls.map((c) => c[1])).toContain(SONNET.timeoutMs)
+    } finally {
+      spy.mockRestore()
+    }
+  })
+
+  it.each(modes)('%s mode: the recorder sees one record per spawn', async (_m, run) => {
+    h.stdout = RESULT_OK('ok')
+    await inAuth(() => run({ model: SONNET, label: 'design' }))
+    expect(records).toEqual([
+      expect.objectContaining({ surface: 'DESIGN_FREEFORM', key: 'SONNET', arg: SONNET.arg, mode: 'cli', source: 'request', label: 'design' }),
+    ])
+  })
+
+  it('an auth retry (personal → team) records twice — two spawns happened', async () => {
+    const teamToken = 'sk-ant-oat01-FAKE-team-token'
+    const personal: ClaudeCliAuth = {
+      ...auth,
+      onAuthFailure: async () => {},
+      resolveFallback: async () => ({ token: teamToken, userId: null, teamId: 'team-1', onAuthFailure: async () => {} }),
+    }
+    h.queue.push({ exitCode: 1, stderr: 'Invalid API key · Please run /login' }, { exitCode: 0, stdout: 'ok' })
+    await expect(runWithClaudeAuth(personal, () => runClaudeCli('p', { model: SONNET }))).resolves.toBe('ok')
+    expect(h.spawnCalls).toHaveLength(2)
+    expect(h.spawnCalls[1].env.CLAUDE_CODE_OAUTH_TOKEN).toBe(teamToken)
+    expect(records).toHaveLength(2)
+    for (const c of h.spawnCalls) expect(modelArg(c.args)).toEqual(['--model', SONNET.arg])
+  })
+
+  it('a string or absent model records nothing (the pre-008 path)', async () => {
+    await inAuth(() => runClaudeCli('p', { model: 'sonnet' }))
+    await inAuth(() => runClaudeCli('p'))
+    expect(h.spawnCalls).toHaveLength(2)
+    expect(records).toHaveLength(0)
   })
 })

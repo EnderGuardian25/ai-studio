@@ -31,5 +31,9 @@ export function humanizeGenerationError(err: unknown): string {
     return 'Generation timed out — please try again. If it keeps happening, the design may be too complex.'
   }
 
+  // ModelRefusalError (008, src/lib/models/anthropicCall.ts) lands here: its
+  // message ("The model declined this request (<category>).") is already
+  // readable, so it passes through unchanged — no pattern above matches it.
+  // A refusal is never retried on another model (A13).
   return raw
 }

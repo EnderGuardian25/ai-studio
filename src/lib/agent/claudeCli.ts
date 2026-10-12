@@ -4,8 +4,11 @@ import { mkdtemp, stat } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { StringDecoder } from "node:string_decoder"
+import Anthropic from "@anthropic-ai/sdk"
 import { env } from "@/lib/env"
 import { currentClaudeAuth } from "@/lib/agent/claudeAuth"
+import type { ResolvedModel } from "@/lib/models/resolve"
+import { modelCallFor, recordModelCall } from "@/lib/models/modelCalls"
 
 // Resolve the Claude Code CLI binary (005 FR-17). An explicit CLAUDE_CLI_PATH
 // runs directly. On Windows a bare `claude` goes through the shell, so cmd.exe
@@ -169,7 +172,33 @@ async function spawnCwd(): Promise<string> {
 // could carry shell syntax. Aliases, full ids, `[1m]` suffixes and
 // provider-prefixed ids (`us.anthropic.…:1`) all pass.
 const MODEL_NAME_RE = /^[A-Za-z0-9._:\-[\]]+$/
-function claudeModelArgs(explicitModel?: string, pinned = false): string[] {
+
+function invalidModelName(model: string): Error {
+  return new Error(
+    `Invalid Claude model name ${JSON.stringify(model.slice(0, 80))}: only letters, digits and . _ : - [ ] are allowed.`,
+  )
+}
+
+// 008 T5 (transitional until T10): a ResolvedModel is told apart from the
+// legacy string by shape. T10 deletes the string branch and makes it required.
+function isResolvedModel(model: ResolvedModel | string | undefined): model is ResolvedModel {
+  return typeof model === "object" && model !== null
+}
+
+// A ResolvedModel (008 FR-07) runs exactly its `arg`: CLAUDE_CLI_MODEL and
+// pinModel are ignored — the resolver has already applied the system default
+// (FR-04) — and there is no "default" branch. MODEL_NAME_RE stays as defence in
+// depth for the win32 shell join.
+function claudeModelArgs(model?: ResolvedModel | string, pinned = false): string[] {
+  if (isResolvedModel(model)) {
+    if (!MODEL_NAME_RE.test(model.arg)) throw invalidModelName(model.arg)
+    return ["--model", model.arg]
+  }
+  return legacyModelArgs(model, pinned)
+}
+
+// The pre-008 string path, unchanged (T10 deletes it).
+function legacyModelArgs(explicitModel?: string, pinned = false): string[] {
   // A pinned call (the refine add-verifier, change 004 FR-14b) runs on exactly
   // the model it names: the global override must not route it elsewhere.
   const pinnedModel = pinned ? explicitModel?.trim() : undefined
@@ -179,26 +208,27 @@ function claudeModelArgs(explicitModel?: string, pinned = false): string[] {
   const override = env.CLAUDE_CLI_MODEL?.toLowerCase() ?? ""
   const model = pinnedModel || override || (explicitModel ?? "haiku").trim()
   if (!model || (!pinnedModel && model.toLowerCase() === "default")) return []
-  if (!MODEL_NAME_RE.test(model)) {
-    throw new Error(
-      `Invalid Claude model name ${JSON.stringify(model.slice(0, 80))}: only letters, digits and . _ : - [ ] are allowed.`,
-    )
-  }
+  if (!MODEL_NAME_RE.test(model)) throw invalidModelName(model)
   return ["--model", model]
 }
 
 export interface ClaudeCliOptions {
+  // Defaults to the ResolvedModel's surface timeout when `model` is one, else
+  // to spawnClaude's 180 s.
   timeoutMs?: number
   maxBuffer?: number
   // Short tag for log lines so concurrent/sequential CLI calls are distinguishable
   // (e.g. "copy", "design:pathB"). Purely diagnostic.
   label?: string
-  // Per-call model (CLI alias or full id). Path A design passes "haiku", Path B
-  // "sonnet". Overridden by CLAUDE_CLI_MODEL when that env var is set.
-  model?: string
-  // When true, `model` is used verbatim and CLAUDE_CLI_MODEL does NOT override
-  // it. Only for calls whose model is a fixed policy rather than a preference —
-  // the refine add-verifier is pinned to Haiku (change 004 FR-14b).
+  // The model to run. A ResolvedModel (008 FR-07) passes `--model <arg>`,
+  // ignores CLAUDE_CLI_MODEL and pinModel, and is recorded before each spawn.
+  // A string (CLI alias or full id) is the pre-008 path, kept until each call
+  // site moves onto the resolver (T6–T8); it is overridden by CLAUDE_CLI_MODEL
+  // when that env var is set. T10 makes this a required ResolvedModel.
+  model?: ResolvedModel | string
+  // String path only: `model` is used verbatim and CLAUDE_CLI_MODEL does NOT
+  // override it — the refine add-verifier is pinned to Haiku (change 004
+  // FR-14b). Ignored for a ResolvedModel, which never consults the env.
   pinModel?: boolean
   // There is deliberately NO tools option (005 FR-08): every spawn passes
   // `--tools ""`, so no caller can opt a headless run — which executes with the
@@ -268,6 +298,31 @@ export function isClaudeAuthFailure(err: unknown): boolean {
     return err.apiErrorStatus === 401 || (err.apiErrorStatus === 403 && REVOKED_TOKEN_RE.test(err.stdout))
   }
   return AUTH_FAILURE_RE.test(`${err.stderr}\n${err.stdout}`)
+}
+
+// Does this error mean the Claude account hit its usage limit (008 FR-11,
+// design §8)? Pure + exported. It only changes a scheduled entry's errorReason
+// (A11) — retries and backoff are unchanged — so a miss costs a less specific
+// message, while a false positive would blame the team's credential for a
+// failure it didn't cause. So it reads exactly what isClaudeAuthFailure reads
+// (the ClaudeCliError field contract): never `diagnostic`, never model text.
+//   - an Anthropic.RateLimitError (API mode, HTTP 429);
+//   - a ClaudeCliError with a non-zero (or null) exit that is NOT an auth
+//     failure (checked first, so a 401 is never a usage limit), then:
+//       - a structured API status decides, as it does for auth: 429 is one,
+//         any other status is not, whatever the text says;
+//       - with no status, a usage-limit phrasing in stderr / stdout.
+// The phrase list is unverified against the pinned CLI 2.1.287 (A11; T2's
+// operator report records what it prints if a limited account was available).
+const USAGE_LIMIT_RE =
+  /usage limit (reached|exceeded)|claude ai usage limit|\brate[_ ]limit(ed|[_ ]error)?\b|\b429\b/i
+export function isClaudeUsageLimit(err: unknown): boolean {
+  if (err instanceof Anthropic.RateLimitError) return true
+  if (!(err instanceof ClaudeCliError)) return false
+  if (err.exitCode === 0) return false
+  if (isClaudeAuthFailure(err)) return false
+  if (err.apiErrorStatus !== null) return err.apiErrorStatus === 429
+  return USAGE_LIMIT_RE.test(`${err.stderr}\n${err.stdout}`)
 }
 
 // Dev-mode diagnostics. CLI mode is a local dev convenience, so log by default;
@@ -381,7 +436,25 @@ export async function runClaudeCliOnce(
   assertPromptSize(prompt.length, "This usually means the brand template is too big — use a smaller template or Path B.")
   const command = claudeCommand()
   const args = [...baseArgs(command.shell), ...claudeModelArgs(opts.model, opts.pinModel)]
-  return spawnClaude(args, prompt, { ...opts, command, tokenOverride })
+  return spawnClaude(args, prompt, { ...resolvedSpawnOpts(opts), command, tokenOverride })
+}
+
+// The 008 FR-07 boundary, shared by both input modes and run once per spawn —
+// so withAuthRetry's second attempt records a second call, which is correct:
+// two spawns happened. For a ResolvedModel, timeoutMs defaults to the entry's
+// surface timeout, and the call is recorded just before the spawn. A string or
+// absent model passes through unchanged (the pre-008 path).
+//
+// Known edge case (spec Edge Cases): resolution happens once, before the call,
+// with the acting user's credential tier. If withAuthRetry then falls back from
+// a rejected personal token to the team token, the one fallback attempt runs
+// the already-resolved model — so a personalTokenGated model admitted on
+// 'personal' can run once on the team token. Accepted: it is one call, the
+// personal token is marked INVALID, and the user's next resolution is 'team'.
+function resolvedSpawnOpts(opts: ClaudeCliOptions): ClaudeCliOptions {
+  if (!isResolvedModel(opts.model)) return opts
+  recordModelCall(modelCallFor(opts.model, "cli", opts.label))
+  return { ...opts, timeoutMs: opts.timeoutMs ?? opts.model.timeoutMs }
 }
 
 // ─── stream-json mode (005 FR-09) ────────────────────────────────────────────
@@ -474,7 +547,7 @@ async function runClaudeCliStreamJsonOnce(
     "--verbose",
     ...claudeModelArgs(opts.model, opts.pinModel),
   ]
-  return spawnClaude(args, line, { ...opts, command, tokenOverride, finalize: finalizeStreamJson })
+  return spawnClaude(args, line, { ...resolvedSpawnOpts(opts), command, tokenOverride, finalize: finalizeStreamJson })
 }
 
 interface StreamJsonResultEvent {
@@ -594,7 +667,7 @@ function finalizeText({ code, stdout, stderr }: SpawnResult): string {
   return stdout.trim()
 }
 
-interface SpawnClaudeOptions extends Pick<ClaudeCliOptions, "timeoutMs" | "maxBuffer" | "label"> {
+interface SpawnClaudeOptions extends Pick<ClaudeCliOptions, "timeoutMs" | "maxBuffer" | "label" | "model"> {
   command: { cmd: string; shell: boolean }
   tokenOverride: string | undefined
   // How a finished run (any exit code) becomes the answer or an error. The
@@ -647,7 +720,11 @@ async function spawnClaude(args: string[], stdinPayload: string, opts: SpawnClau
   const cwd = await spawnCwd()
 
   const modelIdx = args.indexOf("--model")
-  const resolvedModel = modelIdx >= 0 ? args[modelIdx + 1] : "(account default)"
+  const resolvedModel = isResolvedModel(opts.model)
+    ? `${opts.model.arg} (source=${opts.model.source})`
+    : modelIdx >= 0
+      ? args[modelIdx + 1]
+      : "(account default)"
   const startedAt = Date.now()
   const elapsed = () => `${((Date.now() - startedAt) / 1000).toFixed(1)}s`
 
