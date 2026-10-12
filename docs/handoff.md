@@ -13,17 +13,17 @@
 
 ### Commits this session
 
-| Task | Commit                | What                                                                                                                                                                      |
-| ---- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| T8   | `1f00261d`            | MCP `get_draft` / `generate_post` and `POST /api/generate/copy` return `headline` and `captions`; `copyText` stays as the deprecated alias (the Instagram text)           |
-| T9   | `9cf986eb`            | `legacyCaptionText @map("copyText")` (migration `20261011140000_legacy_caption_text`), no placeholder writes, the read-only guard, native fixture seed, the rollback file |
-| T10  | `05e8b021`            | §W captions E2E suite (TC-CAP-01…14) and the existing-case edits; **wave-1 gate**                                                                                         |
-| T11  | `932104ec`            | Per-channel regenerate, the headline panel, per-panel Undo, Copy to clipboard                                                                                             |
-| T12  | `44b28c83`            | The review / last-failed notices, the WhatsApp helper and guide, the counters                                                                                             |
-| T13  | `29ed3c8e`            | §W wave-2 panel cases (TC-CAP-15…20); **wave-2 gate**                                                                                                                     |
-| T14  | `b522046e`            | "copy" → "caption" in the remaining UI strings and the wording guard; **wave-3 gate**                                                                                     |
-| T15  | `c9386ae0`            | `export-posts` / `import-posts` carry captions, the headline and `captionMigration` (manifest v2; v1 bundles still import)                                                |
-| T16  | `<T16 commit — fill>` | Docs: this handoff, the runbook, CLAUDE.md, ROADMAP, 008/010 proposals, e2e plan §W, MCP/ACP guide, DESIGN_SYSTEM §8.14                                                   |
+| Task | Commit     | What                                                                                                                                                                      |
+| ---- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T8   | `1f00261d` | MCP `get_draft` / `generate_post` and `POST /api/generate/copy` return `headline` and `captions`; `copyText` stays as the deprecated alias (the Instagram text)           |
+| T9   | `9cf986eb` | `legacyCaptionText @map("copyText")` (migration `20261011140000_legacy_caption_text`), no placeholder writes, the read-only guard, native fixture seed, the rollback file |
+| T10  | `05e8b021` | §W captions E2E suite (TC-CAP-01…14) and the existing-case edits; **wave-1 gate**                                                                                         |
+| T11  | `932104ec` | Per-channel regenerate, the headline panel, per-panel Undo, Copy to clipboard                                                                                             |
+| T12  | `44b28c83` | The review / last-failed notices, the WhatsApp helper and guide, the counters                                                                                             |
+| T13  | `29ed3c8e` | §W wave-2 panel cases (TC-CAP-15…20); **wave-2 gate**                                                                                                                     |
+| T14  | `b522046e` | "copy" → "caption" in the remaining UI strings and the wording guard; **wave-3 gate**                                                                                     |
+| T15  | `c9386ae0` | `export-posts` / `import-posts` carry captions, the headline and `captionMigration` (manifest v2; v1 bundles still import)                                                |
+| T16  | `1b7186f7` | Docs: this handoff, the runbook, CLAUDE.md, ROADMAP, 008/010 proposals, e2e plan §W, MCP/ACP guide, DESIGN_SYSTEM §8.14                                                   |
 
 ### Gates
 

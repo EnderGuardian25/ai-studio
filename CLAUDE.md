@@ -5,7 +5,7 @@ This repo contains planning documents for **bistec-studio**, an internal marketi
 ## ✅ Outstanding work — START HERE (updated 2026-10-11, later)
 
 - **⏸️ 2026-10-11 (later) — PICK UP HERE: 012 (per-channel captions) is BUILT 16/16 on `v2`, all pushed. Next: `/specclaw:verify 012-per-channel-captions`.** Full detail: [`docs/handoff.md`](docs/handoff.md) top section; deploy/backfill/rollback steps in its **012 runbook** section.
-  - **Commits this session:** T8 `1f00261d`, T9 `9cf986eb`, T10 `05e8b021`, T11 `932104ec`, T12 `44b28c83`, T13 `29ed3c8e`, T14 `b522046e`, T15 `c9386ae0`, T16 `<T16 commit — fill>`.
+  - **Commits this session:** T8 `1f00261d`, T9 `9cf986eb`, T10 `05e8b021`, T11 `932104ec`, T12 `44b28c83`, T13 `29ed3c8e`, T14 `b522046e`, T15 `c9386ae0`, T16 `1b7186f7`.
   - **Gates** (each a full clean mock E2E after a dropped and recreated test DB): wave 1 **363/3/0/0**, wave 2 **369/3/0/0**, wave 3 **369/3/0/0** (passed/skipped/failed/flaky). Unit **2025**.
   - **User decisions this session:**
     - **(a)** MCP/ACP `publish_post` keeps FR-17: a refused caption leaves a **FAILED Post row** with the resolver's reason. The T7 review's "no row" suggestion was rejected.
