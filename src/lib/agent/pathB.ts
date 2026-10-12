@@ -38,6 +38,10 @@ export async function runPathBDesign(
   // 008 FR-07: the DESIGN_FREEFORM model, resolved by the caller (the
   // generation at its start; regenerate-design before its claim).
   model: ResolvedModel,
+  // 008 FR-12: a liveness write (a draft heartbeat or the scheduler's lease
+  // renewal), run after the background step and immediately before the
+  // design-agent call, so each stays within its own budget segment (budget.ts).
+  opts?: { onBeforeDesign?: () => Promise<void> },
 ): Promise<PathBDesignResult> {
   // Feed-to-AI artifact URLs (brand reference imagery).
   const artifacts = await prisma.brandKitArtifact.findMany({
@@ -104,6 +108,8 @@ export async function runPathBDesign(
     height,
     briefImages,
   })
+
+  await opts?.onBeforeDesign?.()
 
   const result = isCliMode()
     ? await runDesignAgentCli({ systemPrompt, userMessage, briefId: brief.id, width, height, model })

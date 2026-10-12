@@ -1,4 +1,5 @@
 import type { ImageProvider } from "../../interfaces/ImageProvider"
+import { IMAGE_GENERATION_TIMEOUT_MS } from "../../imageCapabilities"
 
 // Gemini native image generation over plain fetch (005 FR-13; no SDK, NFR-05).
 //
@@ -32,7 +33,6 @@ import type { ImageProvider } from "../../interfaces/ImageProvider"
 export const GEMINI_IMAGE_MODEL = "gemini-3.1-flash-image"
 
 const ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models"
-const TIMEOUT_MS = 120_000
 
 // The content types persistDataUrlImage stores (RASTER_IMAGE_TYPES in
 // src/lib/storage/minio.ts). Kept local so this provider doesn't pull in the
@@ -61,7 +61,7 @@ export class GeminiImageProvider implements ImageProvider {
   // an aspect-ratio string such as "1:1", "4:5" or "9:16".
   async generateImage(prompt: string, _brandKitId?: string, size?: string): Promise<{ url: string }> {
     const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), TIMEOUT_MS)
+    const timer = setTimeout(() => controller.abort(), IMAGE_GENERATION_TIMEOUT_MS)
     let res: Response
     try {
       res = await fetch(`${ENDPOINT}/${this.model}:generateContent`, {
@@ -75,7 +75,7 @@ export class GeminiImageProvider implements ImageProvider {
       })
     } catch (err) {
       if (controller.signal.aborted) {
-        throw new Error(`Gemini image generation timed out after ${TIMEOUT_MS / 1000}s`)
+        throw new Error(`Gemini image generation timed out after ${IMAGE_GENERATION_TIMEOUT_MS / 1000}s`)
       }
       throw err
     } finally {

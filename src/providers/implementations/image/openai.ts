@@ -1,12 +1,15 @@
 import OpenAI from "openai"
 import type { ImageProvider } from "../../interfaces/ImageProvider"
+import { IMAGE_GENERATION_TIMEOUT_MS } from "../../imageCapabilities"
 
 export class OpenAIImageProvider implements ImageProvider {
   readonly providerName = "openai" as const
   private client: OpenAI
 
   constructor(apiKey: string, private model = "gpt-image-2") {
-    this.client = new OpenAI({ apiKey })
+    // Bounded (008 FR-12): the SDK default is a 10-minute timeout with 2
+    // retries, which no action budget could absorb. One attempt, 120 s.
+    this.client = new OpenAI({ apiKey, timeout: IMAGE_GENERATION_TIMEOUT_MS, maxRetries: 0 })
   }
 
   async generateImage(prompt: string, _brandKitId?: string, size?: string): Promise<{ url: string }> {

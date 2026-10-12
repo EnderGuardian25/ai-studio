@@ -15,6 +15,7 @@ import { GENERATION_TARGETS, requireHeadline, writeCaptions } from '@/lib/captio
 import { captionRowsFromFields, headlineStampFields, saveGenerationCaptions } from '@/lib/captions/store'
 import { resolveModel } from '@/lib/models/policy'
 import type { ResolvedModel } from '@/lib/models/resolve'
+import { touchGeneration } from '@/lib/drafts/draftActions'
 
 // Path B needs a resolvable brand kit; thrown before any model call is paid for.
 export class NoBrandKitError extends Error {
@@ -137,8 +138,12 @@ async function produceDesign(
   // 008: the design surface's model (resolveGenerationModels); it is also the
   // render's stamp.
   model: ResolvedModel,
+  // 008 FR-12: the caller's liveness write, run immediately before the design
+  // call (Path B runs its background step first; Path A has none).
+  onBeforeDesign?: () => Promise<void>,
 ): Promise<ProducedDesign> {
   if (template) {
+    await onBeforeDesign?.()
     const result = await runPathADesign(brief, kit, template, headline, campaignBriefing, actor, model)
     return {
       htmlContent: result.htmlContent,
@@ -149,7 +154,7 @@ async function produceDesign(
       stamp: currentRenderStamp(model),
     }
   }
-  const result = await runPathBDesign(brief, kit!, headline, campaignBriefing, actor, model)
+  const result = await runPathBDesign(brief, kit!, headline, campaignBriefing, actor, model, { onBeforeDesign })
   return {
     htmlContent: result.htmlContent,
     exportUrl: result.exportUrl,
@@ -213,7 +218,8 @@ export async function generateDraftForBrief(
   // rather than let this default to the brief's owner, which would incorrectly
   // consult the OWNER's personal OpenAI key for a machine-triggered run.
   actor: GenerationActor,
-  opts?: { templateId?: string | null },
+  // onBeforeDesign: the scheduler renews its lease here (008 FR-12).
+  opts?: { templateId?: string | null; onBeforeDesign?: () => Promise<void> },
 ): Promise<GenerateDraftResult> {
   // 008: resolved first, so a team with no allowed model throws before any
   // model call is paid for (a sync failure creates no draft).
@@ -229,7 +235,7 @@ export async function generateDraftForBrief(
   )
   const headline = requireHeadline(fields)
 
-  const design = await produceDesign(brief, inputs, headline, actor, models.design)
+  const design = await produceDesign(brief, inputs, headline, actor, models.design, opts?.onBeforeDesign)
 
   const draft = await prisma.$transaction(async (tx) => {
     const created = await tx.draft.create({
@@ -322,7 +328,12 @@ export async function runGenerationForDraft(draftId: string, actor: GenerationAc
     await saveGenerationCaptions(draftId, fields, captionStamp)
     const headline = requireHeadline(fields)
 
-    const design = await produceDesign(draft.brief, inputs, headline, actor, models.design)
+    // Two heartbeats (008 FR-12): the caption save above bumps updatedAt, and
+    // touchGeneration runs again right before the design, so the stale sweep
+    // never measures captions + background + design as one segment.
+    const design = await produceDesign(draft.brief, inputs, headline, actor, models.design, () =>
+      touchGeneration(draftId),
+    )
     await finalizeDraftV1(draftId, design)
   } catch (err) {
     const reason = humanizeGenerationError(err)

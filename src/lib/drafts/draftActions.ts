@@ -49,6 +49,18 @@ export async function touchDraftAction(draftId: string, action: DraftAction): Pr
   })
 }
 
+// The same heartbeat for an async generation (008 FR-12), which the lazy sweep
+// fails as stuck once IN_PROGRESS for STUCK_GENERATION_MS without an update.
+// runGenerationForDraft calls it right before the design (src/lib/models/
+// budget.ts holds the segment arithmetic). Guarded on IN_PROGRESS, so it never
+// revives a draft the sweep already failed.
+export async function touchGeneration(draftId: string): Promise<void> {
+  await prisma.draft.updateMany({
+    where: { id: draftId, status: 'IN_PROGRESS' },
+    data: { updatedAt: new Date() },
+  })
+}
+
 // Release the action slot, optionally recording why the run failed.
 // updateMany (not update) so a draft deleted mid-action is a silent no-op.
 // Guarded on `action` (the one this run claimed): when the claim is no longer

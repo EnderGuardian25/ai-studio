@@ -8,7 +8,7 @@ import { getActiveCampaignBriefing } from '@/lib/campaign/briefing'
 import { runPathBDesign } from '@/lib/agent/pathB'
 import { currentRenderStamp, draftStampFields, withNextRevisionNumber } from '@/lib/drafts/revisions'
 import { resolveModel } from '@/lib/models/policy'
-import { claimDraftAction, startDraftAction } from '@/lib/drafts/draftActions'
+import { claimDraftAction, startDraftAction, touchDraftAction } from '@/lib/drafts/draftActions'
 import { generationSkipFields } from '@/lib/drafts/backgroundNotice'
 import { designHeadline, headlineFallbackMessage } from '@/lib/captions/headline'
 
@@ -87,6 +87,9 @@ export const POST = withTeamAuth<{ id: string }>(async (_req, { params }, user) 
       campaignBriefing,
       { userId: user.userId, teamId: user.teamId },
       model,
+      // 008 FR-12: the stale-sweep heartbeat between the background step and
+      // the design, so neither segment carries the other (budget.ts).
+      { onBeforeDesign: () => touchDraftAction(draft.id, 'REGENERATE_DESIGN') },
     )
     // F3 (AC-04): this render's stamp, resolved once and written to both the
     // new revision row and the draft (008: with the model that made it).

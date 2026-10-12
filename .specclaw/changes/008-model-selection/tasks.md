@@ -184,7 +184,7 @@ Wave 2 adds per-post and per-chat pickers only.
     - **The token ping** uses `internalModel('INTERNAL_TOKEN_PING', 'cli')` with its explicit `authToken`.
     - **Every assistant mock branch records** (design §7).
 
-- [ ] `T9` — The time budget, the heartbeats, scheduler lease renewal, the usage-limit `errorReason` and the image timeout
+- [x] `T9` — The time budget, the heartbeats, scheduler lease renewal, the usage-limit `errorReason` and the image timeout
   - Files: `src/lib/models/budget.ts` (new), `src/lib/drafts/draftActions.ts`, `src/lib/agent/generateDraft.ts`, `src/lib/agent/pathB.ts`, `src/app/api/drafts/[id]/regenerate-design/route.ts`, `src/app/api/drafts/[id]/refine/route.ts`, `src/lib/scheduler/generationRunner.ts`, `src/providers/implementations/image/openai.ts`, `src/lib/renderer/puppeteer.ts` (export a constant only), `tests/unit/actionBudget.test.ts` (new), `tests/unit/draftActions.test.ts`, `tests/unit/generationRunner.test.ts`
   - Estimate: medium
   - Kind: impl

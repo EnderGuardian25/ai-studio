@@ -3,15 +3,23 @@ import { prisma } from "../prisma"
 import { generateDraftForBrief } from "../agent/generateDraft"
 import { findLivePost } from "../publish/publishDraft"
 import { withClaudeAuth } from "../agent/userToken"
+import { isClaudeUsageLimit } from "../agent/claudeCli"
 
 // Generation is expensive (a design run is minutes of model time), so fewer
 // retries than the publish scheduler's 5.
 const MAX_RETRIES = 3
 // Heavy jobs, processed sequentially — bound a tick to a couple of them.
 const CLAIM_BATCH = 2
-// Lease for a claimed (RUNNING) entry. A full generation is copy (≤120s) +
-// background (≤90s) + design (≤300s); 15 min is ~2× that worst case.
-const GENERATION_LEASE_MS = 15 * 60_000
+// Lease for a claimed (RUNNING) entry. It is renewed at each entry's start and
+// again before its design (renewGenerationLease), so it bounds each of those
+// two segments, not the whole run; src/lib/models/budget.ts models them with
+// every eligible model's timeout, and tests/unit/actionBudget.test.ts fails if
+// either can outlive the lease (008 FR-12).
+export const GENERATION_LEASE_MS = 15 * 60_000
+
+// The prefix on errorReason when a scheduled run hit the team credential's
+// usage limit (008 FR-11), so the queue table says why rather than only what.
+const USAGE_LIMIT_REASON_PREFIX = "Claude usage limit reached on the team's credential — "
 
 // Backoff: 20, 40 min, capped at 60. Exported for unit tests.
 export function generationBackoffMs(retryCount: number): number {
@@ -40,6 +48,18 @@ async function claimDueGenerations(leaseUntil: Date): Promise<{ id: string }[]> 
     )
     RETURNING id
   `
+}
+
+// Push a RUNNING entry's lease out to now + GENERATION_LEASE_MS (008 FR-12).
+// The claim computes one lease per tick for every entry it claims, and the
+// entries run one after another, so without this the second entry would start
+// on a lease the first had already spent. Guarded on RUNNING: it never revives
+// an entry that has since settled or been reclaimed as lapsed.
+async function renewGenerationLease(id: string): Promise<void> {
+  await prisma.scheduledGeneration.updateMany({
+    where: { id, status: "RUNNING" },
+    data: { nextRetryAt: new Date(Date.now() + GENERATION_LEASE_MS) },
+  })
 }
 
 // Ensure the entry has its Brief. Created once on the first attempt and reused
@@ -128,6 +148,7 @@ export async function runGenerationJobs(): Promise<void> {
 
   for (const entry of entries) {
     try {
+      await renewGenerationLease(entry.id)
       const brief = await ensureBrief(entry)
 
       // entry.teamId is NOT NULL as of Task 15 (Migration B).
@@ -146,7 +167,7 @@ export async function runGenerationJobs(): Promise<void> {
         generateDraftForBrief(
           brief,
           { userId: null, teamId },
-          { templateId: entry.templateId }
+          { templateId: entry.templateId, onBeforeDesign: () => renewGenerationLease(entry.id) }
         )
       )
 
@@ -163,7 +184,9 @@ export async function runGenerationJobs(): Promise<void> {
       })
       console.log(`[generation] entry ${entry.id} → COMPLETED (draft ${draft.id})`)
     } catch (err) {
-      const reason = err instanceof Error ? err.message : String(err)
+      const message = err instanceof Error ? err.message : String(err)
+      // Retry and backoff are the same either way; only the reason says more.
+      const reason = isClaudeUsageLimit(err) ? USAGE_LIMIT_REASON_PREFIX + message : message
       const nextRetry = entry.retryCount + 1
 
       if (nextRetry <= MAX_RETRIES) {

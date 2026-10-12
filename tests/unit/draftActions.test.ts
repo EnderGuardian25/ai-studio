@@ -29,7 +29,7 @@ vi.mock('@/lib/agent/claudeAuth', () => ({
   runWithClaudeAuth: h.runWithClaudeAuth,
 }))
 
-const { claimDraftAction, completeDraftAction, releaseDraftAction, startDraftAction, touchDraftAction } = await import(
+const { claimDraftAction, completeDraftAction, releaseDraftAction, startDraftAction, touchDraftAction, touchGeneration } = await import(
   '@/lib/drafts/draftActions'
 )
 
@@ -89,6 +89,18 @@ describe('touchDraftAction (stale-sweep heartbeat)', () => {
     await touchDraftAction('draft-1', 'REFINE')
     expect(h.updateMany).toHaveBeenCalledWith({
       where: { id: 'draft-1', pendingAction: 'REFINE' },
+      data: { updatedAt: expect.any(Date) },
+    })
+  })
+})
+
+// 008 FR-12: the async generation's pre-design heartbeat. Its place in the
+// pipeline is tests/unit/actionHeartbeats.test.ts.
+describe('touchGeneration (async-generation heartbeat)', () => {
+  it('bumps updatedAt only while the draft is still IN_PROGRESS', async () => {
+    await touchGeneration('draft-1')
+    expect(h.updateMany).toHaveBeenCalledWith({
+      where: { id: 'draft-1', status: 'IN_PROGRESS' },
       data: { updatedAt: expect.any(Date) },
     })
   })

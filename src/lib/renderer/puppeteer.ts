@@ -96,7 +96,7 @@ export function isAllowedRenderRequest(url: string): boolean {
 
 // Bound a hung render (e.g. a resource that never settles): explicit, generous
 // budget instead of relying on Puppeteer's silent 30s navigation default.
-const SET_CONTENT_TIMEOUT_MS = 60_000
+export const SET_CONTENT_TIMEOUT_MS = 60_000
 
 // Cap concurrent renders. Each render rasterizes at 2× DPI (here 1080→2160px),
 // which is memory-heavy, and the design agent can fire renderHtml repeatedly

@@ -206,23 +206,18 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
         //
         // Stale-sweep heartbeat (T17 fix round 1). The lazy sweep in
         // drafts/recovery.ts clears an action whose Draft.updatedAt is
-        // STUCK_GENERATION_MS (15 min = 900 s) old. A verified refine can now
-        // run two attempts, so each attempt start bumps updatedAt (only while
-        // this claim is held). Worst case between bumps, CLI mode (prod):
-        //   attempt 1 → attempt 2:  refine 300 s (runClaudeCli timeout)
-        //     + after-facts render 60 s (SET_CONTENT_TIMEOUT_MS; the
-        //       before-facts render overlaps the refine call)
-        //     + verifier 60 s (INTERNAL_VERIFIER timeout)      ≈ 420 s
-        //   attempt 2 → settled:  the same 420 s + the final render 60 s
-        //     + upload + a commit/record transaction whose connection wait
-        //       is capped at 10 s (TX_MAX_WAIT_MS)             ≈ 490 s
-        // (a rejected personal token adds one fast failed CLI spawn before the
-        // team-token retry, not a second timeout; the ~410 s margin absorbs
-        // renderer queueing under PUPPETEER_MAX_CONCURRENCY). Both are well under 900 s,
-        // so the sweep cannot fire on a refine that is still verifying, and a
-        // run killed mid-way is still swept 15 min after its last bump.
-        // claim → attempt 1 (the background pre-step: ≤ 90 s decision + image
-        // generation) is unchanged by T17 and shared with regenerate-design.
+        // STUCK_GENERATION_MS (15 min = 900 s) old. A verified refine can run
+        // two attempts, so each attempt start bumps updatedAt (only while this
+        // claim is held), and so does the settle below, before its final
+        // render (008 FR-12). The segments between bumps (claim → attempt 1,
+        // attempt → next bump, pre-settle → settled) are modelled with every
+        // eligible model's timeout in src/lib/models/budget.ts, and
+        // tests/unit/actionBudget.test.ts fails if any can reach 900 s, so the
+        // sweep cannot fire on a refine that is still verifying, and a run
+        // killed mid-way is still swept 15 min after its last bump. (A
+        // rejected personal token adds one fast failed CLI spawn before the
+        // team-token retry, not a second timeout; the margin absorbs renderer
+        // queueing under PUPPETEER_MAX_CONCURRENCY.)
         runRefine: async ({ attempt, model, retryReasons }) => {
           await touchDraftAction(draft.id, 'REFINE')
           return mode === 'cli'
@@ -271,6 +266,9 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
     // 'not-applied' tells startDraftAction to keep the outcome recorded below.
     return settleRefine(result, {
       commit: async (html) => {
+        // The pre-commit heartbeat (008 FR-12): the final render + commit is
+        // its own budget segment, not the tail of the last attempt's.
+        await touchDraftAction(draft.id, 'REFINE')
         // No export key: commitDraftRevision renders + uploads this document —
         // the one that was verified (Ruling D).
         await commitDraftRevision({
@@ -309,6 +307,8 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
         console.warn(
           `[refine] draft ${draft.id}: not applied after ${notApplied.diagnostics.refineCalls} attempts — ${notApplied.reason}`,
         )
+        // The same heartbeat as commit's: the rejected render is rendered too.
+        await touchDraftAction(draft.id, 'REFINE')
         await recordRejectedRender({
           draftId: draft.id,
           instruction,

@@ -74,3 +74,8 @@ export function imageSizeFor(
   if (!sizes) return '1024x1024'
   return (sizes as Record<string, string>)[aspectRatio ?? ''] ?? sizes.SQUARE
 }
+
+// One image call's wall-clock bound, shared by every image provider (008
+// FR-12): the OpenAI client's `timeout` (with no retries) and Gemini's abort
+// timer. src/lib/models/budget.ts imports it as the action budget's image step.
+export const IMAGE_GENERATION_TIMEOUT_MS = 120_000
