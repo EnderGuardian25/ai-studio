@@ -10,5 +10,10 @@ UPDATE "Draft" d SET "copyText" = COALESCE(
   '')
 WHERE d."copyText" IS NULL;
 ALTER TABLE "Draft" ALTER COLUMN "copyText" SET NOT NULL;
+-- Un-record migration 3, whose effect (DROP NOT NULL) was just undone. Without
+-- this, a later 012 redeploy sees it as applied, never re-runs it, and every new
+-- draft fails on NOT NULL (012 code never writes copyText). With it, the
+-- roll-forward's boot `migrate deploy` re-applies it on its own.
+DELETE FROM "_prisma_migrations" WHERE "migration_name" = '20261011140000_legacy_caption_text';
 -- DraftCaption, Draft.headline, Draft.captionMigration and Channel.WHATSAPP are left in place:
 -- the previous image never reads them, and they are what a roll-forward resumes from.

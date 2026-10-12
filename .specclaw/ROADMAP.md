@@ -1,7 +1,9 @@
 # bistec-studio roadmap — changes 004–012
 
 **Updated:** 2026-09-23 · **Branch:** all of this lands on `v2` (see Branching at the bottom); handoff in `docs/handoff.md` top section.
-**Status (2026-10-11):** **004**, **005**, **011**, **013** (fork CI, checks only) and **014** (UI accessibility, shared primitives and consistency) are verified PASS. **012** (per-channel captions) is building on `v2`, with T1–T7 of 16 committed; resume at T8. **006–010** are proposals. Handoff: `docs/handoff.md` top section.
+**Status (2026-10-11, later):** **004**, **005**, **011**, **013** (fork CI, checks only) and **014** (UI accessibility, shared primitives and consistency) are verified PASS. **012** (per-channel captions) is **built, 16/16**, on `v2` and pushed; **`/specclaw:verify` is next**. **012 → 010 stays a hard dependency:** 010 consumes the `DraftCaption` WhatsApp row. **006–010** are proposals. Handoff: `docs/handoff.md` top section.
+
+**(Superseded) Status (2026-10-11, earlier):** 004, 005, 011, 013 and 014 verified PASS; 012 building, T1–T7 of 16 committed.
 
 **(Superseded) Status (2026-10-03):** **004** is done: 24/24 built, verify PARTIAL only because its Phase 0 waits on PR #42 + the Coolify token. **005** is built (9/10) on `v2`; T6 waits on one operator check (AC-16, an in-image CLI vision run with the user’s own token), then `/specclaw:verify`. Item 2 (COPY route) stays deferred to 008. **006–012** are proposals. Handoff: `docs/handoff.md` top section.
 
@@ -19,7 +21,7 @@ This file sequences the open changes. Each change's own `proposal.md` is the sou
 | 009 | [Hero imagery](changes/009-hero-image-design/)                                    | Image model makes the hero subject, not wallpaper; layout archetypes; reference images      | large        | 📋 proposal (new)                          |
 | 010 | [WhatsApp Channel posting](changes/010-whatsapp-channel-posting/)                 | WhatsApp as a channel, with assisted handoff (Meta has no official Channel posting API)     | medium       | 📋 proposal (new)                          |
 | 011 | [App visual redesign](changes/011-app-visual-redesign/)                           | New visual direction; opaque surfaces; floating bottom-right **Create post** button         | large        | 🔨 wave 1 built (T1–T2) — awaiting pick    |
-| 012 | [Per-channel captions](changes/012-per-channel-captions/)                         | Instagram / LinkedIn / WhatsApp captions, each published to its own channel; copy → caption | medium       | 📋 proposal (new)                          |
+| 012 | [Per-channel captions](changes/012-per-channel-captions/)                         | Instagram / LinkedIn / WhatsApp captions, each published to its own channel; copy → caption | medium       | ✅ built 16/16 — verify next               |
 
 ## Hard dependencies
 
@@ -28,7 +30,7 @@ These are "B cannot work until A lands", not just preferences.
 ```
 B4 scheduler fix (ops) ───────────────► 010 scheduled WhatsApp handoffs
 005 item 3 (isDefault image fix) ─────► 009 (else most users get no image at all)
-012 (per-channel captions) ───────────► 010 (the WhatsApp caption + per-channel publish)
+012 (per-channel captions, built) ────► 010 (the DraftCaption WhatsApp row + per-channel publish)
 004 T9 (rasterizing harness) ─────────► 009 safe-area verification
 ```
 
@@ -44,15 +46,15 @@ B4 scheduler fix (ops) ───────────────► 010 sche
 
 ## Boundaries between overlapping changes
 
-| Overlap             | Owner split                                                                                                                                            |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Caption "choice"    | **005** picks the _route_ (OAuth CLI vs a registered API key). **008** picks the _Claude model_ on that route.                                         |
-| WhatsApp caption    | **012** _generates and stores_ it (and fixes per-channel publishing). **010** _posts_ it via the handoff screen.                                       |
-| Naming              | **012** renames "copy" → "caption" in UI, docs and the code it touches. The `COPY` provider slot keeps its name (it also drives brand-voice drafting). |
-| Image generation    | **005** owns _providers_ (Gemini, `isDefault` resolution). **009** owns _how images are used_ (hero, archetypes, references).                          |
-| Design rules        | **007** owns kit _rules and typography_. **009** owns _composition_. **004** owns _refine_.                                                            |
-| Real-render testing | Built once in **004** (T9); reused by 007, 009 and 011.                                                                                                |
-| UI                  | **011** owns the app's look, and the app shell's floating **Create post** button. 008, 010 and 012 add screens _in_ that look; they do not restyle.    |
+| Overlap             | Owner split                                                                                                                                                                                                    |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Caption "choice"    | **005** picks the _route_ (OAuth CLI vs a registered API key). **008** picks the _Claude model_ on that route.                                                                                                 |
+| WhatsApp caption    | **012** _generates and stores_ it as the `DraftCaption` WhatsApp row (and fixes per-channel publishing). **010** _posts_ it via the handoff screen, flips its registry `publishable`, and owns the real limit. |
+| Naming              | **012** renames "copy" → "caption" in UI, docs and the code it touches. The `COPY` provider slot keeps its name (it also drives brand-voice drafting).                                                         |
+| Image generation    | **005** owns _providers_ (Gemini, `isDefault` resolution). **009** owns _how images are used_ (hero, archetypes, references).                                                                                  |
+| Design rules        | **007** owns kit _rules and typography_. **009** owns _composition_. **004** owns _refine_.                                                                                                                    |
+| Real-render testing | Built once in **004** (T9); reused by 007, 009 and 011.                                                                                                                                                        |
+| UI                  | **011** owns the app's look, and the app shell's floating **Create post** button. 008, 010 and 012 add screens _in_ that look; they do not restyle.                                                            |
 
 ## Recommended order
 

@@ -2,9 +2,36 @@
 
 This repo contains planning documents for **bistec-studio**, an internal marketing post generation tool for the Bistec marketing team.
 
-## ✅ Outstanding work — START HERE (updated 2026-10-11)
+## ✅ Outstanding work — START HERE (updated 2026-10-11, later)
 
-- **⏸️ 2026-10-11 — PICK UP HERE: 013 and 014 are verified PASS; 012 (per-channel captions) is building, with T1–T7 of 16 committed. Resume at T8.** Full detail: [`docs/handoff.md`](docs/handoff.md) top section.
+- **⏸️ 2026-10-11 (later) — PICK UP HERE: 012 (per-channel captions) is BUILT 16/16 on `v2`, all pushed. Next: `/specclaw:verify 012-per-channel-captions`.** Full detail: [`docs/handoff.md`](docs/handoff.md) top section; deploy/backfill/rollback steps in its **012 runbook** section.
+  - **Commits this session:** T8 `1f00261d`, T9 `9cf986eb`, T10 `05e8b021`, T11 `932104ec`, T12 `44b28c83`, T13 `29ed3c8e`, T14 `b522046e`, T15 `c9386ae0`, T16 `<T16 commit — fill>`.
+  - **Gates** (each a full clean mock E2E after a dropped and recreated test DB): wave 1 **363/3/0/0**, wave 2 **369/3/0/0**, wave 3 **369/3/0/0** (passed/skipped/failed/flaky). Unit **2025**.
+  - **User decisions this session:**
+    - **(a)** MCP/ACP `publish_post` keeps FR-17: a refused caption leaves a **FAILED Post row** with the resolver's reason. The T7 review's "no row" suggestion was rejected.
+    - **(b)** The red fork CI is debugged as its own change after 012.
+  - **🔴 Fork CI on `v2` has been RED since 014 wave 1** (run 37974533639, 2026-10-09); "v2 CI is green" was true only at 013.
+    - One runner-only failure: `tests/e2e/surfaces.test.ts` "Draft review (T9) at 375px" times out waiting for the refine log row "Applied", on the first attempt and the retry; it passes locally every time. Likely the already-logged refine "Applying…" race.
+    - All 14 wave-1 012 cases pass in CI, including the backfill and down.sql cases.
+    - **Lesson (L21):** after each push, check `gh run list --branch v2`, not just the local gate.
+  - **Follow-ups after 012, each its own change:**
+    1. the red-CI refine race, together with the refine "Applying…" follow-up;
+    2. `import-posts.mjs` never sets `teamId`, so a real import has been broken since team tenancy; `--dry-run` hides it (L22);
+    3. the ACP manifest's advertised `generate_post` output schema (`src/acp/agent.ts`) lacks `headline` and `captions`;
+    4. `POST /api/posts` returns 201 for an immediate publish that ends FAILED;
+    5. a per-claim token for draft actions;
+    6. the floating Create post button overlapping content;
+    7. small items: the trailing `---` in split sections (T3); the caption check runs before the duplicate 409 (T7/T8); per-post caption loads in the posts list GET (T7); the axe rule list copied into `captions.test.ts` should become a shared helper (T13); the 014 verify gaps 5–8;
+    8. **the 005 AC-16 operator run** stays open. 🔴 Revoke the OAuth token pasted into chat on 2026-10-06 first.
+  - **Gotchas:**
+    - **`npm run test:e2e:db` does NOT drop the test DB** (it creates if missing, migrates, seeds). A clean gate first needs `docker exec designer-postgres-1 psql -U bistec -d postgres -c "DROP DATABASE IF EXISTS bistec_studio_test WITH (FORCE);"`.
+    - **`specclaw-build setup` refuses on a stale lock** from a previous session: `specclaw-change-lock .specclaw release <change>` (`setup --force` doesn't parse).
+    - **The `review-package` diff came out repo-wide (~437 KB) for T8;** point reviewers at `git diff -- <task files>`.
+    - **The `captions:*` scripts use `--env-file-if-exists=.env`** (so they work in CI). Locally run them only with `dotenv -e .env.test --` or an explicit `DATABASE_URL`.
+    - **A dev DB without the three 012 migrations can't create drafts** with the current Prisma client: `npx prisma migrate deploy` on the dev DB before running the dev app.
+    - **Rolling back:** run `prisma/rollback/012-per-channel-captions.down.sql` **before** the old image boots. It also un-records migration 3, so a later 012 redeploy re-applies it by itself and no manual roll-forward step is needed (runbook; proven by TC-CAP-13).
+
+- **⏸️ 2026-10-11 (superseded by 2026-10-11 (later) above) — 013 and 014 are verified PASS; 012 (per-channel captions) is building, with T1–T7 of 16 committed. Resume at T8.** Full detail: [`docs/handoff.md`](docs/handoff.md) top section.
   - Everything is pushed to `origin/v2`.
   - **Then** resume `/specclaw:build 012-per-channel-captions` at **T8**, subagent-driven: one task at a time, an implementer then a `specclaw:code-reviewer`, and the orchestrator commits.
     - **T8:** MCP/ACP outputs. It carries two items from the T7 review: MCP `getDraft` still returns `copyText`, and MCP/ACP `publish_post` needs the up-front resolver check.
@@ -447,9 +474,9 @@ Before writing any backend code, API routes, Prisma models, or provider logic, r
 
 ### Testing
 
-- **[`docs/e2e-test-plan.md`](docs/e2e-test-plan.md)** — the authoritative E2E test design + catalog. **The full catalog (§A–§Q) is implemented & green** (145 passed / 0 failed / 4 skipped confirmed 2026-07-17 — the 4 intentional skips below; the 3 §J ACP-auth cases need `BISTEC_API_KEYS` in `.env.test` (CI sets them; skipped without them); §P brief-draft-recovery, §Q async-draft-actions added). Mock seams live in `src/lib/testHooks.ts` (gated by `MOCK_AI`/`MOCK_PUPPETEER`/`MOCK_SOCIAL`, dormant in prod); run against a dedicated `bistec_studio_test` DB. Reproduce: `npm run test:e2e:db` → `npm run test:e2e:serve` → `npm run test:e2e:mock` (plan §0). **CI gate:** `.github/workflows/e2e.yml` runs the whole suite — including the §K security-fix regressions — on every PR + push to `main`. **⚠️ `.env.test` must use `DESIGN_PROVIDER=claude-html` (not `cli`) — CLI mode bypasses the `MOCK_AI` seam and times out generation tests.**
+- **[`docs/e2e-test-plan.md`](docs/e2e-test-plan.md)** — the authoritative E2E test design + catalog. **The full catalog (§A–§W) is implemented & green** (369 passed / 3 skipped / 0 failed / 0 flaky at the 012 wave-3 gate, 2026-10-11 — the 3 intentional skips below; §W is 012's per-channel captions suite, `captions.test.ts`, TC-CAP-01…20). Mock seams live in `src/lib/testHooks.ts` (gated by `MOCK_AI`/`MOCK_PUPPETEER`/`MOCK_SOCIAL`, dormant in prod); run against a dedicated `bistec_studio_test` DB. Reproduce: `npm run test:e2e:db` → `npm run test:e2e:serve` → `npm run test:e2e:mock` (plan §0). **CI gate:** `.github/workflows/e2e.yml` runs the whole suite — including the §K security-fix regressions — on every PR + push to `main`. **⚠️ `.env.test` must use `DESIGN_PROVIDER=claude-html` (not `cli`) — CLI mode bypasses the `MOCK_AI` seam and times out generation tests.**
   - Test-only seams added for the catalog (all dormant in prod): `buildMockCopy`/`shouldMockPublishFail` in `testHooks.ts` (deterministic publish failures via a `__FAIL_*__` sentinel in the brief topic), and `POST /api/test/scheduler-tick` (double-gated: 404 in `NODE_ENV==='production'`, 404 unless `MOCK_SOCIAL`, admin-only) so §K H12 can drive the scheduler over HTTP. **CI runs the app in `next dev` mode** because that seam is intentionally inert in a prod build.
-  - The 4 intentional skips: TC-GEN-05 (needs a mock IMAGE-provider seam), TC-REG-H11a/b/c (real-Chromium / host-process observation).
+  - The 3 intentional skips: TC-REG-H11a/b/c (real-Chromium / host-process observation). TC-GEN-05 runs since 005 T2.
 
 ### Specification & planning
 

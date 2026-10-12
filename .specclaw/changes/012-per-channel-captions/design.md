@@ -399,6 +399,9 @@ UPDATE "Draft" d SET "copyText" = COALESCE(
   '')
 WHERE d."copyText" IS NULL;
 ALTER TABLE "Draft" ALTER COLUMN "copyText" SET NOT NULL;
+-- Un-record migration 3 so a later 012 redeploy re-applies its DROP NOT NULL
+-- (amended 2026-10-11, user decision: found while writing the T16 runbook).
+DELETE FROM "_prisma_migrations" WHERE "migration_name" = '20261011140000_legacy_caption_text';
 -- DraftCaption, Draft.headline, Draft.captionMigration and Channel.WHATSAPP are left in place:
 -- the previous image never reads them, and they are what a roll-forward resumes from.
 ```

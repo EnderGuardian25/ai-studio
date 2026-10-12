@@ -1,13 +1,143 @@
 # bistec-studio — Session Handoff
 
-**Date:** 2026-10-11 (latest: **013 and 014 verified PASS; 012 per-channel captions building, T1–T7 of 16 committed; resume at T8**). Previous: 2026-10-09 (011 verified PASS; fork `main` merged into `v2`; 013 fork CI, checks only, building; 014 and 012 approved). Previous: 2026-10-08 (011 built 13/13 on `v2` in the fork). Previous: 2026-10-07 (005 verified PASS; 011 planned, wave 1 built; the move to the fork). Previous: 2026-10-03 (004 finished and verified PARTIAL, Phase 0 only; 005 built 9/10, waiting on one operator check). Before that: 2026-09-28 (build session — 004 Waves 1–3 built, MinIO → silo, PR #42 + draft PR #43). Before that: 2026-09-23 (later, later the same day: proposal **012** per-channel captions + copy→caption rename, a floating **Create post** button folded into 011, and a launch-video legibility pass. Before that: planning session — proposals 008–011 + roadmap, 004 re-planned to 24 tasks incl. Phase 0, and the deploy pipeline found broken: Coolify 401 since 2026-09-15). Previous: 2026-07-28 (copy-edit status clobber fix).
+**Date:** 2026-10-11, later (latest: **012 per-channel captions BUILT 16/16 and pushed; next is `/specclaw:verify 012-per-channel-captions`; fork CI on `v2` is red since 014 wave 1**). Previous: 2026-10-11, earlier (013 and 014 verified PASS; 012 building, T1–T7 of 16 committed). Previous: 2026-10-09 (011 verified PASS; fork `main` merged into `v2`; 013 fork CI, checks only, building; 014 and 012 approved). Previous: 2026-10-08 (011 built 13/13 on `v2` in the fork). Previous: 2026-10-07 (005 verified PASS; 011 planned, wave 1 built; the move to the fork). Previous: 2026-10-03 (004 finished and verified PARTIAL, Phase 0 only; 005 built 9/10, waiting on one operator check). Before that: 2026-09-28 (build session — 004 Waves 1–3 built, MinIO → silo, PR #42 + draft PR #43). Before that: 2026-09-23 (later, later the same day: proposal **012** per-channel captions + copy→caption rename, a floating **Create post** button folded into 011, and a launch-video legibility pass. Before that: planning session — proposals 008–011 + roadmap, 004 re-planned to 24 tasks incl. Phase 0, and the deploy pipeline found broken: Coolify 401 since 2026-09-15). Previous: 2026-07-28 (copy-edit status clobber fix).
 **Repo (since 2026-10-07):** https://github.com/EnderGuardian25/ai-studio — a public GitHub **fork** of the company repo `bistec-oss/studio`. All development continues here. The company repo is left as it is and receives nothing from this work. See the 2026-10-07 fork section below.
 **Branch:** work continues on **`v2`**, the fork's default branch. Fork `main` = `671ad6e9`, the company `main` at fork time. `v2` has contained fork `main` since the merge at `2506de0b` (2026-10-09).
 **Production:** none for the fork. `https://studio.bistecglobal.com` is the **company's** prod. It runs company `main` and is not ours to deploy.
 
 ---
 
-## ⏸️ 2026-10-11 — PICK UP HERE: 013 and 014 verified PASS; 012 is building, with 7 of 16 tasks committed; resume at T8
+## ⏸️ 2026-10-11 (later) — PICK UP HERE: 012 is BUILT 16/16 and pushed; verify next; fork CI on `v2` is red
+
+**012 per-channel captions is built: 16 of 16 tasks, all on `origin/v2`.** The next step is **`/specclaw:verify 012-per-channel-captions`**. Every task has a report and a review in `.specclaw/changes/012-per-channel-captions/reports/` and `reviews/`. The deploy, backfill and rollback steps are in the **012 runbook** section just below.
+
+### Commits this session
+
+| Task | Commit                | What                                                                                                                                                                      |
+| ---- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T8   | `1f00261d`            | MCP `get_draft` / `generate_post` and `POST /api/generate/copy` return `headline` and `captions`; `copyText` stays as the deprecated alias (the Instagram text)           |
+| T9   | `9cf986eb`            | `legacyCaptionText @map("copyText")` (migration `20261011140000_legacy_caption_text`), no placeholder writes, the read-only guard, native fixture seed, the rollback file |
+| T10  | `05e8b021`            | §W captions E2E suite (TC-CAP-01…14) and the existing-case edits; **wave-1 gate**                                                                                         |
+| T11  | `932104ec`            | Per-channel regenerate, the headline panel, per-panel Undo, Copy to clipboard                                                                                             |
+| T12  | `44b28c83`            | The review / last-failed notices, the WhatsApp helper and guide, the counters                                                                                             |
+| T13  | `29ed3c8e`            | §W wave-2 panel cases (TC-CAP-15…20); **wave-2 gate**                                                                                                                     |
+| T14  | `b522046e`            | "copy" → "caption" in the remaining UI strings and the wording guard; **wave-3 gate**                                                                                     |
+| T15  | `c9386ae0`            | `export-posts` / `import-posts` carry captions, the headline and `captionMigration` (manifest v2; v1 bundles still import)                                                |
+| T16  | `<T16 commit — fill>` | Docs: this handoff, the runbook, CLAUDE.md, ROADMAP, 008/010 proposals, e2e plan §W, MCP/ACP guide, DESIGN_SYSTEM §8.14                                                   |
+
+### Gates
+
+- **Each wave gate was a full clean mock E2E after a dropped and recreated test DB:** wave 1 **363 passed / 3 skipped / 0 failed / 0 flaky**; wave 2 **369/3/0/0**; wave 3 **369/3/0/0**. The 3 skips are the intentional TC-REG-H11a/b/c.
+- **Unit: 2025/2025** (74 files). tsc clean; lint 0 errors, the 7 pre-existing warnings.
+
+### The user's decisions this session
+
+- **(a) MCP/ACP `publish_post` keeps FR-17:** a refused caption leaves a **FAILED Post row** with the resolver's reason, so "every attempt leaves a row" still holds. The T7 review's suggestion of an up-front, no-row refusal was **rejected** (an interim T8 version had it and was reverted). Only a non-publishable channel (WhatsApp) is rejected up front, before any row.
+- **(b) The red fork CI is debugged as its own change after 012** (below).
+
+### 🔴 Fork CI on `v2` has been red since 014 wave 1
+
+- **Since run 37974533639 (2026-10-09).** The earlier "v2 CI is green" was true only at 013.
+- **One runner-only failure:** `tests/e2e/surfaces.test.ts`, "Draft review (T9) at 375px". It times out waiting for the refine log row "Applied", on the first attempt and the retry. It passes locally every time.
+- **Likely cause:** the already-logged refine "Applying…" race, made deterministic by the slower runner.
+- **All 14 wave-1 012 cases pass in CI,** including the backfill (TC-CAP-12) and the down.sql (TC-CAP-13) cases.
+- **Lesson (learning L21):** after each push, check `gh run list --branch v2`, not just the local gate.
+
+### Do this next, in order
+
+1. **`/specclaw:verify 012-per-channel-captions`.** Stop the :3001 server before it: verify runs `npm run build`.
+2. **Follow-ups after 012, each its own change:**
+   1. **The red-CI refine race,** together with the refine "Applying…" follow-up (`/specclaw:debug`).
+   2. **`import-posts.mjs` never sets `teamId`,** so a real import has been broken since team tenancy (2026-07-21); `--dry-run` never calls `create` and hides it (learning L22). Needs a `--team` remap, then a real import into a scratch test DB.
+   3. **The ACP manifest's advertised `generate_post` output schema** (`src/acp/agent.ts`) lists only `draftId`, `exportUrl`, `htmlContent`; it lacks `headline` and `captions`. The real output has them (AC-26).
+   4. **`POST /api/posts` returns 201 for an immediate publish that ends FAILED,** and `PublishDialog` shows it as a success. Predates 012; caption refusals no longer reach it (422), a platform failure still does.
+   5. **A per-claim token for draft actions** (the settle guards key on state, not on the claim).
+   6. **The floating Create post button overlaps content** at some widths.
+   7. **Small items:**
+      - a trailing `---` separator stays in split sections (T3);
+      - the caption check runs before the duplicate 409 (T7/T8);
+      - per-post caption loads in the posts list GET (T7);
+      - the axe rule list is copied into `captions.test.ts` and should become a shared helper (T13);
+      - the 014 verify gaps 5–8.
+   8. **The 005 AC-16 operator run** stays open: `scripts/cli-sandbox-check.mjs` in the rebuilt image with a real OAuth token. 🔴 **Revoke the token pasted into chat on 2026-10-06 first.**
+
+### Gotchas from this session
+
+- **`npm run test:e2e:db` does NOT drop the test DB.** It creates it if missing, then migrates and seeds. A clean gate needs `docker exec designer-postgres-1 psql -U bistec -d postgres -c "DROP DATABASE IF EXISTS bistec_studio_test WITH (FORCE);"` first.
+- **`specclaw-build setup` refuses on a stale lock** left by an earlier session. Clear it with `specclaw-change-lock .specclaw release <change>`; `setup --force` doesn't parse.
+- **The `review-package` diff came out repo-wide (~437 KB) for T8.** Point reviewers at `git diff -- <task files>` instead.
+- **The `captions:*` scripts use `tsx --env-file-if-exists=.env`,** so they also run in CI (no `.env` there). Locally that means they hit the **dev** DB by default: run them only with `npx dotenv -e .env.test --` or an explicit `DATABASE_URL`.
+- **A dev DB without the three 012 migrations can't create drafts** with the current Prisma client (`copyText` is still NOT NULL there, and nothing writes it now). Run `npx prisma migrate deploy` on the dev DB before running the dev app.
+
+---
+
+## 🛠️ 012 runbook — per-channel captions: migrations, boot backfill, report, rollback
+
+**Release note:** _Every channel now publishes its own caption. Drafts whose old single caption couldn't be split by channel show a review notice on Instagram and LinkedIn until each caption is edited or regenerated._ WhatsApp has a caption on every draft but is not publishable from Studio (010).
+
+### The three migrations
+
+All three are applied by the entrypoint's `prisma migrate deploy` on boot. None drops or renames a column or table (AC-27), so the previous container keeps working against the migrated schema during a rolling deploy. The one exception is the cutover window itself: a draft the new container creates has a NULL `copyText`, which the old container can't read.
+
+| Migration                            | What it does                                                                                                                                                                                   |
+| ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `20261011120000_channel_whatsapp`    | `ALTER TYPE "Channel" ADD VALUE 'WHATSAPP';`, alone in its file                                                                                                                                |
+| `20261011130000_draft_captions`      | Enums `CaptionStatus`, `CaptionMigration`; table `DraftCaption` (cascade FK, unique `(draftId, channel)`, CHECK `DraftCaption_failed_has_no_text`); `Draft.headline`, `Draft.captionMigration` |
+| `20261011140000_legacy_caption_text` | `ALTER TABLE "Draft" ALTER COLUMN "copyText" DROP NOT NULL;` The Prisma field is now `legacyCaptionText @map("copyText")`: read-only, dropped in a later change                                |
+
+### The boot backfill
+
+`docker-entrypoint.sh` runs `node dist/scripts/backfill-captions.js` right after `migrate deploy`, inside the same `SKIP_MIGRATIONS` guard. It takes a Postgres advisory lock (the app and scheduler containers serialize), and migrates every draft with a legacy caption, no `DraftCaption` rows and no `captionMigration`, one transaction per draft. It is idempotent.
+
+**Expected boot log:**
+
+```
+[entrypoint] applying pending Prisma migrations…
+[entrypoint] migrations up to date
+[entrypoint] backfilling per-channel captions…
+[captions] backfill: N drafts — split S, unsplit-fallback F, empty E, deferred D, errors X
+[captions] REVIEW draft <id> — team "<name>", topic "<topic>": caption not split (both feeds carry the whole legacy text); live posts: LINKEDIN at <ISO time>, …
+```
+
+- **One `REVIEW` line per `UNSPLIT_FALLBACK` draft that has a SCHEDULED, PENDING or PUBLISHING post.** Those posts will publish the whole legacy text to both feeds (what pre-012 sent) unless someone edits or regenerates the caption first. Open each draft: its Instagram and LinkedIn panels carry the review notice.
+- **A second boot prints `0 drafts — split 0, …`.**
+- **`deferred`** counts drafts that were `IN_PROGRESS` or held `pendingAction = REGENERATE_COPY`. They are migrated lazily by the loader on their next read (`[captions] draft <id> migrated on read: <outcome>`). The same lazy path covers drafts created by the old container during cutover, and a boot with `SKIP_MIGRATIONS=1`.
+- **A per-draft error** logs `[captions] backfill: draft <id> failed (the loader retries it on read): …` and is counted in `errors`; the boot continues.
+- **A top-level failure** (DB unreachable, lock query failing) logs `[captions] backfill failed: …` and exits 1. Under `set -e` the boot fails and the previous container keeps serving.
+
+### `captions:report`
+
+Prints the `REVIEW` list again, with no lock and no writes, then `[captions] report: N draft(s) to review`.
+
+- **In the container:** `node dist/scripts/backfill-captions.js --report`.
+- **Locally:** `npx dotenv -e .env.test -- npm run captions:report` (or with an explicit `DATABASE_URL`). The npm scripts load `.env` if it exists (`--env-file-if-exists=.env`), so **without an explicit target they hit the dev DB.** The same applies to `captions:backfill`: never run it without an explicit test-DB `DATABASE_URL`.
+
+### Rollback to the pre-012 image
+
+1. **Stop both 012 containers** (app and scheduler). Once step 2 restores NOT NULL, 012 code can no longer create drafts: it never writes `copyText`.
+2. **Run the data fix** `prisma/rollback/012-per-channel-captions.down.sql` against the prod DB, e.g. `npx prisma db execute --file prisma/rollback/012-per-channel-captions.down.sql --url "$DATABASE_URL"` (the form TC-CAP-13 runs) or `psql "$DATABASE_URL" -f …`. It sits outside `prisma/migrations/`, so `migrate deploy` never applies it. It:
+   - gives every post-012 draft (`copyText` NULL) its Instagram text, else its LinkedIn text, else `''`;
+   - restores `copyText` NOT NULL;
+   - deletes migration 3's row (`20261011140000_legacy_caption_text`) from `_prisma_migrations`, so a later 012 redeploy re-applies it;
+   - leaves `DraftCaption`, `Draft.headline`, `Draft.captionMigration` and `Channel.WHATSAPP` in place. The old code never reads them, Postgres can't drop an enum value, and they are what a roll-forward resumes from.
+3. **Boot the old image.** If its `migrate deploy` refuses because of the three newer applied migrations, boot it with `SKIP_MIGRATIONS=1`.
+
+> **⚠️ Ordering hazard: the old image must NOT boot before down.sql has run.** Drafts created by 012 have a NULL `copyText`, and the old image's Prisma client treats that column as non-null, so its reads of those drafts fail (T9 review). Run step 2 first, every time.
+
+**While rolled back,** the old code publishes `copyText` to every channel, so a post-012 draft sends its Instagram caption to LinkedIn too: the pre-012 combined-caption behaviour.
+
+### Roll forward again
+
+1. **Redeploy 012. There is no manual step.** down.sql un-recorded migration 3, so the boot `migrate deploy` re-applies it (`DROP NOT NULL`). The boot backfill then migrates the drafts the old code created while rolled back; they have `copyText` and no rows. Post-012 drafts already have rows and are skipped.
+   - The un-record step was added to down.sql on 2026-10-11, by user decision, after the T16 runbook found the gap. Without it, migration 3 would never re-run, and every new draft would fail on NOT NULL.
+   - TC-CAP-13 proves the down and forward directions on a scratch DB, and a mutation check that removes the `DELETE` turns it red.
+2. **Not carried forward:** an edit the old code made to a post-012 draft's `copyText` while rolled back. The rows win; the edited text is still in the `copyText` column for reference, and must be re-applied in the panel by hand.
+
+A bad split is recoverable later too: the legacy text is never touched, so an improved planner can re-plan affected drafts in a later change.
+
+---
+
+## ⏸️ 2026-10-11 (earlier) — superseded by 2026-10-11 (later) above (kept for history): 013 and 014 verified PASS; 012 is building, with 7 of 16 tasks committed; resume at T8
 
 Everything is pushed to `origin/v2` through the 014 verify (`fbd58748`). **012 T1–T7 are committed and pushed** (`d2e782dc` … `5b1514a2`; this handoff is `d6369881`).
 

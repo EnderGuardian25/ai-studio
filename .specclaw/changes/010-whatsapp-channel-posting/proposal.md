@@ -5,7 +5,7 @@
 
 ## Problem
 
-The marketing team wants posts to go out on the company's **WhatsApp Channel** alongside Instagram and LinkedIn, scheduled the same way. Today the product knows exactly two channels (`enum Channel { INSTAGRAM, LINKEDIN }`, `prisma/schema.prisma:46`), and every scheduled post is claimed and auto-published by the job runner (`lib/scheduler/jobRunner.ts`).
+The marketing team wants posts to go out on the company's **WhatsApp Channel** alongside Instagram and LinkedIn, scheduled the same way. Today the product publishes to exactly two channels (on 2026-09-23 `enum Channel { INSTAGRAM, LINKEDIN }`, `prisma/schema.prisma:46`; 012 has since added `WHATSAPP`, unpublishable), and every scheduled post is claimed and auto-published by the job runner (`lib/scheduler/jobRunner.ts`).
 
 **There is no official API for posting to a WhatsApp Channel.** Checked 2026-09-23:
 
@@ -25,7 +25,11 @@ Fully automatic Channel posting therefore cannot be built safely. **The decision
 
 WhatsApp becomes a first-class channel whose publisher **hands off to a person** instead of calling an API.
 
-1. **`WHATSAPP` channel** added to `enum Channel`, selectable in the Publish dialog, the campaign queue post-actions and the scheduler like any other.
+1. **`WHATSAPP` channel**, selectable in the Publish dialog, the campaign queue post-actions and the scheduler like any other.
+   - **012 already added `WHATSAPP` to `enum Channel`** (migration `20261011120000_channel_whatsapp`) and gave it a registry entry in `src/lib/channels.ts` (`CAPTION_CHANNELS`) with `publishable: false`, a 1,000-character **soft** guide and no hard limit. Today a WhatsApp publish fails closed and terminally ("WhatsApp publishing isn't available yet…"), every channel input rejects it, and `CHANNEL_VALUES` (= `PUBLISHABLE_CHANNELS`) keeps every picker at two.
+   - **010 flips `publishable`** to `true` and adds the handoff publisher to `publishers` in `publishDraft.ts`. That one flag puts WhatsApp into `PUBLISHABLE_CHANNELS`, so the pickers and validators follow with no separate edit.
+   - **010 owns the real limit:** replace the soft guide with WhatsApp's actual Channel limit (verify it at design time). The publish resolver then refuses an over-limit caption like the other channels, and the panel counter follows the registry.
+   - **010 owns the picker test change:** 012's TC-CAP-08 (`tests/e2e/captions.test.ts`) asserts that the Publish dialog and the `QueueEntryModal` each show exactly two channel checkboxes (`toHaveCount(2)`). 010 changes that to 3, and the TC-CAP-06/07/14 "WhatsApp is rejected" cases to its handoff behaviour.
 2. **A handoff state, not a publish.** New `PostStatus.AWAITING_MANUAL`.
    - When a WhatsApp post comes due, the worker moves it `SCHEDULED → AWAITING_MANUAL` instead of calling a publisher. There are no retries or backoff, because there is nothing to retry.
    - Publish-now goes straight to `AWAITING_MANUAL`.
@@ -39,7 +43,7 @@ WhatsApp becomes a first-class channel whose publisher **hands off to a person**
    - At due time they are alerted, with an in-app "Ready to post" badge and queue as the always-available baseline.
    - Out-of-app delivery (email, web push, or a WhatsApp message to the poster's own number via the Cloud API) is an open question below. The product has **no notification infrastructure today**.
    - Overdue items (not posted within a configurable window) are flagged and re-alerted, never silently dropped.
-5. **The WhatsApp caption comes from 012 (moved 2026-09-23).** Proposal **012 (per-channel captions)** gives every draft its own Instagram, LinkedIn and WhatsApp caption. The WhatsApp one uses WhatsApp's formatting (`*bold*`, `_italic_`, no Markdown `**`), is short, and puts the link in the body. 010 only **consumes** it: the handoff screen shows it and **Copy caption** copies it. (Correction: this item previously said generation "currently writes `INSTAGRAM:` / `LINKEDIN:` sections". It does not. That was the model's own formatting inside one unstructured string, which 012 replaces.)
+5. **The WhatsApp caption comes from 012 (moved 2026-09-23; 012 built 2026-10-11).** Proposal **012 (per-channel captions)** gives every draft its own Instagram, LinkedIn and WhatsApp caption. The WhatsApp one uses WhatsApp's formatting (`*bold*`, `_italic_`, no Markdown `**`), is short, and puts the link in the body. 010 only **consumes** it: the `DraftCaption` row with `channel = WHATSAPP` (read through `loadDraftCaptions` / `loadCaptionForPublish`, which migrate a legacy draft first). The handoff screen shows it and **Copy caption** copies it. The draft page already has a WhatsApp caption panel with Regenerate, Undo and "Copy WhatsApp caption"; 010 removes its "Not published from Studio yet" helper text once `publishable` is true (it is driven by that flag). (Correction: this item previously said generation "currently writes `INSTAGRAM:` / `LINKEDIN:` sections". It does not. That was the model's own formatting inside one unstructured string, which 012 replaces.)
 6. **`/team` configuration:** the Channel's name and invite link, plus the designated posters. No credential is stored, because none exists. That is a deliberate difference from `ChannelToken`, which assumes an encrypted token.
 7. **MCP / ACP parity.** Publish tools accept `WHATSAPP` and return `awaiting_manual` with the handoff link, instead of pretending the post went out.
 
@@ -47,7 +51,7 @@ WhatsApp becomes a first-class channel whose publisher **hands off to a person**
 
 ### In Scope
 
-- `WHATSAPP` channel + `AWAITING_MANUAL` status (one migration), wired through the publish service, job runner, campaign queue post-actions, Publish dialog, library and the MCP/ACP publish tools
+- `AWAITING_MANUAL` status (one migration; `WHATSAPP` is already in `Channel` since 012), flipping the registry's `publishable`, the real WhatsApp limit, wired through the publish service, job runner, campaign queue post-actions, Publish dialog, library and the MCP/ACP publish tools
 - Mobile-first handoff screen: Web Share with file, download, copy caption, open WhatsApp, mark as posted
 - Designated posters + Channel config at `/team`
 - In-app "Ready to post" badge/queue and overdue flagging
@@ -64,7 +68,7 @@ WhatsApp becomes a first-class channel whose publisher **hands off to a person**
 
 ## Dependencies
 
-- **012 (per-channel captions) should land first.** It supplies the WhatsApp caption and makes the publish service send each channel its own caption. Without it, WhatsApp would inherit the single combined string that Instagram and LinkedIn get today.
+- **012 (per-channel captions) is a hard dependency, and it is built (2026-10-11, verify pending).** It supplies the WhatsApp caption and makes the publish service send each channel its own caption. Without it, WhatsApp would inherit the single combined string that Instagram and LinkedIn get today.
 
 - **B4 (scheduler resource not running on prod) must be fixed first.** Scheduled WhatsApp handoffs are raised by the worker. With the worker down, a scheduled WhatsApp post would sit in `SCHEDULED` forever, exactly like B4's HOLD entry. Manual "publish now" works without it.
 - **006 item 7 (scheduler heartbeat)** is strongly recommended alongside. A missed handoff is a missed post, and it is the same "nothing self-reports" failure B4 was.

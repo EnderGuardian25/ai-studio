@@ -39,16 +39,16 @@ The key is read **once from the `MCP_API_KEY` env var** (`server.ts:13`) but **r
 
 ### Tools (8)
 
-| Tool                    | Purpose                                                                                                |
-| ----------------------- | ------------------------------------------------------------------------------------------------------ |
-| `create_brand_kit`      | Create a brand kit (colors, fonts, logo)                                                               |
-| `set_brand_kit_prompt`  | Set/version the brand voice prompt                                                                     |
-| `upload_brand_template` | Upload an HTML/CSS template                                                                            |
-| `list_brand_kits`       | List active kits                                                                                       |
-| `get_brand_kit`         | Full kit details + templates + active prompt                                                           |
-| `generate_post`         | Brief → finished post (copy + design → render → export). Returns `draftId`, `exportUrl`, `htmlContent` |
-| `get_draft`             | Fetch a draft by id                                                                                    |
-| `publish_post`          | Publish a draft to Instagram / LinkedIn                                                                |
+| Tool                    | Purpose                                                                                                                                            |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `create_brand_kit`      | Create a brand kit (colors, fonts, logo)                                                                                                           |
+| `set_brand_kit_prompt`  | Set/version the brand voice prompt                                                                                                                 |
+| `upload_brand_template` | Upload an HTML/CSS template                                                                                                                        |
+| `list_brand_kits`       | List active kits                                                                                                                                   |
+| `get_brand_kit`         | Full kit details + templates + active prompt                                                                                                       |
+| `generate_post`         | Brief → finished post (captions + headline + design → render → export). Returns `draftId`, `exportUrl`, `htmlContent`, `headline`, `captions` (§4) |
+| `get_draft`             | Fetch a draft by id: `copyText` (deprecated alias), `headline`, `captions`, `imageUrl`, `exportUrl`, `status` (§4)                                 |
+| `publish_post`          | Publish a draft to Instagram / LinkedIn, with that channel's own caption (§4)                                                                      |
 
 ### Client configuration
 
@@ -125,7 +125,44 @@ Response codes: `400` invalid input, `401` bad/missing key, `422` tool-level fai
 
 ---
 
-## 4. Team scoping & guardrails
+## 4. Captions and the headline (change 012)
+
+Since 012 every draft has an on-image **headline** and **one caption per channel** (`DraftCaption`: Instagram, LinkedIn, WhatsApp), each with a `status` of `PENDING`, `READY` or `FAILED`. Each channel is published its **own** caption; nothing sends one combined string any more. The field and route names below are unchanged from before 012 except where noted.
+
+### Output fields
+
+| Tool / route                            | Returns                                                                           |
+| --------------------------------------- | --------------------------------------------------------------------------------- |
+| MCP `get_draft`                         | `{ copyText, headline, captions, imageUrl, exportUrl, status }`                   |
+| MCP / ACP `generate_post`               | `{ draftId, exportUrl, htmlContent, headline, captions }` (no `copyText`)         |
+| `POST /api/generate/copy` (session API) | `{ copyText, headline, captions }`, where `captions` also carries `failureReason` |
+
+- **`captions`** is `[{ channel, text, status }]`: always three entries, in registry order (`INSTAGRAM`, `LINKEDIN`, `WHATSAPP`), WhatsApp included. Read through the caption loader, so a legacy draft is migrated first.
+- **`headline`** is the text drawn on the image (at most 100 characters). It is null only on drafts migrated from before 012, whose designs fall back to the brief topic.
+- **`copyText` is a deprecated alias:** the **Instagram** caption's text, or `''`. It is never the old combined caption. Read `captions` instead; the alias goes when the legacy column is dropped in a later change.
+- **The ACP manifest** still advertises `generate_post`'s output as `draftId`, `exportUrl`, `htmlContent` only (`src/acp/agent.ts`); the real output has `headline` and `captions` too. Updating the advertised schema is a follow-up. Its channel enums stay `['INSTAGRAM', 'LINKEDIN']`.
+
+### `publish_post` (MCP and ACP)
+
+- **A non-publishable channel is rejected up front,** before any lookup or Post row. Today that is `WHATSAPP` (no publisher until change 010): MCP throws `channel must be INSTAGRAM or LINKEDIN`, and ACP answers `400` with the same message from its input validator.
+- **A refused caption leaves a FAILED Post row** (FR-17, user decision 2026-10-11), keeping "every attempt leaves a row". The status, export and duplicate checks run first, as before. Then `createAndPublishPost` writes a PENDING row, and `publishToChannel` resolves that channel's caption **before** it signs the export. A failed, pending, empty or over-limit caption is refused terminally: the row becomes `FAILED` with `errorReason` = the resolver's reason, the export is never signed and the platform is never called. The caller gets `Publish failed (<reason>) — recorded as post <id> with status FAILED` (ACP: `422`), the same format as a platform failure.
+- **The resolver's reasons** (`src/lib/captions/resolve.ts`), first match wins:
+  1. "WhatsApp publishing isn't available yet. Copy the caption and post it by hand." (also for any channel with no publisher);
+  2. "This draft has no <Label> caption.";
+  3. "The <Label> caption is being generated. Publish again when it finishes.";
+  4. "The <Label> caption failed to generate (<failureReason>). Regenerate or edit it, then publish again.";
+  5. "The <Label> caption is empty. Write or regenerate it, then publish again.";
+  6. "The <Label> caption is <n> characters; <Label> allows <limit>." (Instagram 2,200; LinkedIn 3,000).
+- **One channel's refusal doesn't block another:** a failed LinkedIn caption still lets Instagram publish its own text.
+- (The session route `POST /api/posts` differs on purpose: it checks the caption up front and answers `422 { code: 'CAPTION_UNPUBLISHABLE' }` with **no** row.)
+
+### `POST /api/generate/copy`
+
+A session-authenticated route (not MCP/ACP) that writes a headline and three captions for a brief and **persists nothing**. It now returns **`200` with a status per caption**, even when part of the reply was unusable: a missing or invalid field comes back as `{ channel, text: '', status: 'FAILED', failureReason }`, and a failed headline as `headline: null`. Before 012 an unusable caption was a `422`. A provider error (auth, timeout, network) is still `422 { code: 'COPY_ERROR' }`.
+
+---
+
+## 5. Team scoping & guardrails
 
 - **Team-locked.** Every tool call threads `teamId` **from the resolved key**, never from the request. Caller args are spread _first_ so a `teamId` in the payload can't override the key's real team (`server.ts:146`, `run/route.ts:38`). A team-A key cannot read or write team-B data.
 - **Acts as a system user.** MCP/ACP-created rows are owned by a dedicated `MCP Agent` user (EDITOR, `src/mcp/systemUser.ts`), auto-granted an idempotent membership in the calling team so its rows are visible under the team's D6 visibility rules. Editor-level, not super-admin.
@@ -134,7 +171,7 @@ Response codes: `400` invalid input, `401` bad/missing key, `422` tool-level fai
 
 ---
 
-## 5. Security — prompt-injection hardening (CLI mode)
+## 6. Security — prompt-injection hardening (CLI mode)
 
 Production runs in **CLI mode** (`claude -p`), and `generate_post` can drive the vision path. Since 005 T4/T5 no CLI spawn has any tool (`--tools ""`), and vision passes its images inline over stdin. Untrusted inputs (uploaded documents, chat transcripts, image contents) are folded into model prompts, so the app hardens against prompt injection in layers:
 
@@ -152,6 +189,7 @@ Production runs in **CLI mode** (`claude -p`), and `generate_post` can drive the
 - `src/mcp/auth.ts` — key generation (`generateApiKey`) + resolution (`resolveApiKey`)
 - `src/mcp/server.ts` — MCP stdio server + tool dispatch
 - `src/mcp/tools/*` — tool implementations (brandkit, generate, publish)
+- `src/lib/captions/*`, `src/lib/channels.ts` — the caption store and loader, the publish resolver, the per-channel registry (012)
 - `src/mcp/systemUser.ts` — system user + team membership
 - `src/app/api/acp/{manifest,run}/route.ts` — ACP HTTP surface
 - `src/app/api/team/api-keys/*` — key management (mint / list / revoke)

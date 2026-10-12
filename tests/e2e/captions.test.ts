@@ -592,7 +592,7 @@ test.describe('§W — legacy caption migration (AC-23)', () => {
   // DB is built from empty by the same `prisma migrate deploy` the test DB was
   // (an identical schema), seeded with each shape the file must handle, and the
   // file itself is applied with `prisma db execute`.
-  test('the down.sql leaves no NULL copyText and restores NOT NULL, on a scratch database', async () => {
+  test('the down.sql leaves no NULL copyText and restores NOT NULL, and a 012 roll-forward re-applies migration 3, on a scratch database', async () => {
     test.setTimeout(240_000)
     const testUrl = testDbUrl()
     const scratchName = 'bistec_studio_test_012_rollback'
@@ -664,6 +664,19 @@ test.describe('§W — legacy caption migration (AC-23)', () => {
       expect(copyText.get(legacy.id)).toBe('The legacy caption')
       // The table stays: what a roll-forward resumes from.
       expect(await db.draftCaption.count()).toBe(5)
+
+      // Roll forward: down.sql un-recorded migration 3, so redeploying 012's
+      // boot `migrate deploy` re-applies it and a new draft (no copyText) saves.
+      const applied = () => db.$queryRaw<{ n: bigint }[]>`
+        SELECT count(*) AS n FROM "_prisma_migrations"
+        WHERE migration_name = '20261011140000_legacy_caption_text' AND finished_at IS NOT NULL`
+      expect(Number((await applied())[0].n)).toBe(0)
+      const forward = run('npx prisma migrate deploy', scratchUrl)
+      expect(forward.status, forward.output).toBe(0)
+      expect(Number((await applied())[0].n)).toBe(1)
+      expect((await nullable())[0].is_nullable).toBe('YES')
+      const afterForward = await draft([{ channel: 'INSTAGRAM', text: 'Created after the roll-forward' }])
+      expect(afterForward.legacyCaptionText).toBeNull()
     } finally {
       await db.$disconnect()
       await prisma!.$executeRawUnsafe(`DROP DATABASE IF EXISTS "${scratchName}" WITH (FORCE)`)

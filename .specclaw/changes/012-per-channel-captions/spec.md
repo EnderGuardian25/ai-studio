@@ -231,9 +231,10 @@ model DraftCaption {
   1. Run `prisma/rollback/012-per-channel-captions.down.sql`. It is a manual step and sits outside `migrations/` on purpose. It:
      - sets `copyText` on every row where it is NULL (post-012 drafts) to that draft's Instagram caption text, or LinkedIn's when Instagram is empty, or `''`;
      - restores `NOT NULL`;
+     - deletes migration 3's (`20261011140000_legacy_caption_text`) row from `_prisma_migrations`, since its effect has just been undone (amended 2026-10-11, user decision);
      - leaves the table, the two columns and the `WHATSAPP` value in place. The old code never reads them, and Postgres cannot drop an enum value.
-  2. Boot the old image. If its `migrate deploy` refuses because of the three newer applied migrations, boot with `SKIP_MIGRATIONS=1`.
-- **Roll forward later:** redeploy 012. The migrations are already applied. Drafts created by the old code while rolled back have no rows, so they materialize on read. An edit the old code made to a post-012 draft's `copyText` is not carried forward, and the runbook says so.
+  2. Boot the old image. If its `migrate deploy` refuses because of the newer applied migrations, boot with `SKIP_MIGRATIONS=1`.
+- **Roll forward later:** redeploy 012. Its boot `migrate deploy` re-applies migration 3 (DROP NOT NULL); the first two are still applied. Without the un-record step, migration 3 would never re-run and every new draft would fail on NOT NULL, because 012 code never writes `copyText`. TC-CAP-13 proves the rollback and the roll-forward on a scratch DB. Drafts created by the old code while rolled back have no rows, so they materialize on read. An edit the old code made to a post-012 draft's `copyText` is not carried forward, and the runbook says so.
 - **A bad split:** the legacy text is untouched, so an improved planner can re-plan affected drafts in a later change (out of scope here).
 
 #### Generation and extraction (wave 1)

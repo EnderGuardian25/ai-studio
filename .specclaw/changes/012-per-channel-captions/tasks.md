@@ -252,7 +252,7 @@ Waves 2 and 3 add UX and wording only.
     - **The import** writes them idempotently (`skipDuplicates`). An old bundle that has `copyText` and no captions is imported into `legacyCaptionText` with no rows, so the loader materializes it on first read.
     - **Verify with `--dry-run`** against a small export from the test DB. Do not touch the dev DB.
 
-- [ ] `T16` — Docs
+- [x] `T16` — Docs
   - Files: `CLAUDE.md`, `docs/handoff.md`, `.specclaw/ROADMAP.md`, `.specclaw/changes/008-*/proposal.md`, `.specclaw/changes/010-*/proposal.md`, `docs/e2e-test-plan.md`, `docs/mcp-acp-guide.md`, `docs/ui-reference/DESIGN_SYSTEM.md`
   - Estimate: small
   - Kind: docs

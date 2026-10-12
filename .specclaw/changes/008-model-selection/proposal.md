@@ -33,7 +33,7 @@ One model catalogue, one resolver, three places to choose.
 
 1. **Model catalogue** in `src/lib/agent/config.ts`: Haiku 4.5, Sonnet 5, Opus 5.5. Each entry carries its full API ID, a display name, a relative cost/speed label, and a per-surface timeout. The **full ID is passed in both modes** (`claude -p --model` accepts full IDs; see the `claudeCli.ts:20` comment), so CLI and API always run the same version.
 2. **Named surfaces.** Every model call declares one:
-   - `caption` (named `caption`, not `copy`, to match **012**'s rename)
+   - `caption` (named `caption`, not `copy`, to match **012**'s rename). **012 is built (2026-10-11):** one caption call writes the on-image **headline** and the Instagram, LinkedIn and WhatsApp captions as one JSON object (`writeCaptions` with `GENERATION_TARGETS`, `src/lib/captions/generate.ts`). So the headline sits **under** the `caption` surface, not beside it, and the same surface covers `regenerate-copy` in all three forms: "Regenerate all" (`{}`), one channel (`{channel}`) and the headline (`{headline:true}`). The `COPY` provider slot and the `regenerate-copy` / `generate/copy` route names are unchanged.
    - `design.template`
    - `design.freeform`
    - `refine`
@@ -57,7 +57,7 @@ One model catalogue, one resolver, three places to choose.
    - The last pick per surface is remembered per user.
 5. **Team defaults + allow-list at `/team`** (team admins). **Decided 2026-09-23: Opus is allowed for everyone by default**; admins can remove any model from their team's list. The server always validates against the allow-list and never trusts the client.
 6. **Non-interactive callers use the team default:** the scheduler, MCP and ACP have no acting user (they pass `null` to `withClaudeAuth`). A `ScheduledGeneration` may optionally pin models at plan time.
-7. **Stamp what ran.** `Draft.captionModel`, `Draft.designModel` and `DraftRevision.model` sit beside `promptVersion`. Output can then be compared by model, and proposal **006**'s traces can read the field instead of re-deriving it.
+7. **Stamp what ran.** `Draft.captionModel` (the caption surface, headline included), `Draft.designModel` and `DraftRevision.model` sit beside `promptVersion`. Output can then be compared by model, and proposal **006**'s traces can read the field instead of re-deriving it.
 8. **Timeouts scale with the model.** A per-model design timeout, e.g. Opus ~600s against today's 300s, **kept strictly under the 15-minute stale sweeps**, or those sweeps become model-aware. A generation must never be marked FAILED by the sweep while its model call is still legitimately running.
 
 ## Scope
@@ -68,7 +68,7 @@ One model catalogue, one resolver, three places to choose.
 - Upgrading pinned IDs to the current family
 - `TeamModelPolicy` (defaults per surface + allow-list) and per-user remembered choice — schema + migration
 - Pickers: brief wizard, refine, assistant chat headers; `/team` admin section
-- `Brief` carries the chosen copy/design model so async generation, retry and regenerate reuse it
+- `Brief` carries the chosen caption/design model so async generation, retry and regenerate reuse it
 - `Draft` / `DraftRevision` model stamps
 - Per-model timeouts reconciled with the 15-minute generation and `pendingAction` sweeps
 - `CLAUDE_CLI_MODEL` demoted from override to fallback
@@ -100,6 +100,7 @@ One model catalogue, one resolver, three places to choose.
 - Should `design.template` (Path A) offer Opus at all? Template fill is a constrained task where Haiku was chosen deliberately; offering Opus there may only add cost and latency.
 - Should a changed model on **regenerate** default to the draft's stamped model (reproducibility) or to the user's current remembered choice (convenience)?
 - Does Fable 5.1 belong in the catalogue as well, or only the three named models?
+- **After 012, captions are regenerated per channel.** Is one `Draft.captionModel` enough when Instagram was last written by one model and WhatsApp by another, or does the stamp belong on each `DraftCaption` row (plus one for the headline)?
 
 ---
 
