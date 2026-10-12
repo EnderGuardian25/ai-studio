@@ -114,7 +114,27 @@ const { runVisionModel } = await import('@/lib/agent/vision')
 const { ClaudeCliError } = await import('@/lib/agent/claudeCli')
 const { runWithClaudeAuth } = await import('@/lib/agent/claudeAuth')
 const { UNTRUSTED_CONTENT_GUARD } = await import('@/lib/agent/untrusted')
-const { modelFor } = await import('@/lib/agent/config')
+const { decideModel } = await import('@/lib/models/resolve')
+const { setModelCallSink } = await import('@/lib/models/modelCalls')
+type ModelCallRecord = import('@/lib/models/modelCalls').ModelCallRecord
+
+// 008 T8: the caller resolves the model and passes it in — here the
+// ASSISTANT_BRANDKIT system default in CLI mode (Sonnet 5.5, 180 s).
+const resolvedVision = decideModel('ASSISTANT_BRANDKIT', {
+  policy: { allowed: ['HAIKU', 'SONNET', 'OPUS'], defaults: {}, gateOn: false },
+  credential: 'personal',
+  mode: 'cli',
+})
+if (!resolvedVision.ok) throw new Error(resolvedVision.message)
+const VISION_MODEL = resolvedVision.resolved
+// A team default of Opus (300 s), so the timeout check can't pass on the old 180 s literal.
+const opusVision = decideModel('ASSISTANT_BRANDKIT', {
+  policy: { allowed: ['HAIKU', 'SONNET', 'OPUS'], defaults: { ASSISTANT_BRANDKIT: 'OPUS' }, gateOn: false },
+  credential: 'personal',
+  mode: 'cli',
+})
+if (!opusVision.ok) throw new Error(opusVision.message)
+const OPUS_VISION = opusVision.resolved
 type ClaudeCliAuth = import('@/lib/agent/claudeAuth').ClaudeCliAuth
 
 // Fake values — never real credentials.
@@ -153,6 +173,7 @@ const req = (imageUrls = Object.keys(IMAGES), extra: Record<string, unknown> = {
   imageUrls,
   label: 'brandkit',
   teamId: 'team-1',
+  model: VISION_MODEL,
   ...extra,
 })
 
@@ -313,7 +334,7 @@ describe('AC-13 (vision site): the argv', () => {
     expect(at('--input-format')).toBe('stream-json')
     expect(at('--output-format')).toBe('stream-json')
     expect(args).toContain('--verbose')
-    expect(at('--model')).toBe(modelFor('B', 'cli'))
+    expect(at('--model')).toBe(VISION_MODEL.arg)
     expect(args).not.toContain('--allowedTools')
     expect(args).not.toContain('--allowed-tools')
     // maxTokens stays ignored in CLI mode — it never reaches argv.
@@ -338,6 +359,28 @@ describe('AC-13 (vision site): the argv', () => {
     expect([call.cmd, ...call.args].join(' ')).toContain(' --tools "" ')
     // The system text (which has quotes) travels in stdin, never argv.
     expect(call.args.join(' ')).not.toContain('brand voice')
+  })
+
+  it('008 T8: the passed model is recorded once, before the spawn, and its surface timeout applies', async () => {
+    const calls: ModelCallRecord[] = []
+    setModelCallSink({ record: (r) => calls.push(r), read: () => calls, clear: () => (calls.length = 0) })
+    const timers = vi.spyOn(globalThis, 'setTimeout')
+    try {
+      h.scripts.push({ exitCode: 0, chunks: [INIT, result({ result: 'ok' })] })
+      await inAuth(() => runVisionModel(req(undefined, { model: OPUS_VISION })))
+      expect(calls).toMatchObject([
+        { surface: 'ASSISTANT_BRANDKIT', key: 'OPUS', arg: 'claude-opus-5-5', mode: 'cli', source: 'team', label: 'brandkit' },
+      ])
+      expect(h.spawnCalls[0].args[h.spawnCalls[0].args.indexOf('--model') + 1]).toBe('claude-opus-5-5')
+      // No 180_000 literal at the site: the bound is the entry's ASSISTANT_BRANDKIT timeout.
+      expect(OPUS_VISION.timeoutMs).toBe(300_000)
+      const delays = timers.mock.calls.map(([, ms]) => ms)
+      expect(delays).toContain(300_000)
+      expect(delays).not.toContain(180_000)
+    } finally {
+      timers.mockRestore()
+      setModelCallSink(null)
+    }
   })
 
   it('the OAuth token travels in env, never argv or stdin', async () => {

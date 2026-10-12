@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { withTeamAdmin, parseBody } from '@/lib/api/handler'
 import { runBrandKitChat } from '@/lib/brandkit/assistant'
 import { withClaudeAuth } from '@/lib/agent/userToken'
+import { AssistantModelError } from '@/lib/campaign/briefingAssistant'
 
 type Params = { id: string }
 
@@ -38,8 +39,16 @@ export const POST = withTeamAdmin<Params>(async (req, { params }, user) => {
 
   // CLI mode bills the acting user's personal Claude token when connected
   // (the team token otherwise) — see src/lib/agent/userToken.ts.
-  const result = await withClaudeAuth(user.userId, user.teamId, () =>
-    runBrandKitChat(params.id, body.data.messages, user.teamId)
-  )
-  return NextResponse.json(result)
+  try {
+    const result = await withClaudeAuth(user.userId, user.teamId, () =>
+      runBrandKitChat(params.id, body.data.messages, user.teamId, user.userId)
+    )
+    return NextResponse.json(result)
+  } catch (err) {
+    // 008: no model the team can run — nothing ran; say why.
+    if (err instanceof AssistantModelError) {
+      return NextResponse.json({ code: err.code, message: err.message }, { status: 422 })
+    }
+    throw err
+  }
 })

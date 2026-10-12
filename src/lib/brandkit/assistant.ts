@@ -1,7 +1,9 @@
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { runVisionModel } from '@/lib/agent/vision'
-import { runBriefingModel } from '@/lib/campaign/briefingAssistant'
+import { resolveAssistantModel, runBriefingModel } from '@/lib/campaign/briefingAssistant'
+import { pipelineMode } from '@/lib/agent/config'
+import { modelCallFor, recordModelCall } from '@/lib/models/modelCalls'
 import { buildDocsContext } from '@/lib/campaign/documents'
 import { sampleImageColors } from '@/lib/renderer/puppeteer'
 import { fenceUntrusted, UNTRUSTED_CONTENT_GUARD } from '@/lib/agent/untrusted'
@@ -169,11 +171,16 @@ function mergeColors(docColors: string[], sampled: string[]): string[] {
 export async function runBrandKitChat(
   kitId: string,
   messages: ChatMessage[],
-  teamId: string
+  teamId: string,
+  userId: string | null,
 ): Promise<BrandKitChatResult> {
   const { imageUrls: urls, docs } = await collectBrandKitGrounding(kitId)
+  // 008 FR-02: the team's ASSISTANT_BRANDKIT model, for both the vision and the text call.
+  const model = await resolveAssistantModel('ASSISTANT_BRANDKIT', teamId, userId)
 
   if (MOCK_AI) {
+    // 008 FR-16: the short-circuited call is recorded first.
+    recordModelCall(modelCallFor(model, pipelineMode(), 'brandkit'))
     const lastUser = [...messages].reverse().find((m) => m.role === 'user')
     const reply = buildMockBrandKitReply(lastUser?.content ?? '')
     const block = extractBrandKitBlock(reply)
@@ -218,8 +225,8 @@ export async function runBrandKitChat(
   // mode-agnostic text call the campaign briefing assistant uses.
   const [reply, sampled] = await Promise.all([
     urls.length > 0
-      ? runVisionModel({ system, userMessage, imageUrls: urls, label: 'brandkit', teamId })
-      : runBriefingModel(system, [{ role: 'user', content: userMessage }], teamId),
+      ? runVisionModel({ system, userMessage, imageUrls: urls, label: 'brandkit', teamId, model })
+      : runBriefingModel(system, [{ role: 'user', content: userMessage }], teamId, model, { label: 'brandkit' }),
     samplePalette(urls),
   ])
   const block = extractBrandKitBlock(reply)

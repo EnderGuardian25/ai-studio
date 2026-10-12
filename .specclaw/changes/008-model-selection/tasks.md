@@ -167,7 +167,7 @@ Wave 2 adds per-post and per-chat pickers only.
     - **Caption and headline edits** (`saveCaptionEdit`, `saveHeadlineEdit`) write no stamp field. A unit case proves it.
     - **`GET /api/drafts/[id]`** adds `designModel`, `designModelSubstitutedFrom`, `headlineModel`, `headlineModelSubstitutedFrom` and `captions[].model` / `modelSubstitutedFrom`. The revisions list adds `model`. All additive; the `DraftDetail` type follows.
 
-- [~] `T8` — The assistants, image → template, the voice draft and the token ping on the resolver
+- [x] `T8` — The assistants, image → template, the voice draft and the token ping on the resolver
   - Files: `src/lib/campaign/briefingAssistant.ts`, `src/lib/agent/vision.ts`, `src/lib/brandkit/assistant.ts`, `src/lib/brandkit/templateFromImage.ts`, `src/lib/brandkit/voiceDraft.ts`, `src/lib/agent/userToken.ts`, `tests/unit/briefingAssistant.test.ts`, `tests/unit/brandKitAssistant.test.ts`, `tests/unit/visionCli.test.ts`, `tests/unit/userToken.test.ts`
   - Estimate: medium
   - Kind: impl

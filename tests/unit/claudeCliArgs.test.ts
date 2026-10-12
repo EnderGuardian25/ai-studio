@@ -133,7 +133,7 @@ const { setModelCallSink } = await import('@/lib/models/modelCalls')
 
 // 008 T6: the copy and design call sites now pass a ResolvedModel (the
 // system default here: no policy row, CLI mode, team credential).
-function siteModel(surface: 'CAPTION' | 'DESIGN_FREEFORM') {
+function siteModel(surface: 'CAPTION' | 'DESIGN_FREEFORM' | 'ASSISTANT_BRIEFING') {
   const r = decideModel(surface, {
     policy: { allowed: ['HAIKU', 'SONNET', 'OPUS'], defaults: {}, gateOn: false },
     credential: 'team',
@@ -189,8 +189,9 @@ describe('AC-13: every text-mode call site spawns with --tools "" and never --al
     // 008 T7: the verifier runs its internal model (FR-15); no pin, the timeout is the model's.
     ['verifier', { label: 'verify', model: internalModel('INTERNAL_VERIFIER', 'cli') }],
     ['background', { label: 'background', model: modelForBackground('cli'), timeoutMs: 90_000 }],
-    ['briefing', { timeoutMs: 180_000, label: 'briefing', model: modelFor('B', 'cli') }],
-    ['token-validate', { model: 'haiku', timeoutMs: 60_000, label: 'token-validate', authToken: TOKEN }],
+    // 008 T8: the assistant text call and the token ping run a ResolvedModel; the timeout is the model's.
+    ['briefing', { label: 'briefing', model: siteModel('ASSISTANT_BRIEFING') }],
+    ['token-validate', { model: internalModel('INTERNAL_TOKEN_PING', 'cli'), label: 'token-validate', authToken: TOKEN }],
   ]
 
   it.each(sites)('%s (option table, POSIX)', async (_site, opts) => {
@@ -249,7 +250,7 @@ describe('AC-13: every text-mode call site spawns with --tools "" and never --al
     })
 
     it('briefing — runBriefingModel', async () => {
-      await inAuth(() => runBriefingModel('system', [{ role: 'user', content: 'hi' }], 'team-1'))
+      await inAuth(() => runBriefingModel('system', [{ role: 'user', content: 'hi' }], 'team-1', siteModel('ASSISTANT_BRIEFING')))
       expectNoTools(h.spawnCalls[0].args, '')
     })
 

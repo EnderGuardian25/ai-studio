@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { withTeamAdmin, parseBody } from '@/lib/api/handler'
-import { runBriefingChat } from '@/lib/campaign/briefingAssistant'
+import { AssistantModelError, runBriefingChat } from '@/lib/campaign/briefingAssistant'
 import { withClaudeAuth } from '@/lib/agent/userToken'
 
 type Params = { id: string }
@@ -39,8 +39,16 @@ export const POST = withTeamAdmin<Params>(async (req, { params }, user) => {
 
   // CLI mode bills the acting user's personal Claude token when connected
   // (the team token otherwise) — see src/lib/agent/userToken.ts.
-  const result = await withClaudeAuth(user.userId, user.teamId, () =>
-    runBriefingChat(params.id, body.data.messages, user.teamId)
-  )
-  return NextResponse.json(result)
+  try {
+    const result = await withClaudeAuth(user.userId, user.teamId, () =>
+      runBriefingChat(params.id, body.data.messages, user.teamId, user.userId)
+    )
+    return NextResponse.json(result)
+  } catch (err) {
+    // 008: no model the team can run — nothing ran; say why.
+    if (err instanceof AssistantModelError) {
+      return NextResponse.json({ code: err.code, message: err.message }, { status: 422 })
+    }
+    throw err
+  }
 })

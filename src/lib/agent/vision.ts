@@ -1,8 +1,10 @@
 import Anthropic from '@anthropic-ai/sdk'
 import { resolveAnthropicApiKey } from '@/providers/registry'
-import { isCliMode, modelFor } from '@/lib/agent/config'
+import { isCliMode } from '@/lib/agent/config'
 import { runClaudeCliStreamJson, type ContentBlock } from '@/lib/agent/claudeCli'
 import { UNTRUSTED_CONTENT_GUARD } from '@/lib/agent/untrusted'
+import { createMessage, textOf } from '@/lib/models/anthropicCall'
+import type { ResolvedModel } from '@/lib/models/resolve'
 
 // Vision plumbing (F5/F6): send one or more images to a vision-capable model and
 // get its text back. This is the FIRST real image-input path in the app — every
@@ -16,10 +18,11 @@ import { UNTRUSTED_CONTENT_GUARD } from '@/lib/agent/untrusted'
 //                 ALS auth exactly like text calls.
 //
 // Callers own the MOCK_AI seam (they return a deterministic result before calling
-// this), so runVisionModel itself only runs on the live path.
+// this), so runVisionModel itself only runs on the live path. Callers also own
+// the model (008 FR-07): they resolve it and pass it in, and its surface
+// timeout bounds the call in both modes (design §5).
 
 const MAX_TOKENS = 2048
-const CLI_TIMEOUT_MS = 180_000
 
 // Anthropic accepts these image media types; others are coerced to png.
 const SUPPORTED = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp'])
@@ -48,6 +51,7 @@ export interface VisionRequest {
   // Task 19b) — ignored in CLI mode, which never touches the provider
   // registry. Every caller runs inside an already team-scoped request.
   teamId: string
+  model: ResolvedModel
 }
 
 export async function runVisionModel(req: VisionRequest): Promise<string> {
@@ -64,14 +68,17 @@ export async function runVisionModel(req: VisionRequest): Promise<string> {
     })),
     { type: 'text' as const, text: req.userMessage },
   ]
-  const message = await client.messages.create({
-    model: modelFor('B', 'api'),
-    max_tokens: req.maxTokens ?? MAX_TOKENS,
-    system: req.system,
-    messages: [{ role: 'user', content }],
-  })
-  const textBlock = message.content.find((b) => b.type === 'text')
-  return textBlock && 'text' in textBlock ? textBlock.text : ''
+  const message = await createMessage(
+    client,
+    {
+      max_tokens: req.maxTokens ?? MAX_TOKENS,
+      system: req.system,
+      messages: [{ role: 'user', content }],
+    },
+    req.model,
+    { label: req.label ?? 'vision' },
+  )
+  return textOf(message)
 }
 
 // Build the CLI vision prompt — the text block that rides in the same
@@ -107,9 +114,5 @@ async function runVisionCli(req: VisionRequest, images: FetchedImage[]): Promise
     })),
     { type: 'text' as const, text: buildVisionCliPrompt(req.system, req.userMessage) },
   ]
-  return runClaudeCliStreamJson(content, {
-    timeoutMs: CLI_TIMEOUT_MS,
-    label: req.label ?? 'vision',
-    model: modelFor('B', 'cli'),
-  })
+  return runClaudeCliStreamJson(content, { label: req.label ?? 'vision', model: req.model })
 }

@@ -2,8 +2,12 @@ import Anthropic from '@anthropic-ai/sdk'
 import { z } from 'zod'
 import { PostGenerationAction } from '@prisma/client'
 import { resolveAnthropicApiKey } from '@/providers/registry'
-import { isCliMode, modelFor } from '@/lib/agent/config'
+import { isCliMode, pipelineMode } from '@/lib/agent/config'
 import { runClaudeCli, stripCodeFences } from '@/lib/agent/claudeCli'
+import { resolveModel } from '@/lib/models/policy'
+import { createMessage, textOf } from '@/lib/models/anthropicCall'
+import { modelCallFor, recordModelCall } from '@/lib/models/modelCalls'
+import type { DecideErrorCode, ResolvedModel } from '@/lib/models/resolve'
 import { getActiveCampaignBriefing } from '@/lib/campaign/briefing'
 import { collectCampaignDocsContext, collectCampaignDocImageUrls } from '@/lib/campaign/documents'
 import { runVisionModel } from '@/lib/agent/vision'
@@ -15,8 +19,9 @@ import { MOCK_AI, buildMockBriefingReply, buildMockBriefingEnhance } from '@/lib
 // briefing draft, and a one-shot "enhance" rewrite of the briefing editor text.
 // Both run through the same mode-agnostic model call — Anthropic SDK in API
 // mode, `claude -p` in CLI mode (keyless) with the transcript folded into one
-// prompt — so the feature works under either DESIGN_PROVIDER. Sonnet, like
-// Path B: briefing quality is the product and calls are infrequent.
+// prompt — so the feature works under either DESIGN_PROVIDER. The model is the
+// team's ASSISTANT_BRIEFING choice (008 FR-02; system default Sonnet: briefing
+// quality is the product and calls are infrequent).
 
 export interface ChatMessage {
   role: 'user' | 'assistant'
@@ -24,12 +29,55 @@ export interface ChatMessage {
 }
 
 const MAX_TOKENS = 2048
-const CLI_TIMEOUT_MS = 120_000
 
-// Exported for reuse by the brand-kit assistant (same mode-agnostic text
-// call). teamId is required (team-tenancy fix, Task 19b) — every caller runs
-// inside an already team-scoped request.
-export async function runBriefingModel(system: string, messages: ChatMessage[], teamId: string): Promise<string> {
+/**
+ * An assistant surface's model could not be resolved (008 FR-03: e.g.
+ * NO_ALLOWED_MODEL), so nothing ran. The calling route answers 422
+ * { code, message }, the shape the design actions use.
+ */
+export class AssistantModelError extends Error {
+  constructor(
+    public code: DecideErrorCode,
+    message: string,
+  ) {
+    super(message)
+    this.name = 'AssistantModelError'
+  }
+}
+
+/**
+ * The model for an assistant entry point (008 FR-02, design §3): resolved from
+ * the team (and the acting user's credential tier), before any model call.
+ * Shared by the brand-kit assistant, image → template and the voice draft.
+ */
+export async function resolveAssistantModel(
+  surface: 'ASSISTANT_BRIEFING' | 'ASSISTANT_BRANDKIT',
+  teamId: string,
+  userId: string | null,
+): Promise<ResolvedModel> {
+  const result = await resolveModel(surface, { userId, teamId })
+  if (!result.ok) throw new AssistantModelError(result.code, result.message)
+  return result.resolved
+}
+
+export interface BriefingModelOptions {
+  /** API mode only; `claude -p` has no output-token flag. */
+  maxTokens?: number
+  label?: string
+}
+
+// Exported for reuse by the brand-kit assistant and the voice draft (same
+// mode-agnostic text call). teamId is required (team-tenancy fix, Task 19b) —
+// every caller runs inside an already team-scoped request. The time bound is
+// the model's surface timeout in both modes (008 design §5).
+export async function runBriefingModel(
+  system: string | undefined,
+  messages: ChatMessage[],
+  teamId: string,
+  model: ResolvedModel,
+  opts: BriefingModelOptions = {},
+): Promise<string> {
+  const label = opts.label ?? 'briefing'
   if (isCliMode()) {
     // One prompt per turn: the CLI is stateless, so the whole transcript rides
     // along. Doc context is capped (documents.ts) to keep this affordable.
@@ -42,24 +90,21 @@ export async function runBriefingModel(system: string, messages: ChatMessage[], 
       transcript,
       '--- End of conversation ---',
       'Write the Assistant\'s next reply only. Do not prefix it with "Assistant:".',
-    ].join('\n\n')
-    return runClaudeCli(prompt, {
-      timeoutMs: CLI_TIMEOUT_MS,
-      label: 'briefing',
-      model: modelFor('B', 'cli'),
-    })
+    ]
+      .filter(Boolean)
+      .join('\n\n')
+    return runClaudeCli(prompt, { label, model })
   }
 
   const apiKey = await resolveAnthropicApiKey(teamId)
   const client = new Anthropic({ apiKey: apiKey ?? undefined })
-  const message = await client.messages.create({
-    model: modelFor('B', 'api'),
-    max_tokens: MAX_TOKENS,
-    system,
-    messages,
-  })
-  const textBlock = message.content.find((b) => b.type === 'text')
-  return textBlock && 'text' in textBlock ? textBlock.text : ''
+  const message = await createMessage(
+    client,
+    { max_tokens: opts.maxTokens ?? MAX_TOKENS, ...(system ? { system } : {}), messages },
+    model,
+    { label },
+  )
+  return textOf(message)
 }
 
 // Shared campaign context (brand voice + source documents + current briefing)
@@ -154,9 +199,13 @@ export interface BriefingChatResult {
 export async function runBriefingChat(
   campaignId: string,
   messages: ChatMessage[],
-  teamId: string
+  teamId: string,
+  userId: string | null,
 ): Promise<BriefingChatResult> {
+  const model = await resolveAssistantModel('ASSISTANT_BRIEFING', teamId, userId)
   if (MOCK_AI) {
+    // 008 FR-16: the short-circuited call is recorded first.
+    recordModelCall(modelCallFor(model, pipelineMode(), 'briefing'))
     const lastUser = [...messages].reverse().find((m) => m.role === 'user')
     const reply = buildMockBriefingReply(lastUser?.content ?? '')
     return {
@@ -198,9 +247,9 @@ export async function runBriefingChat(
       '',
       `Write the Assistant's next reply to the latest user message: ${lastUser?.content ?? ''}`,
     ].join('\n')
-    reply = await runVisionModel({ system, userMessage, imageUrls, label: 'briefing', teamId })
+    reply = await runVisionModel({ system, userMessage, imageUrls, label: 'briefing', teamId, model })
   } else {
-    reply = await runBriefingModel(system, messages, teamId)
+    reply = await runBriefingModel(system, messages, teamId, model)
   }
   return {
     reply,
@@ -209,8 +258,17 @@ export async function runBriefingChat(
   }
 }
 
-export async function enhanceBriefing(campaignId: string, content: string, teamId: string): Promise<string> {
-  if (MOCK_AI) return buildMockBriefingEnhance(content)
+export async function enhanceBriefing(
+  campaignId: string,
+  content: string,
+  teamId: string,
+  userId: string | null,
+): Promise<string> {
+  const model = await resolveAssistantModel('ASSISTANT_BRIEFING', teamId, userId)
+  if (MOCK_AI) {
+    recordModelCall(modelCallFor(model, pipelineMode(), 'briefing'))
+    return buildMockBriefingEnhance(content)
+  }
 
   const context = await buildCampaignContext(teamId, campaignId)
   const system = [
@@ -227,7 +285,7 @@ export async function enhanceBriefing(campaignId: string, content: string, teamI
     ? `Improve this campaign briefing:\n\n${content}`
     : 'Draft a campaign briefing from the campaign context.'
 
-  const reply = await runBriefingModel(system, [{ role: 'user', content: userMessage }], teamId)
+  const reply = await runBriefingModel(system, [{ role: 'user', content: userMessage }], teamId, model)
   return stripCodeFences(reply).trim()
 }
 
@@ -244,8 +302,16 @@ export interface EnhancePostBriefInput {
 // per-post twin of enhanceBriefing. Grounded in the same context the
 // generation itself will use: the resolved brand voice plus, when a campaign
 // is selected, its active briefing and source documents.
-export async function enhancePostBrief(input: EnhancePostBriefInput, teamId: string): Promise<string> {
-  if (MOCK_AI) return buildMockBriefingEnhance(input.content)
+export async function enhancePostBrief(
+  input: EnhancePostBriefInput,
+  teamId: string,
+  userId: string | null,
+): Promise<string> {
+  const model = await resolveAssistantModel('ASSISTANT_BRIEFING', teamId, userId)
+  if (MOCK_AI) {
+    recordModelCall(modelCallFor(model, pipelineMode(), 'briefing'))
+    return buildMockBriefingEnhance(input.content)
+  }
 
   const context = await buildCampaignContext(teamId, input.campaignId, input.brandKitId)
   const system = [
@@ -271,6 +337,6 @@ export async function enhancePostBrief(input: EnhancePostBriefInput, teamId: str
     ? `${details}\n\nImprove this post brief:\n\n${input.content}`
     : `${details}\n\nDraft a post brief for this topic.`
 
-  const reply = await runBriefingModel(system, [{ role: 'user', content: userMessage }], teamId)
+  const reply = await runBriefingModel(system, [{ role: 'user', content: userMessage }], teamId, model)
   return stripCodeFences(reply).trim()
 }
