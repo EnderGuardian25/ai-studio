@@ -413,3 +413,20 @@ FR-06's roll-forward was broken as approved: down.sql restored copyText NOT NULL
 Every rollback test must also prove the roll-forward. A down script that undoes a migration's effect must also un-record that migration.
 
 ---
+
+## [L25] pattern — Root cause of the 2026-10-09..12 red fork CI (L21): clien...
+
+**When:** 2026-10-12 02:29 UTC
+**Category:** pattern
+**Priority:** high
+**Status:** pending
+
+### Detail
+
+Root cause of the 2026-10-09..12 red fork CI (L21): client settles that fire only on an OBSERVED transition of polled state (pendingAction REFINE->null) silently never fire when the server finishes before the first poll lands. Fixed in 015 by settling on state after an awaited refetch. Repro technique: page.route to hold the first post-202 GET for 3 s.
+
+### Action
+
+Never settle async UI on an observed edge of polled state; arm after the awaited refetch and compare against a baseline captured at send. Force races in E2E by delaying the refetch with page.route.
+
+---

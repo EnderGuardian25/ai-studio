@@ -4,18 +4,25 @@ This repo contains planning documents for **bistec-studio**, an internal marketi
 
 ## ✅ Outstanding work — START HERE (updated 2026-10-11, later)
 
-- **⏸️ 2026-10-11 (later) — PICK UP HERE: 012 (per-channel captions) is BUILT 16/16 and VERIFIED PASS (28/28 gating ACs, 2026-10-12), all pushed. Next: the follow-ups below, starting with the red-CI refine race (`/specclaw:debug`).** Verify: [`verify-report.md`](.specclaw/changes/012-per-channel-captions/verify-report.md) — fresh E2E at HEAD 369/3/0/0, unit 2025, `test:render` 15/15. Full detail: [`docs/handoff.md`](docs/handoff.md) top section; deploy/backfill/rollback steps in its **012 runbook** section.
+- **✅ 2026-10-12 — PICK UP HERE: fork CI on `v2` is GREEN again. Change 015 (draft-page settle race) is built (`df27ff49`); `/specclaw:verify 015` is next.** CI run 38195143494 passed on every job (E2E 371 passed / 3 skipped, unit, build), the first green since 013. Local full gate: 371/3/0/0.
+  - **Root cause** (`/specclaw:debug`, deterministic repro): `RefinementPanel` settled a refine row, and the draft page refreshed its version list, only on an _observed_ `pendingAction` transition. A refine that finished before the post-202 refetch was served went from `null` to `null` as far as the client could see, so the row hung on "Applying…" with the input disabled and History stuck at v1. The slower runner always lost that race. This was also the old 011 "Applying…" follow-up.
+  - **The fix:** settle on state, not on an edge. The panel awaits the refetch, then resolves once `pendingAction` is null, with unchanged outcome logic. The page refetches revisions whenever the current revision is missing from the list. New `tests/e2e/settle-race.test.ts` (§X) forces the race by holding the post-202 GET for 3 s, for refine and for Regenerate design. A mutation check showed each half of the fix guards its own case. `surfaces.test.ts` is untouched.
+  - **User rule (2026-10-12):** all work lands directly on `v2`; no per-change PRs. The whole of `v2` goes to `main` as one PR later, on request.
+  - **New small follow-up:** the `CaptionPanel`/`HeadlinePanel` undo-clear uses the same observed-edge pattern. Its only effect is a leftover Undo that restores identical text after a regenerate that fails faster than the refetch.
+  - **Next after 015 verify:** the remaining post-012 follow-ups below (starting with the `import-posts` `teamId` gap), then the roadmap's next planning item, **008 model selection**.
+
+- **⏸️ 2026-10-11 (later) — superseded by 2026-10-12 above: 012 (per-channel captions) is BUILT 16/16 and VERIFIED PASS (28/28 gating ACs, 2026-10-12), all pushed. Next: the follow-ups below, starting with the red-CI refine race (`/specclaw:debug`).** Verify: [`verify-report.md`](.specclaw/changes/012-per-channel-captions/verify-report.md) — fresh E2E at HEAD 369/3/0/0, unit 2025, `test:render` 15/15. Full detail: [`docs/handoff.md`](docs/handoff.md) top section; deploy/backfill/rollback steps in its **012 runbook** section.
   - **Commits this session:** T8 `1f00261d`, T9 `9cf986eb`, T10 `05e8b021`, T11 `932104ec`, T12 `44b28c83`, T13 `29ed3c8e`, T14 `b522046e`, T15 `c9386ae0`, T16 `1b7186f7`.
   - **Gates** (each a full clean mock E2E after a dropped and recreated test DB): wave 1 **363/3/0/0**, wave 2 **369/3/0/0**, wave 3 **369/3/0/0** (passed/skipped/failed/flaky). Unit **2025**.
   - **User decisions this session:**
     - **(a)** MCP/ACP `publish_post` keeps FR-17: a refused caption leaves a **FAILED Post row** with the resolver's reason. The T7 review's "no row" suggestion was rejected.
     - **(b)** The red fork CI is debugged as its own change after 012.
-  - **🔴 Fork CI on `v2` has been RED since 014 wave 1** (run 37974533639, 2026-10-09); "v2 CI is green" was true only at 013.
+  - **~~🔴 Fork CI on `v2` has been RED since 014 wave 1~~ — FIXED 2026-10-12 by change 015 (green at `df27ff49`).** It had been red since run 37974533639, 2026-10-09; "v2 CI is green" was true only at 013.
     - One runner-only failure: `tests/e2e/surfaces.test.ts` "Draft review (T9) at 375px" times out waiting for the refine log row "Applied", on the first attempt and the retry; it passes locally every time. Likely the already-logged refine "Applying…" race.
     - All 14 wave-1 012 cases pass in CI, including the backfill and down.sql cases.
     - **Lesson (L21):** after each push, check `gh run list --branch v2`, not just the local gate.
   - **Follow-ups after 012, each its own change:**
-    1. the red-CI refine race, together with the refine "Applying…" follow-up;
+    1. ~~the red-CI refine race, together with the refine "Applying…" follow-up;~~ **done: change 015, CI green 2026-10-12;**
     2. `import-posts.mjs` never sets `teamId`, so a real import has been broken since team tenancy; `--dry-run` hides it (L22);
     3. the ACP manifest's advertised `generate_post` output schema (`src/acp/agent.ts`) lacks `headline` and `captions`;
     4. `POST /api/posts` returns 201 for an immediate publish that ends FAILED;
@@ -97,7 +104,7 @@ This repo contains planning documents for **bistec-studio**, an internal marketi
        - one shared page-head / section primitive replacing 8 `folio.ts` copies;
        - smaller consistency items.
     4. ~~**Merge fork `main` into `v2`.** This brings 004 Phase 0: Node 22, `/api/health`, CI hardening and MinIO → silo. Then recheck 005 AC-17 and AC-16.~~ **Done 2026-10-09 at `2506de0b`.** AC-17 passes; AC-16 still needs an operator run.
-  - **Pre-existing bug, logged as a follow-up:** a refine row can stay on "Applying…" if the mock refine finishes before the post-202 refetch sees `pendingAction`. It was seen once.
+  - **~~Pre-existing bug, logged as a follow-up:~~ FIXED 2026-10-12 (change 015):** a refine row can stay on "Applying…" if the mock refine finishes before the post-202 refetch sees `pendingAction`. It was seen once.
   - **The capture tool:** `node scripts/capture-ui.mjs --out ui-captures/<name>`, against `npm run test:e2e:serve`, captures every screen. `ui-captures/` is gitignored.
 
 - **🍴 2026-10-07 — THIS REPO IS NOW THE FORK `EnderGuardian25/ai-studio` (public). Read this before any git, `gh`, CI or deploy step.** Full detail: [`docs/handoff.md`](docs/handoff.md) → "moved to the fork".

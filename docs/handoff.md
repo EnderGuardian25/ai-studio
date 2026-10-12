@@ -1,13 +1,13 @@
 # bistec-studio — Session Handoff
 
-**Date:** 2026-10-11, later (latest: **012 per-channel captions BUILT 16/16 and VERIFIED PASS (2026-10-12); fork CI on `v2` is red since 014 wave 1**). Previous: 2026-10-11, earlier (013 and 014 verified PASS; 012 building, T1–T7 of 16 committed). Previous: 2026-10-09 (011 verified PASS; fork `main` merged into `v2`; 013 fork CI, checks only, building; 014 and 012 approved). Previous: 2026-10-08 (011 built 13/13 on `v2` in the fork). Previous: 2026-10-07 (005 verified PASS; 011 planned, wave 1 built; the move to the fork). Previous: 2026-10-03 (004 finished and verified PARTIAL, Phase 0 only; 005 built 9/10, waiting on one operator check). Before that: 2026-09-28 (build session — 004 Waves 1–3 built, MinIO → silo, PR #42 + draft PR #43). Before that: 2026-09-23 (later, later the same day: proposal **012** per-channel captions + copy→caption rename, a floating **Create post** button folded into 011, and a launch-video legibility pass. Before that: planning session — proposals 008–011 + roadmap, 004 re-planned to 24 tasks incl. Phase 0, and the deploy pipeline found broken: Coolify 401 since 2026-09-15). Previous: 2026-07-28 (copy-edit status clobber fix).
+**Date:** 2026-10-11, later (latest: **2026-10-12: fork CI on `v2` GREEN again. Change 015 fixed the draft-page settle race behind it. 012 per-channel captions BUILT 16/16 and VERIFIED PASS**). Previous: 2026-10-11, earlier (013 and 014 verified PASS; 012 building, T1–T7 of 16 committed). Previous: 2026-10-09 (011 verified PASS; fork `main` merged into `v2`; 013 fork CI, checks only, building; 014 and 012 approved). Previous: 2026-10-08 (011 built 13/13 on `v2` in the fork). Previous: 2026-10-07 (005 verified PASS; 011 planned, wave 1 built; the move to the fork). Previous: 2026-10-03 (004 finished and verified PARTIAL, Phase 0 only; 005 built 9/10, waiting on one operator check). Before that: 2026-09-28 (build session — 004 Waves 1–3 built, MinIO → silo, PR #42 + draft PR #43). Before that: 2026-09-23 (later, later the same day: proposal **012** per-channel captions + copy→caption rename, a floating **Create post** button folded into 011, and a launch-video legibility pass. Before that: planning session — proposals 008–011 + roadmap, 004 re-planned to 24 tasks incl. Phase 0, and the deploy pipeline found broken: Coolify 401 since 2026-09-15). Previous: 2026-07-28 (copy-edit status clobber fix).
 **Repo (since 2026-10-07):** https://github.com/EnderGuardian25/ai-studio — a public GitHub **fork** of the company repo `bistec-oss/studio`. All development continues here. The company repo is left as it is and receives nothing from this work. See the 2026-10-07 fork section below.
 **Branch:** work continues on **`v2`**, the fork's default branch. Fork `main` = `671ad6e9`, the company `main` at fork time. `v2` has contained fork `main` since the merge at `2506de0b` (2026-10-09).
 **Production:** none for the fork. `https://studio.bistecglobal.com` is the **company's** prod. It runs company `main` and is not ours to deploy.
 
 ---
 
-## ⏸️ 2026-10-11 (later) — PICK UP HERE: 012 is BUILT 16/16 and VERIFIED PASS (2026-10-12); fork CI on `v2` is red
+## ⏸️ 2026-10-11 (later) — PICK UP HERE: 012 is BUILT 16/16 and VERIFIED PASS (2026-10-12); fork CI on `v2` was red, ✅ GREEN since 015 (2026-10-12)
 
 **012 per-channel captions is built: 16 of 16 tasks, all on `origin/v2`.** The next step is **`/specclaw:verify 012-per-channel-captions`**. Every task has a report and a review in `.specclaw/changes/012-per-channel-captions/reports/` and `reviews/`. The deploy, backfill and rollback steps are in the **012 runbook** section just below.
 
@@ -35,7 +35,15 @@
 - **(a) MCP/ACP `publish_post` keeps FR-17:** a refused caption leaves a **FAILED Post row** with the resolver's reason, so "every attempt leaves a row" still holds. The T7 review's suggestion of an up-front, no-row refusal was **rejected** (an interim T8 version had it and was reverted). Only a non-publishable channel (WhatsApp) is rejected up front, before any row.
 - **(b) The red fork CI is debugged as its own change after 012** (below).
 
-### 🔴 Fork CI on `v2` has been red since 014 wave 1
+### ✅ Fork CI on `v2`: red since 014 wave 1, FIXED by change 015 (green 2026-10-12)
+
+- **Fixed by change 015** (`.specclaw/changes/015-draft-action-settle-race/`). Run 38195143494 at `df27ff49` passed on every job: E2E 371 passed / 3 skipped, unit, build.
+- **Root cause:** `RefinementPanel` settled a refine row, and the draft page refreshed its version list, only on an _observed_ `pendingAction` transition. A refine that finished before the post-202 refetch was served went from `null` to `null` as far as the client could see. The row then hung on "Applying…", and the version list stayed at v1.
+- **The fix:** settle on state, not on an observed edge. The panel awaits the refetch, then resolves once `pendingAction` is `null`; the page refetches revisions whenever the current revision is missing from the list.
+- **The test:** `tests/e2e/settle-race.test.ts` (§X) forces the race. `surfaces.test.ts` is untouched.
+- **Leftover (small follow-up):** the caption and headline undo-clear uses the same edge pattern. Its only effect is a leftover Undo that restores identical text after a regenerate that fails faster than the refetch.
+
+The original finding:
 
 - **Since run 37974533639 (2026-10-09).** The earlier "v2 CI is green" was true only at 013.
 - **One runner-only failure:** `tests/e2e/surfaces.test.ts`, "Draft review (T9) at 375px". It times out waiting for the refine log row "Applied", on the first attempt and the retry. It passes locally every time.
@@ -47,7 +55,7 @@
 
 1. ~~**`/specclaw:verify 012-per-channel-captions`.**~~ **Done 2026-10-12: PASS, 28/28 gating ACs** (`.specclaw/changes/012-per-channel-captions/verify-report.md`). A fresh full mock E2E at HEAD `3d645899` gave 369/3/0/0, unit 2025/2025, lint 0 errors, build, `test:render` 15/15. Gaps noted but not blocking: AC-25 points 2–3 rest on code plus the static guard, not a running test; AC-03 "discarded text logged" is proven in two halves; AC-29 (optional operator live check) not run; the T6 settle-guard WARN was accepted as the per-claim-token follow-up, not fixed. Next: `/specclaw:pr` only if the user wants a PR (`v2` is the integration branch), or go straight to the follow-ups.
 2. **Follow-ups after 012, each its own change:**
-   1. **The red-CI refine race,** together with the refine "Applying…" follow-up (`/specclaw:debug`).
+   1. ~~**The red-CI refine race,** together with the refine "Applying…" follow-up (`/specclaw:debug`).~~ **Done: change 015, CI green 2026-10-12.** A small leftover is the caption and headline undo-clear on the same edge pattern (a leftover Undo that restores identical text).
    2. **`import-posts.mjs` never sets `teamId`,** so a real import has been broken since team tenancy (2026-07-21); `--dry-run` never calls `create` and hides it (learning L22). Needs a `--team` remap, then a real import into a scratch test DB.
    3. **The ACP manifest's advertised `generate_post` output schema** (`src/acp/agent.ts`) lists only `draftId`, `exportUrl`, `htmlContent`; it lacks `headline` and `captions`. The real output has them (AC-26).
    4. **`POST /api/posts` returns 201 for an immediate publish that ends FAILED,** and `PublishDialog` shows it as a success. Predates 012; caption refusals no longer reach it (422), a platform failure still does.
@@ -338,7 +346,7 @@ There was also one separate docs commit: `1f5a2a39`, the AC-23 wording-guard fix
 
 ### Follow-ups and gotchas from this build
 
-- **Refine poll race (pre-existing; logged in `.specclaw/learnings.md`):** a refine row can stay on "Applying…" when the mock refine finishes before the post-202 refetch sees `pendingAction: 'REFINE'`. It was seen once.
+- **~~Refine poll race~~ (FIXED 2026-10-12, change 015; it was pre-existing and logged in `.specclaw/learnings.md`):** a refine row can stay on "Applying…" when the mock refine finishes before the post-202 refetch sees `pendingAction: 'REFINE'`. It was seen once.
 - **Change 010 must update a T10 E2E assertion** that expects exactly 2 channel checkboxes in `QueueEntryModal`.
 - **Capturing screens:** run `npm run test:e2e:serve`, then `node scripts/capture-ui.mjs --out ui-captures/<name>`. The script hides Next's dev indicator. On a fresh test DB the seeded fixture draft has no MinIO export, so the script mints one.
 - **Scroll containers:** a container that scrolls on its own must be `relative` if it holds `sr-only` cells; otherwise they widen the page at 375. This happened twice. It is in DESIGN_SYSTEM §8.15.

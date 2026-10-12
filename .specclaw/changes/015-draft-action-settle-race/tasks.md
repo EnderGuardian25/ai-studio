@@ -44,7 +44,7 @@ Each task is implemented by a subagent, reviewed by `specclaw:code-reviewer`, an
 
 ### Wave 2 — Gate and CI
 
-- [ ] `T3` — Full gate, fork CI green, handoff
+- [x] `T3` — Full gate, fork CI green, handoff
   - Files: `docs/handoff.md`, `CLAUDE.md`
   - Estimate: small
   - Kind: docs
