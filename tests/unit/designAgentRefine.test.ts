@@ -5,7 +5,7 @@
 // the instruction carries no sentinel — and keeps the conflict_test and
 // __FAIL_GEN_ALWAYS__ behaviours.
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 const h = vi.hoisted(() => ({
   mockAi: false,
@@ -133,5 +133,80 @@ describe('runDesignAgentRefine — the real tool loop', () => {
   it('returns a max_tokens-truncated turn as partial text (the route treats it as not applied), not a crash', async () => {
     h.create.mockResolvedValue({ content: [{ type: 'text', text: '<!DOCTYPE html><html><body>cut' }], stop_reason: 'max_tokens', usage })
     expect(await runDesignAgentRefine(base)).toBe('<!DOCTYPE html><html><body>cut')
+  })
+})
+
+// ── 008 T6: the runners on a ResolvedModel (FR-07, FR-12, FR-16) ─────────────
+
+const { runDesignAgent } = await import('@/lib/agent/designAgent')
+const { decideModel } = await import('@/lib/models/resolve')
+const { setModelCallSink } = await import('@/lib/models/modelCalls')
+
+describe('008: runDesignAgent / runDesignAgentRefine on a ResolvedModel', () => {
+  function resolvedFor(surface: 'DESIGN_FREEFORM' | 'REFINE', key: 'HAIKU' | 'SONNET' | 'OPUS') {
+    const r = decideModel(surface, {
+      requested: key,
+      policy: { allowed: ['HAIKU', 'SONNET', 'OPUS'], defaults: {}, gateOn: false },
+      credential: 'n/a',
+      mode: 'api',
+    })
+    if (!r.ok) throw new Error(r.message)
+    return r.resolved
+  }
+  const OPUS = resolvedFor('DESIGN_FREEFORM', 'OPUS')
+  let records: Array<Record<string, unknown>>
+
+  beforeEach(() => {
+    records = []
+    setModelCallSink({ record: (r) => void records.push(r as never), read: () => [], clear() {} })
+  })
+  afterEach(() => setModelCallSink(null))
+
+  it('the runDesignAgent MOCK_AI branch records the model it was handed before returning (design §7)', async () => {
+    h.mockAi = true
+    h.toolRenderHtml.mockResolvedValue({ key: 'exports/k.png', url: 'u' })
+    const result = await runDesignAgent({ ...base, model: OPUS })
+    expect(result.exportUrl).toBe('exports/k.png')
+    expect(records).toEqual([
+      expect.objectContaining({ surface: 'DESIGN_FREEFORM', key: 'OPUS', arg: 'claude-opus-5-5', label: 'design' }),
+    ])
+  })
+
+  it('the real loop sends model.arg through createMessage, with the entry max_tokens floor', async () => {
+    h.create.mockResolvedValue({ content: [{ type: 'text', text: '<html>final</html>' }], stop_reason: 'end_turn', usage })
+    const result = await runDesignAgent({ ...base, model: OPUS })
+    expect(result.htmlContent).toBe('<html>final</html>')
+    expect(h.create.mock.calls[0][0]).toMatchObject({ model: 'claude-opus-5-5', max_tokens: 16000 })
+    expect(records).toEqual([expect.objectContaining({ surface: 'DESIGN_FREEFORM', label: 'design' })])
+  })
+
+  it('reads the final text by block type: a thinking-first final turn still yields the HTML', async () => {
+    h.create.mockResolvedValue({
+      content: [
+        { type: 'thinking', thinking: 'hm', signature: 's' },
+        { type: 'text', text: '<html>t</html>' },
+      ],
+      stop_reason: 'end_turn',
+      usage,
+    })
+    expect((await runDesignAgent({ ...base, model: OPUS })).htmlContent).toBe('<html>t</html>')
+  })
+
+  it('refine with a ResolvedModel goes through createMessage and the mock records it; a string keeps the old call', async () => {
+    const REFINE = resolvedFor('REFINE', 'SONNET')
+    h.create.mockResolvedValue({ content: [{ type: 'text', text: 'final' }], stop_reason: 'end_turn', usage })
+    await runDesignAgentRefine({ ...base, model: REFINE })
+    expect(h.create.mock.calls[0][0]).toMatchObject({ model: 'claude-sonnet-5-5', max_tokens: 16000 })
+    expect(records).toEqual([expect.objectContaining({ surface: 'REFINE', label: 'refine' })])
+
+    h.create.mockClear()
+    records = []
+    await runDesignAgentRefine({ ...base, model: 'legacy-model-name' })
+    expect(h.create.mock.calls[0][0]).toMatchObject({ model: 'legacy-model-name', max_tokens: 8192 })
+    expect(records).toEqual([])
+
+    h.mockAi = true
+    await runDesignAgentRefine({ ...base, model: REFINE })
+    expect(records).toEqual([expect.objectContaining({ surface: 'REFINE', label: 'refine' })])
   })
 })

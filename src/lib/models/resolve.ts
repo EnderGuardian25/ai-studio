@@ -9,6 +9,7 @@
 //
 // Tiers, first match wins, each checked against the effective set at call time:
 //   1. the explicit request — a miss is refused (the route's 400);
+//      1b. a STORED request (Brief.*Model, FR-10) — a miss falls through;
 //   2. the regenerate stamp  ┐
 //   3. the team default      ├ a miss falls through: stored values are history,
 //   4. the system default    ┘ substituted and recorded, never thrown;
@@ -45,6 +46,13 @@ export interface ModelPolicy {
 export interface DecideInput {
   /** Tier 1: an explicit request (a wave-2 body field). Never a stored value. */
   requested?: ModelKey | null
+  /**
+   * A STORED request (Brief.captionModel / designModel, FR-10): the initial
+   * request as it was saved, read by the generation and its retry. Tried right
+   * after tier 1, but a miss falls through and is recorded as a substitution —
+   * a stored value is history, never a 400 (FR-10, design §3).
+   */
+  storedRequest?: ModelKey | null
   /** Tier 2: a regenerate's stamp (an apiId / cliArg / retired ID), FR-09. */
   stamp?: string | null
   policy: ModelPolicy
@@ -193,6 +201,14 @@ export function decideModel(
   let substitutedFrom: string | null = null
   const refuse = (value: string) => {
     substitutedFrom ??= value
+  }
+
+  // Tier 1b: a stored request (FR-10). A hit is the request it was; a miss (a
+  // model since disallowed, gated or not eligible) falls through, recorded.
+  if (input.storedRequest) {
+    const hit = inSet(input.storedRequest)
+    if (hit) return { ok: true, resolved: resolved(surface, hit, input.mode, 'request', null) }
+    refuse(String(input.storedRequest))
   }
 
   // Tier 2: the stamp. A retired ID maps to its family but is itself a substitution.

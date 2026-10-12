@@ -222,6 +222,8 @@ function logSubstitution(
 export interface ResolveModelOptions {
   /** Tier 1: an explicit request. A miss is refused (the caller's 400). */
   requested?: ModelKey | null
+  /** A stored request (Brief.captionModel / designModel, FR-10): a miss falls through, recorded. */
+  storedRequest?: ModelKey | null
   /** Tier 2: a regenerate's stamp (FR-09). */
   stamp?: string | null
   /** The acting user; null for the scheduler, MCP and ACP (always 'team'). */
@@ -250,6 +252,7 @@ export async function resolveModel(
   ])
   const result = decideModel(surface, {
     requested: opts.requested,
+    storedRequest: opts.storedRequest,
     stamp: opts.stamp,
     policy,
     credential,

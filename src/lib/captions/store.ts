@@ -264,46 +264,92 @@ async function logCaptionReview(
 
 // ── Writers ─────────────────────────────────────────────────────────────────
 
+// The model that wrote a caption reply (008 FR-08): the arg that crossed the
+// boundary (or a non-Claude provider's own ID), and the refused value the
+// resolver substituted away from, or null. writeCaptions produces it.
+export interface CaptionStamp {
+  model: string
+  substitutedFrom: string | null
+}
+
 export interface GenerationCaptionData {
   channel: Channel
   text: string
   status: 'READY' | 'FAILED'
   failureReason: string | null
+  model: string | null
+  modelSubstitutedFrom: string | null
 }
 
 // The row values a generation's caption result gives each registry channel it
-// covers: validated text → READY; a failed field → FAILED with no text (failed
-// model output is never stored). T6 moves regenerate settling onto the pure
-// settleCaptionRow, which also keeps good text on a failed regenerate (A7).
+// covers: validated text → READY, stamped with the model that wrote it; a
+// failed field → FAILED with no text (failed model output is never stored) and
+// no stamp — a stamp names the model whose output is the row's text, and a
+// text-less row has none (008 FR-08). Regenerate settling is settleCaptionRow,
+// which keeps good text, and its stamp, on a failed regenerate (A7).
 export function captionRowsFromFields(
   fields: Partial<Record<CaptionTarget, FieldResult>>,
+  stamp: CaptionStamp,
 ): GenerationCaptionData[] {
   return CAPTION_CHANNELS.flatMap<GenerationCaptionData>(({ channel }) => {
     const field = fields[channel]
     if (!field) return []
     return field.ok
-      ? [{ channel, text: field.text, status: 'READY', failureReason: null }]
-      : [{ channel, text: '', status: 'FAILED', failureReason: field.reason }]
+      ? [
+          {
+            channel,
+            text: field.text,
+            status: 'READY',
+            failureReason: null,
+            model: stamp.model,
+            modelSubstitutedFrom: stamp.substitutedFrom,
+          },
+        ]
+      : [
+          {
+            channel,
+            text: '',
+            status: 'FAILED',
+            failureReason: field.reason,
+            model: null,
+            modelSubstitutedFrom: null,
+          },
+        ]
   })
 }
 
+// The headline's stamp fields (008 FR-08), written with a validated headline only.
+export function headlineStampFields(stamp: CaptionStamp): {
+  headlineModel: string
+  headlineModelSubstitutedFrom: string | null
+} {
+  return { headlineModel: stamp.model, headlineModelSubstitutedFrom: stamp.substitutedFrom }
+}
+
 // The async generation's write (design §4): every channel's row and the
-// headline (when it validated) in one transaction. Row writes are guarded on
-// PENDING, the state createPendingDraft and retry leave them in.
+// headline (when it validated) in one transaction, each with its 008 stamp.
+// Row writes are guarded on PENDING, the state createPendingDraft and retry
+// leave them in.
 export async function saveGenerationCaptions(
   draftId: string,
   fields: Partial<Record<CaptionTarget, FieldResult>>,
+  stamp: CaptionStamp,
 ): Promise<void> {
   const headline = fields.HEADLINE
   await prisma.$transaction([
-    ...captionRowsFromFields(fields).map(({ channel, ...data }) =>
+    ...captionRowsFromFields(fields, stamp).map(({ channel, ...data }) =>
       prisma.draftCaption.updateMany({
         where: { draftId, channel, status: 'PENDING' },
         data: { ...data, needsReview: false },
       }),
     ),
     ...(headline?.ok
-      ? [prisma.draft.updateMany({ where: { id: draftId }, data: { headline: headline.text } })]
+      ? [
+          prisma.draft.updateMany({
+            where: { id: draftId },
+            data: { headline: headline.text, ...headlineStampFields(stamp) },
+          }),
+        ]
       : []),
   ])
 }

@@ -237,6 +237,76 @@ describe('decideModel — AC-02(c), (d), (e)', () => {
   })
 })
 
+// 008 T6: a STORED request (Brief.captionModel / designModel, FR-10) is tried
+// right after tier 1, but a miss falls through and is recorded — never refused.
+describe('decideModel — storedRequest (FR-10: a stored value is never a 400)', () => {
+  it('an allowed stored request runs as the request, with no substitution', () => {
+    const r = ok(
+      'DESIGN_FREEFORM',
+      input({ storedRequest: 'OPUS', policy: policy({ defaults: { DESIGN_FREEFORM: 'HAIKU' } }) }),
+    )
+    expect([r.key, r.source, r.substitutedFrom]).toEqual(['OPUS', 'request', null])
+  })
+
+  it('a stored request since disallowed falls through to the team default, recorded', () => {
+    const r = ok(
+      'DESIGN_FREEFORM',
+      input({
+        storedRequest: 'OPUS',
+        policy: policy({ allowed: ['HAIKU', 'SONNET'], defaults: { DESIGN_FREEFORM: 'HAIKU' } }),
+      }),
+    )
+    expect([r.key, r.source, r.substitutedFrom]).toEqual(['HAIKU', 'team', 'OPUS'])
+  })
+
+  it('a stored request that is gated or not eligible falls through to the system default, recorded', () => {
+    const gated = ok(
+      'CAPTION',
+      input({ storedRequest: 'OPUS', credential: 'team', policy: policy({ gateOn: true }) }),
+    )
+    expect([gated.key, gated.source, gated.substitutedFrom]).toEqual(['HAIKU', 'system', 'OPUS'])
+    // Opus is not eligible for template fill (FR-01): falls through, never NOT_ELIGIBLE.
+    const tmpl = ok('DESIGN_TEMPLATE', input({ storedRequest: 'OPUS' }))
+    expect([tmpl.key, tmpl.source, tmpl.substitutedFrom]).toEqual(['HAIKU', 'system', 'OPUS'])
+  })
+
+  it('a stored request that falls all the way through keeps it as substitutedFrom on the fallback', () => {
+    const r = ok(
+      'DESIGN_FREEFORM',
+      input({ storedRequest: 'OPUS', policy: policy({ allowed: ['HAIKU'] }) }),
+    )
+    expect([r.key, r.source, r.substitutedFrom]).toEqual(['HAIKU', 'fallback', 'OPUS'])
+  })
+
+  it('an explicit request still wins over a stored one, and is still refused on a miss', () => {
+    const r = ok('CAPTION', input({ requested: 'SONNET', storedRequest: 'OPUS' }))
+    expect([r.key, r.source]).toEqual(['SONNET', 'request'])
+    const refused = decideModel(
+      'CAPTION',
+      input({ requested: 'OPUS', storedRequest: 'HAIKU', policy: policy({ allowed: ['HAIKU'] }) }),
+    )
+    expect(refused).toMatchObject({ ok: false, code: 'NOT_ALLOWED' })
+  })
+
+  it('a stored request never turns an empty effective set into anything but NO_ALLOWED_MODEL', () => {
+    const r = decideModel('DESIGN_TEMPLATE', input({ storedRequest: 'HAIKU', policy: policy({ allowed: ['OPUS'] }) }))
+    expect(r).toMatchObject({ ok: false, code: 'NO_ALLOWED_MODEL' })
+  })
+
+  it('every stored key on every user surface resolves (never a refusal) when the set is non-empty', () => {
+    for (const surface of ['CAPTION', 'DESIGN_TEMPLATE', 'DESIGN_FREEFORM', 'REFINE', 'ASSISTANT_BRIEFING', 'ASSISTANT_BRANDKIT'] as const) {
+      for (const stored of ALL) {
+        for (const allowed of [['HAIKU'], ['SONNET'], ['HAIKU', 'SONNET'], ALL] as ModelKey[][]) {
+          const i = input({ storedRequest: stored, policy: policy({ allowed }) })
+          const r = decideModel(surface, i)
+          expect(r.ok).toBe(true)
+          if (r.ok) expect(effectiveSet(surface, i).map((e) => e.key)).toContain(r.resolved.key)
+        }
+      }
+    }
+  })
+})
+
 describe('effectiveSet', () => {
   it('is eligible ∩ allowed, minus gated entries only for a team credential in CLI mode', () => {
     const gate = policy({ gateOn: true })

@@ -11,6 +11,8 @@ import { parseRegenerateBody } from '@/lib/captions/requests'
 import { failedCaptionFields } from '@/lib/captions/actionTargets'
 import { claimCaptionAction, loadDraftCaptions, settleCaptionAction } from '@/lib/captions/store'
 import { releaseDraftAction, startDraftAction } from '@/lib/drafts/draftActions'
+import { resolveModel } from '@/lib/models/policy'
+import type { ResolvedModel } from '@/lib/models/resolve'
 
 // Regenerates captions for a draft (012 FR-11; the route name is a kept
 // contract): body {} → the three captions ("Regenerate all"), { channel } →
@@ -58,7 +60,15 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
   let provider: Awaited<ReturnType<typeof resolveCopyProvider>>
   let kit: Awaited<ReturnType<typeof resolveBrandKit>>
   let campaignBriefing: Awaited<ReturnType<typeof getActiveCampaignBriefing>>
+  let model: ResolvedModel
   try {
+    // 008 (T6, interim): writeCaptions now needs the CAPTION model. Resolved
+    // before the claim, team → system; T7 adds the FR-09 stamp tier and the
+    // stamp writes in the settle.
+    const resolved = await resolveModel('CAPTION', { userId: user.userId, teamId: draft.teamId })
+    if (!resolved.ok) throw new Error(resolved.message)
+    model = resolved.resolved
+
     provider = await resolveCopyProvider(draft.brief.teamId, draft.brief.copyProviderKey ?? undefined)
     // Brand voice follows the same kit precedence as design generation.
     kit = await resolveBrandKit(draft.teamId, draft.brief.campaignId ?? undefined, draft.brief.brandKitId ?? undefined)
@@ -91,7 +101,12 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
       user.teamId,
       'REGENERATE_COPY',
       async () => {
-        const fields = await writeCaptions(provider, buildBriefInput(draft.brief, kit, campaignBriefing), targets)
+        const { fields } = await writeCaptions(
+          provider,
+          buildBriefInput(draft.brief, kit, campaignBriefing),
+          targets,
+          model,
+        )
         await settleCaptionAction(draft.id, targets, fields)
         // A headline has no row to carry a failure, so it is reported on
         // pendingActionError; the stored headline is unchanged.

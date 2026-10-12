@@ -6,7 +6,8 @@ import { canAccessContent } from '@/lib/authz/visibility'
 import { resolveBrandKit } from '@/lib/brandkit/resolve'
 import { getActiveCampaignBriefing } from '@/lib/campaign/briefing'
 import { runPathBDesign } from '@/lib/agent/pathB'
-import { currentRenderStamp, withNextRevisionNumber } from '@/lib/drafts/revisions'
+import { currentRenderStamp, draftStampFields, withNextRevisionNumber } from '@/lib/drafts/revisions'
+import { resolveModel } from '@/lib/models/policy'
 import { claimDraftAction, startDraftAction } from '@/lib/drafts/draftActions'
 import { generationSkipFields } from '@/lib/drafts/backgroundNotice'
 import { designHeadline, headlineFallbackMessage } from '@/lib/captions/headline'
@@ -51,6 +52,15 @@ export const POST = withTeamAuth<{ id: string }>(async (_req, { params }, user) 
   // migrated draft has none and falls back to the brief Topic, logged.
   const headline = designHeadline(draft, draft.brief)
 
+  // 008 (T6, interim): runPathBDesign now needs the DESIGN_FREEFORM model.
+  // Resolved before the claim, team → system; T7 adds the FR-09 stamp tier
+  // (draft.designModel).
+  const resolvedModel = await resolveModel('DESIGN_FREEFORM', { userId: user.userId, teamId: draft.teamId })
+  if (!resolvedModel.ok) {
+    return NextResponse.json({ code: resolvedModel.code, message: resolvedModel.message }, { status: 422 })
+  }
+  const model = resolvedModel.resolved
+
   const claimed = await claimDraftAction(draft.id, 'REGENERATE_DESIGN')
   if (!claimed) {
     return NextResponse.json({ error: 'Another action is already running on this draft' }, { status: 409 })
@@ -65,13 +75,17 @@ export const POST = withTeamAuth<{ id: string }>(async (_req, { params }, user) 
     // Run the new design first — if it fails, the draft is left untouched.
     // actor is the acting teammate (NOT the brief owner) — the image-provider
     // resolution must follow whoever clicked Regenerate.
-    const result = await runPathBDesign(draft.brief, kit, headline.text, campaignBriefing, {
-      userId: user.userId,
-      teamId: user.teamId,
-    })
+    const result = await runPathBDesign(
+      draft.brief,
+      kit,
+      headline.text,
+      campaignBriefing,
+      { userId: user.userId, teamId: user.teamId },
+      model,
+    )
     // F3 (AC-04): this render's stamp, resolved once and written to both the
-    // new revision row and the draft.
-    const stamp = currentRenderStamp()
+    // new revision row and the draft (008: with the model that made it).
+    const stamp = currentRenderStamp(model)
 
     // The Undo target is whatever revision is currently live. The design history
     // is an append-only log, so the live state is already the current revision —
@@ -126,7 +140,7 @@ export const POST = withTeamAuth<{ id: string }>(async (_req, { params }, user) 
           status: 'EXPORTED',
           currentRevisionNumber: revisionNumber,
           pendingConflict: Prisma.JsonNull,
-          ...stamp,
+          ...draftStampFields(stamp),
         },
       })
       return revisionNumber

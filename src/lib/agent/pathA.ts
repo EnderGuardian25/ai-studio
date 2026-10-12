@@ -5,7 +5,8 @@ import { runDesignAgent } from '@/lib/agent/designAgent'
 import { runDesignAgentCli } from '@/lib/agent/designAgentCli'
 import { extractInlineAssets } from '@/lib/agent/inlineAssets'
 import { dimensionsFor } from '@/lib/aspectRatio'
-import { isCliMode, modelFor, pipelineMode } from '@/lib/agent/config'
+import { isCliMode, pipelineMode } from '@/lib/agent/config'
+import type { ResolvedModel } from '@/lib/models/resolve'
 import { buildPathASystemPrompt, buildPathAUserMessage } from '@/lib/agent/prompts/pathA'
 
 // Template/brief mismatch — thrown by the guards below so both HTTP routes
@@ -55,6 +56,8 @@ export async function runPathADesign(
   headline: string,
   campaignBriefing: string | null | undefined,
   actor: GenerationActor,
+  // 008 FR-07: the DESIGN_TEMPLATE model, resolved by the caller.
+  model: ResolvedModel,
 ): Promise<DesignAgentResult> {
   assertTemplateMatchesBrief(brief, template)
 
@@ -97,13 +100,13 @@ export async function runPathADesign(
         inlineAssets,
         width,
         height,
-        model: modelFor('A', 'cli'),
+        model,
       })
     : runDesignAgent({
         systemPrompt,
         userMessage,
         briefId: brief.id,
-        model: modelFor('A', 'api'),
+        model,
         maxToolCalls: 15,
         inlineAssets,
         width,

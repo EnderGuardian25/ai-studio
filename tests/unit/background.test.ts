@@ -35,7 +35,19 @@ const h = vi.hoisted(() => ({
   persistDataUrlImage: vi.fn(),
   // commitDraftRevision's draft writes (the refine writer, FR-07).
   draftUpdates: [] as Array<Record<string, unknown>>,
+  // 008: the pipeline mode, pinned (API, as the unit env is without a .env)
+  // so the CLI-mode decision can be asserted too.
+  cli: false,
 }))
+
+vi.mock('@/lib/agent/config', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/agent/config')>()
+  return {
+    ...actual,
+    isCliMode: () => h.cli,
+    pipelineMode: () => (h.cli ? 'cli' : 'api'),
+  }
+})
 
 // A minimal transaction fake for commitDraftRevision (exportKey supplied, so
 // it never renders): the next-number read, the revision insert, the
@@ -314,6 +326,72 @@ describe('generateBackgroundForBrief — skip reasons (FR-06)', () => {
       url: 'http://minio.example.com/generated-images/background-1.png',
     })
     expect(h.persistDataUrlImage).toHaveBeenCalledWith('data:image/png;base64,AAAA', 'background')
+  })
+})
+
+// ── 008 FR-15: the decision runs the fixed INTERNAL_BACKGROUND model ───────
+
+describe('the background decision model (008 FR-15, A14)', () => {
+  let records: Array<Record<string, unknown>>
+  beforeEach(async () => {
+    const { setModelCallSink } = await import('@/lib/models/modelCalls')
+    records = []
+    setModelCallSink({ record: (r) => void records.push(r as never), read: () => [], clear() {} })
+    h.cli = false
+    h.resolveImageProvider.mockReset().mockResolvedValue(providerReturning('https://cdn.example.com/x.png'))
+    h.runClaudeCli.mockReset()
+    h.anthropicCreate.mockReset()
+  })
+  afterAll(async () => {
+    const { setModelCallSink } = await import('@/lib/models/modelCalls')
+    setModelCallSink(null)
+    h.cli = false
+  })
+
+  it('API mode: through createMessage, on the internal Haiku entry, recorded', async () => {
+    h.anthropicCreate.mockResolvedValueOnce(decisionReply('{"needed": false, "prompt": ""}'))
+    await generateBackgroundForBrief(brief, kit, 'Big news!', null, actor)
+    const [params, options] = h.anthropicCreate.mock.calls[0] as [Record<string, unknown>, { signal?: AbortSignal }]
+    expect(params).toMatchObject({ model: 'claude-haiku-4-5', max_tokens: 1024 })
+    // The wall-clock bound rides the request (createMessage's AbortSignal).
+    expect(options.signal).toBeInstanceOf(AbortSignal)
+    expect(records).toEqual([
+      expect.objectContaining({ surface: 'INTERNAL_BACKGROUND', key: 'HAIKU', mode: 'api', source: 'system', label: 'background' }),
+    ])
+  })
+
+  it('a thinking-first decision reply still parses (textOf, not the first block)', async () => {
+    h.anthropicCreate.mockResolvedValueOnce({
+      content: [
+        { type: 'thinking', thinking: 'hm', signature: 's' },
+        { type: 'text', text: '{"needed": false, "prompt": ""}' },
+      ],
+    })
+    await expect(generateBackgroundForBrief(brief, kit, 'Big news!', null, actor)).resolves.toEqual({
+      url: null,
+      skip: 'NOT_NEEDED',
+    })
+  })
+
+  it("CLI mode: the CLI gets the ResolvedModel, and its timeout is the entry's (no literal)", async () => {
+    h.cli = true
+    h.runClaudeCli.mockResolvedValueOnce('{"needed": false, "prompt": ""}')
+    await generateBackgroundForBrief(brief, kit, 'Big news!', null, actor)
+    const opts = h.runClaudeCli.mock.calls[0][1] as Record<string, unknown>
+    expect(opts).toEqual({
+      label: 'background',
+      model: expect.objectContaining({ surface: 'INTERNAL_BACKGROUND', key: 'HAIKU', arg: 'claude-haiku-4-5', timeoutMs: 90_000 }),
+    })
+    expect(h.anthropicCreate).not.toHaveBeenCalled()
+  })
+
+  it('the team policy is never read: the decision has no team/allow-list input at all', async () => {
+    // generateBackgroundForBrief takes no policy and resolves no user surface;
+    // the model is the same for every team and actor.
+    h.anthropicCreate.mockResolvedValue(decisionReply('{"needed": false, "prompt": ""}'))
+    await generateBackgroundForBrief(brief, kit, 'Big news!', null, actor)
+    await generateBackgroundForBrief(brief, kit, 'Big news!', null, { userId: null, teamId: 'other-team' })
+    expect(records.map((r) => r.arg)).toEqual(['claude-haiku-4-5', 'claude-haiku-4-5'])
   })
 })
 
@@ -605,6 +683,22 @@ describe('background mock seam (MOCK_AI + __MOCK_BG__ sentinels)', () => {
     })
     expect(real.generateImage).not.toHaveBeenCalled()
     expect(h.anthropicCreate).not.toHaveBeenCalled()
+  })
+
+  it('008 FR-16: __MOCK_BG__ records the internal model; the no-sentinel early return records nothing', async () => {
+    const calls = await import('@/lib/models/modelCalls')
+    calls.clearModelCalls()
+    await seam.generateBackgroundForBrief(seamBrief('Plain'), kit, 'c', null, actor)
+    expect(calls.readModelCalls()).toEqual([])
+
+    h.resolveImageProvider.mockResolvedValue(providerReturning('https://x.example.com/x.png'))
+    await seam.generateBackgroundForBrief(seamBrief('Launch __MOCK_BG_NOT_NEEDED__'), kit, 'c', null, actor)
+    expect(calls.readModelCalls()).toEqual([
+      expect.objectContaining({ surface: 'INTERNAL_BACKGROUND', key: 'HAIKU', arg: 'claude-haiku-4-5', label: 'background' }),
+    ])
+    // Short-circuited: no real decision call was made.
+    expect(h.anthropicCreate).not.toHaveBeenCalled()
+    calls.clearModelCalls()
   })
 
   it('backgroundSeamText: the instruction when it carries a sentinel, else the topic', () => {

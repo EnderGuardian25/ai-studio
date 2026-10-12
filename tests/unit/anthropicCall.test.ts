@@ -10,7 +10,8 @@
 //   - the recorder gets exactly one record, before the request.
 //
 // The client is a fake: no real model call is ever made.
-// (AC-13's "the caption provider no longer reads content[0]" is T6's.)
+// AC-13's "the caption provider no longer reads content[0]" (T6) is the
+// AnthropicCopyProvider block at the end.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import type Anthropic from '@anthropic-ai/sdk'
@@ -209,6 +210,47 @@ describe('AC-13: createMessage', () => {
     const { client } = fakeClient(reply({}))
     await createMessage(client, params, verifier)
     expect(records).toEqual([expect.objectContaining({ surface: 'INTERNAL_VERIFIER', arg: verifier.arg, label: null })])
+  })
+})
+
+// AC-13's last bullet (T6): the Anthropic caption provider goes through
+// createMessage and reads the reply by block type, never content[0].
+describe('AC-13: AnthropicCopyProvider', () => {
+  const brief = { topic: 't', description: '', goal: 'g', tone: 'x', channels: [] }
+
+  async function providerWith(client: Anthropic) {
+    const { AnthropicCopyProvider } = await import('@/providers/implementations/copy/anthropic')
+    const provider = new AnthropicCopyProvider('sk-ant-FAKE-unit-test')
+    // The constructor builds a real (never-called) SDK client; swap in the fake.
+    ;(provider as unknown as { client: Anthropic }).client = client
+    return provider
+  }
+
+  it('a thinking-first reply still yields the caption text, stamped with the arg that ran', async () => {
+    const { client, create } = fakeClient(
+      reply({
+        content: [
+          { type: 'thinking', thinking: 'plan the captions', signature: 'sig' },
+          { type: 'text', text: '{"linkedin":"LI"}' },
+        ],
+      }),
+    )
+    const provider = await providerWith(client)
+    await expect(provider.generateCaptions(brief, ['LINKEDIN'], SONNET)).resolves.toEqual({
+      raw: '{"linkedin":"LI"}',
+      modelId: 'claude-sonnet-5-5',
+    })
+    // Through the boundary: the resolved arg, the thinking floor, one record.
+    expect(create.mock.calls[0][0]).toMatchObject({ model: 'claude-sonnet-5-5', max_tokens: 16000 })
+    expect(records).toEqual([expect.objectContaining({ surface: 'CAPTION', key: 'SONNET', label: 'copy' })])
+  })
+
+  it('a reply with no text block is an empty response, not a crash on content[0]', async () => {
+    const { client } = fakeClient(reply({ content: [{ type: 'thinking', thinking: 'hm', signature: 's' }] }))
+    const provider = await providerWith(client)
+    await expect(provider.generateCaptions(brief, ['LINKEDIN'], HAIKU)).rejects.toThrow(
+      'Anthropic returned an empty response',
+    )
   })
 })
 

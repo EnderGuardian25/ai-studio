@@ -129,7 +129,7 @@ Wave 2 adds per-post and per-chat pickers only.
     - **`/api/test/model-calls`** copies `/api/test/scheduler-tick`'s gate: 404 in production, 404 unless `MOCK_AI`, admin-only. GET returns `{ calls }`; DELETE clears and returns 204.
     - **`claudeCliArgs.test.ts`:** today's override cases stay green on the string path. New cases: a `ResolvedModel` gives `['--model', arg]` with `CLAUDE_CLI_MODEL` both set and unset, and a `MODEL_NAME_RE` violation still throws.
 
-- [ ] `T6` — Generation on the resolver, with caption, headline and design stamps
+- [x] `T6` — Generation on the resolver, with caption, headline and design stamps
   - Files: `src/providers/interfaces/CopyProvider.ts`, `src/providers/implementations/copy/anthropic.ts`, `src/providers/implementations/copy/claude-cli.ts`, `src/providers/implementations/copy/openai.ts`, `src/providers/registry.ts`, `src/lib/captions/generate.ts`, `src/lib/captions/store.ts`, `src/lib/agent/generateDraft.ts`, `src/lib/agent/pathA.ts`, `src/lib/agent/pathB.ts`, `src/lib/agent/designAgent.ts`, `src/lib/agent/designAgentCli.ts`, `src/lib/agent/background.ts`, `src/lib/drafts/revisions.ts`, `src/app/api/generate/copy/route.ts`, `src/mcp/tools/generate.ts`, `src/lib/testHooks.ts`, `tests/unit/captionWriters.test.ts`, `tests/unit/captionStore.test.ts`, `tests/unit/renderStamps.test.ts`, `tests/unit/background.test.ts`, `tests/unit/copyProviderCliMode.test.ts`
   - Estimate: large
   - Kind: impl
@@ -146,7 +146,7 @@ Wave 2 adds per-post and per-chat pickers only.
     - **`retry/route.ts` is untouched:** retry re-enters `runGenerationForDraft`, which resolves from `Brief`.
 
 - [ ] `T7` — Draft actions on the resolver: regenerate-copy, regenerate-design, refine and the verifier, plus every remaining stamp writer
-  - Files: `src/app/api/drafts/[id]/regenerate-copy/route.ts`, `src/app/api/drafts/[id]/regenerate-design/route.ts`, `src/app/api/drafts/[id]/refine/route.ts`, `src/app/api/drafts/[id]/inline-edit/route.ts`, `src/app/api/drafts/[id]/revisions/[rev]/restore/route.ts`, `src/app/api/drafts/[id]/rejected/[revisionId]/adopt/route.ts`, `src/app/api/drafts/[id]/route.ts`, `src/lib/drafts/refineVerify.ts`, `src/lib/drafts/revisions.ts`, `src/lib/captions/store.ts`, `src/lib/api-types.ts`, `src/lib/testHooks.ts`, `tests/unit/draftRevisions.test.ts`, `tests/unit/renderStamps.test.ts`, `tests/unit/captionStore.test.ts`, `tests/unit/refineVerify.test.ts`, `tests/unit/captionRoutes.test.ts`
+  - Files: `src/app/api/drafts/[id]/regenerate-copy/route.ts`, `src/app/api/drafts/[id]/regenerate-design/route.ts`, `src/app/api/drafts/[id]/refine/route.ts`, `src/app/api/drafts/[id]/inline-edit/route.ts`, `src/app/api/drafts/[id]/revisions/[rev]/restore/route.ts`, `src/app/api/drafts/[id]/rejected/[revisionId]/adopt/route.ts`, `src/app/api/drafts/[id]/retry/route.ts`, `src/app/api/drafts/[id]/route.ts`, `src/lib/drafts/refineVerify.ts`, `src/lib/drafts/revisions.ts`, `src/lib/captions/store.ts`, `src/lib/api-types.ts`, `src/lib/testHooks.ts`, `tests/unit/draftRevisions.test.ts`, `tests/unit/renderStamps.test.ts`, `tests/unit/captionStore.test.ts`, `tests/unit/refineVerify.test.ts`, `tests/unit/captionRoutes.test.ts`
   - Estimate: large
   - Kind: impl
   - Depends: T6
@@ -163,6 +163,7 @@ Wave 2 adds per-post and per-chat pickers only.
       - inline edit carries `draft.designModel` forward (A6);
       - the legacy "Design before regenerate" snapshot copies the draft's stamp;
       - the Override path reads `pendingConflict.model`, which refine's `conflict` callback now writes (A6).
+    - **Retry** (added after T6): `retry/route.ts` clears `headlineModel` / `headlineModelSubstitutedFrom` together with the headline (spec FR-08).
     - **Caption and headline edits** (`saveCaptionEdit`, `saveHeadlineEdit`) write no stamp field. A unit case proves it.
     - **`GET /api/drafts/[id]`** adds `designModel`, `designModelSubstitutedFrom`, `headlineModel`, `headlineModelSubstitutedFrom` and `captions[].model` / `modelSubstitutedFrom`. The revisions list adds `model`. All additive; the `DraftDetail` type follows.
 
@@ -205,7 +206,7 @@ Wave 2 adds per-post and per-chat pickers only.
     - **AC-10's order assertions** use the mocked Prisma call log. No timers.
 
 - [ ] `T10` — Close the boundary: `model` required, the old resolvers deleted, the literal guard and the boundary test
-  - Files: `src/lib/agent/claudeCli.ts`, `src/lib/agent/config.ts`, `src/lib/drafts/refineVerify.ts`, `src/lib/agent/designAgentCli.ts`, `tests/unit/modelLiteralGuard.test.ts` (new), `tests/unit/modelBoundary.test.ts` (new), `tests/unit/claudeCliArgs.test.ts`, `scripts/cli-sandbox-check.mjs`, `tests/unit/visionCli.test.ts`
+  - Files: `src/lib/agent/claudeCli.ts`, `src/lib/agent/config.ts`, `src/lib/drafts/refineVerify.ts`, `src/lib/agent/designAgentCli.ts`, `src/lib/agent/designAgent.ts`, `src/lib/agent/types.ts`, `tests/unit/modelLiteralGuard.test.ts` (new), `tests/unit/modelBoundary.test.ts` (new), `tests/unit/claudeCliArgs.test.ts`, `scripts/cli-sandbox-check.mjs`, `tests/unit/visionCli.test.ts`
   - Estimate: medium
   - Kind: refactor
   - Depends: T6, T7, T8, T9
@@ -213,6 +214,7 @@ Wave 2 adds per-post and per-chat pickers only.
     - **Covers:** FR-03 (deletions), FR-04 (`claudeCli.ts` stops reading the env), FR-07 (required `model`), FR-15, NFR-03. **ACs:** AC-11, AC-12.
     - **Deleted:**
       - the `string` branch of `ClaudeCliOptions.model`, which becomes `model: ResolvedModel` (required);
+      - the refine runners' `ResolvedModel | string` (`runDesignAgentRefine`, `runDesignAgentCliRefine`), the refine default model literal in `designAgent.ts`, and `DesignAgentOptions.model?: string` / `deadlineMs` in `agent/types.ts` (found by T6);
       - `pinModel`;
       - the `env.CLAUDE_CLI_MODEL` read;
       - the `"default"` / no-`--model` path;

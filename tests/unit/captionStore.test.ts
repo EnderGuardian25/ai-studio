@@ -257,40 +257,84 @@ describe('loadDraftCaptions — the materializer', () => {
 })
 
 describe('saveGenerationCaptions', () => {
+  // 008 FR-08: the model that wrote the reply, and the value it substituted.
+  const STAMP = { model: 'claude-haiku-4-5', substitutedFrom: 'OPUS' }
+
   it('writes READY text / FAILED-without-text per channel, guarded on PENDING, and the headline only when valid', async () => {
-    await saveGenerationCaptions('d1', {
-      INSTAGRAM: { ok: true, text: 'ig' },
-      LINKEDIN: { ok: false, reason: 'empty' },
-      WHATSAPP: { ok: true, text: 'wa' },
-      HEADLINE: { ok: false, reason: 'missing' },
-    })
+    await saveGenerationCaptions(
+      'd1',
+      {
+        INSTAGRAM: { ok: true, text: 'ig' },
+        LINKEDIN: { ok: false, reason: 'empty' },
+        WHATSAPP: { ok: true, text: 'wa' },
+        HEADLINE: { ok: false, reason: 'missing' },
+      },
+      STAMP,
+    )
 
     expect(h.transaction).toHaveBeenCalledTimes(1)
+    // AC-07: the stamp lands on the ok rows only; the failed row has no text,
+    // so it names no model.
     expect(h.captionUpdateMany.mock.calls.map((c) => c[0])).toEqual([
       {
         where: { draftId: 'd1', channel: 'INSTAGRAM', status: 'PENDING' },
-        data: { text: 'ig', status: 'READY', failureReason: null, needsReview: false },
+        data: {
+          text: 'ig',
+          status: 'READY',
+          failureReason: null,
+          model: 'claude-haiku-4-5',
+          modelSubstitutedFrom: 'OPUS',
+          needsReview: false,
+        },
       },
       {
         where: { draftId: 'd1', channel: 'LINKEDIN', status: 'PENDING' },
-        data: { text: '', status: 'FAILED', failureReason: 'empty', needsReview: false },
+        data: {
+          text: '',
+          status: 'FAILED',
+          failureReason: 'empty',
+          model: null,
+          modelSubstitutedFrom: null,
+          needsReview: false,
+        },
       },
       {
         where: { draftId: 'd1', channel: 'WHATSAPP', status: 'PENDING' },
-        data: { text: 'wa', status: 'READY', failureReason: null, needsReview: false },
+        data: {
+          text: 'wa',
+          status: 'READY',
+          failureReason: null,
+          model: 'claude-haiku-4-5',
+          modelSubstitutedFrom: 'OPUS',
+          needsReview: false,
+        },
       },
     ])
+    // A failed headline writes neither the headline nor its stamp.
     expect(h.draftUpdateMany).not.toHaveBeenCalled()
 
     h.captionUpdateMany.mockClear()
-    await saveGenerationCaptions('d1', { HEADLINE: { ok: true, text: 'Big launch' } })
+    await saveGenerationCaptions('d1', { HEADLINE: { ok: true, text: 'Big launch' } }, STAMP)
     expect(h.captionUpdateMany).not.toHaveBeenCalled()
-    expect(h.draftUpdateMany).toHaveBeenCalledWith({ where: { id: 'd1' }, data: { headline: 'Big launch' } })
+    expect(h.draftUpdateMany).toHaveBeenCalledWith({
+      where: { id: 'd1' },
+      data: { headline: 'Big launch', headlineModel: 'claude-haiku-4-5', headlineModelSubstitutedFrom: 'OPUS' },
+    })
   })
 
-  it('captionRowsFromFields covers only the channels it was given', () => {
-    expect(captionRowsFromFields({ LINKEDIN: { ok: true, text: 'x' } })).toEqual([
-      { channel: 'LINKEDIN', text: 'x', status: 'READY', failureReason: null },
+  it('captionRowsFromFields covers only the channels it was given, stamping the ok ones', () => {
+    expect(captionRowsFromFields({ LINKEDIN: { ok: true, text: 'x' } }, STAMP)).toEqual([
+      {
+        channel: 'LINKEDIN',
+        text: 'x',
+        status: 'READY',
+        failureReason: null,
+        model: 'claude-haiku-4-5',
+        modelSubstitutedFrom: 'OPUS',
+      },
+    ])
+    expect(captionRowsFromFields({ WHATSAPP: { ok: false, reason: 'missing' } }, STAMP)).toEqual([
+      { channel: 'WHATSAPP', text: '', status: 'FAILED', failureReason: 'missing', model: null, modelSubstitutedFrom: null },
     ])
   })
 })

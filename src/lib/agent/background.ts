@@ -1,6 +1,7 @@
 // Background-image pre-step for Path B generation and AGUI refine.
 //
-// Flow: Claude (Haiku — modelForBackground) answers a small strict-JSON question
+// Flow: Claude (the fixed INTERNAL_BACKGROUND model, Haiku — 008 FR-15)
+// answers a small strict-JSON question
 // ("should this post get an AI-generated background, and with what prompt?"),
 // then the server calls the resolved IMAGE provider (gpt-image-2 by default) and
 // persists the result to the public IMAGES bucket. The returned URL is injected
@@ -17,6 +18,9 @@
 // sentinel (the NFR-06 seam, testHooks.ts).
 
 import Anthropic from '@anthropic-ai/sdk'
+import { internalModel, type ResolvedModel } from '@/lib/models/resolve'
+import { createMessage, textOf } from '@/lib/models/anthropicCall'
+import { modelCallFor, recordModelCall } from '@/lib/models/modelCalls'
 import { z } from 'zod'
 import type { Brief } from '@prisma/client'
 import { env } from '@/lib/env'
@@ -33,7 +37,7 @@ import { imageSizeFor } from '@/providers/imageCapabilities'
 import type { ImageProvider } from '@/providers/interfaces/ImageProvider'
 import { persistDataUrlImage } from '@/lib/storage/minio'
 import { runClaudeCli, stripCodeFences } from '@/lib/agent/claudeCli'
-import { isCliMode, modelForBackground } from '@/lib/agent/config'
+import { isCliMode, pipelineMode } from '@/lib/agent/config'
 import type { GenerationActor } from '@/lib/agent/types'
 import {
   buildBackgroundDecisionPrompt,
@@ -84,26 +88,34 @@ export function parseBackgroundDecision(raw: string): BackgroundDecision | null 
   }
 }
 
-// One decision call, CLI vs API. Small constrained task → Haiku both ways.
+// The decision's model: an internal surface (008 FR-15, A14), fixed and never
+// read from a team policy, so removing Haiku at /team does not stop this step.
+// Its timeout is the entry's INTERNAL_BACKGROUND timeout.
+function decisionModel(): ResolvedModel {
+  return internalModel('INTERNAL_BACKGROUND', pipelineMode())
+}
+
+// One decision call, CLI vs API, on the fixed internal model.
 async function runDecision(prompt: BackgroundDecisionPrompt): Promise<BackgroundDecision | null> {
+  const model = decisionModel()
   if (isCliMode()) {
-    const raw = await runClaudeCli(`${prompt.system}\n\n${prompt.user}`, {
-      label: 'background',
-      model: modelForBackground('cli'),
-      timeoutMs: 90_000,
-    })
+    const raw = await runClaudeCli(`${prompt.system}\n\n${prompt.user}`, { label: 'background', model })
     return parseBackgroundDecision(raw)
   }
 
   const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY })
-  const message = await client.messages.create({
-    model: modelForBackground('api'),
-    max_tokens: 1024,
-    system: prompt.system,
-    messages: [{ role: 'user', content: prompt.user }],
-  })
-  const text = message.content.find((b) => b.type === 'text')
-  return text && text.type === 'text' ? parseBackgroundDecision(text.text) : null
+  const message = await createMessage(
+    client,
+    {
+      max_tokens: 1024,
+      system: prompt.system,
+      messages: [{ role: 'user', content: prompt.user }],
+    },
+    model,
+    { label: 'background' },
+  )
+  const text = textOf(message)
+  return text ? parseBackgroundDecision(text) : null
 }
 
 // Shared tail: resolve the provider, run the decision, then (when needed)
@@ -153,6 +165,10 @@ async function runBackgroundStep(
   let stage: 'decision' | 'provider' = 'decision'
   try {
     // The seam replaces only the Haiku decision here; resolution above is real.
+    // It short-circuits before the boundary, so it records the internal model
+    // the real decision would have run (008 FR-16, design §7). The no-sentinel
+    // early return above records nothing: no call is made, as today.
+    if (mockSeam) recordModelCall(modelCallFor(decisionModel(), pipelineMode(), 'background'))
     const decision = mockSeam ? mockBackgroundDecision(opts.seamText) : await runDecision(buildPrompt())
     if (!decision) return skip('DECISION_ERROR', 'decision response was not valid JSON')
     stage = 'provider'

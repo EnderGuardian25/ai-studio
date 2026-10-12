@@ -7,6 +7,7 @@ import { getFontSetId } from '@/lib/renderer/fontSet'
 import type { DraftAction } from '@prisma/client'
 import type { DraftNotApplied } from '@/lib/api-types'
 import type { BackgroundSkipFields } from '@/lib/drafts/backgroundNotice'
+import type { ResolvedModel } from '@/lib/models/resolve'
 
 // ── The revision chain vs. rejected renders (change 004 Phase 2, T15/T16) ────
 // DraftRevision holds two kinds of row. COMMITTED rows are the chain: numbered
@@ -33,29 +34,69 @@ import type { BackgroundSkipFields } from '@/lib/drafts/backgroundNotice'
 // back onto the draft instead of leaving (or writing) the current values. A
 // pre-F3 row has no stamp: it is copied as null, because unknown is honest and
 // a stale value is not.
+//
+// 008 FR-08 / D4: the stamp also names the model whose output the HTML is
+// (`model`: the arg that crossed the boundary) and the refused value the
+// resolver substituted away from (`modelSubstitutedFrom`), so every revision
+// writer that carries promptVersion carries the model too. A DraftRevision row
+// takes the stamp as-is; a Draft write goes through draftStampFields, because
+// the draft's columns are designModel / designModelSubstitutedFrom.
 export interface RenderStamp {
   promptVersion: string | null
   fontSet: string | null
+  model: string | null
+  modelSubstitutedFrom: string | null
 }
 
-// The stamp of a render made NOW. Resolve it once per render and write the
-// same value to the draft and the revision row.
-export function currentRenderStamp(): RenderStamp {
-  return { promptVersion: PROMPT_VERSION, fontSet: getFontSetId() }
+// The stamp of a render made NOW by `model`. Resolve it once per render and
+// write the same value to the draft and the revision row. null = no resolved
+// model is known for this render (a transitional caller); history reads it as
+// "unknown", the 004 rule.
+export function currentRenderStamp(model: ResolvedModel | null): RenderStamp {
+  return {
+    promptVersion: PROMPT_VERSION,
+    fontSet: getFontSetId(),
+    model: model?.arg ?? null,
+    modelSubstitutedFrom: model?.substitutedFrom ?? null,
+  }
+}
+
+// A RenderStamp as Draft columns (008 D4): Draft.designModel mirrors the
+// current revision's DraftRevision.model.
+export function draftStampFields(stamp: RenderStamp): {
+  promptVersion: string | null
+  fontSet: string | null
+  designModel: string | null
+  designModelSubstitutedFrom: string | null
+} {
+  return {
+    promptVersion: stamp.promptVersion,
+    fontSet: stamp.fontSet,
+    designModel: stamp.model,
+    designModelSubstitutedFrom: stamp.modelSubstitutedFrom,
+  }
 }
 
 // The stamp a restore gives the draft. Normally the revision's stored PNG is
 // reused, so the stamp is the row's own (null on a legacy row). A legacy row
 // with no stored PNG is re-rendered by the restore route: the HTML is still
 // the row's (its prompt version), but the pixels come from the font set
-// installed now.
+// installed now. The model is always the row's own (008 A6): the HTML is
+// still that model's output, whatever font set rasterizes it.
 export function restoredRenderStamp(
-  revision: { promptVersion?: string | null; fontSet?: string | null },
+  revision: {
+    promptVersion?: string | null
+    fontSet?: string | null
+    model?: string | null
+    modelSubstitutedFrom?: string | null
+  },
   rerendered: boolean,
 ): RenderStamp {
   return {
     promptVersion: revision.promptVersion ?? null,
     fontSet: rerendered ? getFontSetId() : (revision.fontSet ?? null),
+    model: revision.model ?? null,
+    modelSubstitutedFrom: revision.modelSubstitutedFrom ?? null,
   }
 }
 
@@ -267,9 +308,11 @@ export async function commitDraftRevision(
   // unchanged, and the stamp columns are never updated after insert. An
   // unknown row reads as null here and the guard inside the transaction
   // refuses it.
+  // 008: until T7 threads the refine's resolved model into the commit, a
+  // fresh commit's model is unknown (null).
   const stamp = adoptRejectedRevisionId
     ? await rejectedRenderStamp(draftId, adoptRejectedRevisionId)
-    : currentRenderStamp()
+    : currentRenderStamp(null)
 
   let finalExportKey = args.exportKey
   // Set only when THIS call rendered + uploaded the export — the only object
@@ -369,7 +412,7 @@ export async function commitDraftRevision(
       exportUrl: committedExportKey,
       currentRevisionNumber: revisionNumber,
       pendingConflict: Prisma.JsonNull,
-      ...stamp,
+      ...draftStampFields(stamp),
       ...(backgroundImageUrl ? { imageUrl: backgroundImageUrl } : {}),
       ...backgroundSkip,
     }
@@ -423,9 +466,14 @@ export async function commitDraftRevision(
 async function rejectedRenderStamp(draftId: string, revisionId: string): Promise<RenderStamp> {
   const row = await prisma.draftRevision.findFirst({
     where: { id: revisionId, draftId },
-    select: { promptVersion: true, fontSet: true },
+    select: { promptVersion: true, fontSet: true, model: true, modelSubstitutedFrom: true },
   })
-  return { promptVersion: row?.promptVersion ?? null, fontSet: row?.fontSet ?? null }
+  return {
+    promptVersion: row?.promptVersion ?? null,
+    fontSet: row?.fontSet ?? null,
+    model: row?.model ?? null,
+    modelSubstitutedFrom: row?.modelSubstitutedFrom ?? null,
+  }
 }
 
 // ── Not-applied outcome + rejected renders (change 004 Phase 2, T17) ─────────
@@ -564,8 +612,7 @@ export async function restoreDraftToRevision(
         // reversible, since you can jump forward again to any other revision.
         currentRevisionNumber: revisionNumber,
         pendingConflict: Prisma.JsonNull,
-        promptVersion: stamp.promptVersion,
-        fontSet: stamp.fontSet,
+        ...draftStampFields(stamp),
         ...NOT_APPLIED_CLEARED,
       },
     })
@@ -606,8 +653,9 @@ export async function recordRejectedRender(
   const diagnostics = rejectionDiagnosticsSchema.omit({ export: true }).parse(args.diagnostics)
   // F3: the rejected row carries the stamp of ITS render, so a later "Use
   // anyway" can reinstate it. The draft's stamp is untouched: its current
-  // render did not change.
-  const stamp = currentRenderStamp()
+  // render did not change. 008: the attempt's model arrives with T7 (null
+  // until then).
+  const stamp = currentRenderStamp(null)
 
   let exportKey: string | null = null
   let exported: RejectionDiagnostics['export'] = 'none'

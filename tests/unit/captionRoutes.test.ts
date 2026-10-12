@@ -37,6 +37,11 @@ vi.mock('@/lib/campaign/briefing', () => ({ getActiveCampaignBriefing: async () 
 vi.mock('@/lib/storage/minio', () => ({ resolveExportUrl: async () => null }))
 vi.mock('@/lib/drafts/revisions', () => ({ COMMITTED_REVISION: {}, resolveNotAppliedOutcome: async () => null }))
 vi.mock('@/lib/captions/generate', () => ({ writeCaptions: vi.fn() }))
+// 008 T6: the route resolves the CAPTION model before its claim; writeCaptions
+// is faked above, so any resolved value will do.
+vi.mock('@/lib/models/policy', () => ({
+  resolveModel: async () => ({ ok: true, resolved: { surface: 'CAPTION', key: 'HAIKU', arg: 'claude-haiku-4-5' } }),
+}))
 vi.mock('@/lib/captions/store', () => ({
   loadDraftCaptions: h.loadDraftCaptions,
   claimCaptionAction: h.claimCaptionAction,

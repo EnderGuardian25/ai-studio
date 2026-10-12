@@ -6,7 +6,8 @@ import { runDesignAgent } from '@/lib/agent/designAgent'
 import { runDesignAgentCli } from '@/lib/agent/designAgentCli'
 import { extractInlineAssets } from '@/lib/agent/inlineAssets'
 import { dimensionsFor } from '@/lib/aspectRatio'
-import { isCliMode, modelFor, pipelineMode } from '@/lib/agent/config'
+import { isCliMode, pipelineMode } from '@/lib/agent/config'
+import type { ResolvedModel } from '@/lib/models/resolve'
 import { buildPathBSystemPrompt, buildPathBUserMessage } from '@/lib/agent/prompts/pathB'
 import { parseBriefImages } from '@/lib/agent/briefInput'
 import { generateBackgroundForBrief, type BackgroundResult } from '@/lib/agent/background'
@@ -34,6 +35,9 @@ export async function runPathBDesign(
   headline: string,
   campaignBriefing: string | null | undefined,
   actor: GenerationActor,
+  // 008 FR-07: the DESIGN_FREEFORM model, resolved by the caller (the
+  // generation at its start; regenerate-design before its claim).
+  model: ResolvedModel,
 ): Promise<PathBDesignResult> {
   // Feed-to-AI artifact URLs (brand reference imagery).
   const artifacts = await prisma.brandKitArtifact.findMany({
@@ -71,7 +75,7 @@ export async function runPathBDesign(
   const mode = pipelineMode()
   const briefImages = parseBriefImages(brief.briefImages)
 
-  // Background pre-step: Claude (Haiku) decides + gpt-image generates a
+  // Background pre-step: Claude (INTERNAL_BACKGROUND, Haiku) decides + gpt-image generates a
   // full-bleed background before the design call. A skip (with its reason)
   // on no provider/failure — the design proceeds with CSS/SVG visuals as
   // before. See agent/background.ts.
@@ -102,12 +106,12 @@ export async function runPathBDesign(
   })
 
   const result = isCliMode()
-    ? await runDesignAgentCli({ systemPrompt, userMessage, briefId: brief.id, width, height, model: modelFor('B', 'cli') })
+    ? await runDesignAgentCli({ systemPrompt, userMessage, briefId: brief.id, width, height, model })
     : await runDesignAgent({
         systemPrompt,
         userMessage,
         briefId: brief.id,
-        model: modelFor('B', 'api'),
+        model,
         maxToolCalls: 15,
         width,
         height,

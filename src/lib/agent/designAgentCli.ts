@@ -4,12 +4,12 @@ import { extractHtmlDocument } from "./htmlDocument"
 import { restoreInlineAssets, missingTokens } from "./inlineAssets"
 import { renderHtmlToPng } from "@/lib/renderer/puppeteer"
 import { uploadObject, exportKey, BUCKET_EXPORTS } from "@/lib/storage/minio"
+import type { ResolvedModel } from "@/lib/models/resolve"
 
 type CliAgentOptions = Pick<DesignAgentOptions, "systemPrompt" | "userMessage" | "briefId" | "inlineAssets" | "width" | "height"> & {
-  // Design model for this run: Path A (template fill) passes "haiku", Path B
-  // (freeform) passes "sonnet" (see agent/config.ts modelFor). Overridden by
-  // CLAUDE_CLI_MODEL when set.
-  model?: string
+  // 008 FR-07: the DESIGN_TEMPLATE / DESIGN_FREEFORM model the caller resolved.
+  // The CLI runs exactly its arg, and the spawn's timeout is its surface timeout.
+  model: ResolvedModel
 }
 
 // CLI-mode replacement for runDesignAgent. Drives a single-shot HTML generation
@@ -33,9 +33,9 @@ export async function runDesignAgentCli(options: CliAgentOptions): Promise<Desig
 
   const prompt = `${systemPrompt}\n\n${userMessage}`
 
-  // Freeform Path B design is a heavier single-shot than copy/template-fill and
-  // can run past 3 min on the local CLI; allow more headroom before timing out.
-  const raw = await runClaudeCli(prompt, { timeoutMs: 300_000, label: "design", model })
+  // The timeout is the model's (008 FR-12, design §5): freeform design on a
+  // slower model gets more headroom than template fill on Haiku.
+  const raw = await runClaudeCli(prompt, { label: "design", model })
 
   // Cut the document out of the reply rather than testing that one is in there
   // somewhere: any commentary the model wrapped around it would otherwise be
@@ -83,8 +83,11 @@ export async function runDesignAgentCli(options: CliAgentOptions): Promise<Desig
 // missed attempt leaves no orphaned export. runDesignAgentCli above is
 // untouched (AC-20: regenerate-design, generation and Path A use it).
 export async function runDesignAgentCliRefine(
-  options: Pick<CliAgentOptions, "systemPrompt" | "userMessage" | "model">,
+  options: Pick<CliAgentOptions, "systemPrompt" | "userMessage"> & { model?: ResolvedModel | string },
 ): Promise<string> {
   const { systemPrompt, userMessage, model } = options
-  return runClaudeCli(`${systemPrompt}\n\n${userMessage}`, { timeoutMs: 300_000, label: "refine", model })
+  // 008 (transitional, T7 → T10): a ResolvedModel REFINE model runs on its own
+  // surface timeout; the pre-008 string keeps today's 300 s. T10 deletes the string.
+  const timeoutMs = typeof model === "object" ? undefined : 300_000
+  return runClaudeCli(`${systemPrompt}\n\n${userMessage}`, { timeoutMs, label: "refine", model })
 }

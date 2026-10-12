@@ -6,13 +6,15 @@ import { resolveCopyProvider } from '@/providers/registry'
 import { buildBriefInput } from '@/lib/agent/briefInput'
 import { runPathADesign, assertTemplateMatchesBrief } from '@/lib/agent/pathA'
 import { runPathBDesign } from '@/lib/agent/pathB'
-import { currentRenderStamp, type RenderStamp } from '@/lib/drafts/revisions'
+import { currentRenderStamp, draftStampFields, type RenderStamp } from '@/lib/drafts/revisions'
 import { humanizeGenerationError } from '@/lib/agent/generationErrors'
 import { generationSkipFields, type BackgroundSkipFields } from '@/lib/drafts/backgroundNotice'
 import type { GenerationActor } from '@/lib/agent/types'
 import { CAPTION_CHANNELS } from '@/lib/channels'
 import { GENERATION_TARGETS, requireHeadline, writeCaptions } from '@/lib/captions/generate'
-import { captionRowsFromFields, saveGenerationCaptions } from '@/lib/captions/store'
+import { captionRowsFromFields, headlineStampFields, saveGenerationCaptions } from '@/lib/captions/store'
+import { resolveModel } from '@/lib/models/policy'
+import type { ResolvedModel } from '@/lib/models/resolve'
 
 // Path B needs a resolvable brand kit; thrown before any model call is paid for.
 export class NoBrandKitError extends Error {
@@ -28,6 +30,45 @@ export class TemplateNotFoundError extends Error {
     super('Template not found')
     this.name = 'TemplateNotFoundError'
   }
+}
+
+// The team allows no model for a surface the generation needs (008 FR-03:
+// only a hand-edited policy row gets here — /team can't save one). The
+// generation fails closed with the resolver's message, before any model call.
+export class NoAllowedModelError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'NoAllowedModelError'
+  }
+}
+
+export interface GenerationModels {
+  caption: ResolvedModel
+  design: ResolvedModel
+}
+
+// 008 FR-10/FR-11, design §3: a generation's two models, resolved once at its
+// start, on the brief's team, as the acting user (null for the scheduler, MCP
+// and ACP, which always resolve on the team credential).
+//
+// Brief.captionModel / designModel are the initial request as it was STORED,
+// so they go in as storedRequest: one that has since become disallowed falls
+// through to the team default, then the system default, and is recorded as a
+// substitution on the stamp — never a 400, never a throw. designModel serves
+// DESIGN_TEMPLATE or DESIGN_FREEFORM by the brief's design mode. Retry
+// re-enters here, so it re-runs the same initial request.
+export async function resolveGenerationModels(
+  brief: Pick<Brief, 'teamId' | 'designMode' | 'captionModel' | 'designModel'>,
+  actor: GenerationActor,
+): Promise<GenerationModels> {
+  const designSurface = brief.designMode === 'TEMPLATE' ? 'DESIGN_TEMPLATE' : 'DESIGN_FREEFORM'
+  const [caption, design] = await Promise.all([
+    resolveModel('CAPTION', { storedRequest: brief.captionModel, userId: actor.userId, teamId: brief.teamId }),
+    resolveModel(designSurface, { storedRequest: brief.designModel, userId: actor.userId, teamId: brief.teamId }),
+  ])
+  if (!caption.ok) throw new NoAllowedModelError(caption.message)
+  if (!design.ok) throw new NoAllowedModelError(design.message)
+  return { caption: caption.resolved, design: design.resolved }
 }
 
 export interface GenerateDraftResult {
@@ -93,25 +134,28 @@ async function produceDesign(
   { kit, campaignBriefing, template }: ResolvedInputs,
   headline: string,
   actor: GenerationActor,
+  // 008: the design surface's model (resolveGenerationModels); it is also the
+  // render's stamp.
+  model: ResolvedModel,
 ): Promise<ProducedDesign> {
   if (template) {
-    const result = await runPathADesign(brief, kit, template, headline, campaignBriefing, actor)
+    const result = await runPathADesign(brief, kit, template, headline, campaignBriefing, actor, model)
     return {
       htmlContent: result.htmlContent,
       exportUrl: result.exportUrl,
       backgroundImageUrl: null,
       // Path A has no background step: nothing was skipped.
       backgroundSkip: generationSkipFields(null),
-      stamp: currentRenderStamp(),
+      stamp: currentRenderStamp(model),
     }
   }
-  const result = await runPathBDesign(brief, kit!, headline, campaignBriefing, actor)
+  const result = await runPathBDesign(brief, kit!, headline, campaignBriefing, actor, model)
   return {
     htmlContent: result.htmlContent,
     exportUrl: result.exportUrl,
     backgroundImageUrl: result.backgroundImageUrl,
     backgroundSkip: generationSkipFields(result.background),
-    stamp: currentRenderStamp(),
+    stamp: currentRenderStamp(model),
   }
 }
 
@@ -135,7 +179,7 @@ async function finalizeDraftV1(
         imageUrl: design.backgroundImageUrl,
         ...design.backgroundSkip,
         status: 'EXPORTED',
-        ...design.stamp,
+        ...draftStampFields(design.stamp),
         currentRevisionNumber: 1,
         failureReason: null,
       },
@@ -171,17 +215,21 @@ export async function generateDraftForBrief(
   actor: GenerationActor,
   opts?: { templateId?: string | null },
 ): Promise<GenerateDraftResult> {
+  // 008: resolved first, so a team with no allowed model throws before any
+  // model call is paid for (a sync failure creates no draft).
+  const models = await resolveGenerationModels(brief, actor)
   const inputs = await resolveGenerationInputs(brief, opts?.templateId)
 
   const copyProvider = await resolveCopyProvider(brief.teamId, brief.copyProviderKey ?? undefined)
-  const fields = await writeCaptions(
+  const { fields, stamp: captionStamp } = await writeCaptions(
     copyProvider,
     buildBriefInput(brief, inputs.kit, inputs.campaignBriefing),
     GENERATION_TARGETS,
+    models.caption,
   )
   const headline = requireHeadline(fields)
 
-  const design = await produceDesign(brief, inputs, headline, actor)
+  const design = await produceDesign(brief, inputs, headline, actor, models.design)
 
   const draft = await prisma.$transaction(async (tx) => {
     const created = await tx.draft.create({
@@ -189,14 +237,16 @@ export async function generateDraftForBrief(
         teamId: brief.teamId,
         briefId: brief.id,
         headline,
-        captions: { create: captionRowsFromFields(fields) },
+        // requireHeadline passed, so the headline validated: it carries the stamp.
+        ...headlineStampFields(captionStamp),
+        captions: { create: captionRowsFromFields(fields, captionStamp) },
         htmlContent: design.htmlContent,
         templateId: inputs.template?.id ?? null,
         exportUrl: design.exportUrl,
         imageUrl: design.backgroundImageUrl,
         ...design.backgroundSkip,
         status: 'EXPORTED',
-        ...design.stamp,
+        ...draftStampFields(design.stamp),
         currentRevisionNumber: 1,
       },
     })
@@ -256,18 +306,23 @@ export async function runGenerationForDraft(draftId: string, actor: GenerationAc
   const draft = await prisma.draft.findUnique({ where: { id: draftId }, include: { brief: true } })
   if (!draft) return
   try {
+    // 008 design §3: the one resolution that runs in the background — retry
+    // re-enters here — so it reads stored values only (Brief → team → system),
+    // never an explicit request. NO_ALLOWED_MODEL fails the draft with its message.
+    const models = await resolveGenerationModels(draft.brief, actor)
     const inputs = await resolveGenerationInputs(draft.brief, draft.templateId)
 
     const copyProvider = await resolveCopyProvider(draft.brief.teamId, draft.brief.copyProviderKey ?? undefined)
-    const fields = await writeCaptions(
+    const { fields, stamp: captionStamp } = await writeCaptions(
       copyProvider,
       buildBriefInput(draft.brief, inputs.kit, inputs.campaignBriefing),
       GENERATION_TARGETS,
+      models.caption,
     )
-    await saveGenerationCaptions(draftId, fields)
+    await saveGenerationCaptions(draftId, fields, captionStamp)
     const headline = requireHeadline(fields)
 
-    const design = await produceDesign(draft.brief, inputs, headline, actor)
+    const design = await produceDesign(draft.brief, inputs, headline, actor, models.design)
     await finalizeDraftV1(draftId, design)
   } catch (err) {
     const reason = humanizeGenerationError(err)

@@ -106,18 +106,36 @@ describe('resolveCopyProvider — non-CLI mode unchanged', () => {
 // caption reply (testHooks.buildMockCaptionReply), which the real extractor
 // then parses — no row lookup, no provider call.
 describe('resolveCopyProvider — MOCK_AI caption seam', () => {
-  it('returns buildMockCaptionReply for the brief topic and the requested targets', async () => {
+  it('returns buildMockCaptionReply for the brief topic and the requested targets, stamped and recorded (008 FR-16)', async () => {
     vi.resetModules()
     vi.stubEnv('MOCK_AI', 'true')
     try {
       const { resolveCopyProvider: resolveMocked } = await import('@/providers/registry')
       const { buildMockCaptionReply } = await import('@/lib/testHooks')
+      const { decideModel } = await import('@/lib/models/resolve')
+      const { setModelCallSink } = await import('@/lib/models/modelCalls')
+      const records: unknown[] = []
+      setModelCallSink({ record: (r) => void records.push(r), read: () => [], clear() {} })
+      const r = decideModel('CAPTION', {
+        requested: 'SONNET',
+        policy: { allowed: ['HAIKU', 'SONNET', 'OPUS'], defaults: {}, gateOn: false },
+        credential: 'n/a',
+        mode: 'api',
+      })
+      if (!r.ok) throw new Error(r.message)
+
       const provider = await resolveMocked(TEAM_ID)
       const brief = { topic: 'Launch', description: '', goal: 'g', tone: 't', channels: [] }
-      await expect(provider.generateCaptions(brief, ['LINKEDIN'])).resolves.toBe(
-        buildMockCaptionReply('Launch', ['LINKEDIN']),
-      )
+      await expect(provider.generateCaptions(brief, ['LINKEDIN'], r.resolved)).resolves.toEqual({
+        raw: buildMockCaptionReply('Launch', ['LINKEDIN']),
+        modelId: 'claude-sonnet-5-5',
+      })
+      // The seam short-circuits before the boundary, so it records the model it was handed.
+      expect(records).toEqual([
+        expect.objectContaining({ surface: 'CAPTION', key: 'SONNET', arg: 'claude-sonnet-5-5', source: 'request', label: 'copy' }),
+      ])
       expect(h.availableProviderFindFirst).not.toHaveBeenCalled()
+      setModelCallSink(null)
     } finally {
       vi.unstubAllEnvs()
       vi.resetModules()

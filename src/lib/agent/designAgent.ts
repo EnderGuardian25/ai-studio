@@ -8,6 +8,10 @@ import { MOCK_AI, buildMockHtml, buildMockConflict, buildMockRefineReply, should
 import { env } from "@/lib/env"
 import { nearestAspectRatio } from "@/lib/aspectRatio"
 import type { AspectRatio } from "@prisma/client"
+import type { ResolvedModel } from "@/lib/models/resolve"
+import { createMessage, textOf as replyText } from "@/lib/models/anthropicCall"
+import { modelCallFor, recordModelCall } from "@/lib/models/modelCalls"
+import { pipelineMode } from "./config"
 
 const TOOL_DEFINITIONS: Tool[] = [
   {
@@ -86,26 +90,37 @@ async function executeTool(
   }
 }
 
-export async function runDesignAgent(options: DesignAgentOptions): Promise<DesignAgentResult> {
+// 008 FR-07: the design loop runs exactly the DESIGN_* model its caller
+// resolved (required — there is no default model), and its wall-clock budget
+// is that model's surface timeout (FR-12): deadlineMs is not an option here.
+export type RunDesignAgentOptions = Omit<DesignAgentOptions, "model" | "deadlineMs"> & {
+  model: ResolvedModel
+}
+
+export async function runDesignAgent(options: RunDesignAgentOptions): Promise<DesignAgentResult> {
   const {
     systemPrompt,
     userMessage,
     briefId,
-    model = "claude-sonnet-4-6",
+    model,
     maxToolCalls = 15,
-    // Wall-clock budget mirroring the CLI runner's 300s tree-killed timeout —
-    // maxToolCalls alone doesn't bound slow image generations + renders.
-    deadlineMs = 300_000,
     inlineAssets,
     width = 1080,
     height = 1080,
     actor,
   } = options
+  // The whole tool-use loop's budget — maxToolCalls alone doesn't bound slow
+  // image generations + renders. Every turn's request is also bounded by it
+  // (createMessage's deadlineAt), not just checked at the loop's start.
+  const deadlineMs = model.timeoutMs
 
   // Test seam: skip the Anthropic tool-use loop entirely. Emits deterministic
   // HTML and a real EXPORTS object key (rendered via the mocked Puppeteer path),
   // or a conflict marker when a refine instruction contains "conflict_test".
+  // It short-circuits before the boundary, so it records the model it was
+  // handed first (008 FR-16, design §7).
   if (MOCK_AI) {
+    recordModelCall(modelCallFor(model, pipelineMode(), "design"))
     if (shouldMockGenerateFail(userMessage)) {
       throw new Error("Mock generation failure (__FAIL_GEN_ALWAYS__ sentinel)")
     }
@@ -122,7 +137,11 @@ export async function runDesignAgent(options: DesignAgentOptions): Promise<Desig
   const messages: MessageParam[] = [{ role: "user", content: userMessage }]
 
   const MAX_TOKENS = 8192
+  // What the request actually carries: createMessage raises max_tokens to the
+  // entry's floor (thinking models spend from the same cap).
+  const effectiveMaxTokens = Math.max(MAX_TOKENS, model.entry.apiMaxTokensFloor ?? 0)
   const startedAt = Date.now()
+  const deadlineAt = startedAt + deadlineMs
   let toolCallCount = 0
   let iteration = 0
   let lastHtml = ""
@@ -135,15 +154,19 @@ export async function runDesignAgent(options: DesignAgentOptions): Promise<Desig
 
     iteration++
     const turnStartedAt = Date.now()
-    const response = await client.messages.create({
+    const response = await createMessage(
+      client,
+      {
+        max_tokens: MAX_TOKENS,
+        system: systemPrompt,
+        tools: TOOL_DEFINITIONS,
+        messages,
+      },
       model,
-      max_tokens: MAX_TOKENS,
-      system: systemPrompt,
-      tools: TOOL_DEFINITIONS,
-      messages,
-    })
+      { deadlineAt, label: "design" },
+    )
     console.log(
-      `[designAgent] turn ${iteration} (${model}): ${Date.now() - turnStartedAt}ms, ` +
+      `[designAgent] turn ${iteration} (${model.arg}, ${model.source}): ${Date.now() - turnStartedAt}ms, ` +
         `in=${response.usage.input_tokens} out=${response.usage.output_tokens} tokens, ` +
         `stop=${response.stop_reason}, elapsed=${Math.round((Date.now() - startedAt) / 1000)}s`
     )
@@ -151,7 +174,7 @@ export async function runDesignAgent(options: DesignAgentOptions): Promise<Desig
     // A truncated turn means a mangled tool call or half-emitted HTML — fail
     // with the real cause instead of storing broken output.
     if (response.stop_reason === "max_tokens") {
-      throw new AgentTruncatedError(MAX_TOKENS)
+      throw new AgentTruncatedError(effectiveMaxTokens)
     }
 
     const toolUseBlocks = response.content.filter(
@@ -159,10 +182,11 @@ export async function runDesignAgent(options: DesignAgentOptions): Promise<Desig
     )
 
     if (toolUseBlocks.length === 0) {
-      // No more tool calls — agent is done
-      const textBlock = response.content.find((b) => b.type === "text")
-      if (textBlock && "text" in textBlock && lastHtml === "") {
-        lastHtml = restoreInlineAssets(textBlock.text, inlineAssets)
+      // No more tool calls — agent is done. Read by block type (008 §6): a
+      // thinking model's reply does not start with its text block.
+      const text = replyText(response)
+      if (text && lastHtml === "") {
+        lastHtml = restoreInlineAssets(text, inlineAssets)
       }
       break
     }
@@ -260,8 +284,16 @@ const REFINE_TOOL_DEFINITIONS = TOOL_DEFINITIONS.filter((t) => t.name !== "rende
 const textOf = (content: Anthropic.Messages.ContentBlock[]) =>
   content.flatMap((b) => (b.type === "text" ? [b.text] : [])).join("\n")
 
+// 008 (transitional, T7 → T10): `model` is a ResolvedModel (the REFINE model
+// the route resolved: through createMessage, bounded by its surface timeout,
+// recorded by the mock seam) or the pre-008 string (today's direct SDK call
+// and 300 s budget, unchanged). T7 moves the refine route onto the resolver;
+// T10 deletes the string and the default below.
 export async function runDesignAgentRefine(
-  options: Omit<DesignAgentOptions, "inlineAssets"> & { refine: RefineModeOptions },
+  options: Omit<DesignAgentOptions, "inlineAssets" | "model"> & {
+    model?: ResolvedModel | string
+    refine: RefineModeOptions
+  },
 ): Promise<string> {
   const {
     systemPrompt,
@@ -269,17 +301,21 @@ export async function runDesignAgentRefine(
     briefId,
     model = "claude-sonnet-4-6",
     maxToolCalls = 15,
-    deadlineMs = 300_000,
     width = 1080,
     height = 1080,
     actor,
     refine,
   } = options
+  const resolved = typeof model === "object" ? model : null
+  const deadlineMs = options.deadlineMs ?? resolved?.timeoutMs ?? 300_000
+  const modelLabel = resolved ? resolved.arg : model
 
   // Test seam: the same failure and conflict sentinels as runDesignAgent's
   // mock branch, then the deterministic envelope reply (T20). With no refine
   // sentinel the reply is exactly the document runDesignAgent's mock returns.
   if (MOCK_AI) {
+    // 008 FR-16: a ResolvedModel short-circuited here is recorded first.
+    if (resolved) recordModelCall(modelCallFor(resolved, pipelineMode(), "refine"))
     if (shouldMockGenerateFail(userMessage)) {
       throw new Error("Mock generation failure (__FAIL_GEN_ALWAYS__ sentinel)")
     }
@@ -298,20 +334,23 @@ export async function runDesignAgentRefine(
   const messages: MessageParam[] = [{ role: "user", content: userMessage }]
   const MAX_TOKENS = 8192
   const startedAt = Date.now()
+  const deadlineAt = startedAt + deadlineMs
   let toolCallCount = 0
 
   for (let iteration = 1; ; iteration++) {
     if (Date.now() - startedAt > deadlineMs) throw new AgentTimeoutError(deadlineMs)
 
-    const response = await client.messages.create({
-      model,
+    const params = {
       max_tokens: MAX_TOKENS,
       system: systemPrompt,
       tools: REFINE_TOOL_DEFINITIONS,
       messages,
-    })
+    }
+    const response = resolved
+      ? await createMessage(client, params, resolved, { deadlineAt, label: "refine" })
+      : await client.messages.create({ ...params, model: model as string })
     console.log(
-      `[designAgent:refine#${refine.attempt}] turn ${iteration} (${model}): ` +
+      `[designAgent:refine#${refine.attempt}] turn ${iteration} (${modelLabel}): ` +
         `in=${response.usage.input_tokens} out=${response.usage.output_tokens} tokens, ` +
         `stop=${response.stop_reason}, elapsed=${Math.round((Date.now() - startedAt) / 1000)}s`
     )

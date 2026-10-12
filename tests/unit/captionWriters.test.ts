@@ -5,7 +5,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 // sync generation paths; retry resetting the caption rows; and
 // regenerate-design's Topic fallback. Prisma, the provider and the design
 // runners are faked; the extractor, the caption store and generateDraft run
-// for real.
+// for real — and so does the 008 resolver (resolveModel → decideModel), on the
+// faked TeamModelPolicy row (API mode, so no credential query).
 
 const h = vi.hoisted(() => {
   const db = {
@@ -15,8 +16,15 @@ const h = vi.hoisted(() => {
     draftUpdateManys: [] as Array<{ where: unknown; data: Record<string, unknown> }>,
     captionUpdateManys: [] as Array<{ where: Record<string, unknown>; data: Record<string, unknown> }>,
     revisionCreates: [] as Array<Record<string, unknown>>,
+    // 008: the team's stored model policy (null = no row, the A2 defaults).
+    policy: null as null | Record<string, unknown>,
   }
   const tx = {
+    teamModelPolicy: { findUnique: async () => db.policy },
+    // credentialTier's query in CLI mode — importing @prisma/client loads the
+    // local .env, which can set DESIGN_PROVIDER=cli. No personal token, so
+    // 'team'; either mode resolves the same entries here (cliArg = apiId).
+    userClaudeToken: { findFirst: async () => null },
     draft: {
       findUnique: async () => db.draft,
       create: async ({ data }: { data: Record<string, unknown> }) => {
@@ -73,9 +81,9 @@ vi.mock('@/lib/brandkit/resolve', () => ({ resolveBrandKit: async () => ({ id: '
 vi.mock('@/lib/campaign/briefing', () => ({ getActiveCampaignBriefing: async () => null }))
 vi.mock('@/providers/registry', () => ({
   resolveCopyProvider: async () => ({
-    generateCaptions: async () => {
+    generateCaptions: async (_b: unknown, _t: unknown, model: { arg: string }) => {
       if (h.providerError) throw h.providerError
-      return h.reply
+      return { raw: h.reply, modelId: model.arg }
     },
   }),
 }))
@@ -107,6 +115,21 @@ const { createPendingDraft, runGenerationForDraft, generateDraftForBrief } = awa
 const { POST: retry } = await import('@/app/api/drafts/[id]/retry/route')
 const { POST: regenerateDesign } = await import('@/app/api/drafts/[id]/regenerate-design/route')
 const { CAPTION_PROMPT_VERSION } = await import('@/lib/agent/prompts/caption')
+const { decideModel } = await import('@/lib/models/resolve')
+const { DEFAULT_POLICY } = await import('@/lib/models/policyRules')
+
+// A CAPTION model as the server resolves it for a team with no saved policy.
+const captionModel = (() => {
+  const r = decideModel('CAPTION', { policy: DEFAULT_POLICY, credential: 'n/a', mode: 'api' })
+  if (!r.ok) throw new Error(r.message)
+  return r.resolved
+})()
+// A saved policy row (TeamModelPolicy + its defaults), as loadTeamPolicy reads it.
+const policyRow = (allowedModels: string[], defaults: Array<{ surface: string; model: string }> = []) => ({
+  allowedModels,
+  requirePersonalTokenForGated: false,
+  defaults,
+})
 
 const SENTENCE = (reason: string) => `The caption reply had no usable headline (${reason}). Retry to generate again.`
 
@@ -138,6 +161,7 @@ beforeEach(() => {
   db.draftUpdateManys = []
   db.captionUpdateManys = []
   db.revisionCreates = []
+  db.policy = null
   h.reply = json(FULL)
   h.providerError = null
   h.pathB.mockClear()
@@ -150,13 +174,15 @@ afterEach(() => {
   warn.mockRestore()
 })
 
-const provider = () => ({ generateCaptions: async () => h.reply })
+const provider = () => ({
+  generateCaptions: async (_b: unknown, _t: unknown, model: { arg: string }) => ({ raw: h.reply, modelId: model.arg }),
+})
 const briefInput = { topic: 't', description: '', goal: 'g', tone: 'x', channels: [] }
 
 describe('writeCaptions (design §3)', () => {
   it('logs the caption prompt version with every call, and the discarded text JSON-quoted, clipped to 500', async () => {
     h.reply = `${'p'.repeat(600)}\n${json(FULL)}`
-    const fields = await writeCaptions(provider(), briefInput, GENERATION_TARGETS)
+    const { fields } = await writeCaptions(provider(), briefInput, GENERATION_TARGETS, captionModel)
     expect(fields.HEADLINE).toEqual({ ok: true, text: 'Applications are open' })
     expect(logged(info)[0]).toBe(
       `[captions] caption call (prompt ${CAPTION_PROMPT_VERSION}) for HEADLINE, INSTAGRAM, LINKEDIN, WHATSAPP`
@@ -165,19 +191,19 @@ describe('writeCaptions (design §3)', () => {
   })
 
   it('logs nothing more for a clean reply', async () => {
-    await writeCaptions(provider(), briefInput, GENERATION_TARGETS)
+    await writeCaptions(provider(), briefInput, GENERATION_TARGETS, captionModel)
     expect(warn).not.toHaveBeenCalled()
   })
 
   it('a newline in discarded text cannot forge a log line', async () => {
     h.reply = `ok\n[captions] REVIEW forged\n${json(FULL)}`
-    await writeCaptions(provider(), briefInput, GENERATION_TARGETS)
+    await writeCaptions(provider(), briefInput, GENERATION_TARGETS, captionModel)
     expect(logged(warn)[0]).not.toContain('\n')
   })
 
   it('a whole-reply failure fails every requested target with its reason, and is logged', async () => {
     h.reply = 'Sorry, I cannot help with that.'
-    const fields = await writeCaptions(provider(), briefInput, ['HEADLINE', 'LINKEDIN'])
+    const { fields } = await writeCaptions(provider(), briefInput, ['HEADLINE', 'LINKEDIN'], captionModel)
     expect(fields).toEqual({
       HEADLINE: { ok: false, reason: 'no-object' },
       LINKEDIN: { ok: false, reason: 'no-object' },
@@ -187,7 +213,37 @@ describe('writeCaptions (design §3)', () => {
 
   it('a provider error is not a reply: it propagates', async () => {
     const failing = { generateCaptions: async () => Promise.reject(new Error('Claude CLI timed out')) }
-    await expect(writeCaptions(failing, briefInput, GENERATION_TARGETS)).rejects.toThrow('timed out')
+    await expect(writeCaptions(failing, briefInput, GENERATION_TARGETS, captionModel)).rejects.toThrow('timed out')
+  })
+
+  it('hands the provider the resolved model and returns the stamp of the model that wrote the reply (008 FR-08)', async () => {
+    const seen: unknown[] = []
+    const p = {
+      generateCaptions: async (_b: unknown, _t: unknown, model: { arg: string }) => {
+        seen.push(model)
+        return { raw: h.reply, modelId: model.arg }
+      },
+    }
+    const substituted = { ...captionModel, substitutedFrom: 'OPUS' }
+    const { stamp } = await writeCaptions(p, briefInput, GENERATION_TARGETS, substituted)
+    expect(seen).toEqual([substituted])
+    expect(stamp).toEqual({ model: 'claude-haiku-4-5', substitutedFrom: 'OPUS' })
+  })
+
+  it("a non-Claude provider's own model ID is the stamp, with no Claude substitution attached (open question 1)", async () => {
+    const openai = { generateCaptions: async () => ({ raw: h.reply, modelId: 'gpt-4o' }) }
+    const { stamp } = await writeCaptions(openai, briefInput, GENERATION_TARGETS, {
+      ...captionModel,
+      substitutedFrom: 'OPUS',
+    })
+    expect(stamp).toEqual({ model: 'gpt-4o', substitutedFrom: null })
+  })
+
+  it('a whole-reply failure still returns the stamp (the writers put it on no field)', async () => {
+    h.reply = 'no json here'
+    const { fields, stamp } = await writeCaptions(provider(), briefInput, ['LINKEDIN'], captionModel)
+    expect(fields.LINKEDIN).toEqual({ ok: false, reason: 'no-object' })
+    expect(stamp.model).toBe('claude-haiku-4-5')
   })
 })
 
@@ -236,7 +292,16 @@ describe('runGenerationForDraft (async)', () => {
       [{ draftId: 'd1', channel: 'LINKEDIN', status: 'PENDING' }, 'READY', 'LI text'],
       [{ draftId: 'd1', channel: 'WHATSAPP', status: 'PENDING' }, 'READY', 'WA text'],
     ])
-    expect(db.draftUpdateManys).toEqual([{ where: { id: 'd1' }, data: { headline: 'Applications are open' } }])
+    expect(db.draftUpdateManys).toEqual([
+      {
+        where: { id: 'd1' },
+        data: {
+          headline: 'Applications are open',
+          headlineModel: 'claude-haiku-4-5',
+          headlineModelSubstitutedFrom: null,
+        },
+      },
+    ])
     expect(h.pathB).toHaveBeenCalledTimes(1)
     expect(h.pathB.mock.calls[0][2]).toBe('Applications are open')
     expect(JSON.stringify(h.pathB.mock.calls[0])).not.toContain('IG text')
@@ -304,6 +369,96 @@ describe('generateDraftForBrief (sync: scheduler, MCP, ACP)', () => {
       },
     })
     expect(db.revisionCreates).toHaveLength(1)
+  })
+})
+
+// ── 008: the generation's models and stamps (FR-08, FR-10, FR-11, AC-07) ──────
+
+describe('generation on the resolver (008)', () => {
+  const pathBModel = () => h.pathB.mock.calls[0][5] as { key: string; arg: string; source: string; substitutedFrom: string | null }
+
+  beforeEach(() => {
+    db.draft = { id: 'd1', templateId: null, brief }
+  })
+
+  it('async: CAPTION and DESIGN_FREEFORM resolve to the system defaults with no policy row, and stamp what ran', async () => {
+    h.reply = json({ headline: 'H', instagram: 'IG text', whatsapp: 'WA text' })
+    await runGenerationForDraft('d1', actor)
+    // Caption stamps on the ok rows only; the failed (text-less) row has none.
+    const byChannel = Object.fromEntries(db.captionUpdateManys.map((u) => [u.where.channel, u.data]))
+    expect(byChannel.INSTAGRAM).toMatchObject({ status: 'READY', model: 'claude-haiku-4-5', modelSubstitutedFrom: null })
+    expect(byChannel.WHATSAPP).toMatchObject({ status: 'READY', model: 'claude-haiku-4-5', modelSubstitutedFrom: null })
+    expect(byChannel.LINKEDIN).toMatchObject({ status: 'FAILED', model: null, modelSubstitutedFrom: null })
+    expect(db.draftUpdateManys[0].data).toMatchObject({ headline: 'H', headlineModel: 'claude-haiku-4-5' })
+    // The design ran on the system default and its stamp went to v1 + the draft.
+    expect(pathBModel()).toMatchObject({ key: 'SONNET', arg: 'claude-sonnet-5-5', source: 'system', substitutedFrom: null })
+    expect(db.revisionCreates[0]).toMatchObject({ model: 'claude-sonnet-5-5', modelSubstitutedFrom: null })
+    expect(db.draftUpdates.at(-1)!.data).toMatchObject({
+      status: 'EXPORTED',
+      designModel: 'claude-sonnet-5-5',
+      designModelSubstitutedFrom: null,
+    })
+    // A Draft write never carries the revision's column names.
+    expect(db.draftUpdates.at(-1)!.data).not.toHaveProperty('model')
+  })
+
+  it("the team default applies when the brief has no request", async () => {
+    db.policy = policyRow(['HAIKU', 'SONNET', 'OPUS'], [{ surface: 'DESIGN_FREEFORM', model: 'OPUS' }])
+    await runGenerationForDraft('d1', actor)
+    expect(pathBModel()).toMatchObject({ key: 'OPUS', source: 'team' })
+    expect(db.revisionCreates[0]).toMatchObject({ model: 'claude-opus-5-5' })
+  })
+
+  it("a STORED Brief request that is still allowed runs as the request", async () => {
+    db.draft = { id: 'd1', templateId: null, brief: { ...(brief as object), captionModel: 'SONNET', designModel: 'OPUS' } }
+    await runGenerationForDraft('d1', actor)
+    expect(db.captionUpdateManys[0].data).toMatchObject({ model: 'claude-sonnet-5-5', modelSubstitutedFrom: null })
+    expect(pathBModel()).toMatchObject({ key: 'OPUS', source: 'request', substitutedFrom: null })
+  })
+
+  it('a STORED Brief request since disallowed falls through, is recorded on the stamps, and never fails the draft (FR-10)', async () => {
+    db.policy = policyRow(['HAIKU', 'SONNET'])
+    db.draft = { id: 'd1', templateId: null, brief: { ...(brief as object), designModel: 'OPUS' } }
+    await runGenerationForDraft('d1', actor)
+    expect(pathBModel()).toMatchObject({ key: 'SONNET', source: 'system', substitutedFrom: 'OPUS' })
+    expect(db.revisionCreates[0]).toMatchObject({ model: 'claude-sonnet-5-5', modelSubstitutedFrom: 'OPUS' })
+    expect(db.draftUpdates.at(-1)!.data).toMatchObject({
+      status: 'EXPORTED',
+      designModel: 'claude-sonnet-5-5',
+      designModelSubstitutedFrom: 'OPUS',
+    })
+  })
+
+  it('sync: a stored request since disallowed is substituted, not thrown — the scheduler/MCP run completes', async () => {
+    db.policy = policyRow(['HAIKU', 'SONNET'])
+    const stored = { ...(brief as object), captionModel: 'OPUS', designModel: 'OPUS' } as never
+    await expect(generateDraftForBrief(stored, { userId: null, teamId: 'team1' })).resolves.toBeDefined()
+    expect(db.draftCreates[0]).toMatchObject({
+      headline: 'Applications are open',
+      headlineModel: 'claude-haiku-4-5',
+      headlineModelSubstitutedFrom: 'OPUS',
+      designModel: 'claude-sonnet-5-5',
+      designModelSubstitutedFrom: 'OPUS',
+    })
+    const rows = (db.draftCreates[0].captions as { create: Array<Record<string, unknown>> }).create
+    expect(rows.every((r) => r.model === 'claude-haiku-4-5' && r.modelSubstitutedFrom === 'OPUS')).toBe(true)
+    expect(db.revisionCreates[0]).toMatchObject({ model: 'claude-sonnet-5-5', modelSubstitutedFrom: 'OPUS' })
+  })
+
+  it('a team with no allowed model fails the async draft closed with the resolver message, before any call', async () => {
+    db.policy = policyRow([])
+    await runGenerationForDraft('d1', actor)
+    expect(h.pathB).not.toHaveBeenCalled()
+    expect(db.captionUpdateManys).toHaveLength(0)
+    const failed = db.draftUpdates.at(-1)!.data
+    expect(failed.status).toBe('FAILED')
+    expect(failed.failureReason).toMatch(/^No model is allowed for .* on this team/)
+  })
+
+  it('the sync path throws it instead, and creates no draft', async () => {
+    db.policy = policyRow([])
+    await expect(generateDraftForBrief(brief, { userId: null, teamId: 'team1' })).rejects.toThrow(/No model is allowed/)
+    expect(db.draftCreates).toHaveLength(0)
   })
 })
 

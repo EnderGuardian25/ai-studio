@@ -1,4 +1,5 @@
 import type { CaptionTarget } from '@/lib/channels'
+import type { ResolvedModel } from '@/lib/models/resolve'
 
 // Input to copy generation — only what copy providers actually consume.
 // Design-path concerns (designMode, image URLs, template references) live on
@@ -21,6 +22,18 @@ export interface BriefInput {
 // The COPY slot keeps its name (it also drives brand-voice drafting). One call
 // writes every requested caption target (012 FR-07) and returns the RAW reply:
 // parsing never happens in a provider — extractCaptionReply does it.
+//
+// 008 FR-07/FR-08: the call runs the CAPTION model the caller resolved, and
+// reports the model ID that actually wrote the reply, for the caption stamps.
+// A Claude provider reports model.arg (the string that crossed the boundary); a
+// non-Claude provider (OpenAI) ignores `model` and reports its own ID (spec
+// open question 1), which matches no catalogue entry, so a later regenerate
+// falls through to the team default.
+export interface CaptionReply {
+  raw: string
+  modelId: string
+}
+
 export interface CopyProvider {
-  generateCaptions(brief: BriefInput, targets: readonly CaptionTarget[]): Promise<string>
+  generateCaptions(brief: BriefInput, targets: readonly CaptionTarget[], model: ResolvedModel): Promise<CaptionReply>
 }

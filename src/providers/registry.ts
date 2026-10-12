@@ -9,7 +9,8 @@ import { AnthropicCopyProvider } from "./implementations/copy/anthropic"
 import { ClaudeCliCopyProvider } from "./implementations/copy/claude-cli"
 import { MOCK_AI, buildMockCaptionReply } from "@/lib/testHooks"
 import { env } from "@/lib/env"
-import { isCliMode } from "@/lib/agent/config"
+import { isCliMode, pipelineMode } from "@/lib/agent/config"
+import { modelCallFor, recordModelCall } from "@/lib/models/modelCalls"
 import { IMAGE_PROVIDERS } from "./imageCapabilities"
 
 function instantiateCopyProvider(providerName: string, apiKey: string): CopyProvider {
@@ -54,8 +55,16 @@ export async function resolveCopyProvider(teamId: string, providerKey?: string):
   // real extractor still parses it (012 FR-21). The brief's copyProviderKey must
   // still reference a real enabled COPY provider (validated at brief creation) —
   // only the generation call is stubbed here.
+  // 008 FR-16: the seam short-circuits before the boundary, so it records the
+  // CAPTION model it was handed (the E2E reads it through /api/test/model-calls)
+  // and stamps model.arg, exactly as a real Claude provider would.
   if (MOCK_AI) {
-    return { generateCaptions: async (brief, targets) => buildMockCaptionReply(brief?.topic ?? '', targets) }
+    return {
+      generateCaptions: async (brief, targets, model) => {
+        recordModelCall(modelCallFor(model, pipelineMode(), 'copy'))
+        return { raw: buildMockCaptionReply(brief?.topic ?? '', targets), modelId: model.arg }
+      },
+    }
   }
 
   if (providerKey) {

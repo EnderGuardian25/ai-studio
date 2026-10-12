@@ -58,6 +58,11 @@ vi.mock('@/lib/prisma', () => ({
     },
     post: { findFirst: h.postFindFirst, create: h.postCreate, update: h.postUpdate },
     brief: { create: h.briefCreate, findUnique: h.briefFindUnique },
+    // 008 T6: generate/copy resolves the CAPTION model (no saved policy; in
+    // CLI mode, which the local .env that @prisma/client loads can set, the
+    // credential tier is 'team').
+    teamModelPolicy: { findUnique: async () => null },
+    userClaudeToken: { findFirst: async () => null },
   },
 }))
 vi.mock('@/lib/storage/minio', () => ({ resolveExportUrl: h.resolveExportUrl }))
@@ -259,8 +264,11 @@ describe('POST /api/generate/copy', () => {
 
   async function post(topic: string) {
     h.briefFindUnique.mockResolvedValue(brief(topic))
-    h.generateCaptions.mockImplementation(async (_b: unknown, targets: readonly string[]) =>
-      buildMockCaptionReply(topic, targets as never),
+    h.generateCaptions.mockImplementation(
+      async (_b: unknown, targets: readonly string[], model: { arg: string }) => ({
+        raw: buildMockCaptionReply(topic, targets as never),
+        modelId: model.arg,
+      }),
     )
     const req = new Request('http://localhost/api/generate/copy', {
       method: 'POST',
@@ -282,6 +290,8 @@ describe('POST /api/generate/copy', () => {
     const { status, body } = await post('Launch')
     expect(status).toBe(200)
     expect(h.generateCaptions.mock.calls[0][1]).toEqual(['HEADLINE', 'INSTAGRAM', 'LINKEDIN', 'WHATSAPP'])
+    // 008: the CAPTION system default, resolved by the route.
+    expect(h.generateCaptions.mock.calls[0][2]).toMatchObject({ surface: 'CAPTION', key: 'HAIKU', source: 'system' })
     expect(body).toEqual({
       copyText: 'Mock Instagram caption [Launch]',
       headline: 'Mock headline Launch',

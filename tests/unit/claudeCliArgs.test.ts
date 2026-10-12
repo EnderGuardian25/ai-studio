@@ -132,6 +132,18 @@ const { VERIFIER_MODEL } = await import('@/lib/drafts/refineVerify')
 const { decideModel, internalModel } = await import('@/lib/models/resolve')
 const { setModelCallSink } = await import('@/lib/models/modelCalls')
 
+// 008 T6: the copy and design call sites now pass a ResolvedModel (the
+// system default here: no policy row, CLI mode, team credential).
+function siteModel(surface: 'CAPTION' | 'DESIGN_FREEFORM') {
+  const r = decideModel(surface, {
+    policy: { allowed: ['HAIKU', 'SONNET', 'OPUS'], defaults: {}, gateOn: false },
+    credential: 'team',
+    mode: 'cli',
+  })
+  if (!r.ok) throw new Error(r.message)
+  return r.resolved
+}
+
 type ClaudeCliOptions = import('@/lib/agent/claudeCli').ClaudeCliOptions
 type ClaudeCliAuth = import('@/lib/agent/claudeAuth').ClaudeCliAuth
 
@@ -172,8 +184,8 @@ describe('AC-13: every text-mode call site spawns with --tools "" and never --al
   // so a new option on a site shows up here as a diff). Vision is not listed:
   // it runs in stream-json mode, and its site is covered by visionCli.test.ts.
   const sites: Array<[string, ClaudeCliOptions]> = [
-    ['copy', { timeoutMs: 120_000, label: 'copy' }],
-    ['design', { timeoutMs: 300_000, label: 'design', model: 'sonnet' }],
+    ['copy', { model: siteModel('CAPTION'), label: 'copy' }],
+    ['design', { label: 'design', model: siteModel('DESIGN_FREEFORM') }],
     ['refine', { timeoutMs: 300_000, label: 'refine', model: 'sonnet' }],
     ['verifier', { label: 'verify', model: VERIFIER_MODEL.cli, pinModel: true, timeoutMs: 60_000 }],
     ['background', { label: 'background', model: modelForBackground('cli'), timeoutMs: 90_000 }],
@@ -218,14 +230,16 @@ describe('AC-13: every text-mode call site spawns with --tools "" and never --al
           goal: 'g',
           tone: 'friendly',
           channels: ['INSTAGRAM'],
-        }, ['INSTAGRAM']),
+        }, ['INSTAGRAM'], siteModel('CAPTION')),
       )
       expectNoTools(h.spawnCalls[0].args, '')
     })
 
     it('design — runDesignAgentCli', async () => {
       h.stdout = '<!doctype html><html><body>x</body></html>'
-      await inAuth(() => runDesignAgentCli({ systemPrompt: 's', userMessage: 'u', briefId: 'b1', model: 'sonnet' }))
+      await inAuth(() =>
+        runDesignAgentCli({ systemPrompt: 's', userMessage: 'u', briefId: 'b1', model: siteModel('DESIGN_FREEFORM') }),
+      )
       expectNoTools(h.spawnCalls[0].args, '')
     })
 
