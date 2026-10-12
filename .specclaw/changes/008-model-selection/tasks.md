@@ -145,7 +145,7 @@ Wave 2 adds per-post and per-chat pickers only.
     - **Mock branches record** (design §7: the registry mock provider, the `runDesignAgent` mock, the background seam). The mock caption reply's stamp is `model.arg`.
     - **`retry/route.ts` is untouched:** retry re-enters `runGenerationForDraft`, which resolves from `Brief`.
 
-- [~] `T7` — Draft actions on the resolver: regenerate-copy, regenerate-design, refine and the verifier, plus every remaining stamp writer
+- [x] `T7` — Draft actions on the resolver: regenerate-copy, regenerate-design, refine and the verifier, plus every remaining stamp writer
   - Files: `src/app/api/drafts/[id]/regenerate-copy/route.ts`, `src/app/api/drafts/[id]/regenerate-design/route.ts`, `src/app/api/drafts/[id]/refine/route.ts`, `src/app/api/drafts/[id]/inline-edit/route.ts`, `src/app/api/drafts/[id]/revisions/[rev]/restore/route.ts`, `src/app/api/drafts/[id]/rejected/[revisionId]/adopt/route.ts`, `src/app/api/drafts/[id]/retry/route.ts`, `src/app/api/drafts/[id]/route.ts`, `src/lib/drafts/refineVerify.ts`, `src/lib/drafts/revisions.ts`, `src/lib/captions/store.ts`, `src/lib/api-types.ts`, `src/lib/testHooks.ts`, `tests/unit/draftRevisions.test.ts`, `tests/unit/renderStamps.test.ts`, `tests/unit/captionStore.test.ts`, `tests/unit/refineVerify.test.ts`, `tests/unit/captionRoutes.test.ts`
   - Estimate: large
   - Kind: impl
@@ -167,7 +167,7 @@ Wave 2 adds per-post and per-chat pickers only.
     - **Caption and headline edits** (`saveCaptionEdit`, `saveHeadlineEdit`) write no stamp field. A unit case proves it.
     - **`GET /api/drafts/[id]`** adds `designModel`, `designModelSubstitutedFrom`, `headlineModel`, `headlineModelSubstitutedFrom` and `captions[].model` / `modelSubstitutedFrom`. The revisions list adds `model`. All additive; the `DraftDetail` type follows.
 
-- [ ] `T8` — The assistants, image → template, the voice draft and the token ping on the resolver
+- [~] `T8` — The assistants, image → template, the voice draft and the token ping on the resolver
   - Files: `src/lib/campaign/briefingAssistant.ts`, `src/lib/agent/vision.ts`, `src/lib/brandkit/assistant.ts`, `src/lib/brandkit/templateFromImage.ts`, `src/lib/brandkit/voiceDraft.ts`, `src/lib/agent/userToken.ts`, `tests/unit/briefingAssistant.test.ts`, `tests/unit/brandKitAssistant.test.ts`, `tests/unit/visionCli.test.ts`, `tests/unit/userToken.test.ts`
   - Estimate: medium
   - Kind: impl
