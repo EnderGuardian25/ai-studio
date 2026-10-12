@@ -173,7 +173,10 @@ function claudeModelArgs(explicitModel?: string, pinned = false): string[] {
   // A pinned call (the refine add-verifier, change 004 FR-14b) runs on exactly
   // the model it names: the global override must not route it elsewhere.
   const pinnedModel = pinned ? explicitModel?.trim() : undefined
-  const override = (env.CLAUDE_CLI_MODEL ?? "").trim()
+  // 008 T3 interim (T5/T10 delete this read): env.CLAUDE_CLI_MODEL is now a
+  // validated ModelKey; its lower-case form is the CLI family alias, which is
+  // what the override passed before. A full-ID value now passes as its alias.
+  const override = env.CLAUDE_CLI_MODEL?.toLowerCase() ?? ""
   const model = pinnedModel || override || (explicitModel ?? "haiku").trim()
   if (!model || (!pinnedModel && model.toLowerCase() === "default")) return []
   if (!MODEL_NAME_RE.test(model)) {

@@ -117,6 +117,28 @@ enum ArtifactType {
   OTHER
 }
 
+// A catalogue key: a model family, not a version (008 A1). The values are
+// src/lib/models/catalogue.ts MODEL_KEYS (tests/unit/modelCatalogue.test.ts
+// pins the two together); the full API ID lives only in the catalogue and in
+// the stamps. A new family is `ALTER TYPE … ADD VALUE`, alone in its migration.
+enum ModelKey {
+  HAIKU
+  SONNET
+  OPUS
+}
+
+// The surfaces a team admin can set a default for (008 FR-02) — catalogue.ts
+// USER_SURFACES. Internal surfaces (background decision, verifier, token ping)
+// are fixed on Haiku and never persisted (A14).
+enum ModelSurface {
+  CAPTION
+  DESIGN_TEMPLATE
+  DESIGN_FREEFORM
+  REFINE
+  ASSISTANT_BRIEFING
+  ASSISTANT_BRANDKIT
+}
+
 // ── better-auth models ────────────────────────────────────────────────────
 
 model User {
@@ -253,6 +275,35 @@ model Team {
   encryptedClaudeToken String?
   claudeKeyPrefix      String?
   memberships          TeamMembership[]
+  // The team's model policy (008 FR-05); absent until an admin first saves it.
+  modelPolicy          TeamModelPolicy?
+}
+
+// A team's model policy (008 FR-05), 1:1 with Team. No row = the catalogue's
+// defaultAllowed entries, no team defaults, switch off (A2). Once saved, the
+// list is authoritative: a later catalogue addition is never added silently.
+model TeamModelPolicy {
+  teamId                       String             @id
+  team                         Team               @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  // The models this team may run on user surfaces; checked at every tier at
+  // call time (a stored value no longer allowed falls to the team default).
+  allowedModels                ModelKey[]
+  // The "Opus requires a personal token" switch (A3): gates every catalogue
+  // entry flagged personalTokenGated, in CLI mode only.
+  requirePersonalTokenForGated Boolean            @default(false)
+  updatedAt                    DateTime           @default(now()) @updatedAt
+  defaults                     TeamModelDefault[]
+}
+
+// One team default per user surface (008 FR-05). A missing row means "use the
+// system default" (FR-04's table, then CLAUDE_CLI_MODEL in CLI mode).
+model TeamModelDefault {
+  teamId  String
+  policy  TeamModelPolicy @relation(fields: [teamId], references: [teamId], onDelete: Cascade)
+  surface ModelSurface
+  model   ModelKey
+
+  @@id([teamId, surface])
 }
 
 model TeamMembership {
@@ -444,6 +495,12 @@ model Brief {
   briefImages         Json?
   referenceTemplateId String?
   referenceTemplate   BrandKitTemplate?  @relation("BriefReferenceTemplate", fields: [referenceTemplateId], references: [id])
+  // The initial generation's explicit model request (008 FR-10), read only by
+  // the generation and its retry as tier 1. designModel serves DESIGN_TEMPLATE
+  // or DESIGN_FREEFORM by designMode. Null = no explicit request; wave 1 never
+  // writes them.
+  captionModel        ModelKey?
+  designModel         ModelKey?
   createdAt           DateTime           @default(now())
   drafts              Draft[]
   scheduledGenerations ScheduledGeneration[]
@@ -522,6 +579,16 @@ model Draft {
   // once, guarded on null, by captions/store.ts migrateDraft. Null on drafts
   // created after 012.
   captionMigration CaptionMigration?
+  // The model that wrote `headline` (008 FR-08): the arg that crossed the
+  // boundary (apiId in API mode, cliArg in CLI mode). Plain TEXT, so a retired
+  // or non-Claude ID is kept as history. Null = unknown (pre-008). A headline
+  // edit leaves it (A6). …SubstitutedFrom = the refused value, or null.
+  headlineModel                String?
+  headlineModelSubstitutedFrom String?
+  // Mirrors the current revision's DraftRevision.model / modelSubstitutedFrom
+  // (008 FR-08): the model whose output is the live htmlContent.
+  designModel                  String?
+  designModelSubstitutedFrom   String?
   createdAt       DateTime        @default(now())
   // @default(now()) keeps the added column valid for pre-existing rows
   updatedAt       DateTime        @default(now()) @updatedAt
@@ -733,6 +800,11 @@ model DraftRevision {
   // written before this existed (unknown, and copied as null).
   promptVersion  String?
   fontSet        String?
+  // The model whose output is this row's htmlSnapshot (008 FR-08), part of the
+  // same render stamp: the arg that crossed the boundary, as plain TEXT. Null =
+  // unknown (pre-008). modelSubstitutedFrom = the refused value, or null.
+  model                String?
+  modelSubstitutedFrom String?
   // Drafts whose current not-applied outcome references this rejected row.
   notAppliedOn   Draft[]  @relation("DraftNotAppliedRevision")
 
@@ -758,6 +830,12 @@ model DraftCaption {
   // True only on fallback-migrated Instagram/LinkedIn rows (FR-05). Cleared by
   // an edit or a successful regenerate.
   needsReview   Boolean       @default(false)
+  // The model whose output is this row's text (008 FR-08), as plain TEXT: set
+  // by the generation and a successful regenerate of this channel, left by a
+  // user edit (A6) and by a failed field. Null = unknown (pre-008, or a FAILED
+  // row with no text). modelSubstitutedFrom = the refused value, or null.
+  model                String?
+  modelSubstitutedFrom String?
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @default(now()) @updatedAt
 

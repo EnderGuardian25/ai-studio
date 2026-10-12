@@ -91,7 +91,7 @@ Wave 2 adds per-post and per-chat pickers only.
     - **On a rejection:** that entry's `cliArg` becomes its alias (`haiku`/`sonnet`/`opus`). Re-run with the alias, record its `init.model`, and note the narrowed version-consistency claim for the verify report.
     - **Also recorded if available:** what CLI 2.1.287 prints on a usage-limited account (design §8). Otherwise the report says it was not observed.
 
-- [ ] `T3` — Schema, migration, rollback and `CLAUDE_CLI_MODEL` validation
+- [x] `T3` — Schema, migration, rollback and `CLAUDE_CLI_MODEL` validation
   - Files: `prisma/schema.prisma`, `prisma/migrations/20261012120000_model_selection/migration.sql` (new), `prisma/rollback/008-model-selection.down.sql` (new), `src/lib/env.ts`, `.env.example`, `tests/unit/envModel.test.ts` (new), `tests/unit/modelCatalogue.test.ts`
   - Estimate: medium
   - Kind: migration

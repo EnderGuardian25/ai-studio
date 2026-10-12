@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { ModelKey as PrismaModelKey, ModelSurface as PrismaModelSurface } from '@prisma/client'
 import {
   CATALOGUE,
   INTERNAL_SURFACES,
@@ -257,6 +258,23 @@ describe('system defaults — FR-04 table', () => {
       for (const path of ['A', 'B'] as const) {
         expect(isEligible(byKey(tableDefault(surface, path)), surface)).toBe(true)
       }
+    }
+  })
+})
+
+describe('the Prisma enums carry the catalogue values (T3)', () => {
+  // The catalogue's unions are client-safe TypeScript with no Prisma import;
+  // the persisted vocabulary is schema.prisma's ModelKey / ModelSurface. A key
+  // or surface added on one side only fails here, before a write could store a
+  // value the other side can't read.
+  it('ModelKey equals MODEL_KEYS', () => {
+    expect(Object.values(PrismaModelKey)).toEqual([...MODEL_KEYS])
+  })
+
+  it('ModelSurface equals USER_SURFACES (internal surfaces are never persisted)', () => {
+    expect(Object.values(PrismaModelSurface)).toEqual([...USER_SURFACES])
+    for (const surface of INTERNAL_SURFACES) {
+      expect(Object.values(PrismaModelSurface)).not.toContain(surface)
     }
   })
 })
