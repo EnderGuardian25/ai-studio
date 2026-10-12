@@ -4,7 +4,11 @@ This repo contains planning documents for **bistec-studio**, an internal marketi
 
 ## ✅ Outstanding work — START HERE (updated 2026-10-12, later)
 
-- **⏸️ 2026-10-12 (evening) — PICK UP HERE: 008 BUILD in progress.** Full detail: [`docs/handoff.md`](docs/handoff.md) top section.
+- **⏸️ 2026-10-13 — PICK UP HERE: 008 wave 1 is BUILT, REVIEWED and GREEN.** Full detail: [`docs/handoff.md`](docs/handoff.md) top section.
+  - **Done:** T1 and T3–T12 are committed, each reviewed NOTE. The local full clean E2E gave **383/3/0/0** and unit 2394. **CI run 38304451112 at `d3c5685a` is green.**
+  - **Open:** **T2, the operator CLI full-ID check** (the user runs it; the command is in `tasks.md` T2). T12 stays `in_progress` until `reports/T2.md` exists.
+  - **Next:** wave 2, T13–T19 (the pickers), with the same one-task-at-a-time process.
+- **(superseded) 2026-10-12 (evening) — 008 BUILD in progress.** Full detail: [`docs/handoff.md`](docs/handoff.md) top section.
   - **Committed:** T1, T3–T6 (each reviewed) and **T7, which is UNREVIEWED.** The review was stopped to save usage; the gates were verified (unit 2285/2285).
   - **Next:**
     1. review T7, then mark it complete;

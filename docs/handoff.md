@@ -7,7 +7,52 @@
 
 ---
 
-## ⏸️ 2026-10-12 (evening) — PICK UP HERE: 008 BUILD in progress — wave 1, T1–T7 committed (T7 UNREVIEWED); next: review T7, then T8
+## ⏸️ 2026-10-13 — PICK UP HERE: 008 WAVE 1 is built, reviewed and green (local and CI). Only T2 (operator) is open, then wave 2
+
+Every wave-1 task except T2 is committed, reviewed and pushed. All reviews were NOTE, with no BLOCK or WARN. T12 stays `in_progress` until T2's report exists.
+
+| Task                                                                                            | Review                                                               | Commit                         |
+| ----------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- | ------------------------------ |
+| T7 draft actions on the resolver                                                                | NOTE (4)                                                             | `19a6ba22` + review `5d4386ed` |
+| T8 assistants, image → template, voice draft, token ping                                        | NOTE                                                                 | `004153ab`                     |
+| T9 action budget, heartbeats, scheduler lease renewal, usage-limit `errorReason`, image timeout | NOTE (3)                                                             | `1c02c90b`                     |
+| T10 boundary closed, literal guard, `modelBoundary.test.ts`                                     | NOTE (3)                                                             | `ddc3e9db`                     |
+| T11 `/team` → Models                                                                            | NOTE (3); the orchestrator fixed note 1 (`cliMode` from `view.mode`) | `73765983`                     |
+| T12 wave-1 E2E §Y (TC-MODEL-01…12), AC-23 round trip, export/import stamps                      | NOTE (3)                                                             | `d3c5685a`                     |
+
+**Wave-1 gate:**
+
+- **Local:** the orchestrator ran a full clean mock E2E after DROP, `test:e2e:db` and `rm -rf .next`: **383 passed / 3 skipped / 0 failed / 0 flaky**. Unit is 2394/2394 in CLI and API mode; tsc is clean; lint has 0 errors.
+- **CI:** run 38304451112 at `d3c5685a` is **green**: E2E 383/3, unit, build, render 15/15.
+- **The T11 commit's own CI run was red** because of the /team Save-count ripple that T12 fixed. HEAD is green.
+
+### Resume, in order
+
+1. **T2 (the user runs it).**
+   - The command is in `tasks.md` T2. Paste its output into `reports/T2.md`.
+   - **If an ID is rejected,** that catalogue entry's `cliArg` becomes its alias. `scripts/cli-sandbox-check.mjs` `VISION_MODEL` follows it; its drift test pins it.
+   - Then mark T12 complete with `specclaw-update-task-status … T12 complete`.
+2. **Wave 2, T13 → T19.** Same process: an implementer, then `specclaw:code-reviewer`, then the orchestrator re-gates and commits, one task at a time. The full clean E2E runs at T18.
+
+### Rulings and facts from 2026-10-13 (keep them)
+
+- **T8, model resolution:** an assistant entry point whose model can't be resolved returns **422 `{code, message}`**. Before, it returned a generic 500. T13 will map an _explicit-request_ miss to 400 via `AssistantModelError.code`.
+- **T8, voice routes:** the two brand-voice routes are now wrapped in `withClaudeAuth`, because the voice draft now has a CLI path.
+- **T8, token ping:** its MOCK branch records mode `cli`.
+- **T9, the tightest budget segment** is the scheduler's renew-before-design → complete: 830 s plus the 60 s margin is 890 s, against the 900 s lease. If a real Opus run nears 600 s, lower Opus `DESIGN_FREEFORM` first.
+- **T9, refine** also touches before `recordRejectedRender`.
+- **T9, accepted:** a DB error on a heartbeat or lease renewal fails the generation, or sends the entry to retry.
+- **T10, the literal guard** allows model literals only in `src/lib/models/catalogue.ts`; ALL-CAPS keys are exempt.
+- **T10, `CLAUDE_CLI_MODEL`** is read at runtime only in `policy.ts`, as the system default.
+- **T10, cosmetic:** the "Known edge case" comment in `claudeCli.ts` (~403) lost the function it described. Re-anchor it some time.
+- **T11:** unticking a model resets the defaults that named it. Refine's "System default" label names only Path B's model.
+- **T12, test isolation:** §Y resets the team model-policy row before and after every case.
+- **T12, export manifest:** it stays at v2, because the change is additive.
+- **T12, AC-23:** the in-suite case uses a migrate-deployed scratch DB, because `TEMPLATE` is refused while the server is connected. The literal `TEMPLATE` run is recorded in `reports/T12.md`.
+- **Wave-2 UI (from the T7 review):** a FAILED caption row may keep an old stamp, so hide the stamp when the row is FAILED.
+- **Gotchas:** start Docker Desktop before the E2E gate. `pgrep` doesn't exist in this Git Bash.
+
+## (superseded) 2026-10-12 (evening) — 008 BUILD in progress — wave 1, T1–T7 committed (T7 UNREVIEWED); next: review T7, then T8
 
 The session stopped to save usage. The user approved the plan ("continue") and the build is running `/specclaw:build 008-model-selection` subagent-driven, ONE task at a time: implementer subagent → `specclaw:code-reviewer` → the orchestrator re-runs the gates and commits (`specclaw-build commit`).
 
