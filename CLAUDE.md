@@ -4,7 +4,7 @@ This repo contains planning documents for **bistec-studio**, an internal marketi
 
 ## ✅ Outstanding work — START HERE (updated 2026-10-13)
 
-- **⏸️ 2026-10-13 (latest) — PICK UP HERE: **016 fresh-start cleanup is BUILT 5/5 and VERIFIED PASS (E2E 386/3/0/0; CI green, run 38432519271); 017 building.** The new system starts FRESH (no data import, user decision). 004 re-verified PASS at `e88b55b6` (CI green). Changes 016–020 are approved (bounded) and build one at a time: 016 fresh-start cleanup → 017 publish fixes → 018 small fixes → 019 claim token → 020 Create post button off the draft page.** Full detail: [`docs/handoff.md`](docs/handoff.md) top section.
+- **⏸️ 2026-10-13 (latest) — PICK UP HERE: **016 fresh-start cleanup VERIFIED PASS (E2E 386/3/0/0; CI green). 017 publish fixes BUILT 3/3 (E2E 387/3/0/0); 018 next.** The new system starts FRESH (no data import, user decision). 004 re-verified PASS at `e88b55b6` (CI green). Changes 016–020 are approved (bounded) and build one at a time: 016 fresh-start cleanup → 017 publish fixes → 018 small fixes → 019 claim token → 020 Create post button off the draft page.** Full detail: [`docs/handoff.md`](docs/handoff.md) top section.
   - **Decisions:**
     - no import or carry-over; `import-posts` is won't-fix and both scripts are deleted in 016;
     - no pre-made "Bistec" team on fresh systems;
@@ -85,7 +85,7 @@ This repo contains planning documents for **bistec-studio**, an internal marketi
     1. ~~the red-CI refine race, together with the refine "Applying…" follow-up;~~ **done: change 015, CI green 2026-10-12;**
     2. ~~`import-posts.mjs` never sets `teamId`~~ (won't-fix; removed by 016), so a real import has been broken since team tenancy; `--dry-run` hides it (L22);
     3. the ACP manifest's advertised `generate_post` output schema (`src/acp/agent.ts`) lacks `headline` and `captions`;
-    4. `POST /api/posts` returns 201 for an immediate publish that ends FAILED;
+    4. ~~`POST /api/posts` returns 201 for an immediate publish that ends FAILED;~~ fixed by 017;
     5. a per-claim token for draft actions;
     6. the floating Create post button overlapping content;
     7. small items: the trailing `---` in split sections (T3); the caption check runs before the duplicate 409 (T7/T8); per-post caption loads in the posts list GET (T7); the axe rule list copied into `captions.test.ts` should become a shared helper (T13); the 014 verify gaps 5–8;
@@ -116,7 +116,7 @@ This repo contains planning documents for **bistec-studio**, an internal marketi
     - Contracts keep their names.
     - `copyText` is preserved as `legacyCaptionText @map`, alongside the boot backfill and the lazy loader (all removed by 016).
   - **Follow-ups to propose after 012:**
-    - `POST /api/posts` returns 201 for a FAILED immediate publish;
+    - ~~`POST /api/posts` returns 201 for a FAILED immediate publish;~~ fixed by 017;
     - a per-claim token for draft actions;
     - the floating Create post button overlapping content at some widths.
   - **Gotchas:**

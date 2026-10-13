@@ -1,9 +1,11 @@
 {
   "change": "018-post-008-small-fixes",
-  "phase": "proposal",
+  "phase": "tasks",
   "branch": "",
   "size": "bounded",
   "phases": {
-    "proposal": { "status": "approved", "at": "2026-10-13T15:44:23Z" }
+    "proposal": { "status": "approved", "at": "2026-10-13T15:44:23Z" },
+    "spec": { "status": "done", "at": "2026-10-13T17:04:08Z" },
+    "tasks": { "status": "done", "at": "2026-10-13T17:04:09Z" }
   }
 }

@@ -32,7 +32,7 @@ This change has **3 tasks in 2 waves**. Each task is implemented by a subagent, 
 
 ### Wave 2 — Gate
 
-- [ ] `T3` — Full gate and CI
+- [x] `T3` — Full gate and CI
   - Files: `docs/handoff.md`, `CLAUDE.md`
   - Estimate: small
   - Kind: docs
