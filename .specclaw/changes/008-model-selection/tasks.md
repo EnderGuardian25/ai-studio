@@ -311,7 +311,7 @@ Wave 2 adds per-post and per-chat pickers only.
     - **No new settle logic** (015, L25): each control already posts then awaits the refetch; the picker only adds `model` to the body.
     - **"Generated with":** a muted line per panel and in the Versions sheet. Its display name comes from `entryForStamp`; it falls back to the raw stamp, and adds "(substituted)" with a `title` naming `substitutedFrom`.
 
-- [ ] `T17` — The assistant chat header pickers and the team-token notice wiring
+- [x] `T17` — The assistant chat header pickers and the team-token notice wiring
   - Files: `src/components/campaigns/BriefingAssistantPanel.tsx`, `src/components/admin/brandkits/BrandKitAssistantPanel.tsx`
   - Estimate: small
   - Kind: impl

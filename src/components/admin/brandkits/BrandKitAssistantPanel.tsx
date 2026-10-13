@@ -1,11 +1,13 @@
 'use client'
 
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { Check, FileText, Loader2, Paperclip, Send, Sparkles, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Drawer } from '@/components/ui/Modal'
-import { apiFetch } from '@/lib/apiFetch'
+import { ModelPicker } from '@/components/ui/ModelPicker'
+import { ApiError, apiFetch } from '@/lib/apiFetch'
+import type { ModelKey } from '@/lib/models/catalogue'
 import { ColorEditor } from './ColorEditor'
 import { COMPACT_TEXTAREA, EYEBROW, FOCUS, ICON, ICON_BUTTON, SCROLL_FOCUS, TAG } from '@/components/ui/folio'
 import { FieldLabel } from '@/components/ui/FieldLabel'
@@ -75,6 +77,16 @@ export function BrandKitAssistantPanel({ kitId, open, onClose, onApplied }: Bran
   const [style, setStyle] = useState('')
   const [hasSuggestion, setHasSuggestion] = useState(false)
   const [applying, setApplying] = useState(false)
+  // 008 FR-21: the header model pick. It is client state for this open chat
+  // only (no remembered choice; a reload resets it). Undefined means the team
+  // or system default (A5), so an untouched picker sends today's body. A
+  // refused pick's 400 message shows on the picker.
+  const [model, setModel] = useState<ModelKey | undefined>(undefined)
+  const [modelError, setModelError] = useState<string | undefined>(undefined)
+  const pickModel = useCallback((next: ModelKey | undefined) => {
+    setModel(next)
+    setModelError(undefined)
+  }, [])
 
   // Load the kit's source documents when the drawer opens.
   useEffect(() => {
@@ -140,6 +152,7 @@ export function BrandKitAssistantPanel({ kitId, open, onClose, onApplied }: Bran
     setMessages(next)
     setInput('')
     setPending(true)
+    setModelError(undefined)
     setTimeout(() => endRef.current?.scrollIntoView({ behavior: 'smooth' }), 0)
     try {
       const result = await apiFetch<{ reply: string; suggestion: BrandKitSuggestion | null }>(
@@ -147,14 +160,18 @@ export function BrandKitAssistantPanel({ kitId, open, onClose, onApplied }: Bran
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ messages: next.map(m => ({ role: m.role, content: m.content })) }),
+          // model is dropped by JSON.stringify while undefined (A5).
+          body: JSON.stringify({ messages: next.map(m => ({ role: m.role, content: m.content })), model }),
         },
       )
       setMessages([...next, { role: 'assistant', content: result.reply, suggestion: result.suggestion }])
       if (result.suggestion) loadSuggestion(result.suggestion)
       setTimeout(() => endRef.current?.scrollIntoView({ behavior: 'smooth' }), 0)
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'The assistant failed to reply')
+      // A refused model pick (400, nothing ran) shows on the picker; any other
+      // failure toasts. Either way the turn rolls back so it can be resent.
+      if (err instanceof ApiError && err.code === 'MODEL_NOT_ALLOWED') setModelError(err.message)
+      else toast.error(err instanceof Error ? err.message : 'The assistant failed to reply')
       setMessages(messages)
       setInput(content)
     } finally {
@@ -193,6 +210,19 @@ export function BrandKitAssistantPanel({ kitId, open, onClose, onApplied }: Bran
   return (
     <Drawer open={open} onClose={onClose} title="Extract brand from references">
       <div className="flex h-full flex-col">
+        {/* The chat header's model picker (008 FR-21), pre-selected to the team
+            or system default. Its team-token notice is the picker's own
+            (FR-22). It renders nothing until /api/models loads. */}
+        <ModelPicker
+          id="brandkit-assistant-model"
+          surface="ASSISTANT_BRANDKIT"
+          value={model}
+          onChange={pickModel}
+          label="Brand kit assistant model"
+          disabled={pending}
+          error={modelError}
+          className="flex-shrink-0 border-b border-line-subtle px-5 py-4"
+        />
         {/* Documents */}
         <div className="space-y-2 border-b border-line-subtle px-5 py-4">
           <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">

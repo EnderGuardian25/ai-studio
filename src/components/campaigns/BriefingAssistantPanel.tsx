@@ -1,13 +1,15 @@
 'use client'
 
-import React, { useRef, useState } from 'react'
+import React, { useCallback, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { FileText, Loader2, Paperclip, Send, Trash2, ArrowUp, ArrowDown, CalendarClock } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Drawer } from '@/components/ui/Modal'
 import { FieldLabel } from '@/components/ui/FieldLabel'
-import { apiFetch } from '@/lib/apiFetch'
+import { ModelPicker } from '@/components/ui/ModelPicker'
+import { ApiError, apiFetch } from '@/lib/apiFetch'
+import type { ModelKey } from '@/lib/models/catalogue'
 import { CHANNEL_VALUES } from '@/lib/channels'
 import { COMPACT_FIELD, FOCUS, ICON, ICON_BUTTON, SCROLL_FOCUS, SMALL_CAPS } from '@/components/ui/folio'
 
@@ -90,6 +92,16 @@ export function BriefingAssistantPanel({ campaignId, open, onClose, onApply }: B
   const [plan, setPlan] = useState<PlanRow[] | null>(null)
   const [scheduling, setScheduling] = useState(false)
   const messageId = React.useId()
+  // 008 FR-21: the header model pick. It is client state for this open chat
+  // only (no remembered choice; a reload resets it). Undefined means the team
+  // or system default (A5), so an untouched picker sends today's body. A
+  // refused pick's 400 message shows on the picker.
+  const [model, setModel] = useState<ModelKey | undefined>(undefined)
+  const [modelError, setModelError] = useState<string | undefined>(undefined)
+  const pickModel = useCallback((next: ModelKey | undefined) => {
+    setModel(next)
+    setModelError(undefined)
+  }, [])
 
   const { data: docs = [] } = useQuery({
     queryKey: ['campaigns', campaignId, 'documents'],
@@ -142,6 +154,7 @@ export function BriefingAssistantPanel({ campaignId, open, onClose, onApply }: B
     setMessages(nextMessages)
     setInput('')
     setPending(true)
+    setModelError(undefined)
     // Let the new message render before scrolling to it.
     setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 0)
     try {
@@ -156,6 +169,8 @@ export function BriefingAssistantPanel({ campaignId, open, onClose, onApply }: B
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             messages: nextMessages.map(m => ({ role: m.role, content: m.content })),
+            // Dropped by JSON.stringify while undefined (A5).
+            model,
           }),
         },
       )
@@ -177,7 +192,10 @@ export function BriefingAssistantPanel({ campaignId, open, onClose, onApply }: B
       }
       setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 0)
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'The assistant failed to reply')
+      // A refused model pick (400, nothing ran) shows on the picker; any other
+      // failure toasts.
+      if (err instanceof ApiError && err.code === 'MODEL_NOT_ALLOWED') setModelError(err.message)
+      else toast.error(err instanceof Error ? err.message : 'The assistant failed to reply')
       // Roll the failed turn back so it can be resent.
       setMessages(messages)
       setInput(content)
@@ -241,6 +259,19 @@ export function BriefingAssistantPanel({ campaignId, open, onClose, onApply }: B
   return (
     <Drawer open={open} onClose={onClose} title="Draft briefing with AI">
       <div className="flex h-full flex-col">
+        {/* The chat header's model picker (008 FR-21), pre-selected to the team
+            or system default. Its team-token notice is the picker's own
+            (FR-22). It renders nothing until /api/models loads. */}
+        <ModelPicker
+          id="briefing-assistant-model"
+          surface="ASSISTANT_BRIEFING"
+          value={model}
+          onChange={pickModel}
+          label="Briefing assistant model"
+          disabled={pending}
+          error={modelError}
+          className="flex-shrink-0 border-b border-line-subtle px-5 py-4"
+        />
         {/* Documents */}
         <div className="space-y-2 border-b border-line-subtle px-5 py-4">
           <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
