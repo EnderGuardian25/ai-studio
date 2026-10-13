@@ -1,15 +1,189 @@
 # bistec-studio — Session Handoff
 
-**Date:** 2026-10-12, evening (latest: **008 BUILD in progress — wave 1 T1–T7 committed, T7 unreviewed; T2 waiting on the user; next: review T7 then T8.** Earlier: **008 model selection APPROVED (architectural) after a deep party panel; a planner subagent was writing its spec/design/tasks at the context clear. 015 verified PASS, and fork CI on `v2` is GREEN**). Previous: 2026-10-12 (015 fixed the draft-page settle race behind the red CI; 012 per-channel captions BUILT 16/16 and VERIFIED PASS). Previous: 2026-10-11, earlier (013 and 014 verified PASS; 012 building, T1–T7 of 16 committed). Previous: 2026-10-09 (011 verified PASS; fork `main` merged into `v2`; 013 fork CI, checks only, building; 014 and 012 approved). Previous: 2026-10-08 (011 built 13/13 on `v2` in the fork). Previous: 2026-10-07 (005 verified PASS; 011 planned, wave 1 built; the move to the fork). Previous: 2026-10-03 (004 finished and verified PARTIAL, Phase 0 only; 005 built 9/10, waiting on one operator check). Before that: 2026-09-28 (build session — 004 Waves 1–3 built, MinIO → silo, PR #42 + draft PR #43). Before that: 2026-09-23 (later, later the same day: proposal **012** per-channel captions + copy→caption rename, a floating **Create post** button folded into 011, and a launch-video legibility pass. Before that: planning session — proposals 008–011 + roadmap, 004 re-planned to 24 tasks incl. Phase 0, and the deploy pipeline found broken: Coolify 401 since 2026-09-15). Previous: 2026-07-28 (copy-edit status clobber fix).
+**Date:** 2026-10-13 (latest: **008 model selection is BUILT, 19 of 19 tasks; the wave-2 gate is 391/3/0/0; next: `/specclaw:verify 008-model-selection`.** Earlier the same day: 008 wave 1 built, reviewed and CI-green, and T2 passed). Previous: 2026-10-12, evening (**008 BUILD in progress — wave 1 T1–T7 committed, T7 unreviewed; T2 waiting on the user; next: review T7 then T8.** Earlier: **008 model selection APPROVED (architectural) after a deep party panel; a planner subagent was writing its spec/design/tasks at the context clear. 015 verified PASS, and fork CI on `v2` is GREEN**). Previous: 2026-10-12 (015 fixed the draft-page settle race behind the red CI; 012 per-channel captions BUILT 16/16 and VERIFIED PASS). Previous: 2026-10-11, earlier (013 and 014 verified PASS; 012 building, T1–T7 of 16 committed). Previous: 2026-10-09 (011 verified PASS; fork `main` merged into `v2`; 013 fork CI, checks only, building; 014 and 012 approved). Previous: 2026-10-08 (011 built 13/13 on `v2` in the fork). Previous: 2026-10-07 (005 verified PASS; 011 planned, wave 1 built; the move to the fork). Previous: 2026-10-03 (004 finished and verified PARTIAL, Phase 0 only; 005 built 9/10, waiting on one operator check). Before that: 2026-09-28 (build session — 004 Waves 1–3 built, MinIO → silo, PR #42 + draft PR #43). Before that: 2026-09-23 (later, later the same day: proposal **012** per-channel captions + copy→caption rename, a floating **Create post** button folded into 011, and a launch-video legibility pass. Before that: planning session — proposals 008–011 + roadmap, 004 re-planned to 24 tasks incl. Phase 0, and the deploy pipeline found broken: Coolify 401 since 2026-09-15). Previous: 2026-07-28 (copy-edit status clobber fix).
 **Repo (since 2026-10-07):** https://github.com/EnderGuardian25/ai-studio — a public GitHub **fork** of the company repo `bistec-oss/studio`. All development continues here. The company repo is left as it is and receives nothing from this work. See the 2026-10-07 fork section below.
 **Branch:** work continues on **`v2`**, the fork's default branch. Fork `main` = `671ad6e9`, the company `main` at fork time. `v2` has contained fork `main` since the merge at `2506de0b` (2026-10-09).
 **Production:** none for the fork. `https://studio.bistecglobal.com` is the **company's** prod. It runs company `main` and is not ours to deploy.
 
 ---
 
-## ⏸️ 2026-10-13 — PICK UP HERE: 008 WAVE 1 is built, reviewed and green (local and CI). Only T2 (operator) is open, then wave 2
+## ⏸️ 2026-10-13 (later) — PICK UP HERE: 008 model selection is BUILT, 19 of 19 tasks. Next: `/specclaw:verify 008-model-selection`
 
-Every wave-1 task except T2 is committed, reviewed and pushed. All reviews were NOTE, with no BLOCK or WARN. T12 stays `in_progress` until T2's report exists.
+Both waves are committed and pushed to `v2`. Every task has a report in `.specclaw/changes/008-model-selection/reports/` and a review in `reviews/`; no review raised a BLOCK, and T1's one WARN was fixed before commit. T2, the operator check, passed. The deploy, rollback, `CLAUDE_CLI_MODEL` and procedure notes are in the **008 runbook** section just below.
+
+### Commits
+
+| Task | Commit                 | What                                                                                                                                                         |
+| ---- | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| T1   | `0295a53c`             | The catalogue (`src/lib/models/catalogue.ts`) and the pure resolver (`resolve.ts`, `policyRules.ts`)                                                         |
+| T2   | `b8c84ae0`, `677d2e19` | **Operator:** the pinned CLI 2.1.287 accepts all three full model IDs (PASS)                                                                                 |
+| T3   | `628b6179`             | Schema, migration `20261012120000_model_selection`, the down script, `CLAUDE_CLI_MODEL` validation                                                           |
+| T4   | `8d5b66c1`             | `resolveModel`, the team policy store, `GET/PUT /api/team/model-policy`, `GET /api/models`                                                                   |
+| T5   | `b43c4a64`             | The boundary: the CLI takes a `ResolvedModel`, `createMessage`, the recorder, the usage-limit classifier, `/api/test/model-calls`                            |
+| T6   | `198a64d9`             | Generation on the resolver, with the caption, headline and design stamps                                                                                     |
+| T7   | `19a6ba22`, `5d4386ed` | regenerate-copy, regenerate-design, refine and the verifier on the resolver, and every remaining stamp writer                                                |
+| T8   | `004153ab`             | The assistants, image → template, the voice draft and the token ping on the resolver                                                                         |
+| T9   | `1c02c90b`             | The per-action time budget, the heartbeats, scheduler lease renewal, the usage-limit `errorReason` and the 120 s image timeout                               |
+| T10  | `ddc3e9db`             | The boundary closed: `model` required, `modelFor` / `modelForBackground` / `pinModel` / `VERIFIER_MODEL` deleted, the literal guard, `modelBoundary.test.ts` |
+| T11  | `73765983`             | `/team` → Models                                                                                                                                             |
+| T12  | `d3c5685a`             | Wave-1 E2E §Y (TC-MODEL-01…12), the AC-23 round trip, export/import carry the stamps; **wave-1 gate**                                                        |
+| T13  | `95a9ab26`             | The `model` body fields, the `Brief` initial request, and spec open question 1 (a caption pick needs a Claude caption provider)                              |
+| T14  | `57f5dfa7`             | The shared `ModelPicker`, `useModels()` and the pure picker helpers                                                                                          |
+| T15  | `8c164a6a`             | The brief wizard's Review step pickers                                                                                                                       |
+| T16  | `f886db89`             | The draft page pickers and "Generated with"                                                                                                                  |
+| T17  | `92ae2854`             | The assistant chat header pickers and the team-token notice                                                                                                  |
+| T18  | `b36be415`             | Wave-2 E2E §Y (TC-MODEL-13…20); **wave-2 gate**                                                                                                              |
+| T19  | (this commit)          | Docs: this handoff and runbook, CLAUDE.md, ROADMAP, the MCP/ACP guide, DESIGN_SYSTEM §8.19, the e2e plan's status lines                                      |
+
+### Gates
+
+- **Wave 1:** a full clean mock E2E after DROP, `test:e2e:db` and `rm -rf .next` gave **383 passed / 3 skipped / 0 failed / 0 flaky**. CI run 38304451112 at `d3c5685a` was green (E2E 383/3, unit, build, render 15/15).
+- **Wave 2:** the same procedure gave **391 passed / 3 skipped / 0 failed / 0 flaky** (9.0 min). The 3 skips are the intentional TC-REG-H11a/b/c.
+- **Unit: 2604/2604** (93 files), in the machine's CLI mode and in forced API mode. tsc is clean; lint has 0 errors and the 7 pre-existing warnings.
+- **CI for `b36be415`:** run 38354472914 was still in progress when T19 was written. **Check it** (`gh run list --branch v2 --repo EnderGuardian25/ai-studio`) before calling wave 2 green on CI (L21).
+
+### Do this next, in order
+
+1. **Confirm the CI run for `b36be415` (and for the T19 commit) is green.**
+2. **`/specclaw:verify 008-model-selection`.** Wave 1 ACs AC-01 … AC-24, wave 2 ACs AC-25 … AC-33. AC-14 is T2's report. AC-32 is optional and not a gate (see the runbook).
+3. **Then the follow-ups below,** each its own change.
+
+### Rulings and facts from wave 2 (keep them)
+
+- **T13, spec open question 1 is built as its recommended default.** A `model` pick on a caption (`POST /api/briefs` `captionModel`, every `regenerate-copy` form) returns **400 `MODEL_NOT_ALLOWED`** "This team's caption provider is not Claude, so the caption model can't be chosen" when the caption provider is OpenAI. "Is Claude" is read from the registered row: `cli` and `anthropic` are Claude, `openai` is not, no row is Claude, and an unknown name counts as Claude. The draft GET carries `captionProviderIsClaude` for **that draft's** provider, so the caption pickers hide exactly when the server would refuse.
+- **T13, error shapes.** A refused **explicit** pick is a 400 `{ error, code: 'MODEL_NOT_ALLOWED' }`, before any claim; `POST /api/briefs` adds `field`. With **no** pick, a resolution failure keeps the wave-1 answer: 422 `{ code, message }` on refine, regenerate-design and the two chats, 422 `COPY_ERROR` on regenerate-copy.
+- **T13, `regenerate-design` now reads a strict body:** `{}` or `{ model }`; anything else is 400 "Send {} or { model }". An empty body is still valid.
+- **T14, the picker resets a stale pick by itself** (a model unticked at `/team`, the switch turned on, or a path change to template fill), so a client never sends a key the server would refuse.
+- **T15, `apiFetch` throws `ApiError`,** which carries `status`, `code` and `field`. `message` and `instanceof Error` are unchanged for existing callers.
+- **T16, the "Regenerate all" picker is labelled "All captions model".** "Generated with" is hidden for a FAILED caption row and on a FAILED draft.
+- **T17, the chat picker** is the first strip under each assistant drawer's title bar. The pick lasts for the open chat and resets on reload.
+
+### Still open after 008 (each its own change)
+
+1. **`import-posts.mjs` never sets `teamId` (L22).** A real import has been broken since team tenancy, and `--dry-run` hides it. 008 T12 made the scripts carry the stamps but did not fix this.
+2. **The ACP manifest's `generate_post` output schema** is missing `headline` and `captions`.
+3. **`POST /api/posts` returns 201 for an immediate publish that ends FAILED.**
+4. **A per-claim token for draft actions.**
+5. **The floating Create post button overlaps content** at some widths.
+6. **The caption/headline undo-clear uses the observed-edge pattern** (a 015 follow-up).
+7. **The 015 revision-list guard doesn't retry after a transient `fetchRevisions` failure.**
+8. **Small 008 items:**
+   - `/team` → Models names refine's "System default" for Path B only; Path A drafts refine on Haiku (T11);
+   - the "Known edge case" comment in `claudeCli.ts` lost the function it described (T10);
+   - `src/mcp/tools/generate.ts` still has a comment about "per-path models", which the catalogue replaced;
+   - the axe rule list is now copied into `captions.test.ts` and `model-selection.test.ts`; make it a shared helper;
+   - the draft poll makes one extra `copyProviderIsClaude` lookup per GET (T16).
+9. **Small 012/014 items:** the trailing `---` in split sections; the caption check runs before the duplicate-post 409; per-post caption loads in the posts list; the 014 verify gaps 5–8.
+10. **The 005 AC-16 operator run.** 🔴 Revoke the OAuth token pasted into chat on 2026-10-06 first.
+
+---
+
+## 🛠️ 008 runbook — model selection: migration, rollback, `CLAUDE_CLI_MODEL`, procedures
+
+**Release note:**
+
+- _Models are now chosen per team at /team → Models._
+- _`CLAUDE_CLI_MODEL` is the system default, not a global override, and `default` is no longer accepted._
+- _Freeform design and the assistants move from Sonnet 4.6 to Sonnet 5.5._
+- Also: every caption, headline and design revision now records the model that wrote it, and users can pick a model per post, per regenerate and per chat. A team that changes nothing keeps today's split (Haiku for captions and template fill, Sonnet for the rest), on current IDs.
+
+### The catalogue
+
+`src/lib/models/catalogue.ts` is the only file under `src/` allowed to hold a model literal (`tests/unit/modelLiteralGuard.test.ts`; ALL-CAPS keys are exempt).
+
+| Key      | Name       | `apiId` = `cliArg`  | `previousApiIds`            | $/MTok in / out | Tier  | Template fill (Path A) | Gated by the switch |
+| -------- | ---------- | ------------------- | --------------------------- | --------------- | ----- | ---------------------- | ------------------- |
+| `HAIKU`  | Haiku 4.5  | `claude-haiku-4-5`  | `claude-haiku-4-5-20251001` | 1 / 5           | `$`   | yes                    | no                  |
+| `SONNET` | Sonnet 5.5 | `claude-sonnet-5-5` | `claude-sonnet-4-6`         | 2 / 10          | `$$`  | yes                    | no                  |
+| `OPUS`   | Opus 5.5   | `claude-opus-5-5`   | —                           | 4 / 20          | `$$$` | **no**                 | **yes**             |
+
+- **System defaults:** captions and template fill → Haiku; freeform design, both assistants → Sonnet; refine → Haiku on a Path A draft, Sonnet on Path B.
+- **Internal steps** (the background decision, the refine verifier, the token ping) always run Haiku. They ignore the team allow-list.
+- **The tier is computed** from the numeric prices (`modelTier`), never written. The prices' dated source is the entry's `priceSource`.
+- **Timeouts per model and surface** are in design.md §5. The Opus values are **placeholders** until AC-32 measures them.
+
+### The migration
+
+- **One migration, `20261012120000_model_selection`.** It only adds: the enums `ModelKey` and `ModelSurface`, the tables `TeamModelPolicy` and `TeamModelDefault`, `Brief.captionModel` / `designModel`, and the eight nullable `TEXT` stamp columns (`Draft.headlineModel`, `headlineModelSubstitutedFrom`, `designModel`, `designModelSubstitutedFrom`; `DraftRevision.model`, `modelSubstitutedFrom`; `DraftCaption.model`, `modelSubstitutedFrom`).
+- **The entrypoint's `prisma migrate deploy` applies it on boot.** There is no backfill: pre-008 rows read as null, which means "unknown" (004's stamp rule). A regenerate on a null stamp starts at the team default.
+- **The previous image runs against the migrated schema unchanged,** because it never reads the new columns. A rolling deploy is safe.
+- **Locally:** run `npx prisma migrate deploy` on the dev DB before running the dev app. The Prisma client selects the new columns, so a dev DB without the migration can't load drafts.
+
+### Rollback
+
+- **To go back to the pre-008 image, boot it. No SQL step is needed.** It ignores everything 008 added. If its `migrate deploy` refuses because a newer migration is applied, boot it with `SKIP_MIGRATIONS=1`.
+- **Full removal only:** `prisma/rollback/008-model-selection.down.sql`. Stop both 008 containers (app and scheduler) first, because 008 code reads the columns it drops. Run it with `npx prisma db execute --file prisma/rollback/008-model-selection.down.sql --url "$DATABASE_URL"` (the form TC-MODEL-12 uses) or `psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f …`. It sits outside `prisma/migrations/`, so `migrate deploy` never applies it.
+  - It drops the eight stamp columns, the two `Brief` columns, both tables and both enums, in reverse order with `IF EXISTS`. **That destroys every stamp and every team model policy.** Drafts, captions and revisions themselves are kept.
+  - **It deletes its own `_prisma_migrations` row** (`20261012120000_model_selection`), so a later 008 redeploy re-applies the migration by itself. No manual roll-forward step (L24).
+  - **Proven twice:** TC-MODEL-12 in the suite (a migrate-built scratch DB: forward → down → `migrate deploy` → the same `information_schema` shape), and the literal `CREATE DATABASE … TEMPLATE bistec_studio_test` round trip in `reports/T12.md` (forward `10 | 2 | 2 | 1`, after down `0 | 0 | 0 | 0`, after redeploy `10 | 2 | 2 | 1`, shape IDENTICAL, all 203 drafts kept).
+
+### `CLAUDE_CLI_MODEL`: what changed, and the boot error
+
+- **Before 008** it was a **global override** in CLI mode: when set, it forced one model onto every `claude -p` call, and `default` meant "omit `--model`", which ran the account default (Opus).
+- **Now it is the system default** (CLI mode only), below team defaults and explicit picks. It applies on every user surface where that model is eligible; Opus leaves template fill on Haiku. Internal steps stay on Haiku. `claudeCli.ts` no longer reads it; `src/lib/models/policy.ts` does.
+- **Accepted values:** `haiku`, `sonnet`, `opus` (any case), or a **current** `apiId`. Anything else, including `default`, a retired ID such as `claude-sonnet-4-6`, and `gpt-4o`, makes `src/lib/env.ts` throw when it loads:
+
+  ```
+  CLAUDE_CLI_MODEL must be one of haiku, sonnet, opus, claude-haiku-4-5, claude-sonnet-5-5, claude-opus-5-5 (got "default"). It is now the system default, not a global override.
+  ```
+
+  `next build` reads a bad value as unset, so the build passes and the **running app and worker** fail. The fix is to unset the variable or give it an accepted value.
+
+- **The boot log line,** once per process, at the first model resolution:
+  - CLI mode: `[models] CLAUDE_CLI_MODEL=<KEY> is the system default (below team defaults and explicit picks); it no longer overrides them`;
+  - API mode (warn): `[models] CLAUDE_CLI_MODEL is set but ignored in API mode`.
+- **Before deploying, check the deployment's environment.** In this repo only `.env.example` mentions it (commented out); `.env`, `.env.test`, CI, `docker-compose*.yml` and the `Dockerfile` don't set it (T3).
+
+### What the team admin controls (`/team` → Models)
+
+- **Allowed models**, the per-surface **defaults** ("System default (…)" or an allowed, eligible model), and the switch **"Opus requires a personal token"**.
+- **A team with no saved policy** is allowed all three models and runs the system defaults. **Once saved, the list is authoritative:** a model added to the catalogue later reaches that team only when an admin ticks it, where it shows a "New" chip.
+- **`/team` refuses a policy that leaves any surface with no model,** e.g. Opus alone: "Template fill needs Haiku or Sonnet allowed".
+- **The switch only acts in CLI mode** (disabled in API mode, "Only applies in CLI mode."). With it on, a run on the team token can't use Opus: an explicit pick is a 400, and a stored or default Opus is substituted and recorded.
+- **The allow-list is checked at every tier at call time.** A stored value that is no longer allowed (a stamp, a team default, `Brief.captionModel` / `designModel`, `CLAUDE_CLI_MODEL`) falls through to the next tier and is recorded in the stamp's `…SubstitutedFrom`. Each substitution logs `[models] <surface>: <value> not available (<reason>) → <KEY> (<source>)`, at `warn` for scheduled, MCP and ACP runs.
+- **Scheduled, MCP and ACP runs** have no model input. They use the team default (then the system default) on the team credential.
+- **A scheduled run that hits a Claude usage limit** gets `errorReason` prefixed with "Claude usage limit reached on the team's credential — ". Retries and backoff are unchanged.
+
+### Adding a model (design.md §2)
+
+1. **Add one `CATALOGUE` entry:** key, `apiId`, `cliArg`, prices with a dated `priceSource`, speed, the eligible `surfaces` with their timeouts, and the two decisions `defaultAllowed` and `personalTokenGated`. Keep the catalogue cheapest first (the fallback tier takes the first entry).
+2. **A new family key** (for example `FABLE`) needs a migration with `ALTER TYPE "ModelKey" ADD VALUE 'FABLE';` **alone in its file** (Postgres can't use a new enum value inside the transaction that adds it). Then `npx prisma generate`.
+3. **`npm run test:unit`.** The catalogue invariants (AC-01), the action budget (AC-09) and the boundary test (AC-12) re-run against the new entry. A timeout that would break a 15-minute sweep or the scheduler lease fails `actionBudget.test.ts` here.
+4. **Teams with a saved policy** don't get the model until an admin ticks it ("New"). Teams with no saved policy get it if `defaultAllowed`.
+5. **Run T2's check for the new ID** against the pinned CLI (the command is in `tasks.md` T2). If the CLI rejects the full ID, set that entry's `cliArg` to the alias.
+
+**Upgrading a family** (Sonnet 5.5 → 6) is step 1 alone: change `apiId` and `cliArg`, and push the old ID onto `previousApiIds`. Old stamps keep the ID that ran; a regenerate on one runs the new model and records it as a substitution. If the `ASSISTANT_BRANDKIT` system default's `cliArg` changes, update `VISION_MODEL` in `scripts/cli-sandbox-check.mjs` too; the drift test in `claudeCliArgs.test.ts` fails until they match.
+
+### Splitting a surface (spec FR-02)
+
+Example: `CAPTION` into `CAPTION` and `HEADLINE`.
+
+1. A migration with `ALTER TYPE "ModelSurface" ADD VALUE 'HEADLINE';`, alone in its file.
+2. A second migration that copies every team's `TeamModelDefault` row for the parent surface to the new one, so the child inherits the parent's choice.
+3. Move the call site, and add the surface to the catalogue entries' `surfaces` (with timeouts) and to the system-default table.
+
+Stamps need nothing: `DraftCaption.model` and `Draft.headlineModel` are separate columns already. The same procedure is in `catalogue.ts`'s header comment.
+
+### T2: the operator CLI check (done)
+
+**PASS, 2026-10-13** (`reports/T2.md`). The pinned CLI 2.1.287 accepted `claude-haiku-4-5`, `claude-sonnet-5-5` and `claude-opus-5-5`: exit 0, the `system/init` event echoed each ID, and each returned a non-error result. So every entry keeps `cliArg = apiId`, and a CLI-mode stamp is the exact ID that ran. This machine's global CLI is 2.1.296, so the check ran the pin through `npx -y @anthropic-ai/claude-code@2.1.287`. **Re-run it when the Dockerfile's CLI pin moves.**
+
+### AC-32: the optional Opus timing sample (operator, not a gate)
+
+- **What:** in CLI mode, with a real token, run one Path B generation and one refine on Opus 5.5 (set the team defaults at `/team` → Models, or pick Opus in the wizard and the refine box).
+- **Record in the verify report:** each call's duration against its placeholder timeout (`DESIGN_FREEFORM` 600 s, `REFINE` 540 s on Opus), and whether any call came within 20 % of it.
+- **If freeform design nears 600 s:** lower Opus `DESIGN_FREEFORM` first; don't raise the lease. The tightest segment is the scheduler's "renew before design → complete", 830 s plus a 60 s margin against the 900 s lease. `actionBudget.test.ts` fails on any timeout that breaks a segment.
+- It is the only measurement of Opus durations, and it is one sample.
+
+### Export and import
+
+`scripts/export-posts.mjs` already exported every scalar column, so bundles carry the stamps; `import-posts.mjs` copies `Brief.captionModel` / `designModel` and the eight stamp columns verbatim. The manifest stays **v2**: a pre-008 bundle imports with null stamps, and a pre-008 importer drops only the stamps. The L22 `teamId` gap is unchanged.
+
+---
+
+## (superseded) 2026-10-13 — 008 WAVE 1 is built, reviewed and green (local and CI). Only T2 (operator) is open, then wave 2
+
+Every wave-1 task except T2 is committed, reviewed and pushed. No review raised a BLOCK; T1's WARN was fixed before commit and every other review was NOTE. T12 stays `in_progress` until T2's report exists.
 
 | Task                                                                                            | Review                                                               | Commit                         |
 | ----------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- | ------------------------------ |

@@ -162,7 +162,22 @@ A session-authenticated route (not MCP/ACP) that writes a headline and three cap
 
 ---
 
-## 5. Team scoping & guardrails
+## 5. The Claude model (change 008)
+
+Since 008 every model call resolves through one catalogue (`src/lib/models/catalogue.ts`: Haiku 4.5, Sonnet 5.5, Opus 5.5) and one resolver (`resolveModel`). A team admin sets the allowed models, a default per surface and the "Opus requires a personal token" switch at `/team` → Models.
+
+- **MCP and ACP have no `model` input.** Neither `generate_post` nor `publish_post` takes one, and the ACP manifest is unchanged. An extra `model` key in an ACP `input` is ignored (TC-MODEL-09 sends `model: 'HAIKU'` and the draft still runs the team default).
+- **`generate_post` uses the team default.** MCP, ACP and the scheduler run with no user (`userId: null`), so each surface (captions; template fill or freeform design) resolves from the team's default at run time, then the system default (captions and template fill → Haiku, freeform design → Sonnet). In CLI mode they always run on the **team** Claude token. There is no per-key or per-entry model pin.
+- **With the switch on, in CLI mode,** these callers can never run Opus, because they always use the team token. A team default of Opus falls through to the next tier, is recorded on the draft's stamp as a substitution, and is logged at `warn`: `[models] DESIGN_FREEFORM: "OPUS" not available (needs a personal token) → SONNET (system)`.
+- **Stamps.** The generated draft records the full ID of the model that wrote each caption, the headline and the design (`DraftCaption.model`, `Draft.headlineModel`, `Draft.designModel`, `DraftRevision.model`). The session API's draft GET returns them; the MCP `get_draft` and `generate_post` outputs (§4) are unchanged and don't.
+- **A team with no runnable model** (reachable only through a hand-edited policy row; `/team` refuses to save one) fails closed before any model call, with the resolver's `NO_ALLOWED_MODEL` message: an MCP error, an ACP `422`, or a scheduled entry's `errorReason`. The sync path creates no draft.
+- **A scheduled run that hits a Claude usage limit** gets its `errorReason` prefixed with "Claude usage limit reached on the team's credential — ". Retries and backoff are unchanged.
+- **`POST /api/generate/copy`** (a session route, not MCP/ACP) has no `model` field either: it resolves the caption surface from the team default, then the system default.
+- **The session routes that do take a pick** are `POST /api/briefs` (`captionModel`, `designModel`), `regenerate-copy`, `regenerate-design`, `refine` and the two assistant chats (`model`). Only a key (`HAIKU`, `SONNET`, `OPUS`) is accepted, and a refused pick is `400 { error, code: 'MODEL_NOT_ALLOWED' }` before anything is claimed.
+
+---
+
+## 6. Team scoping & guardrails
 
 - **Team-locked.** Every tool call threads `teamId` **from the resolved key**, never from the request. Caller args are spread _first_ so a `teamId` in the payload can't override the key's real team (`server.ts:146`, `run/route.ts:38`). A team-A key cannot read or write team-B data.
 - **Acts as a system user.** MCP/ACP-created rows are owned by a dedicated `MCP Agent` user (EDITOR, `src/mcp/systemUser.ts`), auto-granted an idempotent membership in the calling team so its rows are visible under the team's D6 visibility rules. Editor-level, not super-admin.
@@ -171,7 +186,7 @@ A session-authenticated route (not MCP/ACP) that writes a headline and three cap
 
 ---
 
-## 6. Security — prompt-injection hardening (CLI mode)
+## 7. Security — prompt-injection hardening (CLI mode)
 
 Production runs in **CLI mode** (`claude -p`), and `generate_post` can drive the vision path. Since 005 T4/T5 no CLI spawn has any tool (`--tools ""`), and vision passes its images inline over stdin. Untrusted inputs (uploaded documents, chat transcripts, image contents) are folded into model prompts, so the app hardens against prompt injection in layers:
 

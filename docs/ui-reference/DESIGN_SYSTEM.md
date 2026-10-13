@@ -603,6 +603,48 @@ The page heads, section heads, notices and field labels are shared components in
 
 **The guard.** `tests/unit/uiTokenGuard.test.ts` fails when any file under `src/` outside `src/components/ui/` declares a `const` or `function` with a shared name, or spells out the small-caps tracking `tracking-[0.14em]`. The names are `FOCUS`, `SCROLL_FOCUS`, `SMALL_CAPS`, `EYEBROW`, `FIELD_LABEL`, `PAGE_TITLE`, `PAGE_LEAD`, `SECTION_HEAD`, `SECTION_NUMERAL`, `SUB_HEAD`, `KIT_TITLE`, `STEP_HEAD`, `STEP_NUMERAL`, `STEP_LEAD`, `GROUP_HEAD`, `ASIDE_HEAD`, `NOTICE`, `WARN_NOTICE`, `ICON`, `ICON_SM`, `ICON_BUTTON`, `TEXT_LINK`, `TAG`, `TABLE_HEAD_ROW`, `COMPACT_FIELD`, `PageHead`, `PageTitle`, `SectionHead`, `SectionHeader`, `Notice`, `FieldLabel` and `StatusWord`. A copy has no legitimate exception, so `// ui-exception:` does not apply to this guard. Import the atom, or give a genuinely different thing a different name (the shell's 36 px icon button is `SHELL_ICON_BUTTON`).
 
+### 8.19 The model picker, its hint line and the team-token notice (008)
+
+**`ModelPicker`** (`src/components/ui/ModelPicker.tsx`) is the one control for choosing a Claude model. It is a `Select` (§8.3) with its `FieldLabel`, then a hint line, then an optional notice. Every answer it shows comes from the pure helpers in `src/lib/models/pickerState.ts`, which call the server's own resolver (`decideModel`) over `GET /api/models` (`useModels()`, React Query key `['models']`). It adds no rule of its own.
+
+- **Options:** only the models this user can run on this surface on this team: the team's allowed models that the surface supports, minus Opus when the switch applies. They are cheapest first, valued by key (`HAIKU`, `SONNET`, `OPUS`), and labelled `<name> · <tier> (<speed>)`, for example "Sonnet 5.5 · $$ (medium)". The tier (`$`, `$$`, `$$$`) is computed from the catalogue's prices. The speed sits in parentheses because a native `<option>` can't hold secondary text.
+- **Pre-selection:** what the server would run if the picker is left alone (the stamp, then the team default, then the system default).
+- **The send rule:** the picker reports `undefined` until the user picks a different model, and the caller then omits `model` from the request. Picking the pre-selected model again reports `undefined` too, so a later change to the team default still reaches an untouched picker.
+- **Accessible name:** `FieldLabel` "Model", or a surface-specific name wherever more than one picker shares a screen. The names in use: "Caption model" and "Design model" (wizard Review); "Refine model", "Design model", "Headline model", "All captions model" and "Instagram / LinkedIn / WhatsApp caption model" (draft page); "Briefing assistant model" and "Brand kit assistant model" (the assistant drawers). Each is unique on its screen.
+- **Disabled** while any action on the screen is pending, like the controls beside it.
+- **One model** shows as plain text, `--text-sm` `--fg`, "Model: Haiku 4.5" (the label, a colon, the name), with no select.
+- **Hidden** (renders nothing) while `/api/models` loads, when no model can run the surface, and for captions when the caption provider isn't Claude.
+- **A refused pick** (the server's `400 MODEL_NOT_ALLOWED`) is shown as the `Select`'s field error: `<id>-error`, joined to `aria-describedby`, with `aria-invalid="true"` on the select. It is not a toast. A new pick clears it.
+- **A pick that stops being offered** (an admin unticked it, the switch went on, or the wizard moved to template fill) is reset to `undefined` by the picker, so it is never sent.
+
+**The hint line** is `--text-xs` `--fg-muted` under the select, with the id `<id>-hint`, tied to the select by `aria-describedby`. It says why the pre-selection is what it is. Once the user picks, the pre-selection line drops; the gated line and the caller's note stay.
+
+| Why                                         | Text                                                                                          |
+| ------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| The draft's stamp                           | "Same model as the current caption" (or "headline", or "design")                              |
+| The team default                            | "Team default"                                                                                |
+| The system default                          | "Default"                                                                                     |
+| The fallback                                | "Default (the team's choice isn't available)"                                                 |
+| A stamp the team no longer allows           | "Opus 5.5 is no longer available on this team — using Sonnet 5.5" (the stamped and run names) |
+| The switch hides Opus from this user        | "Opus requires a personal Claude token on this team — connect one in Settings"                |
+| The caller's note (the wizard's path reset) | "Opus 5.5 isn't available for template fill"                                                  |
+
+**The team-token notice** is `Notice tone="warning" role="status"` (§8.18) under the hint, non-blocking: "This run uses your team's Claude allowance. Connect your own token in Settings to use yours." It shows only in CLI mode, on the team credential, when the shown model is one the switch can gate (today, Opus). It belongs to the picker; no screen draws its own copy.
+
+**"Generated with"** (`src/components/drafts/GeneratedWith.tsx`) is a muted `<p>`, `--text-xs` `--fg-muted`, in each caption panel's tail, the headline panel's tail and under the post: "Generated with Sonnet 5.5". A stamp no catalogue entry describes shows the raw ID. A substitution adds "(substituted)", whose `title` reads "Substituted for <name>", with an `sr-only` copy of that text. It is hidden while the row is generating, for a FAILED caption row (whose stamp may belong to older text) and on a FAILED draft. In the Versions cells (§8.13) the model name shows alone at `--text-2xs` `--fg-muted`, with the sentence in its `title` and an `sr-only` "Generated with".
+
+**Where pickers sit:**
+
+| Screen                    | Placement                                                                                                                                              |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Brief wizard, Review step | Two pickers in a `sm:grid-cols-2` grid under the summary list; the summary gains "Caption model" and "Design model" rows naming the effective choice   |
+| Draft page, refine        | Under the instruction form                                                                                                                             |
+| Draft page, captions      | In each caption panel's and the headline panel's tail; "All captions model" in the section tail, under the head that holds "Regenerate all"            |
+| Draft page, design        | Under the action bar, Path B only and once the draft is ready, `sm:max-w-xs`                                                                           |
+| Assistant drawers         | The first strip under the drawer's title bar, with a 1 px `--line-subtle` rule below; nothing renders, not even the strip, until the models view loads |
+
+**`/team` → Models** (section "v.") is the admin side: a named group of checkboxes, "Allowed models", labelled `<name> · <tier> · <speed>` with a "New" `StatusChip` outside the label for a model added since the team saved; six `Select`s in a "Defaults" group, each starting with "System default (<name>)"; the switch "Opus requires a personal token" with its helper text (disabled in API mode, "Only applies in CLI mode."); and an ink Save (§8.2). A 400 shows inline as `Notice tone="error" role="alert"`.
+
 ---
 
 ## 9. Accessibility floor

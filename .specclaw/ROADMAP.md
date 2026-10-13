@@ -1,7 +1,9 @@
 # bistec-studio roadmap — changes 004–012
 
 **Updated:** 2026-09-23 · **Branch:** all of this lands on `v2` (see Branching at the bottom); handoff in `docs/handoff.md` top section.
-**Status (2026-10-12, later):** **015** (the draft-page settle race behind the red fork CI) is verified PASS, and fork CI on `v2` is green again. **008** (model selection) is **approved (architectural)** after a deep party panel; its rulings are recorded in its proposal and **planning is in progress**. Work lands directly on `v2`, with no per-change PRs; one `v2`→`main` PR follows later, on request.
+**Status (2026-10-13):** **008** (model selection) is **built, 19/19**, on `v2`. Wave 1 (catalogue, resolver, `/team` → Models, stamps, time budget) gated at 383/3/0/0 with CI green; wave 2 (the pickers) gated at 391/3/0/0. T2, the operator CLI full-ID check, passed. **Next: `/specclaw:verify 008-model-selection`.** Handoff and the 008 runbook: `docs/handoff.md` top section.
+
+**(Superseded) Status (2026-10-12, later):** **015** (the draft-page settle race behind the red fork CI) is verified PASS, and fork CI on `v2` is green again. **008** (model selection) is **approved (architectural)** after a deep party panel; its rulings are recorded in its proposal and **planning is in progress**. Work lands directly on `v2`, with no per-change PRs; one `v2`→`main` PR follows later, on request.
 
 **(Superseded) Status (2026-10-11, later):** **004**, **005**, **011**, **013** (fork CI, checks only) and **014** (UI accessibility, shared primitives and consistency) are verified PASS. **012** (per-channel captions) is **built, 16/16, and verified PASS** (2026-10-12) on `v2`. **012 → 010 stays a hard dependency:** 010 consumes the `DraftCaption` WhatsApp row. **006–010** are proposals. Handoff: `docs/handoff.md` top section.
 
@@ -19,7 +21,7 @@ This file sequences the open changes. Each change's own `proposal.md` is the sou
 | 005 | [Provider flexibility + onboarding](changes/005-provider-flexibility-onboarding/) | Guided Claude connect; COPY provider route; `isDefault` image bug; Gemini; CLI sandbox      | medium       | ✅ built 10/10 — verify PASS (2026-10-06)  |
 | 006 | [Product observability](changes/006-product-observability/)                       | Self-hosted PostHog, generation traces, scheduler heartbeat, stale-export badge             | large        | 📋 proposal                                |
 | 007 | [Brand-kit design system](changes/007-brandkit-design-system/)                    | Turn adjectival kit prose into measurable rules; typography dataset                         | medium-large | 📋 proposal                                |
-| 008 | [Model selection](changes/008-model-selection/)                                   | Choose Haiku / Sonnet / Opus per caption, design, refine and assistant chat                 | medium-large | 📝 approved (architectural), planning      |
+| 008 | [Model selection](changes/008-model-selection/)                                   | Choose Haiku / Sonnet / Opus per caption, design, refine and assistant chat                 | medium-large | ✅ built 19/19 — verify next               |
 | 009 | [Hero imagery](changes/009-hero-image-design/)                                    | Image model makes the hero subject, not wallpaper; layout archetypes; reference images      | large        | 📋 proposal (new)                          |
 | 010 | [WhatsApp Channel posting](changes/010-whatsapp-channel-posting/)                 | WhatsApp as a channel, with assisted handoff (Meta has no official Channel posting API)     | medium       | 📋 proposal (new)                          |
 | 011 | [App visual redesign](changes/011-app-visual-redesign/)                           | New visual direction; opaque surfaces; floating bottom-right **Create post** button         | large        | 🔨 wave 1 built (T1–T2) — awaiting pick    |
@@ -41,8 +43,8 @@ B4 scheduler fix (ops) ───────────────► 010 sche
 - **011 foundation + app shell → 008 pickers, 010 handoff screen.** Both add new UI. Build them once in the new style instead of in Frozen Light and again later.
 - **008 → 005 item 2.** 008 introduces the model resolver. 005's COPY provider selector (OAuth CLI vs API key) should sit on top of it, not beside it.
 - **007 ↔ 009.** 009's layout archetypes belong in the same design-system data module as 007's dataset. Whichever lands first creates the module; the other extends it.
-- **008 → 006.** 006's generation traces read 008's `Draft.captionModel` / `designModel` stamps instead of re-deriving the model.
-- **012 → 008.** Build 012 first so 008 stamps `captionModel` on the new caption shape and names its surface `caption` from the start. If 008 goes first, it must use those names anyway.
+- **008 → 006.** 006's generation traces read 008's stamps instead of re-deriving the model: `DraftCaption.model` (per caption row), `Draft.headlineModel`, `Draft.designModel` and `DraftRevision.model`. Each is the full ID that ran, with a `…SubstitutedFrom` sibling. Cost comes from the catalogue's numeric per-MTok prices (`priceInputPerMTok` / `priceOutputPerMTok` in `src/lib/models/catalogue.ts`, with a dated `priceSource`), not from the `$` / `$$` / `$$$` tier, which is computed from them.
+- **012 → 008.** Build 012 first so 008 stamps `captionModel` on the new caption shape and names its surface `caption` from the start. If 008 goes first, it must use those names anyway. **Done:** 012 shipped first, and 008 stamps each caption row (`DraftCaption.model`) and the headline (`Draft.headlineModel`) under the `CAPTION` surface.
 - **011 foundation → 012 caption panels.** Same reason as 008: new UI, built once in the new style.
 - **006 item 7 (scheduler heartbeat) → 010.** A missed WhatsApp handoff is a missed post. It is the same "nothing self-reports" failure B4 was.
 

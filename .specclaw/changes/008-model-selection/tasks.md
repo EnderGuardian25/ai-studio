@@ -332,7 +332,7 @@ Wave 2 adds per-post and per-chat pickers only.
     - **The axe blocks** on the wizard Review step, the draft page and `/team` (014) run with the pickers present.
     - **The gate:** the full per-wave procedure, 0 failed and 0 flaky, then push `v2` and check `gh run list --branch v2`.
 
-- [ ] `T19` — Docs, the runbook and the ROADMAP
+- [x] `T19` — Docs, the runbook and the ROADMAP
   - Files: `CLAUDE.md`, `docs/handoff.md`, `docs/mcp-acp-guide.md`, `docs/ui-reference/DESIGN_SYSTEM.md`, `docs/e2e-test-plan.md`, `.specclaw/ROADMAP.md`
   - Estimate: small
   - Kind: docs
