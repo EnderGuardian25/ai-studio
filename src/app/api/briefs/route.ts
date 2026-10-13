@@ -10,7 +10,12 @@ import { isCliMode } from '@/lib/agent/config'
 import { resolveBriefCopyKey } from '@/lib/brief/copyProvider'
 import { IMAGE_PROVIDERS } from '@/providers/imageCapabilities'
 import { resolveModel } from '@/lib/models/policy'
-import { captionProviderNotClaudeError, modelError, parseModelField } from '@/lib/models/requests'
+import {
+  captionProviderNotClaudeError,
+  modelError,
+  parseModelField,
+  type ModelErrorField,
+} from '@/lib/models/requests'
 import { copyProviderIsClaude } from '@/providers/registry'
 import type { ModelKey, UserSurface } from '@/lib/models/catalogue'
 
@@ -93,10 +98,15 @@ export const POST = withTeamAuth(async (req: NextRequest, _ctx, user) => {
   }
   // 008 FR-17: the Review step's optional model picks — the initial request
   // (FR-10). The design pick serves the surface of the chosen design path.
+  // Every refusal names its field: the wizard shows it on that picker (T15).
   const captionPick = parseModelField(body.captionModel, 'captionModel')
-  if (!captionPick.ok) return NextResponse.json(captionPick.body, { status: 400 })
+  if (!captionPick.ok) {
+    return NextResponse.json(modelError({ message: captionPick.body.error }, 'captionModel'), { status: 400 })
+  }
   const designPick = parseModelField(body.designModel, 'designModel')
-  if (!designPick.ok) return NextResponse.json(designPick.body, { status: 400 })
+  if (!designPick.ok) {
+    return NextResponse.json(modelError({ message: designPick.body.error }, 'designModel'), { status: 400 })
+  }
   // CLI mode defaults copy to the local Claude CLI (OAuth chain) — no provider
   // key required; an explicit key overrides and is existence-checked below.
   const copyKeyDecision = resolveBriefCopyKey(copyProviderKey, isCliMode())
@@ -192,19 +202,19 @@ export const POST = withTeamAuth(async (req: NextRequest, _ctx, user) => {
   // stored. Once stored it is history: a later policy change makes the
   // generation substitute it, never fail (FR-10).
   const designSurface: UserSurface = designMode === 'TEMPLATE' ? 'DESIGN_TEMPLATE' : 'DESIGN_FREEFORM'
-  const picks: [UserSurface, ModelKey | undefined][] = [
-    ['CAPTION', captionPick.value],
-    [designSurface, designPick.value],
+  const picks: [UserSurface, ModelKey | undefined, ModelErrorField][] = [
+    ['CAPTION', captionPick.value, 'captionModel'],
+    [designSurface, designPick.value, 'designModel'],
   ]
   // Spec open question 1: a caption pick needs a Claude caption provider — the
   // one this brief's generation will use (its key, else the team default).
   if (captionPick.value && !(await copyProviderIsClaude(user.teamId, resolvedCopyKey))) {
-    return NextResponse.json(captionProviderNotClaudeError(), { status: 400 })
+    return NextResponse.json(captionProviderNotClaudeError('captionModel'), { status: 400 })
   }
-  for (const [surface, requested] of picks) {
+  for (const [surface, requested, field] of picks) {
     if (!requested) continue
     const resolved = await resolveModel(surface, { requested, userId: user.userId, teamId: user.teamId })
-    if (!resolved.ok) return NextResponse.json(modelError(resolved), { status: 400 })
+    if (!resolved.ok) return NextResponse.json(modelError(resolved, field), { status: 400 })
   }
 
   const brief = await prisma.brief.create({

@@ -5,9 +5,18 @@ import { Loader2 } from 'lucide-react'
 import type { AspectRatio } from '@prisma/client'
 import { ASPECT_LABELS, dimensionsLabel } from '@/lib/aspectRatio'
 import type { Campaign, TemplateSummary, BrandKitSummary } from '@/lib/api-types'
+import type { ModelKey } from '@/lib/models/catalogue'
+import { useModels } from '@/lib/hooks/useModels'
+import {
+  designPath,
+  designSurface,
+  reviewModelName,
+  type BriefModelField,
+} from '@/lib/brief/modelPicks'
 import type { DesignMode, UploadedImage } from './types'
 import { ReviewRow, type ReviewRowProps } from './ReviewRow'
 import { Notice } from '@/components/ui/Notice'
+import { ModelPicker } from '@/components/ui/ModelPicker'
 import { StepHead } from './StepHead'
 
 // ─── Step 4 — Review ─────────────────────────────────────────────────────────
@@ -28,6 +37,13 @@ interface ReviewStepProps {
   copyProviderReady: boolean
   error: string | null
   submitting: boolean
+  // 008 FR-19: the model picks (undefined = untouched, A5)
+  captionModel: ModelKey | undefined
+  onCaptionModelChange: (model: ModelKey | undefined) => void
+  designModel: ModelKey | undefined
+  onDesignModelChange: (model: ModelKey | undefined) => void
+  designModelNote: string | null
+  modelErrors: Partial<Record<BriefModelField, string>>
 }
 
 export function ReviewStep({
@@ -46,7 +62,22 @@ export function ReviewStep({
   copyProviderReady,
   error,
   submitting,
+  captionModel,
+  onCaptionModelChange,
+  designModel,
+  onDesignModelChange,
+  designModelNote,
+  modelErrors,
 }: ReviewStepProps) {
+  const { data: models } = useModels()
+  const designContext = { designPath: designPath(designMode) }
+  // The models each run will use: the pick, else the server's pre-selection.
+  // No row while the models load, or when the picker is hidden.
+  const captionModelName = models ? reviewModelName('CAPTION', models, {}, captionModel) : null
+  const designModelName = models
+    ? reviewModelName(designSurface(designMode), models, designContext, designModel)
+    : null
+
   // The summary is a plain list of rows: a new field (008's model selection,
   // for one) is one more entry, in the order it should read.
   const rows: ReviewRowProps[] = [
@@ -64,6 +95,8 @@ export function ReviewStep({
             ? `Style ref: ${selectedRefTemplate.name}`
             : 'None',
     },
+    ...(captionModelName ? [{ label: 'Caption model', value: captionModelName }] : []),
+    ...(designModelName ? [{ label: 'Design model', value: designModelName }] : []),
     { label: 'Goal', value: goal, capitalize: true },
     { label: 'Tone', value: tone, capitalize: true },
     {
@@ -88,6 +121,31 @@ export function ReviewStep({
           <ReviewRow key={row.label} {...row} />
         ))}
       </dl>
+
+      {/* 008 FR-19: the caption and design models, pre-selected to what the
+          server would run; a pick is sent only when it differs (A5). */}
+      <div className="mt-6 grid gap-4 sm:grid-cols-2">
+        <ModelPicker
+          id="brief-caption-model"
+          surface="CAPTION"
+          label="Caption model"
+          value={captionModel}
+          onChange={onCaptionModelChange}
+          error={modelErrors.captionModel}
+          disabled={submitting}
+        />
+        <ModelPicker
+          id="brief-design-model"
+          surface={designSurface(designMode)}
+          context={designContext}
+          label="Design model"
+          value={designModel}
+          onChange={onDesignModelChange}
+          note={designModelNote ?? undefined}
+          error={modelErrors.designModel}
+          disabled={submitting}
+        />
+      </div>
 
       {providersLoaded && !copyProviderReady && (
         <Notice tone="warning" className="mt-6">

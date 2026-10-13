@@ -108,6 +108,12 @@ export default function NewBriefPage() {
           copyProviderReady={wizard.copyProviderReady}
           error={wizard.error}
           submitting={submitting}
+          captionModel={wizard.captionModel}
+          onCaptionModelChange={wizard.setCaptionModel}
+          designModel={wizard.designModel}
+          onDesignModelChange={wizard.setDesignModel}
+          designModelNote={wizard.designModelNote}
+          modelErrors={wizard.modelErrors}
         />
       )}
 

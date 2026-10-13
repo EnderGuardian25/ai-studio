@@ -30,21 +30,29 @@ const keySchema = (field: string) =>
 /** A closed ModelKey, case-sensitive: 'opus' and 'gpt-4o' are refused. */
 export const modelKeySchema = keySchema('model')
 
+/**
+ * Which pick a POST /api/briefs refusal is about: that route takes two, so its
+ * 400 names the field and the wizard shows the message on that picker (T15).
+ * Routes with a single `model` field leave it out.
+ */
+export type ModelErrorField = 'captionModel' | 'designModel'
+
 /** The 400 body of a refused pick. */
 export interface ModelErrorBody {
   error: string
   code: typeof MODEL_NOT_ALLOWED
+  field?: ModelErrorField
 }
 
 /**
  * A failed decideModel (or an AssistantModelError, or a bad key) → FR-17's 400
- * body: `{ error: <message>, code: 'MODEL_NOT_ALLOWED' }`. The messages are
- * decideModel's own (resolve.ts refuseRequest). Callers send it with status 400,
- * and only for an EXPLICIT pick — a resolution that fails without one keeps its
- * 422 (NO_ALLOWED_MODEL, wave 1).
+ * body: `{ error: <message>, code: 'MODEL_NOT_ALLOWED' }`, plus `field` when
+ * given. The messages are decideModel's own (resolve.ts refuseRequest). Callers
+ * send it with status 400, and only for an EXPLICIT pick — a resolution that
+ * fails without one keeps its 422 (NO_ALLOWED_MODEL, wave 1).
  */
-export function modelError(failure: { message: string }): ModelErrorBody {
-  return { error: failure.message, code: MODEL_NOT_ALLOWED }
+export function modelError(failure: { message: string }, field?: ModelErrorField): ModelErrorBody {
+  return { error: failure.message, code: MODEL_NOT_ALLOWED, ...(field ? { field } : {}) }
 }
 
 /**
@@ -57,8 +65,8 @@ export function modelError(failure: { message: string }): ModelErrorBody {
 export const CAPTION_PROVIDER_NOT_CLAUDE_MESSAGE =
   "This team's caption provider is not Claude, so the caption model can't be chosen"
 
-export const captionProviderNotClaudeError = (): ModelErrorBody =>
-  modelError({ message: CAPTION_PROVIDER_NOT_CLAUDE_MESSAGE })
+export const captionProviderNotClaudeError = (field?: ModelErrorField): ModelErrorBody =>
+  modelError({ message: CAPTION_PROVIDER_NOT_CLAUDE_MESSAGE }, field)
 
 export type ModelFieldResult =
   { ok: true; value: ModelKey | undefined } | { ok: false; body: ModelErrorBody }

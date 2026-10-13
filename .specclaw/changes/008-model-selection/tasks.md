@@ -285,7 +285,7 @@ Wave 2 adds per-post and per-chat pickers only.
     - **The component** follows design §9 and spec FR-18. It reports `undefined` until the user picks a different value (A5).
     - **`uiPrimitives.test.ts`** gains the picker's accessible-name and hidden-when-one-option cases, in the existing style.
 
-- [ ] `T15` — The brief wizard's Review step pickers
+- [x] `T15` — The brief wizard's Review step pickers
   - Files: `src/components/brief/ReviewStep.tsx`, `src/components/brief/useBriefWizard.ts`, `src/components/brief/types.ts`, `src/components/brief/ReviewRow.tsx` (if a row helper is needed)
   - Estimate: small
   - Kind: impl

@@ -170,7 +170,7 @@ import {
   REGENERATE_DESIGN_SHAPE_MESSAGE,
 } from '@/lib/models/requests'
 import { REGENERATE_BOTH_MESSAGE, REGENERATE_SHAPE_MESSAGE } from '@/lib/captions/requests'
-import { CAPTION_PROVIDER_NOT_CLAUDE_MESSAGE } from '@/lib/models/requests'
+import { CAPTION_PROVIDER_NOT_CLAUDE_MESSAGE, captionProviderNotClaudeError } from '@/lib/models/requests'
 import type { ModelKey, UserSurface } from '@/lib/models/catalogue'
 
 const { POST: createBrief } = await import('@/app/api/briefs/route')
@@ -312,6 +312,8 @@ const fieldOf = (r: Route) =>
     : r.name.includes('designModel')
       ? 'designModel'
       : 'model'
+/** POST /api/briefs takes two picks, so its 400 names the field (T15); the others don't. */
+const fieldBody = (r: Route) => (isBrief(r) ? { field: fieldOf(r) } : {})
 
 function draft(over: Record<string, unknown> = {}) {
   return {
@@ -396,6 +398,21 @@ describe('the pure helpers', () => {
     expect(modelError({ message: "Opus 5.5 isn't allowed on this team" })).toStrictEqual({
       error: "Opus 5.5 isn't allowed on this team",
       code: MODEL_NOT_ALLOWED,
+    })
+    // T15 review: an optional field, only when given (the single-`model` routes pass none).
+    expect(modelError({ message: 'm' }, 'designModel')).toStrictEqual({
+      error: 'm',
+      code: MODEL_NOT_ALLOWED,
+      field: 'designModel',
+    })
+    expect(captionProviderNotClaudeError()).toStrictEqual({
+      error: CAPTION_PROVIDER_NOT_CLAUDE_MESSAGE,
+      code: MODEL_NOT_ALLOWED,
+    })
+    expect(captionProviderNotClaudeError('captionModel')).toStrictEqual({
+      error: CAPTION_PROVIDER_NOT_CLAUDE_MESSAGE,
+      code: MODEL_NOT_ALLOWED,
+      field: 'captionModel',
     })
     expect(MODEL_NOT_ALLOWED).toBe('MODEL_NOT_ALLOWED')
   })
@@ -490,6 +507,7 @@ describe('AC-25: a model outside the closed keys is a 400 — parsed before anyt
       expect(await res.json()).toStrictEqual({
         error: modelKeyMessage(fieldOf(route)),
         code: 'MODEL_NOT_ALLOWED',
+        ...fieldBody(route),
       })
       expect(h.draftFindUnique).not.toHaveBeenCalled()
       expect(route.touched()).toBe(false)
@@ -508,6 +526,7 @@ describe("a pick the team's effective set refuses is FR-17's 400, before the cla
       expect(await res.json()).toStrictEqual({
         error: "Opus 5.5 isn't allowed on this team",
         code: 'MODEL_NOT_ALLOWED',
+        ...fieldBody(route),
       })
       expect(route.touched()).toBe(false)
       expect(route.seen()).toBeUndefined()
@@ -524,6 +543,7 @@ describe("a pick the team's effective set refuses is FR-17's 400, before the cla
       expect(await res.json()).toStrictEqual({
         error: 'Your team requires a personal Claude token for Opus 5.5 — connect one in Settings',
         code: 'MODEL_NOT_ALLOWED',
+        ...fieldBody(route),
       })
       expect(route.touched()).toBe(false)
 
@@ -544,6 +564,40 @@ describe("a pick the team's effective set refuses is FR-17's 400, before the cla
     expect(await res.json()).toStrictEqual({
       error: "Opus 5.5 isn't available for template fill",
       code: 'MODEL_NOT_ALLOWED',
+      field: 'designModel',
+    })
+    expect(h.briefCreate).not.toHaveBeenCalled()
+  })
+
+  it('both picks Opus on a Path A brief: the caption Opus is allowed, the refusal names designModel (T15 review)', async () => {
+    const res = await send(createBrief as Handler, {
+      ...BRIEF,
+      designMode: 'TEMPLATE',
+      captionModel: 'OPUS',
+      designModel: 'OPUS',
+    })
+    expect(res.status).toBe(400)
+    expect(await res.json()).toStrictEqual({
+      error: "Opus 5.5 isn't available for template fill",
+      code: 'MODEL_NOT_ALLOWED',
+      field: 'designModel',
+    })
+    expect(h.briefCreate).not.toHaveBeenCalled()
+  })
+
+  it('both picks Opus, Opus not allowed: the caption is checked first, so the refusal names captionModel', async () => {
+    h.policy = policy(['HAIKU', 'SONNET'])
+    const res = await send(createBrief as Handler, {
+      ...BRIEF,
+      designMode: 'GENERATE',
+      captionModel: 'OPUS',
+      designModel: 'OPUS',
+    })
+    expect(res.status).toBe(400)
+    expect(await res.json()).toStrictEqual({
+      error: "Opus 5.5 isn't allowed on this team",
+      code: 'MODEL_NOT_ALLOWED',
+      field: 'captionModel',
     })
     expect(h.briefCreate).not.toHaveBeenCalled()
   })
@@ -662,7 +716,7 @@ describe('spec open question 1: a caption pick needs a Claude caption provider',
       h.copyRow = { id: 'p1', providerName: 'OpenAI' }
       const res = await route.call('HAIKU')
       expect(res.status).toBe(400)
-      expect(await res.json()).toStrictEqual(NOT_CLAUDE)
+      expect(await res.json()).toStrictEqual({ ...NOT_CLAUDE, ...fieldBody(route) })
       expect(route.touched()).toBe(false)
       expect(route.seen()).toBeUndefined()
     },

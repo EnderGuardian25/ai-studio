@@ -1,11 +1,14 @@
 'use client'
 
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useQuery } from '@tanstack/react-query'
-import { apiFetch } from '@/lib/apiFetch'
+import { ApiError, apiFetch } from '@/lib/apiFetch'
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser'
 import { canSubmitBrief } from '@/lib/brief/copyProvider'
+import { designPickForPath, refusedModelField, type BriefModelField } from '@/lib/brief/modelPicks'
+import { MODEL_NOT_ALLOWED } from '@/lib/models/requests'
+import type { ModelKey } from '@/lib/models/catalogue'
 import type { AspectRatio } from '@prisma/client'
 import type {
   Campaign,
@@ -62,7 +65,8 @@ export interface UseBriefWizardResult {
   setBrandKitId: React.Dispatch<React.SetStateAction<string>>
   brandKitOptions: { value: string; label: string }[]
   designMode: DesignMode
-  setDesignMode: React.Dispatch<React.SetStateAction<DesignMode>>
+  /** Also resets a design model the new path can't run (008 FR-19). */
+  setDesignMode: (mode: DesignMode) => void
   templateId: string
   setTemplateId: React.Dispatch<React.SetStateAction<string>>
   referenceTemplateId: string
@@ -96,6 +100,16 @@ export interface UseBriefWizardResult {
   providersLoaded: boolean
   /** True when POST /api/briefs would accept this submission (see canSubmitBrief). */
   copyProviderReady: boolean
+
+  // Step 4 — model picks (008 FR-19). undefined = the picker is untouched (A5).
+  captionModel: ModelKey | undefined
+  setCaptionModel: (model: ModelKey | undefined) => void
+  designModel: ModelKey | undefined
+  setDesignModel: (model: ModelKey | undefined) => void
+  /** Why a path change reset the design pick ("Opus 5.5 isn't available for template fill"). */
+  designModelNote: string | null
+  /** A refused pick's 400 MODEL_NOT_ALLOWED message, on the picker it belongs to. */
+  modelErrors: Partial<Record<BriefModelField, string>>
 }
 
 export function useBriefWizard(): UseBriefWizardResult {
@@ -112,9 +126,38 @@ export function useBriefWizard(): UseBriefWizardResult {
   // Step 1 — Size & Design
   const [aspectRatio, setAspectRatio] = useState<AspectRatio>('SQUARE')
   const [brandKitId, setBrandKitId] = useState('')
-  const [designMode, setDesignMode] = useState<DesignMode>('TEMPLATE')
+  const [designMode, setDesignModeState] = useState<DesignMode>('TEMPLATE')
   const [templateId, setTemplateId] = useState('')
   const [referenceTemplateId, setReferenceTemplateId] = useState('')
+
+  // Step 4 — model picks (008 FR-19). undefined = untouched: the field is left
+  // out of the POST and the autosave, and the server resolves the default (A5).
+  const [captionModel, setCaptionModelState] = useState<ModelKey | undefined>(undefined)
+  const [designModel, setDesignModelState] = useState<ModelKey | undefined>(undefined)
+  const [designModelNote, setDesignModelNote] = useState<string | null>(null)
+  const [modelErrors, setModelErrors] = useState<Partial<Record<BriefModelField, string>>>({})
+
+  // A new pick (or the picker's own stale-pick reset) clears that picker's
+  // refusal and the path-change note: they described the previous value.
+  const setCaptionModel = useCallback((model: ModelKey | undefined) => {
+    setCaptionModelState(model)
+    setModelErrors(({ captionModel: _refused, ...rest }) => rest)
+  }, [])
+  const setDesignModel = useCallback((model: ModelKey | undefined) => {
+    setDesignModelState(model)
+    setDesignModelNote(null)
+    setModelErrors(({ designModel: _refused, ...rest }) => rest)
+  }, [])
+
+  // FR-19: a design pick the new path can't run (Opus → template fill) resets,
+  // with the reason shown under the Review step's picker.
+  function setDesignMode(mode: DesignMode) {
+    if (mode === designMode) return
+    setDesignModeState(mode)
+    const next = designPickForPath(designModel, mode)
+    setDesignModel(next.pick) // clears the previous path's note and refusal
+    if (next.note) setDesignModelNote(next.note)
+  }
 
   // Step 2 — Content
   // topic = the short post title (Brief.topic — names the post in the library);
@@ -189,6 +232,9 @@ export function useBriefWizard(): UseBriefWizardResult {
       goal,
       tone,
       images: images.map(({ id, url, filename, intent }) => ({ id, url, filename, intent })),
+      // An untouched pick is undefined, which JSON.stringify leaves out.
+      captionModel,
+      designModel,
     }
     if (autosaveStoppedRef.current) return
     if (isTrivialBriefDraft(latestPayloadRef.current)) return
@@ -208,6 +254,8 @@ export function useBriefWizard(): UseBriefWizardResult {
     goal,
     tone,
     images,
+    captionModel,
+    designModel,
   ])
 
   // Resume: /brief?resume=<id> rehydrates the saved row and continues saving
@@ -230,7 +278,7 @@ export function useBriefWizard(): UseBriefWizardResult {
         setCampaignId(p.campaignId)
         setAspectRatio(p.aspectRatio)
         setBrandKitId(p.brandKitId)
-        setDesignMode(p.designMode)
+        setDesignModeState(p.designMode)
         setTemplateId(p.templateId)
         setReferenceTemplateId(p.referenceTemplateId)
         setTopic(p.topic)
@@ -238,6 +286,8 @@ export function useBriefWizard(): UseBriefWizardResult {
         setGoal(p.goal)
         setTone(p.tone)
         setImages(p.images.map((img) => ({ ...img })))
+        setCaptionModelState(p.captionModel)
+        setDesignModelState(p.designModel)
       })
       .catch(() => {
         /* deleted/expired/foreign id → fresh wizard */
@@ -400,6 +450,7 @@ export function useBriefWizard(): UseBriefWizardResult {
   // ── Submit: create brief → generate → open draft ───────────────────────
   async function handleGenerate() {
     setError(null)
+    setModelErrors({})
     if (!copyProviderReady) {
       setError(
         'No copy provider is configured, and the server is not in CLI mode. Ask an admin to add a COPY provider in AI Providers.'
@@ -430,6 +481,10 @@ export function useBriefWizard(): UseBriefWizardResult {
         additionalImageUrl: designMode === 'TEMPLATE' ? embedImages[0]?.url : undefined,
         // Path B uses referenceTemplateId for style inspiration.
         referenceTemplateId: designMode === 'GENERATE' ? referenceTemplateId || undefined : undefined,
+        // 008 FR-19: sent only when the user picked a model (A5); an undefined
+        // pick is left out by JSON.stringify, so the server resolves the default.
+        captionModel,
+        designModel,
       }
 
       const brief = await apiFetch<{ id: string }>('/api/briefs', {
@@ -465,7 +520,15 @@ export function useBriefWizard(): UseBriefWizardResult {
 
       router.push(`/drafts/${gen.draftId}`)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Generation failed')
+      // A refused model pick (400 MODEL_NOT_ALLOWED) shows on its picker;
+      // anything else, or a refusal that can't be placed, on the step.
+      const field =
+        e instanceof ApiError && e.code === MODEL_NOT_ALLOWED
+          ? refusedModelField(e.field)
+          : null
+      const message = e instanceof Error ? e.message : 'Generation failed'
+      if (field) setModelErrors({ [field]: message })
+      else setError(message)
       setSubmitting(false)
     }
   }
@@ -531,5 +594,11 @@ export function useBriefWizard(): UseBriefWizardResult {
     selectedBrandKit,
     providersLoaded,
     copyProviderReady,
+    captionModel,
+    setCaptionModel,
+    designModel,
+    setDesignModel,
+    designModelNote,
+    modelErrors,
   }
 }
