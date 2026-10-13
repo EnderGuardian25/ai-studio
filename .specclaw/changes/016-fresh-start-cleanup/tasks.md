@@ -75,7 +75,7 @@ This change has **5 tasks in 3 waves**, all built on `v2`. Each task is implemen
 
 ### Wave 3 — Docs and gate
 
-- [ ] `T5` — Docs sweep, the full gate and CI
+- [x] `T5` — Docs sweep, the full gate and CI
   - Files: `CLAUDE.md`, `docs/handoff.md`, `docs/e2e-test-plan.md`, `docs/mcp-acp-guide.md`, `docs/cold-start.md` (if needed), `.specclaw/ROADMAP.md`
   - Estimate: medium
   - Kind: docs

@@ -137,8 +137,8 @@ Since 012 every draft has an on-image **headline** and **one caption per channel
 | MCP / ACP `generate_post`               | `{ draftId, exportUrl, htmlContent, headline, captions }`               |
 | `POST /api/generate/copy` (session API) | `{ headline, captions }`, where `captions` also carries `failureReason` |
 
-- **`captions`** is `[{ channel, text, status }]`: always three entries, in registry order (`INSTAGRAM`, `LINKEDIN`, `WHATSAPP`), WhatsApp included. Read through the caption loader, so a legacy draft is migrated first.
-- **`headline`** is the text drawn on the image (at most 100 characters). It is null only on drafts migrated from before 012, whose designs fall back to the brief topic.
+- **`captions`** is `[{ channel, text, status }]`: always three entries, in registry order (`INSTAGRAM`, `LINKEDIN`, `WHATSAPP`), WhatsApp included. Read through the caption loader, which fills a missing channel with an empty `READY` entry.
+- **`headline`** is the text drawn on the image (at most 100 characters). It is null only while it has not been written yet (a generation still running, or one that failed before the headline was stored); a design made for such a draft falls back to the brief topic.
 - **There is no `copyText` field.** The pre-012 alias (the Instagram caption's text) was removed by change 016. Read the channel's entry in `captions`.
 - **The ACP manifest** still advertises `generate_post`'s output as `draftId`, `exportUrl`, `htmlContent` only (`src/acp/agent.ts`); the real output has `headline` and `captions` too. Updating the advertised schema is a follow-up. Its channel enums stay `['INSTAGRAM', 'LINKEDIN']`.
 

@@ -158,6 +158,9 @@ kit's `createdBy` resolves to a real admin id). Both are idempotent. Result:
 
 - Admin login: username **`adminBTG`**. The initial password is **printed once by the seed script** (set `SEED_ADMIN_PASSWORD` beforehand to choose it; otherwise a random one is generated) — change it after first login. **The password is per-machine** (each dev machine has its own DB — see the §0 warning); the person setting up the machine picks and owns it. The account is a **SUPER_ADMIN** (can manage users at `/admin/users`); sign-in is by username since the username switch — the email `admin@bisteccare.lk` is internal (and still works in the login form as a legacy fallback). A password can be reset directly via better-auth's hash + `internalAdapter.updatePassword` (see `PATCH /api/admin/users/[id]` for the in-app flow; super-admin accounts must be reset via script/DB since the API refuses super-admin targets).
 - Default **"Bistec"** brand kit: Glacier palette, Inter + JetBrains Mono (Google Fonts), active brand-voice prompt v1
+- A **"Bistec"** team, created by `seed-brandkit.mjs` to hold that kit. **Since change 016 the migrations create no team:** a fresh database has zero teams until something creates one. `npm run db:seed` is a dev demo seed, not part of a fresh system's boot.
+  - **Without the demo content** (a fresh system: run only `node --env-file=.env scripts/seed-admin.mjs`): sign in as the super admin; the dashboard says there are no teams yet and links to **`/admin/teams`** to create the first one.
+  - **With the seed:** the super admin works in the Bistec team straight away (super admins act in any live team). Editors need a membership, added at `/admin/teams`.
 
 Optional: seed a 3:4 portrait template on the default kit so Path A has a portrait option out of the box (the brief filters templates by the chosen size):
 

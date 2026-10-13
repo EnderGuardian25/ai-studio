@@ -1,13 +1,15 @@
 # bistec-studio — E2E Test Plan
 
 **Created:** 2026-06-23
-**Status:** ✅ Full §6 catalog implemented **and green**. **Unit as of 2026-07-27 (PR #40): 322/322.** The CI gate (`.github/workflows/e2e.yml`) passed on PRs #38, #39 and #40. Last full _local_ run with recorded counts (2026-07-22, `feature/team-tenancy` branch, post TC-REG-H7a de-flake): **171 passed, 4 skipped, 0 failed** (175 tests total; 0 flaky — TC-REG-H7a's parallel-fire assertion was rewritten to a timing-robust integrity invariant, see below), unit **264/264** at that time.
+**Status:** ✅ Full §6 catalog implemented **and green**. **Latest full clean mock gate (change 016, 2026-10-13): 386 passed / 3 skipped / 0 failed / 0 flaky** (the 008 wave-2 gate before it was 391 / 3 / 0 / 0). The older counts below are history. **Unit as of 2026-07-27 (PR #40): 322/322.** The CI gate (`.github/workflows/e2e.yml`) passed on PRs #38, #39 and #40. Last full _local_ run with recorded counts (2026-07-22, `feature/team-tenancy` branch, post TC-REG-H7a de-flake): **171 passed, 4 skipped, 0 failed** (175 tests total; 0 flaky — TC-REG-H7a's parallel-fire assertion was rewritten to a timing-robust integrity invariant, see below), unit **264/264** at that time.
 
 Last full run on `main` (2026-07-13, post brief-draft-recovery §P): **132 passed, 0 failed, 7 skipped** (`npm run test:e2e:mock`; the machine lacked `BISTEC_API_KEYS` in `.env.test`, so 3 §J ACP-auth cases skipped on top of the 4 intentional skips below — CI sets the keys as job env and runs them). The 2026-07-13 feature batch added `async-generation.test.ts` (F1 async + retry), a version back/forward-jump case (F2), F4 auto-scheduling cases in `campaign-scheduling.test.ts`, `brandkit-assistant.test.ts` (F5), and `image-to-template.test.ts` (F6); generation-dependent suites now poll via the `waitForDraft` helper (generation is async). A GitHub Actions gate (`.github/workflows/e2e.yml`) runs the whole suite — including the §K security-fix regressions — on every PR and push to `main`, and is **green as of 2026-07-13** (it had been red for weeks on a bad CI `TOKEN_ENCRYPTION_KEY` — it MUST be a valid 64-char hex string, else `crypto.ts` throws and the credential-encrypting routes 500). Runs on GitHub-hosted `ubuntu-latest` with the actions on the Node 24 runtime.
 
-> **Update (2026-10-13, change 008 model selection):** new suite **`model-selection.test.ts` (§Y, 20 cases, TC-MODEL-01…20)**: the model stamps on every generation path, the team policy at `/team` → Models and its allow-list applied to stored values, regenerate like for like, refine and the verifier, the scheduler and ACP on the team default, the assistants, the migration round trip, and the wave-2 pickers (the 400 `MODEL_NOT_ALLOWED` refusals, the wizard, the draft page, the chat headers, the team-token notice). New seam: the `MOCK_AI` model-call recorder, `GET` / `DELETE /api/test/model-calls`. Gates (each a full clean mock run after a dropped and recreated test DB): wave 1 **383 / 3 / 0 / 0**, wave 2 **391 / 3 / 0 / 0**.
+> **Update (2026-10-13, change 016 fresh-start cleanup):** the legacy-only cases are removed with the code they tested: **TC-CAP-11, -12, -13 and -19** (§W: lazy migration, the backfill/report scripts, the 012 rollback down.sql, the review notice) and **TC-MODEL-12** (§Y: the 008 rollback round trip), plus the `makeLegacyDraft` helper. **TC-CAP-16** now nulls the headline directly through the test DB instead of using a migrated draft. §W now has 16 cases and §Y 19. A fresh test DB has no migration-created team; `npm run test:e2e:db` seeds Bistec, ClientX and NoKitCo by name. Gate: **386 passed / 3 skipped / 0 failed / 0 flaky**.
 
-> **Update (2026-10-11, change 012 per-channel captions):** new suite **`captions.test.ts` (§W, 20 cases, TC-CAP-01…20)** — per-channel captions + the headline, the publish resolver (terminal refusals, WhatsApp fails closed), the legacy migration, the backfill/report scripts, the rollback down.sql, and the caption-desk panels. New seams: the `__DROP_CAPTION_*__` topic sentinels and the hashed mock `platformId`. Gates (each a full clean mock run after a dropped and recreated test DB): wave 1 **363 passed / 3 skipped / 0 failed / 0 flaky**, waves 2 and 3 **369 / 3 / 0 / 0**. ⚠️ `npm run test:e2e:db` does not drop the test DB; drop it first (`DROP DATABASE IF EXISTS bistec_studio_test WITH (FORCE)`) for a clean gate.
+> **Update (2026-10-13, change 008 model selection):** new suite **`model-selection.test.ts` (§Y, 20 cases, TC-MODEL-01…20; 19 since 016 removed TC-MODEL-12)**: the model stamps on every generation path, the team policy at `/team` → Models and its allow-list applied to stored values, regenerate like for like, refine and the verifier, the scheduler and ACP on the team default, the assistants, the migration round trip (removed by 016), and the wave-2 pickers (the 400 `MODEL_NOT_ALLOWED` refusals, the wizard, the draft page, the chat headers, the team-token notice). New seam: the `MOCK_AI` model-call recorder, `GET` / `DELETE /api/test/model-calls`. Gates (each a full clean mock run after a dropped and recreated test DB): wave 1 **383 / 3 / 0 / 0**, wave 2 **391 / 3 / 0 / 0**.
+
+> **Update (2026-10-11, change 012 per-channel captions):** new suite **`captions.test.ts` (§W, 20 cases, TC-CAP-01…20; 16 since 016)** — per-channel captions + the headline, the publish resolver (terminal refusals, WhatsApp fails closed), the legacy migration, the backfill/report scripts, the rollback down.sql (those three removed by 016), and the caption-desk panels. New seams: the `__DROP_CAPTION_*__` topic sentinels and the hashed mock `platformId`. Gates (each a full clean mock run after a dropped and recreated test DB): wave 1 **363 passed / 3 skipped / 0 failed / 0 flaky**, waves 2 and 3 **369 / 3 / 0 / 0**. ⚠️ `npm run test:e2e:db` does not drop the test DB; drop it first (`DROP DATABASE IF EXISTS bistec_studio_test WITH (FORCE)`) for a clean gate.
 
 > **⚠️ Coverage gap this suite cannot see (learned from PR #40).** The suite runs `DESIGN_PROVIDER=claude-html` — **API mode** — so every CLI-mode-only code path is untested here, including the one where copy defaults to `claude -p` with no COPY provider registered. PR #40's bug (the wizard's Generate button dead on a team with no COPY provider) was invisible to this suite for that reason _and_ because the local seed added a `cli` COPY row that satisfied the gate. When changing provider-resolution or credential-chain behaviour, cover it in **unit** tests against the pure helpers (`resolveBriefCopyKey` / `canSubmitBrief`, `resolveCopyProvider`, `resolveClaudeAuth`) — do not assume a green E2E run says anything about CLI mode.
 
@@ -200,7 +202,7 @@ The deterministic path uses small, test-only seams, all centralized in **`src/li
 | `/api/generate/assemble-b`                 | POST   | `{briefId}`                                                           | **200** `{draftId,exportUrl}`                                                                                                   | signed; 200 not 201.                                              |
 | `/api/generate/export`                     | POST   | `{draftId}`                                                           | `{exportUrl}`                                                                                                                   | signed; short-circuits if set                                     |
 | `/api/drafts/[id]`                         | GET    | —                                                                     | draft detail, `exportUrl` signed                                                                                                | ownership                                                         |
-| `/api/drafts/[id]`                         | PATCH  | `{copyText}`                                                          | updated draft                                                                                                                   | EXPORTED→IN_PROGRESS                                              |
+| `/api/drafts/[id]`                         | PATCH  | `{channel,text}` or `{headline}`                                      | updated draft                                                                                                                   | never writes status; `{copyText}` → 400                           |
 | `/api/drafts/[id]/refine`                  | POST   | `{instruction}` or `{overrideConflictId,instruction}`                 | **202** `{ok:true}` (async — poll draft GET; conflict via `conflict` field) or sync `{reply,revisionId,exportUrl}` for Override | 409 while a `pendingAction` is in flight (§Q)                     |
 | `/api/drafts/[id]/revisions`               | GET    | —                                                                     | array, `exportUrl` signed                                                                                                       |                                                                   |
 | `/api/drafts/[id]/revisions/[rev]/restore` | POST   | —                                                                     | `{exportUrl}` signed                                                                                                            |                                                                   |
@@ -510,7 +512,7 @@ Refine writes by its own rule: it resolves the provider **first** and, with none
 
 ### W. Per-channel captions (`captions.test.ts`, change 012 T10 + T13 — AC-12 → AC-24)
 
-Every draft carries an on-image **headline** and one **`DraftCaption` row per channel** (Instagram, LinkedIn, WhatsApp), each `PENDING` / `READY` / `FAILED`. `GET /api/drafts/[id]` returns `headline`, `captionMigration` and `captions[]` and has **no `copyText` key**. Every publish path resolves the matching channel's caption first and refuses a failed, pending, empty, over-limit or WhatsApp one **terminally**. Legacy single-caption drafts migrate (boot backfill, or lazily on first read) as `SPLIT` / `UNSPLIT_FALLBACK` / `EMPTY`, with the original text kept in `legacyCaptionText @map("copyText")`.
+Every draft carries an on-image **headline** and one **`DraftCaption` row per channel** (Instagram, LinkedIn, WhatsApp), each `PENDING` / `READY` / `FAILED`. `GET /api/drafts/[id]` returns `headline` and `captions[]` and has **no `copyText` key**. Every publish path resolves the matching channel's caption first and refuses a failed, pending, empty, over-limit or WhatsApp one **terminally**. **Removed by 016 (2026-10-13):** the legacy single-caption migration (boot backfill, lazy read, `captionMigration`, `legacyCaptionText`) and the 012 rollback are gone, and so are the cases that tested them (TC-CAP-11, -12, -13, -19).
 
 Each case uses a unique topic, `waitForDraft` / `waitForAction` from `tests/helpers/api.ts`, and one kit + one campaign per worker (keeps the campaign count under the 200-row listing cap). Needs `MOCK_AI` + `MOCK_PUPPETEER` + `MOCK_SOCIAL` and test-DB access. The scheduler cases drive `POST /api/test/scheduler-tick`.
 
@@ -519,9 +521,9 @@ Each case uses a unique topic, `waitForDraft` / `waitForAction` from `tests/help
 - **`buildMockCaptionReply(topic, targets)`** (`src/lib/testHooks.ts`, returned by the `MOCK_AI` `CopyProvider`): a raw reply with a preamble, a `json`-fenced object holding only the requested keys, and a trailer, so **the real extractor parses it**. Captions are `Mock <Label> caption [<topic>]` (WhatsApp `Mock **WhatsApp** caption [<topic>]`, normalised to `*WhatsApp*`); the headline is `Mock headline <topic>`.
 - **`__DROP_CAPTION_INSTAGRAM__` / `__DROP_CAPTION_LINKEDIN__` / `__DROP_CAPTION_WHATSAPP__` / `__DROP_CAPTION_HEADLINE__`** in the brief topic omit that key, **only in a reply that requests every channel**. So a generation yields a `FAILED` row (or, for the headline, a `FAILED` draft), and a single-channel regenerate of that channel then succeeds, with no stored state.
 - **The hashed mock `platformId`:** `mockPlatformId(channel, caption)` = `mock-<channel>-<Date.now()>-<sha256(caption)[0:12]>`, used by the mock publishers, so a case can prove which text a channel received.
-- **`makeLegacyDraft(draftId, legacyText)`** (`tests/helpers/db.ts`): direct SQL that deletes the draft's caption rows and sets `copyText`, `headline = NULL`, `captionMigration = NULL`, i.e. a pre-012 draft.
-- **The scripts:** TC-CAP-12 runs `npm run captions:backfill` / `captions:report` through `spawnSync` with `.env.test` **overriding** the runner env (`dotenv -o` semantics; the runner already has `MOCK_AI` and the dev `.env`'s `DESIGN_PROVIDER=cli`). `testDbUrl()` throws unless the DB name ends in `_test`.
-- **The rollback check** (TC-CAP-13) builds a scratch DB `bistec_studio_test_012_rollback` with `prisma migrate deploy` (a `TEMPLATE` copy is refused while the test server holds the source), seeds it through Prisma, applies the real file with `prisma db execute --file prisma/rollback/012-per-channel-captions.down.sql`, and drops it `WITH (FORCE)` in `finally`. It needs only Prisma, so it also runs in CI.
+- **Removed by 016:** `makeLegacyDraft` (`tests/helpers/db.ts`), the `captions:backfill` / `captions:report` script runs and the rollback scratch DB, with TC-CAP-11/12/13/19. The two bullets below are kept as history.
+- ~~**The scripts:**~~ (historical) TC-CAP-12 ran `npm run captions:backfill` / `captions:report` through `spawnSync` with `.env.test` **overriding** the runner env (`dotenv -o` semantics; the runner already has `MOCK_AI` and the dev `.env`'s `DESIGN_PROVIDER=cli`). `testDbUrl()` throws unless the DB name ends in `_test`.
+- ~~**The rollback check**~~ (historical) (TC-CAP-13) built a scratch DB `bistec_studio_test_012_rollback` with `prisma migrate deploy` (a `TEMPLATE` copy is refused while the test server holds the source), seeds it through Prisma, applies the real file with `prisma db execute --file prisma/rollback/012-per-channel-captions.down.sql`, and drops it `WITH (FORCE)` in `finally`. It needs only Prisma, so it also runs in CI.
 
 **Wave 1 (T10):**
 
@@ -535,26 +537,24 @@ Each case uses a unique topic, `waitForDraft` / `waitForAction` from `tests/help
 - **TC-CAP-08 — WhatsApp is in no picker (AC-18, UI).** The draft page's Publish dialog and the campaign's Plan a post modal (`QueueEntryModal`) each show exactly two "Channels" checkboxes, Instagram and LinkedIn. **010 changes this to 3.**
 - **TC-CAP-09 — Single-flight (AC-20).** With `pendingAction = REGENERATE_COPY` and the LI row PENDING seeded through the test DB: `regenerate-copy {channel:'WHATSAPP'}`, `{headline:true}`, `regenerate-design` and restore each 409 "Another action is already running on this draft"; a PATCH on the PENDING LI row 409s "This caption is being generated", while a PATCH on READY IG is 200.
 - **TC-CAP-10 — Restore never touches captions (AC-22).** Refine → revision 2, PATCH LI, restore revision 1: `captions` (every field, `updatedAt` included) and `headline` equal their pre-restore values.
-- **TC-CAP-11 — Lazy migration on first read (AC-23 a, d).** Three drafts made legacy by SQL (header-split, header-less, whitespace-only) read as `SPLIT` / `UNSPLIT_FALLBACK` / `EMPTY` with the exact FR-05 texts (split loses `**` on IG/LI, WA `**WA**` → `*WA*`; fallback keeps `**` verbatim on IG and LI, both `needsReview`, WA `''`; empty → three READY `''`); 3 rows stored, legacy text kept. `regenerate-design` on the migrated draft (headline null → the Topic fallback) → 202 → EXPORTED, revision 2, `headline` still null.
-- **TC-CAP-12 — The backfill and report scripts (AC-23 b, c).** Two legacy drafts (split, header-less) plus a SCHEDULED LinkedIn post on the fallback one. `captions:backfill` prints `[captions] backfill: 2 drafts — split 1, unsplit-fallback 1, empty 0, deferred 0, errors 0` and the fallback's `REVIEW` line; both drafts then carry their outcome and 3 rows; a second run prints `0 drafts — …`; `captions:report` prints the `REVIEW` line with `LINKEDIN at <scheduledAt>` and the topic.
-- **TC-CAP-13 — The rollback down.sql (AC-23 e).** On the scratch DB (above), with four shapes (IG text; IG `''` + LI text; no rows; a legacy draft): no NULL `copyText` afterwards, each row the right value (IG, else LI, else `''`, legacy unchanged), `copyText` NOT NULL again (`is_nullable` `YES` → `NO`), the `DraftCaption` rows left in place. **Then the roll-forward:** migration 3 is un-recorded, a second `prisma migrate deploy` re-applies it (`NO` → `YES`), and a new draft with no `copyText` saves.
+- ~~**TC-CAP-11 — Lazy migration on first read**~~, ~~**TC-CAP-12 — The backfill and report scripts**~~, ~~**TC-CAP-13 — The rollback down.sql**~~ **(AC-23): removed by 016 (2026-10-13)** with the legacy caption machinery and the 012 rollback.
 - **TC-CAP-14 — ACP outputs (AC-26, AC-17 ACP).** ACP `generate_post` output has `headline` and `captions` (3, registry order, READY). ACP `publish_post {channel:'WHATSAPP'}` → 400 (`channel must be INSTAGRAM or LINKEDIN`), no Post row.
 - **AC-19** is the rewritten **TC-ASYNC-10** in `async-actions.test.ts` (§Q): PATCH `{channel:'INSTAGRAM', text}` then `text:''` keep the draft EXPORTED, in the library, regenerable and refinable, and the empty IG panel is an editable textarea with no skeleton.
 
 **Wave 2 (T13), the panels:**
 
 - **TC-CAP-15 — Regenerate all (AC-21 a).** A hand-set headline first; `regenerate-copy {}` → 202 → three READY captions with a strictly later `updatedAt`; the hand-set headline and `currentRevisionNumber` unchanged; `pendingActionError` null.
-- **TC-CAP-16 — Regenerate the headline only (AC-21 b).** A migrated draft (headline null); `{headline:true}` → 202 → `headline` = `Mock headline <topic>`; `captions` deep-equal the migrated read; revision pointer unchanged.
+- **TC-CAP-16 — Regenerate the headline only (AC-21 b).** A generated draft whose headline is nulled directly through the test DB (`prisma.draft.update`, since 016); `{headline:true}` → 202 → `headline` = `Mock headline <topic>`; `captions` deep-equal the read before the regenerate; revision pointer unchanged.
 - **TC-CAP-17 — The caption desk structure and counters (AC-24 a–d).** Under the "Captions" h2 the h3s are exactly Headline, Instagram, LinkedIn, WhatsApp, and one textbox is named "Headline". Each caption textarea is named by its h3 and holds the GET text. Counters `n / 2,200 (Instagram)`, `n / 3,000 (LinkedIn)`, `n / 1,000 guide`. 1,001 WhatsApp characters show `1,001 / 1,000 guide` and "Longer than the 1,000-character guide" and still save; 2,201 Instagram characters show "Over the Instagram limit" and still save. Then the axe scan.
 - **TC-CAP-18 — Copy and per-panel Undo (AC-24 e, f).** Clipboard permission granted on the context. "Copy LinkedIn caption" → toast "Caption copied", clipboard = LI text. WhatsApp hand-edited, then "Regenerate WhatsApp caption" → "Undo WhatsApp caption" appears (no other Undo); Undo restores the hand-written text in the field and the GET; IG, LI and the headline untouched.
-- **TC-CAP-19 — The review notice (AC-24 g).** A `makeLegacyDraft` fallback draft: exactly 2 `role="status"` review notices, starting the IG and LI descriptions, not WhatsApp's. Axe scan. Editing and blurring IG on the same page leaves one notice (LI's); the GET has IG `needsReview: false`.
+- ~~**TC-CAP-19 — The review notice (AC-24 g).**~~ **Removed by 016 (2026-10-13)** with the notice and `makeLegacyDraft`.
 - **TC-CAP-20 — A FAILED row (AC-24 h).** `__DROP_CAPTION_LINKEDIN__`: the error notice "The LinkedIn caption failed to generate (<reason>)." starts the LI description; the field is empty and editable; the button is "Generate" (named "Generate LinkedIn caption"). Axe scan. Generate fills LI with `Mock LinkedIn caption [<topic>]` and the notice goes.
 
-TC-CAP-17, -19 and -20 run 014's 12 AC-19 axe rules over the caption states 014's own draft-page scan never sees (0 violations). The rule list is copied from `a11y.test.ts` (importing a spec file would register its tests twice); a shared helper is a follow-up.
+TC-CAP-17 and -20 (and TC-CAP-19 until 016) run 014's 12 AC-19 axe rules over the caption states 014's own draft-page scan never sees (0 violations). The rule list is copied from `a11y.test.ts` (importing a spec file would register its tests twice); a shared helper is a follow-up.
 
 **Existing cases edited by 012** (reasons in `.specclaw/changes/012-per-channel-captions/reports/T10.md` and `T14.md`): `async-actions` TC-ASYNC-02, -06, -09, -10; `team-isolation` cross-team draft PATCH body; `surfaces` T9 at 375 px (placeholder, "Regenerate all") and "Brief & Caption Direction"; `a11y` rows 26/27 and the three "Brief & Caption Direction" headings.
 
-**AC → case map (change 012).** The unit side is AC-01 → AC-11 (`channels`, `captionMigrationPlan`, `captionExtract`, `captionHeadline`, `captionResolve`, `jobRunner`, `draftRecovery`, `legacyCaptionGuard`, `captionWording`, `mcpGetDraft`, `testHooks`).
+**AC → case map (change 012).** The unit side is AC-01 → AC-11 (`channels`, `captionExtract`, `captionHeadline`, `captionResolve`, `jobRunner`, `draftRecovery`, `captionWording`, `mcpGetDraft`, `testHooks`; `captionMigrationPlan`, `captionBackfill` and `legacyCaptionGuard` were deleted by 016).
 
 | AC                                                         | E2E                             |
 | ---------------------------------------------------------- | ------------------------------- |
@@ -569,8 +569,8 @@ TC-CAP-17, -19 and -20 run 014's 12 AC-19 axe rules over the caption states 014'
 | AC-20 single-flight 409s                                   | TC-CAP-09                       |
 | AC-21 Regenerate all; headline-only regenerate             | TC-CAP-15, TC-CAP-16            |
 | AC-22 restore never touches captions                       | TC-CAP-10                       |
-| AC-23 migration, backfill, report, rollback                | TC-CAP-11, TC-CAP-12, TC-CAP-13 |
-| AC-24 the panels: structure, counters, copy, undo, notices | TC-CAP-17 … TC-CAP-20           |
+| AC-23 migration, backfill, report, rollback                | removed by 016 (no case)        |
+| AC-24 the panels: structure, counters, copy, undo, notices | TC-CAP-17, TC-CAP-18, TC-CAP-20 |
 
 ---
 
@@ -594,7 +594,7 @@ Each case uses a unique topic and `waitForDraft` / `waitForAction`, with one kit
   - Each case `DELETE`s before the action it asserts on.
 - **Stamps are seeded through the test DB** (`prisma.draft.update` / `draftCaption.update`), as §W does.
 - **The verifier is reached with an _add_ instruction** ("Include a human character"). A bare mock document defaults to the add class, whose post-condition is the verifier (004 TC-FID-09).
-- **The rollback check (TC-MODEL-12)** builds a scratch DB, `bistec_studio_test_008_rollback`, with `prisma migrate deploy`, as TC-CAP-13 does. A `TEMPLATE` copy is refused while the test server holds the source. The literal `TEMPLATE` run of AC-23 is a scripted step with the server stopped, recorded in `.specclaw/changes/008-model-selection/reports/T12.md`.
+- ~~**The rollback check (TC-MODEL-12)**~~ **Removed by 016 (2026-10-13)** with `prisma/rollback/008-model-selection.down.sql`. (Historical:) it built a scratch DB, `bistec_studio_test_008_rollback`, with `prisma migrate deploy`, as TC-CAP-13 does. A `TEMPLATE` copy is refused while the test server holds the source. The literal `TEMPLATE` run of AC-23 is a scripted step with the server stopped, recorded in `.specclaw/changes/008-model-selection/reports/T12.md`.
 
 **Cases:**
 
@@ -652,11 +652,7 @@ Each case uses a unique topic and `waitForDraft` / `waitForAction`, with one kit
   - **Untick Opus + Save** → "Models saved". The GET `allowed` is `['HAIKU','SONNET']` with `newModels: ['OPUS']`, and there is one "New" chip.
   - **Only Opus ticked** → Template fill reads "System default (none allowed)". Save → `role="alert"` "Template fill needs Haiku or Sonnet allowed", and nothing is saved.
   - Axe again, with the error showing.
-- **TC-MODEL-12 — The migration round trip (AC-23).** On the scratch DB:
-  1. The forward shape equals the test DB's own. The shape is: the 10 added columns plus both tables' columns, each with type and nullability; both tables; both enum types; and the `20261012120000_model_selection` row.
-  2. Rows are seeded in every added object: a policy with a default, a Brief with both keys, and a stamped Draft, caption and revision.
-  3. `prisma db execute --file prisma/rollback/008-model-selection.down.sql` → nothing of 008 is left (`{columns: [], tables: [], types: [], migration: 0}`), and the Draft row is kept.
-  4. A second `prisma migrate deploy` re-applies the migration by itself, and the shape equals the forward one again.
+- ~~**TC-MODEL-12 — The migration round trip (AC-23).**~~ **Removed by 016 (2026-10-13)** with the 008 down script. There is no rollback to before 008 on a fresh system.
 - **AC-22's axe half on the full page** is also covered by 014's `a11y.test.ts` "AC-19: /team with the register form open", which now waits for the Models section's Save button before scanning.
 
 **Existing cases edited by 008** (reasons in `.specclaw/changes/008-model-selection/reports/T12.md`):
@@ -666,18 +662,18 @@ Each case uses a unique topic and `waitForDraft` / `waitForAction`, with one kit
 
 **AC → case map (change 008, wave 1).** The unit side is AC-01 → AC-13: `modelCatalogue`, `modelResolve`, `envModel`, `modelPolicy`, `regenerateStamp`, `captionStore` / `renderStamps` / `draftActions`, `usageLimit`, `actionBudget`, the heartbeat cases, `modelLiteralGuard`, `modelBoundary` and `anthropicCall`. AC-14 is the operator's T2.
 
-| AC                                                     | E2E                                                  |
-| ------------------------------------------------------ | ---------------------------------------------------- |
-| AC-15 generation stamps on system defaults             | TC-MODEL-01, TC-MODEL-02                             |
-| AC-16 the team policy                                  | TC-MODEL-03, TC-MODEL-04, TC-MODEL-05                |
-| AC-17 a removal applies to stored values               | TC-MODEL-06                                          |
-| AC-18 regenerate is like for like                      | TC-MODEL-07                                          |
-| AC-19 refine and the verifier                          | TC-MODEL-08                                          |
-| AC-20 non-interactive callers use the team default     | TC-MODEL-09                                          |
-| AC-21 the assistants and the stamp-less surfaces       | TC-MODEL-10                                          |
-| AC-22 `/team` → Models                                 | TC-MODEL-11, `a11y` "AC-19: /team …"                 |
-| AC-23 the migration and rollback                       | TC-MODEL-12 + the scripted TEMPLATE run (T12 report) |
-| AC-24 wave 1's full clean mock E2E, 0 failed / 0 flaky | the wave-1 gate                                      |
+| AC                                                     | E2E                                                     |
+| ------------------------------------------------------ | ------------------------------------------------------- |
+| AC-15 generation stamps on system defaults             | TC-MODEL-01, TC-MODEL-02                                |
+| AC-16 the team policy                                  | TC-MODEL-03, TC-MODEL-04, TC-MODEL-05                   |
+| AC-17 a removal applies to stored values               | TC-MODEL-06                                             |
+| AC-18 regenerate is like for like                      | TC-MODEL-07                                             |
+| AC-19 refine and the verifier                          | TC-MODEL-08                                             |
+| AC-20 non-interactive callers use the team default     | TC-MODEL-09                                             |
+| AC-21 the assistants and the stamp-less surfaces       | TC-MODEL-10                                             |
+| AC-22 `/team` → Models                                 | TC-MODEL-11, `a11y` "AC-19: /team …"                    |
+| AC-23 the migration and rollback                       | removed by 016 (was TC-MODEL-12 + the T12 TEMPLATE run) |
+| AC-24 wave 1's full clean mock E2E, 0 failed / 0 flaky | the wave-1 gate                                         |
 
 #### Y, wave 2: the pickers (change 008 T18 — AC-27 → AC-31, AC-33)
 

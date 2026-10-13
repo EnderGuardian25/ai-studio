@@ -32,13 +32,13 @@
 
 ### Changes 016–020: approved (all bounded), building one at a time in this order
 
-| #   | Change                                                                                           | What                                                                                                                                                                                                                                                                                                                    |
-| --- | ------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 016 | [Fresh-start cleanup](../.specclaw/changes/016-fresh-start-cleanup/)                             | Delete the export/import scripts and the 012 legacy caption machinery (a migration drops `copyText`, `captionMigration`, `needsReview`). Remove the copy-edit heal, two legacy guards, three one-off scripts, the 012/008 rollbacks and the `copyText` alias. No pre-made team; a zero-team dashboard for super admins. |
-| 017 | [Publish API fixes](../.specclaw/changes/017-publish-api-fixes/)                                 | **A failed immediate publish shows "✓ published" today:** return 502 with the reason (also on Retry). Duplicate check before the caption check. A batch caption load for the posts list.                                                                                                                                |
-| 018 | [Post-008 small fixes](../.specclaw/changes/018-post-008-small-fixes/)                           | ACP manifest output; the `/team` refine label; stale comments; the draft-GET provider lookup; caption/headline Undo settle-on-state; revision-list retry; the shared axe helper; TC-MODEL-14 caption pick; 014 gaps 5, 7 and 8.                                                                                         |
-| 019 | [Draft-action claim token](../.specclaw/changes/019-draft-action-claim-token/)                   | `Draft.pendingActionClaimId`, so a run swept as stuck can't settle or overwrite a newer run's claim. Additive migration plus a down script.                                                                                                                                                                             |
-| 020 | [Create post button off the draft page](../.specclaw/changes/020-create-post-button-draft-page/) | It covered the refine Send button.                                                                                                                                                                                                                                                                                      |
+| #   | Change                                                                                              | What                                                                                                                                                                                                                                                                                                                    |
+| --- | --------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 016 | [Fresh-start cleanup](../.specclaw/changes/016-fresh-start-cleanup/) (**BUILT 5/5**; E2E 386/3/0/0) | Delete the export/import scripts and the 012 legacy caption machinery (a migration drops `copyText`, `captionMigration`, `needsReview`). Remove the copy-edit heal, two legacy guards, three one-off scripts, the 012/008 rollbacks and the `copyText` alias. No pre-made team; a zero-team dashboard for super admins. |
+| 017 | [Publish API fixes](../.specclaw/changes/017-publish-api-fixes/)                                    | **A failed immediate publish shows "✓ published" today:** return 502 with the reason (also on Retry). Duplicate check before the caption check. A batch caption load for the posts list.                                                                                                                                |
+| 018 | [Post-008 small fixes](../.specclaw/changes/018-post-008-small-fixes/)                              | ACP manifest output; the `/team` refine label; stale comments; the draft-GET provider lookup; caption/headline Undo settle-on-state; revision-list retry; the shared axe helper; TC-MODEL-14 caption pick; 014 gaps 5, 7 and 8.                                                                                         |
+| 019 | [Draft-action claim token](../.specclaw/changes/019-draft-action-claim-token/)                      | `Draft.pendingActionClaimId`, so a run swept as stuck can't settle or overwrite a newer run's claim. Additive migration plus a down script.                                                                                                                                                                             |
+| 020 | [Create post button off the draft page](../.specclaw/changes/020-create-post-button-draft-page/)    | It covered the refine Send button.                                                                                                                                                                                                                                                                                      |
 
 - **016 goes first,** because 017–019 edit the caption code it simplifies.
 - **The party panel was skipped for all five** (no explicit approval this time).
@@ -52,6 +52,48 @@
   - 009 hero imagery;
   - 010 WhatsApp Channel posting.
 - **⚠️ Remotes:** a second remote, `upstream`, points at the company repo with **push enabled**. Removing it is waiting on the user's go-ahead. Never push to it.
+
+---
+
+## 🛠️ 016 runbook — fresh-start cleanup: deploy, first run, rollback
+
+**This system is fresh-start only.** 016 deletes the code that existed only to repair, convert, carry or roll back data written by older versions. Older sections of this file that describe that machinery are marked **"Removed by 016"**; they are history, not instructions.
+
+### What 016 removed
+
+- **Scripts:** `scripts/export-posts.mjs`, `import-posts.mjs`, `fix-data-uri-logos.mjs`, `migrate-to-teams.mjs` and `reseed-single-admin.mjs`. The runtime `data:` logo guards stay.
+- **The 012 legacy caption machinery:** the columns `Draft.copyText` (`legacyCaptionText`), `Draft.captionMigration` and `DraftCaption.needsReview`, the enum `CaptionMigration`, the migrate-on-read loader, `migrationPlan.ts` / `backfill.ts` / `src/scripts/backfill-captions.ts`, the `captions:backfill` / `captions:report` npm scripts, the boot backfill in `docker-entrypoint.sh` (and its Dockerfile bundle), and `CaptionPanel`'s "migrated from the old single caption" notice. `loadDraftCaptions` now reads the rows and fills a missing channel with an empty READY row, nothing else.
+- **The copy-edit status heal** (`recovery.ts`, 2026-07-28), the regenerate-design null-pointer snapshot and refine's pre-008 conflict branch.
+- **Both rollbacks:** `prisma/rollback/012-per-channel-captions.down.sql` and `prisma/rollback/008-model-selection.down.sql`, with TC-CAP-13 and TC-MODEL-12 (and TC-CAP-11/12/19, `makeLegacyDraft`).
+- **The `copyText` alias:** MCP `get_draft`, MCP/ACP `generate_post` and `POST /api/generate/copy` return only `headline` and `captions`. Callers read the channel's entry in `captions`. A `{copyText}` PATCH body is still refused with 400.
+
+### Deploy
+
+- **Two migrations, applied on boot** by the entrypoint's `prisma migrate deploy`:
+  - `20261013120000_drop_legacy_captions` drops the three columns and the enum;
+  - `20261013130000_drop_empty_default_team` deletes the migration-created "Bistec" team (`team_bistec_default`) **only when it is empty**: no members, no rows in any team-owned table, and no team Claude token. A team in use is kept.
+- **⚠️ FRESH SYSTEMS ONLY.** On a database that still holds legacy single captions (a `Draft` with `copyText` and no `DraftCaption` rows), the first migration raises and `migrate deploy` fails, by design, instead of losing caption text:
+
+  ```
+  ERROR: 016 drop_legacy_captions: this system is fresh-start only (change 016), but this database still holds legacy single captions that were never migrated to per-channel captions. Reset the database, or run the 012 caption backfill on a pre-016 build first.
+  ```
+
+  The fix is to reset the database (the fresh start), or to run the 012 backfill on a pre-016 build first and then deploy 016. Under the entrypoint's `set -e` the boot fails and the previous container keeps serving.
+
+- **Locally:** `npx prisma migrate deploy` on the dev DB. A dev DB with unmigrated legacy drafts fails the same way; drop and recreate it.
+
+### First run on a fresh database
+
+- **A fresh database has zero teams.** Sign in as the super admin that `seed-admin` creates. The dashboard says there are no teams yet and links to **`/admin/teams`** to create the first one. Non-super-admins with no team see the old "no team" message.
+- **`npm run db:seed` is a dev demo seed,** not part of a fresh system's boot. It creates a "Bistec" team by name (through `seed-brandkit`) with demo content. The E2E setup (`npm run test:e2e:db`) creates its own Bistec, ClientX and NoKitCo teams the same way.
+
+### Rollback
+
+- Run **`prisma/rollback/016-fresh-start-cleanup.down.sql` before the pre-016 image boots**, e.g. `npx prisma db execute --file prisma/rollback/016-fresh-start-cleanup.down.sql --url "$DATABASE_URL"` or `psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f …`.
+  - It re-creates the `CaptionMigration` enum and re-adds `Draft.copyText` (nullable), `Draft.captionMigration` (nullable) and `DraftCaption.needsReview` (`NOT NULL DEFAULT false`), so a pre-016 image boots.
+  - It un-records both 016 migrations in `_prisma_migrations`, so a later 016 redeploy re-applies them by itself (L24).
+  - It is idempotent. **It restores no data:** no caption text and not the deleted team.
+- There is no rollback to before 012 or 008 any more.
 
 ---
 
@@ -160,7 +202,8 @@ Both waves are committed and pushed to `v2`. Every task has a report in `.speccl
 ### Rollback
 
 - **To go back to the pre-008 image, boot it. No SQL step is needed.** It ignores everything 008 added. If its `migrate deploy` refuses because a newer migration is applied, boot it with `SKIP_MIGRATIONS=1`.
-- **Full removal only:** `prisma/rollback/008-model-selection.down.sql`. Stop both 008 containers (app and scheduler) first, because 008 code reads the columns it drops. Run it with `npx prisma db execute --file prisma/rollback/008-model-selection.down.sql --url "$DATABASE_URL"` (the form TC-MODEL-12 uses) or `psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f …`. It sits outside `prisma/migrations/`, so `migrate deploy` never applies it.
+- **Removed by 016 (2026-10-13):** the full-removal script below, `prisma/rollback/008-model-selection.down.sql`, and TC-MODEL-12 are deleted. There is no rollback to before 008 on a fresh system; the bullet is kept as history. The only down script is 016's (see the 016 runbook).
+- ~~**Full removal only:**~~ (historical) `prisma/rollback/008-model-selection.down.sql`. Stop both 008 containers (app and scheduler) first, because 008 code reads the columns it drops. Run it with `npx prisma db execute --file prisma/rollback/008-model-selection.down.sql --url "$DATABASE_URL"` (the form TC-MODEL-12 uses) or `psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -f …`. It sits outside `prisma/migrations/`, so `migrate deploy` never applies it.
   - It drops the eight stamp columns, the two `Brief` columns, both tables and both enums, in reverse order with `IF EXISTS`. **That destroys every stamp and every team model policy.** Drafts, captions and revisions themselves are kept.
   - **It deletes its own `_prisma_migrations` row** (`20261012120000_model_selection`), so a later 008 redeploy re-applies the migration by itself. No manual roll-forward step (L24).
   - **Proven twice:** TC-MODEL-12 in the suite (a migrate-built scratch DB: forward → down → `migrate deploy` → the same `information_schema` shape), and the literal `CREATE DATABASE … TEMPLATE bistec_studio_test` round trip in `reports/T12.md` (forward `10 | 2 | 2 | 1`, after down `0 | 0 | 0 | 0`, after redeploy `10 | 2 | 2 | 1`, shape IDENTICAL, all 203 drafts kept).
@@ -224,6 +267,8 @@ Stamps need nothing: `DraftCaption.model` and `Draft.headlineModel` are separate
 - It is the only measurement of Opus durations, and it is one sample.
 
 ### Export and import
+
+**Removed by 016 (2026-10-13):** both scripts are deleted (fresh start, no import). The paragraph below is history.
 
 `scripts/export-posts.mjs` already exported every scalar column, so bundles carry the stamps; `import-posts.mjs` copies `Brief.captionModel` / `designModel` and the eight stamp columns verbatim. The manifest stays **v2**: a pre-008 bundle imports with null stamps, and a pre-008 importer drops only the stamps. The L22 `teamId` gap is unchanged.
 
@@ -412,7 +457,7 @@ The session stopped to save usage. The user approved the plan ("continue") and t
 | T12  | `44b28c83` | The review / last-failed notices, the WhatsApp helper and guide, the counters                                                                                             |
 | T13  | `29ed3c8e` | §W wave-2 panel cases (TC-CAP-15…20); **wave-2 gate**                                                                                                                     |
 | T14  | `b522046e` | "copy" → "caption" in the remaining UI strings and the wording guard; **wave-3 gate**                                                                                     |
-| T15  | `c9386ae0` | `export-posts` / `import-posts` carry captions, the headline and `captionMigration` (manifest v2; v1 bundles still import)                                                |
+| T15  | `c9386ae0` | `export-posts` / `import-posts` carry captions, the headline and `captionMigration` (manifest v2; v1 bundles still import). Scripts removed by 016                        |
 | T16  | `1b7186f7` | Docs: this handoff, the runbook, CLAUDE.md, ROADMAP, 008/010 proposals, e2e plan §W, MCP/ACP guide, DESIGN_SYSTEM §8.14                                                   |
 
 ### Gates
@@ -446,7 +491,7 @@ The original finding:
 1. ~~**`/specclaw:verify 012-per-channel-captions`.**~~ **Done 2026-10-12: PASS, 28/28 gating ACs** (`.specclaw/changes/012-per-channel-captions/verify-report.md`). A fresh full mock E2E at HEAD `3d645899` gave 369/3/0/0, unit 2025/2025, lint 0 errors, build, `test:render` 15/15. Gaps noted but not blocking: AC-25 points 2–3 rest on code plus the static guard, not a running test; AC-03 "discarded text logged" is proven in two halves; AC-29 (optional operator live check) not run; the T6 settle-guard WARN was accepted as the per-claim-token follow-up, not fixed. Next: `/specclaw:pr` only if the user wants a PR (`v2` is the integration branch), or go straight to the follow-ups.
 2. **Follow-ups after 012, each its own change:**
    1. ~~**The red-CI refine race,** together with the refine "Applying…" follow-up (`/specclaw:debug`).~~ **Done: change 015, CI green 2026-10-12.** A small leftover is the caption and headline undo-clear on the same edge pattern (a leftover Undo that restores identical text).
-   2. **`import-posts.mjs` never sets `teamId`,** so a real import has been broken since team tenancy (2026-07-21); `--dry-run` never calls `create` and hides it (learning L22). Needs a `--team` remap, then a real import into a scratch test DB.
+   2. ~~**`import-posts.mjs` never sets `teamId`,**~~ **Won't fix; the script was removed by 016 (2026-10-13).** A real import has been broken since team tenancy (2026-07-21); `--dry-run` never calls `create` and hides it (learning L22). Needs a `--team` remap, then a real import into a scratch test DB.
    3. **The ACP manifest's advertised `generate_post` output schema** (`src/acp/agent.ts`) lists only `draftId`, `exportUrl`, `htmlContent`; it lacks `headline` and `captions`. The real output has them (AC-26).
    4. **`POST /api/posts` returns 201 for an immediate publish that ends FAILED,** and `PublishDialog` shows it as a success. Predates 012; caption refusals no longer reach it (422), a platform failure still does.
    5. **A per-claim token for draft actions** (the settle guards key on state, not on the claim).
@@ -464,12 +509,14 @@ The original finding:
 - **`npm run test:e2e:db` does NOT drop the test DB.** It creates it if missing, then migrates and seeds. A clean gate needs `docker exec designer-postgres-1 psql -U bistec -d postgres -c "DROP DATABASE IF EXISTS bistec_studio_test WITH (FORCE);"` first.
 - **`specclaw-build setup` refuses on a stale lock** left by an earlier session. Clear it with `specclaw-change-lock .specclaw release <change>`; `setup --force` doesn't parse.
 - **The `review-package` diff came out repo-wide (~437 KB) for T8.** Point reviewers at `git diff -- <task files>` instead.
-- **The `captions:*` scripts use `tsx --env-file-if-exists=.env`,** so they also run in CI (no `.env` there). Locally that means they hit the **dev** DB by default: run them only with `npx dotenv -e .env.test --` or an explicit `DATABASE_URL`.
-- **A dev DB without the three 012 migrations can't create drafts** with the current Prisma client (`copyText` is still NOT NULL there, and nothing writes it now). Run `npx prisma migrate deploy` on the dev DB before running the dev app.
+- **(Removed by 016: the `captions:*` scripts no longer exist.)** ~~**The `captions:*` scripts use `tsx --env-file-if-exists=.env`,**~~ so they also run in CI (no `.env` there). Locally that means they hit the **dev** DB by default: run them only with `npx dotenv -e .env.test --` or an explicit `DATABASE_URL`.
+- **(Superseded by 016: the `copyText` column is dropped; a dev DB with unmigrated legacy drafts now fails `migrate deploy` and must be reset. See the 016 runbook.)** A dev DB without the three 012 migrations can't create drafts with the then-current Prisma client (`copyText` is still NOT NULL there, and nothing writes it now). Run `npx prisma migrate deploy` on the dev DB before running the dev app.
 
 ---
 
 ## 🛠️ 012 runbook — per-channel captions: migrations, boot backfill, report, rollback
+
+**Removed by 016 (2026-10-13):** the boot backfill, `captions:report` / `captions:backfill`, the legacy columns (`copyText`, `captionMigration`, `needsReview`), the review notice and `prisma/rollback/012-per-channel-captions.down.sql` are all deleted. **Do not follow the backfill, report, rollback or roll-forward steps below:** the scripts and files they name no longer exist. The three 012 migrations stay applied; migration `20261013120000_drop_legacy_captions` drops what they added for the legacy path. There is no rollback to before 012. This section is history; the current deploy notes are the **016 runbook**.
 
 **Release note:** _Every channel now publishes its own caption. Drafts whose old single caption couldn't be split by channel show a review notice on Instagram and LinkedIn until each caption is edited or regenerated._ WhatsApp has a caption on every draft but is not publishable from Studio (010).
 
@@ -483,7 +530,7 @@ All three are applied by the entrypoint's `prisma migrate deploy` on boot. None 
 | `20261011130000_draft_captions`      | Enums `CaptionStatus`, `CaptionMigration`; table `DraftCaption` (cascade FK, unique `(draftId, channel)`, CHECK `DraftCaption_failed_has_no_text`); `Draft.headline`, `Draft.captionMigration` |
 | `20261011140000_legacy_caption_text` | `ALTER TABLE "Draft" ALTER COLUMN "copyText" DROP NOT NULL;` The Prisma field is now `legacyCaptionText @map("copyText")`: read-only, dropped in a later change                                |
 
-### The boot backfill
+### The boot backfill (removed by 016)
 
 `docker-entrypoint.sh` runs `node dist/scripts/backfill-captions.js` right after `migrate deploy`, inside the same `SKIP_MIGRATIONS` guard. It takes a Postgres advisory lock (the app and scheduler containers serialize), and migrates every draft with a legacy caption, no `DraftCaption` rows and no `captionMigration`, one transaction per draft. It is idempotent.
 
@@ -503,14 +550,14 @@ All three are applied by the entrypoint's `prisma migrate deploy` on boot. None 
 - **A per-draft error** logs `[captions] backfill: draft <id> failed (the loader retries it on read): …` and is counted in `errors`; the boot continues.
 - **A top-level failure** (DB unreachable, lock query failing) logs `[captions] backfill failed: …` and exits 1. Under `set -e` the boot fails and the previous container keeps serving.
 
-### `captions:report`
+### `captions:report` (removed by 016)
 
 Prints the `REVIEW` list again, with no lock and no writes, then `[captions] report: N draft(s) to review`.
 
 - **In the container:** `node dist/scripts/backfill-captions.js --report`.
 - **Locally:** `npx dotenv -e .env.test -- npm run captions:report` (or with an explicit `DATABASE_URL`). The npm scripts load `.env` if it exists (`--env-file-if-exists=.env`), so **without an explicit target they hit the dev DB.** The same applies to `captions:backfill`: never run it without an explicit test-DB `DATABASE_URL`.
 
-### Rollback to the pre-012 image
+### Rollback to the pre-012 image (removed by 016)
 
 1. **Stop both 012 containers** (app and scheduler). Once step 2 restores NOT NULL, 012 code can no longer create drafts: it never writes `copyText`.
 2. **Run the data fix** `prisma/rollback/012-per-channel-captions.down.sql` against the prod DB, e.g. `npx prisma db execute --file prisma/rollback/012-per-channel-captions.down.sql --url "$DATABASE_URL"` (the form TC-CAP-13 runs) or `psql "$DATABASE_URL" -f …`. It sits outside `prisma/migrations/`, so `migrate deploy` never applies it. It:
@@ -524,7 +571,7 @@ Prints the `REVIEW` list again, with no lock and no writes, then `[captions] rep
 
 **While rolled back,** the old code publishes `copyText` to every channel, so a post-012 draft sends its Instagram caption to LinkedIn too: the pre-012 combined-caption behaviour.
 
-### Roll forward again
+### Roll forward again (removed by 016)
 
 1. **Redeploy 012. There is no manual step.** down.sql un-recorded migration 3, so the boot `migrate deploy` re-applies it (`DROP NOT NULL`). The boot backfill then migrates the drafts the old code created while rolled back; they have `copyText` and no rows. Post-012 drafts already have rows and are skipped.
    - The un-record step was added to down.sql on 2026-10-11, by user decision, after the T16 runbook found the gap. Without it, migration 3 would never re-run, and every new draft would fail on NOT NULL.
@@ -564,7 +611,7 @@ Everything is pushed to `origin/v2` through the 014 verify (`fbd58748`). **012 T
     - migrated drafts fall back to the brief Topic, and the fallback is logged;
     - the headline enters the design prompts only fenced as untrusted content.
   - **Contracts keep their names:** the `regenerate-copy` and `generate/copy` routes, `DraftAction.REGENERATE_COPY`, and the MCP/ACP field names. MCP/ACP keep `copyText` as a deprecated alias holding the Instagram caption, plus a `captions: [{channel,text,status}]` list and `headline` (A4).
-  - **The old caption text is preserved:**
+  - **The old caption text is preserved** _(all removed by 016, 2026-10-13: the column, the migration record, the notice, the backfill and the lazy loader)_:
     - it becomes `legacyCaptionText @map("copyText")`, a rename in code only (A1);
     - it is dropped only in a later change;
     - each draft records how it migrated (`split` / `unsplit-fallback` / `empty`);
@@ -630,7 +677,7 @@ Everything is pushed to `origin/v2` through the 014 verify (`fbd58748`). **012 T
 - **A finished gate agent restarted a detached `next dev` on :3001** after its background task died, and it collided with the next gate. **Before every full E2E, confirm exactly one :3001 listener**, the one you started after `rm -rf .next` and the DB reset. This is logged in `.specclaw/learnings.md`.
 - **Never run `npm run build` while `next dev` is serving :3001.** It corrupts the dev `.next`. `specclaw-build finalize` and `specclaw-verify collect` both run the build, so stop the server first and `rm -rf .next` afterwards.
 - **`specclaw-build setup` acquires a change lock.** `.specclaw/changes/*/.lock/` is now gitignored, after a lock got committed once. `finalize` releases it; a stale build lock blocks verify until then.
-- **012 T4's implementer ran the backfill once against the dev DB by accident.** `@prisma/client` loads `.env` even when `DATABASE_URL` is unset. It failed with P2022 before writing anything, because the dev DB doesn't have the migration yet. **Never run `src/scripts/backfill-captions.ts` without an explicit test-DB `DATABASE_URL`.**
+- **(Historical; the backfill was removed by 016.)** **012 T4's implementer ran the backfill once against the dev DB by accident.** `@prisma/client` loads `.env` even when `DATABASE_URL` is unset. It failed with P2022 before writing anything, because the dev DB doesn't have the migration yet. **Never run `src/scripts/backfill-captions.ts` without an explicit test-DB `DATABASE_URL`.**
 - **Local MinIO now runs `pgsty/silo:RELEASE.2026-09-16T00-00-00Z`** on the same volume, with no data change. The rollback image is `local/minio-rollback:pre-silo`, and the volume backups are in the 2026-10-09 session scratchpad.
 - **The 012 migrations exist only as SQL files:** `20261011120000_channel_whatsapp` and `20261011130000_draft_captions`. They are applied when the wave gate recreates the test DB. Run `npx prisma migrate deploy` on the dev DB only when you want the dev app to run 012 code.
 - **GitHub moves `ubuntu-latest` to Ubuntu 26 from 2026-10-19.** Watch the first CI run after that date.
@@ -1155,6 +1202,8 @@ Both were reported as "the fix didn't work". Both times the code was right and t
 
 ### ✅ 2026-07-28 (latest) — editing the copy silently broke the whole draft
 
+**Removed by 016 (2026-10-13):** fix part 3, the read-time heal (`hasFinishedDesign` / `isStatusClobbered` / `healStatus` in `recovery.ts` and its call in the draft GET), is deleted: on a fresh system no draft carries a clobbered status. Parts 1 and 2 stand, and TC-ASYNC-10 still guards them. The applied migration `20260728120000_heal_copy_edit_clobbered_drafts` stays (applied migrations are never edited).
+
 **Reported:** "delete the copy completely and the Refine design option disappears; regenerate the copy afterwards and some posts say draft not ready — fix it so we don't have to regenerate every time it breaks."
 
 **Root cause: one line.** `PATCH /api/drafts/[id]` — the copy editor's save — flipped an `EXPORTED` draft to `IN_PROGRESS` on any copy edit, meaning "the export is now stale". But in this codebase `IN_PROGRESS` means **"a generation is running right now"**, and every consumer read it that way:
@@ -1354,7 +1403,7 @@ The prod **Bistec** team had **no brand kits** (they'd been cleaned up), so both
 
 - Dropped `@unique` from `Team.name`; new migration **`20260726120000_team_name_unique_active`** drops `Team_name_key` and creates a **partial** unique index `Team_name_active_key ON "Team"("name") WHERE "isDeleted" = false`.
 - Create + rename routes now check with `findFirst({ name, isDeleted:false })` (rename excludes self) and map a `P2002` race to 409.
-- `scripts/seed-teams.mjs` + `scripts/migrate-to-teams.mjs` moved off `findUnique`-by-name (name is no longer a Prisma unique field → would throw at runtime).
+- `scripts/seed-teams.mjs` + `scripts/migrate-to-teams.mjs` (the latter removed by 016) moved off `findUnique`-by-name (name is no longer a Prisma unique field → would throw at runtime).
 - Gates: tsc clean, lint 0 errors (7 pre-existing warnings), **unit 318/318**, and a direct-DB proof (reuse of a soft-deleted name succeeds; a second _live_ duplicate is rejected with P2002). Migration applied cleanly to the local DB.
 - **⚠️ Prod — this prediction was half right, and the wrong half mattered.** It correctly said the migration "only runs on `prisma migrate deploy` during a redeploy". It wrongly _assumed a redeploy runs one_. It does not: nothing in the image or the pipeline ever did. PR #38 merged, prod redeployed, and "Hearts Academy" still 409'd — because the index was never created. **See the 2026-07-27 section at the top of this file** for the diagnosis and the migrate-on-boot fix.
 
@@ -1468,7 +1517,7 @@ Against the **Claude Testing** team (test data KEPT — IDs in the 2026-07-23 fi
    Optional additions only when actually used: `ANTHROPIC_API_KEY` (API mode), `MCP_API_KEY` (the credential a stdio MCP client presents), `MINIO_PUBLIC_ENDPOINT` (Instagram tunnel testing, see `docs/social-publishing-setup.md` §4), `CLAUDE_CLI_MODEL`/`CLAUDE_CLI_DEBUG`. Nothing else belongs in `.env` — all AI/social credentials live in the DB (`/settings`, `/team`). This machine's `.env` was brought to this exact state on 2026-07-21.
 
 4. Post-deploy ops, in-app: set the team's Claude/OpenAI/social credentials at `/team`; each user connects their own personal Claude/OpenAI token at `/settings`; re-issue MCP/ACP API keys at `/team` (the plaintext is shown once — save it immediately, the old env-list keys are dead).
-5. `scripts/migrate-to-teams.mjs --dry-run` is kept around as an inspection tool only — it is not part of the deploy path anymore (the backfill lives in migration B).
+5. **(Removed by 016, 2026-10-13: the script is deleted.)** ~~`scripts/migrate-to-teams.mjs --dry-run` is kept around as an inspection tool only~~ — it is not part of the deploy path anymore (the backfill lives in migration B).
 
 ### Testing
 
@@ -1511,14 +1560,14 @@ Small UI-only change set (no schema, no API changes, no migrations, no new env v
 - **Prompt guards (defense in depth):** `buildBrandKitSystemContext` renders `Logo URL: none (embedded logo omitted)` for a `data:` logoUrl; `pathB.ts` filters `data:` URLs out of the reference-artifact list. **`PROMPT_VERSION` → `2026-07-17.1`.**
 - **Write-surface validation:** `POST/PATCH /api/admin/brandkits(/[id])` reject a non-`http(s)://` `logoUrl` with 400 (clearing with `null` still allowed); MCP `create_brand_kit` throws the same check as a tool error.
 - **Seed fix:** `scripts/seed-hearts-talk.mjs` uploads its logo assets to the brand-kits bucket (stable public URL) instead of embedding data-URIs (the presigned-URL rationale died with H10).
-- **New `scripts/fix-data-uri-logos.mjs`:** finds every `BrandKit.logoUrl` / `BrandKitArtifact.url` holding a `data:` URI, uploads the decoded bytes to the brand-kits bucket, rewrites the row. Idempotent, `--dry-run` supported, exits non-zero if any row was unparsable/skipped.
-- **Data fix APPLIED on this machine** (not a commit): Hearts Academy kit `logoUrl` → `http://localhost:9000/brand-kits/cmqroh4po00008xc8tcntem58/hearts-academy-logo-transparent.png` (background made transparent via edge-connected removal — the white knot inside the heart mark preserved); the mislabeled 136k data-URI "BISTEC Global" LOGO artifact was replaced by **"BISTEC Hearts Academy"** (`feedToAI: true`, same URL). `fix-data-uri-logos.mjs` confirms **0 data-URIs remain locally**.
+- **New `scripts/fix-data-uri-logos.mjs` (removed by 016, 2026-10-13; the runtime `data:` guards above stay):** finds every `BrandKit.logoUrl` / `BrandKitArtifact.url` holding a `data:` URI, uploads the decoded bytes to the brand-kits bucket, rewrites the row. Idempotent, `--dry-run` supported, exits non-zero if any row was unparsable/skipped.
+- **Data fix APPLIED on this machine** (not a commit; historical): Hearts Academy kit `logoUrl` → `http://localhost:9000/brand-kits/cmqroh4po00008xc8tcntem58/hearts-academy-logo-transparent.png` (background made transparent via edge-connected removal — the white knot inside the heart mark preserved); the mislabeled 136k data-URI "BISTEC Global" LOGO artifact was replaced by **"BISTEC Hearts Academy"** (`feedToAI: true`, same URL). `fix-data-uri-logos.mjs` confirms **0 data-URIs remain locally**.
 
 ### Tests + gates
 
 - **New §Q E2E suite** (`tests/e2e/async-actions.test.ts`, 9 cases, AC-1..AC-7) + `waitForAction` helper in `tests/helpers/api.ts`; `agui-refinement.test.ts` rewritten to the async contract; TC-BK-09 logo-validation cases added.
 - **TC-REG-H7a rewritten** (`tests/e2e/regression.test.ts`): the old case fired 10 PARALLEL refines expecting 10 sequential revisions — under single-flight, 9 of those now 409 **by design**. The H7 guarantee it guards (unique, contiguous revision numbers, no 500s) is preserved via 10 SEQUENTIAL refines (each 202 → `waitForAction`) asserting contiguous 2..11, plus a parallel-fire phase. **De-flaked 2026-07-22:** the parallel phase originally asserted a fixed **exactly one 202, nine 409s**, which flaked (observed 3 winners) because under the instant `MOCK_*` seams a fire-and-forget refine settles in milliseconds, so a later request in the batch legitimately re-claims a slot an earlier winner already released — the winner count is timing-dependent, not fixed. It now asserts the mock-stable H7 integrity invariant instead: every request is **202 or 409 (never 500)**, and **exactly one revision is appended per 202 winner**, numbering still distinct and contiguous. Catalog entry updated in `docs/e2e-test-plan.md`.
-- Also fixed at finalize: 3 pre-existing lint errors in `scripts/export-posts.mjs` (unused destructured rest-siblings from the 2026-07-17 transfer-scripts commit → `_`-prefixed), and `.env.test` had lost `BISTEC_API_KEYS`/`BISTEC_ADMIN_API_KEYS` (re-added, mirroring `.github/workflows/e2e.yml`, so the 3 §J ACP-auth cases run locally again).
+- Also fixed at finalize: 3 pre-existing lint errors in `scripts/export-posts.mjs` (since removed by 016) (unused destructured rest-siblings from the 2026-07-17 transfer-scripts commit → `_`-prefixed), and `.env.test` had lost `BISTEC_API_KEYS`/`BISTEC_ADMIN_API_KEYS` (re-added, mirroring `.github/workflows/e2e.yml`, so the 3 §J ACP-auth cases run locally again).
 - **Gates:** tsc clean; lint **0 errors** (7 pre-existing warnings); **174/174 unit**; full mock **E2E 145 passed / 4 skipped / 0 failed** (baseline 135/4 + §Q 9 + TC-BK-09; the 4 skips are the intentional TC-GEN-05 + TC-REG-H11a/b/c); production build green (`.next` deleted afterward — stale-`.next` footgun).
 
 ### Same-day addition — brand-kit assistant source documents (campaign-style)
@@ -1545,11 +1594,13 @@ The brand-kit assistant chat previously had NO upload affordance (its empty stat
 - **Brand-kit documents, live:** upload (201) → list → **real assistant chat call quoted a marker string from the uploaded doc** (grounding confirmed; the reply also described the logo artifacts — union working) → delete (200) → list empty.
 - **Logo-hygiene effect, live:** background-decision prompt 5,103 chars and design prompt 5,818 chars on the Hearts kit (vs 141k/277k during the incident); regenerate-design completed in 41s vs the 300s timeout.
 
-**⚠️ Deploy:** `npx prisma migrate deploy` (**2 new migrations**: `20260717085058_draft_pending_action`, `20260717114732_brandkit_documents` — nullable columns / new table, no backfill); no new env vars. **Machine-1 TODO:** its Hearts kit has the same data-URI rows — run `node --env-file=.env scripts/fix-data-uri-logos.mjs --dry-run`, review, then run it for real. (The Hearts Academy voice-prompt/logo-artifact rebrand above is also machine-local data — recreate via the admin UI there if wanted.)
+**⚠️ Deploy:** `npx prisma migrate deploy` (**2 new migrations**: `20260717085058_draft_pending_action`, `20260717114732_brandkit_documents` — nullable columns / new table, no backfill); no new env vars. ~~**Machine-1 TODO:** its Hearts kit has the same data-URI rows — run `node --env-file=.env scripts/fix-data-uri-logos.mjs --dry-run`, review, then run it for real.~~ **Dropped: the script was removed by 016 (fresh start).** (The Hearts Academy voice-prompt/logo-artifact rebrand above is also machine-local data — recreate via the admin UI there if wanted.)
 
 ---
 
 ## 2026-07-17 — Cross-machine post transfer scripts + ✅ import completed on machine 2
+
+**Removed by 016 (2026-10-13):** `scripts/export-posts.mjs` and `scripts/import-posts.mjs` are deleted (fresh start, no import). Nothing in this section can be run any more; it is history.
 
 **Scripts-only commit** (no app code changes, no migrations, no new env vars). Context: the two dev machines have independent Postgres/MinIO instances; Damian wants the library posts made on machine 1 (`DamianDeCruzBISTECCa`) merged **on top of** the other machine's existing data — not a clone/overwrite.
 
@@ -1564,7 +1615,7 @@ The brand-kit assistant chat previously had NO upload affordance (its empty stat
 
 Ran the same day on machine 2 (bundle landed in `Downloads\post-export`, not the recommended Documents spot). Sequence: Docker up → dry-run (clean plan, no missing owners — `adminbtg` exists locally, so no `--owner` flag) → real import → second dry-run showed everything "already present" (idempotency confirmed). Results matched the expected counts exactly: **6 briefs / 6 drafts / 16 revisions / 0 posts created, 31 objects uploaded**. The predicted link drops occurred: 1 campaign + 1 brand-kit link dropped by name-match (the "AI : a new Era" brief falls back to kit precedence). DB spot-check: all 6 drafts EXPORTED with an `exportUrl`, revision chains intact, `currentRevisionNumber` pointers valid — the two zero-revision drafts (`Data Engineering Promotion`, `AI : a new Era`) are legacy pre-F2 rows where a null pointer means "latest revision" by design. Bundle folder can be deleted. The original TODO steps are kept below for reference.
 
-### Original TODO (executed above)
+### Original TODO (executed above; the scripts were removed by 016)
 
 The export bundle lives on machine 1 at `C:\Users\DamianDeCruzBISTECCa\Documents\post-export`; Damian is copying it to the other machine (recommended landing spot: `Documents\post-export`, i.e. **outside the repo**). Then, in the project directory on the other machine:
 
