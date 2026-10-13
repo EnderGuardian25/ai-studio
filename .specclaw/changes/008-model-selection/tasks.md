@@ -66,7 +66,7 @@ Wave 2 adds per-post and per-chat pickers only.
     - **AC-03 is exhaustive, not sampled:** a nested loop over the stated product. It must run in under 2 s.
     - **No I/O, no clock, no env read** in any of the three modules. `envDefault`, `mode` and `credential` are inputs.
 
-- [ ] `T2` — **Operator:** the pinned CLI accepts full model IDs (AC-14)
+- [x] `T2` — **Operator:** the pinned CLI accepts full model IDs (AC-14)
   - Files: `.specclaw/changes/008-model-selection/reports/T2.md` (new), `src/lib/models/catalogue.ts` (only if an ID is rejected)
   - Estimate: small
   - Kind: config
@@ -241,7 +241,7 @@ Wave 2 adds per-post and per-chat pickers only.
     - **API mode:** the switch is disabled with "Only applies in CLI mode." (`useCurrentUser().cliMode`).
     - **Accessible names:** each checkbox is labelled by its model, and each `Select` by its surface name (`htmlFor`).
 
-- [ ] `T12` — Wave-1 E2E, the migration round trip, the export/import scripts, and the gate
+- [x] `T12` — Wave-1 E2E, the migration round trip, the export/import scripts, and the gate
   - Files: `tests/e2e/model-selection.test.ts` (new), edited pre-existing E2E files (listed in the report), `scripts/export-posts.mjs`, `scripts/import-posts.mjs`, `.specclaw/changes/008-model-selection/reports/T12.md` (new)
   - Estimate: large
   - Kind: test
