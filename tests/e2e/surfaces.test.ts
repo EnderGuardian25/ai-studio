@@ -562,7 +562,13 @@ test.describe('Brief wizard (T8)', () => {
 
     // Step 5 — Review
     await expect(page.getByRole('heading', { name: 'Review & Generate' })).toBeVisible()
-    await expect(page.getByRole('term')).toHaveCount(10)
+    // 008 FR-19: the Caption model and Design model rows, which render once
+    // /api/models has loaded, and their two pickers.
+    await expect(page.getByRole('term').filter({ hasText: /^Design model$/ })).toBeVisible()
+    await expect(page.getByRole('term')).toHaveCount(12)
+    for (const name of ['Caption model', 'Design model']) {
+      await expect(page.getByRole('combobox', { name, exact: true })).toBeVisible()
+    }
     await expect(page.getByRole('definition').filter({ hasText: '1 image (0 embed, 1 reference)' })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Generate Post' })).toBeVisible()
     await expectNoHorizontalScroll(page, 'brief: review step at 375px')
@@ -604,6 +610,11 @@ test.describe('Draft review (T9)', () => {
     await page.goto(`/drafts/${draft.id}`)
     const fullScreen = page.getByRole('button', { name: 'View full screen', exact: true })
     await expect(fullScreen).toBeVisible({ timeout: 20_000 })
+    // 008 FR-20: the model pickers load after the page (/api/models); wait for
+    // them, so the no-scroll checks below cover them.
+    for (const name of ['Design model', 'Headline model', 'All captions model', 'Instagram caption model', 'Refine model']) {
+      await expect(page.getByRole('combobox', { name, exact: true })).toBeVisible()
+    }
     await expectNoHorizontalScroll(page, 'draft page at 375px')
 
     // FR-12: every control the page had, by role and name.
@@ -831,6 +842,8 @@ test.describe('Campaigns and projects (T10)', () => {
     await page.getByRole('button', { name: 'Draft with AI' }).click()
     const drawer = page.getByRole('dialog', { name: 'Draft briefing with AI' })
     await expect(drawer.getByRole('button', { name: 'Add document' })).toBeVisible()
+    // 008 FR-21: the header's model picker, covered by the no-scroll check below.
+    await expect(drawer.getByRole('combobox', { name: 'Briefing assistant model', exact: true })).toBeVisible()
     const ask = drawer.getByPlaceholder('Tell the assistant about this campaign…')
     await expect(drawer.getByRole('button', { name: 'Send' })).toBeDisabled()
     await ask.fill('A T10 campaign for final-year students.')
@@ -968,6 +981,8 @@ test.describe('Brand kits (T11)', () => {
     await page.getByRole('button', { name: 'Extract from references' }).click()
     const drawer = page.getByRole('dialog', { name: 'Extract brand from references' })
     await expect(drawer.getByRole('button', { name: 'Add document' })).toBeVisible()
+    // 008 FR-21: the header's model picker, covered by the no-scroll check below.
+    await expect(drawer.getByRole('combobox', { name: 'Brand kit assistant model', exact: true })).toBeVisible()
     await expect(drawer.getByRole('button', { name: `Delete t11-brand-book-${stamp}.txt` })).toBeVisible()
     await expect(drawer.getByRole('button', { name: 'Send' })).toBeDisabled()
     const ask = drawer.getByPlaceholder('e.g. Extract the brand voice and style from these references')

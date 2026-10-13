@@ -321,7 +321,7 @@ Wave 2 adds per-post and per-chat pickers only.
     - **The pick is client state for the open chat.** It is sent on each turn once changed, and resets on reload (no remembered choice).
     - **The notice** comes from `ModelPicker`'s own `teamTokenNotice` slot. Nothing is duplicated.
 
-- [ ] `T18` — Wave-2 E2E and the gate
+- [x] `T18` — Wave-2 E2E and the gate
   - Files: `tests/e2e/model-selection.test.ts`, edited pre-existing E2E files (listed in the report), `.specclaw/changes/008-model-selection/reports/T18.md` (new)
   - Estimate: medium
   - Kind: test

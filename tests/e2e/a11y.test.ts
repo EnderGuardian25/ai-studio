@@ -1159,6 +1159,11 @@ test.describe('axe scan (T18)', () => {
     await pageLogin(page)
     await page.goto(`/drafts/${draft.id}`)
     await expect(page.getByRole('button', { name: 'View full screen', exact: true })).toBeVisible({ timeout: 20_000 })
+    // 008 AC-33: the scan covers the model pickers. They load a query of their
+    // own (/api/models), so wait for them rather than relying on networkidle.
+    for (const name of ['Design model', 'Headline model', 'Instagram caption model', 'Refine model']) {
+      await expect(page.getByRole('combobox', { name, exact: true })).toBeVisible()
+    }
     await expectNoAxeViolations(page, '/drafts/[id]')
   })
 

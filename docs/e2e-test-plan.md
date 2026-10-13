@@ -677,6 +677,80 @@ Each case uses a unique topic and `waitForDraft` / `waitForAction`, with one kit
 | AC-23 the migration and rollback                       | TC-MODEL-12 + the scripted TEMPLATE run (T12 report) |
 | AC-24 wave 1's full clean mock E2E, 0 failed / 0 flaky | the wave-1 gate                                      |
 
+#### Y, wave 2: the pickers (change 008 T18 — AC-27 → AC-31, AC-33)
+
+A picker pre-selects exactly what the server would run (`decideModel` with no request), and sends `model` **only once the user picks something else** (A5). The wave-2 cases are in the `describe` block "§Y — the pickers (wave 2)". It resets the team policy before and after each case, as wave 1 does, and discards any unfinished brief a wizard walk autosaved.
+
+**What the cases read:**
+
+- **the request bodies the UI sends** (`page.waitForRequest`), for A5;
+- **the stamps and the recorder,** for what ran (a pick runs with `source: 'request'`);
+- **each picker's hint line** (`#<id>-hint`) and **refusal** (`#<id>-error`, with `aria-invalid` on the select). The ids are `brief-caption-model`, `brief-design-model`, `draft-caption-model-<channel>`, `draft-headline-model`, `draft-all-captions-model`, `draft-design-model`, `draft-refine-model`, `briefing-assistant-model` and `brandkit-assistant-model`.
+
+Picker names are matched with `exact: true`, because "Instagram caption model" contains "caption model".
+
+**Seams:**
+
+- **AC-31's CLI state is faked client-side.** CLI mode never runs under `MOCK_AI`. So `page.route` answers `/api/me` and `/api/models` from their real responses, with `cliMode: true` and `mode: 'cli'`, `credential: 'team'`, `gateOn`. The server stays in API mock mode.
+- **A refused pick in the UI (TC-MODEL-18)** uses the same rewrite: the real policy drops Opus, while the faked `/api/models` still offers it, so the server's 400 is what the page meets.
+
+**Cases:**
+
+- **TC-MODEL-13 — An explicit disallowed request (AC-27).** With `allowed: ['HAIKU','SONNET']`, `model: 'OPUS'` is a 400 `{ code: 'MODEL_NOT_ALLOWED', error: "Opus 5.5 isn't allowed on this team" }` on every route:
+  - `POST /api/briefs` (`designModel`, with `field: 'designModel'`, and no Brief row written);
+  - the three `regenerate-copy` forms, `regenerate-design` and `refine`, with `pendingAction` null after each;
+  - the briefing chat and the brand-kit chat.
+
+  The recorder is empty, and the draft's revision, captions, headline and stamps are unchanged. With every model allowed, `designModel: 'OPUS'` on a TEMPLATE brief → 400 "Opus 5.5 isn't available for template fill", and no row is written.
+
+- **TC-MODEL-14 — The wizard (AC-28, and AC-33's Review-step axe scan).** It walks Path B to Review.
+  - "Caption model" is Haiku and "Design model" is Sonnet, each with the hint "Default". The summary has 12 rows, and names both models. Axe (014's 12 rules) runs with the pickers present.
+  - Picking Opus updates the summary, and the autosave payload carries `designModel: 'OPUS'`.
+  - Switching to Path A resets the picker to Haiku, with the hint "Opus 5.5 isn't available for template fill". Opus is not offered, and the summary says Haiku. Back on Path B, the pick stays reset and the note is gone.
+  - After Opus is picked again, `/brief?resume=<id>` restores it.
+  - Generate sends `designModel: 'OPUS'` and no `captionModel`. `Brief` stores `{ captionModel: null, designModel: 'OPUS' }`, and the draft's `designModel` is Opus (recorder `request`), with Haiku captions (`system`). The unfinished brief is deleted.
+- **TC-MODEL-15 — Untouched wizard pickers (AC-28).** The POST body has neither field. `Brief` stores null for both, and the draft runs on the defaults (Sonnet design, Haiku captions, both `system`).
+- **TC-MODEL-16 — The draft page (AC-29, and AC-33's draft-page axe scan).** The LinkedIn row is seeded with a Sonnet stamp.
+  - **The pre-selections and hints:** LinkedIn Sonnet, Instagram and WhatsApp Haiku ("Same model as the current caption"); Headline Haiku ("…headline"); "All captions model" Haiku ("Default", mixed stamps); Design Sonnet ("…design"); Refine Sonnet ("Default").
+  - **"Generated with":** one per caption panel and the headline panel, by its stamp, plus the design line. The Versions cell carries the sentence in its `title`. Axe runs with the pickers present.
+  - **LinkedIn → Opus, then Regenerate:** the body is `{ channel: 'LINKEDIN', model: 'OPUS' }`. Only LinkedIn's row changes; the others deep-equal their seeded read.
+  - **Headline → Sonnet:** `{ headline: true, model: 'SONNET' }` → `headlineModel` is Sonnet, and no caption row changes.
+  - **Refine → Haiku:** `{ instruction, model: 'HAIKU' }` → revision 2 and `designModel` are Haiku.
+  - **The design picker** now pre-selects Haiku from the new stamp. Opus → `{ model: 'OPUS' }` → revision 3 is Opus.
+- **TC-MODEL-17 — Substitution and the hide rules (AC-29, reviews/T16.md).** The draft is seeded with design Opus, LinkedIn Haiku substituted from Opus, and a FAILED WhatsApp row, then `allowed: ['HAIKU','SONNET']`.
+  - The design picker reads Sonnet, with the hint "Opus 5.5 is no longer available on this team — using Sonnet 5.5", and offers no Opus.
+  - LinkedIn's line reads "Generated with Haiku 4.5 (substituted)", titled "Substituted for Opus 5.5".
+  - The FAILED row shows its failure and no "Generated with".
+  - A FAILED design (seeded) shows no design line and no design picker, while the caption and headline lines stay.
+- **TC-MODEL-18 — A refused pick in the UI (FR-17, reviews/T16.md).** Each picker shows "Opus 5.5 isn't allowed on this team" as its field error.
+  - **Refine** takes the request out of the log and puts the instruction back in the field.
+  - **The design regenerate and the LinkedIn regenerate** leave no Undo behind.
+  - Nothing is claimed, written or recorded. A new pick clears the error.
+- **TC-MODEL-19 — The assistant headers (AC-30, FR-21).** The team has no `ASSISTANT_BRIEFING` default, so Haiku is a real change from the pre-selection.
+  - **The briefing chat:** pick Haiku. Two turns each send `model: 'HAIKU'` and record `ASSISTANT_BRIEFING` → Haiku (`request`).
+  - **A reload** pre-selects Sonnet again; the body's keys are `['messages']`, and the turn records Sonnet (`system`).
+  - **The brand-kit chat:** pick Haiku → the turn records `ASSISTANT_BRANDKIT` → Haiku (`request`).
+- **TC-MODEL-20 — The team-token notice and the gated state (AC-31, FR-22).** The CLI state is faked as above.
+  - Picking Opus in the refine box shows the `role="status"` notice inside the refine section. Picking Sonnet removes it.
+  - With `gateOn: true`, the refine and design pickers offer Haiku and Sonnet only, and the refine hint says "Opus requires a personal Claude token on this team — connect one in Settings".
+
+**Existing cases edited by 008 wave 2** (reasons in `.specclaw/changes/008-model-selection/reports/T18.md`):
+
+- `surfaces` "every step at 375px…": the Review step has 12 terms, not 10, once its two model rows load, and both pickers are visible;
+- `surfaces` "Draft review (T9) … at 375px every control is there…", "a campaign detail at 375px, with … the assistant" and "at 375px a kit keeps its controls, with … the assistant…": each waits for its pickers, so the no-scroll checks cover them;
+- `a11y` "AC-19: /drafts/[id]" waits for the pickers before its scan.
+
+**AC → case map (change 008, wave 2).** The unit side is AC-25 (`modelRequests`, `captionRequests`, `briefDraftPayload`) and AC-26 (`modelPicker`, `uiPrimitives`).
+
+| AC                                                              | E2E                                                                     |
+| --------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| AC-27 an explicit disallowed request → 400, claims nothing      | TC-MODEL-13 (API), TC-MODEL-18 (the UI)                                 |
+| AC-28 the wizard                                                | TC-MODEL-14, TC-MODEL-15                                                |
+| AC-29 the draft page pickers                                    | TC-MODEL-16, TC-MODEL-17                                                |
+| AC-30 the chat headers                                          | TC-MODEL-19                                                             |
+| AC-31 the team-token notice and the gated state                 | TC-MODEL-20                                                             |
+| AC-33 the wave-2 gate; the Review-step and draft-page axe scans | the wave-2 gate; TC-MODEL-14, TC-MODEL-16, `a11y` "AC-19: /drafts/[id]" |
+
 ---
 
 ## 7. Fixes required to the existing specs (before/while implementing)
@@ -742,5 +816,6 @@ CI gate: **`.github/workflows/e2e.yml`** runs the whole suite (§A–§W, includ
 | Change 005 skipped-background notice (AC-01, AC-08 → AC-11) | §BG TC-BG-01…10, TC-GEN-05 (see §BG map)                                               |
 | Change 012 per-channel captions (AC-12 → AC-24)             | §W TC-CAP-01…20, TC-ASYNC-10 (see §W map)                                              |
 | Change 008 model selection, wave 1 (AC-15 → AC-23)          | §Y TC-MODEL-01…12, `a11y` /team axe (see §Y map)                                       |
+| Change 008 model selection, wave 2 (AC-27 → AC-31, AC-33)   | §Y TC-MODEL-13…20, `a11y` /drafts/[id] axe (see §Y wave-2 map)                         |
 
 > Items with no behavioral surface (M2 init race, M3 stdin, M7 polling, M8 crypto guards, M13 dead code) are best covered by unit tests; M7 polling can optionally be a UI test (draft auto-refresh while `IN_PROGRESS`).
