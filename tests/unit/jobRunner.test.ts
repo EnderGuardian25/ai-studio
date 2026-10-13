@@ -9,7 +9,9 @@
 //     reasons (one shared string for "not available");
 //   - POST /api/posts: a refused caption is a 422 CAPTION_UNPUBLISHABLE with no
 //     Post row, on the immediate and the scheduled path;
-//   - the posts GET routes return draft.caption, the post channel's text.
+//   - the posts GET routes return draft.caption, the post channel's text;
+//   - 017: a refused immediate publish, and a refused retry, are 502
+//     PUBLISH_FAILED with the FAILED row's postId and status.
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import type { Channel } from '@prisma/client'
@@ -306,5 +308,85 @@ describe('posts GET routes — draft.caption', () => {
     const res = await postsRoute.GET(new Request('http://test/api/posts') as never, undefined as never)
     const body = await res.json()
     expect(body.posts.map((p: { draft: { caption: string } }) => p.draft.caption)).toEqual([IG_TEXT, LI_TEXT])
+  })
+})
+
+// 017 FR-01/FR-02 (AC-01, AC-02): a publish the platform refused is a 502
+// PUBLISH_FAILED carrying the FAILED row's id and status, not a 2xx.
+describe('publish failures are 502 PUBLISH_FAILED (017)', () => {
+  const postRetryRoute = () => import('@/app/api/posts/[id]/publish/route')
+
+  it('POST /api/posts: an immediate PublishError is 502, and the FAILED row is still written', async () => {
+    h.igPublish.mockRejectedValue(new PublishError('INSTAGRAM', 'Instagram said no'))
+    const res = await postsRoute.POST(
+      new Request('http://test/api/posts', {
+        method: 'POST',
+        body: JSON.stringify({ draftId: 'd1', channel: 'INSTAGRAM' }),
+      }) as never,
+      undefined as never,
+    )
+    expect(res.status).toBe(502)
+    expect(await res.json()).toEqual({
+      error: 'Instagram said no',
+      code: 'PUBLISH_FAILED',
+      postId: 'new-post',
+      status: 'FAILED',
+    })
+    expect(h.postCreate).toHaveBeenCalledTimes(1)
+    expect(h.postCreate.mock.calls[0][0].data).toMatchObject({ draftId: 'd1', channel: 'INSTAGRAM', status: 'PENDING' })
+    expect(lastUpdate()).toEqual({
+      where: { id: 'new-post' },
+      data: { status: 'FAILED', errorReason: 'Instagram said no' },
+    })
+  })
+
+  it('POST /api/posts: a successful immediate publish is still 201', async () => {
+    const res = await postsRoute.POST(
+      new Request('http://test/api/posts', {
+        method: 'POST',
+        body: JSON.stringify({ draftId: 'd1', channel: 'INSTAGRAM' }),
+      }) as never,
+      undefined as never,
+    )
+    expect(res.status).toBe(201)
+    expect(await res.json()).toEqual({ postId: 'new-post', status: 'PUBLISHED' })
+  })
+
+  function failedPost() {
+    return {
+      id: 'p1',
+      teamId: 'team1',
+      draftId: 'd1',
+      channel: 'LINKEDIN',
+      status: 'FAILED',
+      errorReason: 'first failure',
+      draft: { exportUrl: 'exports/d1.png' },
+    }
+  }
+
+  it('POST /api/posts/[id]/publish: a retry that fails again is 502 in the same shape; the row stays FAILED', async () => {
+    h.postFindUnique.mockResolvedValue(failedPost())
+    h.liPublish.mockRejectedValue(new PublishError('LINKEDIN', 'LinkedIn said no again'))
+    const { POST } = await postRetryRoute()
+    const res = await POST(new Request('http://test', { method: 'POST' }) as never, { params: { id: 'p1' } } as never)
+    expect(res.status).toBe(502)
+    expect(await res.json()).toEqual({
+      error: 'LinkedIn said no again',
+      code: 'PUBLISH_FAILED',
+      postId: 'p1',
+      status: 'FAILED',
+    })
+    expect(lastUpdate()).toEqual({
+      where: { id: 'p1' },
+      data: { status: 'FAILED', errorReason: 'LinkedIn said no again', nextRetryAt: null },
+    })
+  })
+
+  it('POST /api/posts/[id]/publish: a retry that works is still 200 PUBLISHED', async () => {
+    h.postFindUnique.mockResolvedValue(failedPost())
+    const { POST } = await postRetryRoute()
+    const res = await POST(new Request('http://test', { method: 'POST' }) as never, { params: { id: 'p1' } } as never)
+    expect(res.status).toBe(200)
+    expect(await res.json()).toEqual({ postId: 'p1', status: 'PUBLISHED' })
   })
 })

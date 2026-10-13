@@ -10,7 +10,7 @@ This change has **3 tasks in 2 waves**. Each task is implemented by a subagent, 
 
 ### Wave 1 — Server and client
 
-- [ ] `T1` — A failed publish or retry is a 502, and the UI shows it
+- [x] `T1` — A failed publish or retry is a 502, and the UI shows it
   - Files: `src/app/api/posts/route.ts`, `src/app/api/posts/[id]/publish/route.ts`, `src/components/library/PublishDialog.tsx`, `src/app/(app)/library/page.tsx`, `src/app/(app)/drafts/[id]/page.tsx` (only if its `onSuccess` wiring needs it), `tests/unit/jobRunner.test.ts`, `tests/e2e/publish.test.ts`, `docs/e2e-test-plan.md`
   - Estimate: medium
   - Kind: impl

@@ -86,12 +86,20 @@ export const POST = withTeamAdmin(async (req: NextRequest, _ctx, auth) => {
   }
 
   // Immediate path — shared PENDING → publish → PUBLISHED/FAILED state machine.
-  const { post } = await createAndPublishPost({
+  const { post, error } = await createAndPublishPost({
     draftId,
     channel,
     userId: auth.userId,
     scheduledAt: scheduledAtDate,
   })
+  // A publish the platform refused is an error, not a 201 (017 FR-01). The
+  // FAILED row is still the record; its id and status ride along.
+  if (error) {
+    return NextResponse.json(
+      { error: post.errorReason ?? error.reason, code: 'PUBLISH_FAILED', postId: post.id, status: post.status },
+      { status: 502 }
+    )
+  }
   return NextResponse.json({ postId: post.id, status: post.status }, { status: 201 })
 })
 

@@ -51,7 +51,12 @@ export const POST = withTeamAdmin<{ id: string }>(async (_req, { params }, user)
         where: { id: post.id },
         data: { status: 'FAILED', errorReason: err.reason, nextRetryAt: null },
       })
-      return NextResponse.json({ postId: updated.id, status: updated.status })
+      // A retry that fails again is an error, in the immediate path's shape
+      // (017 FR-02). The row stays FAILED with the new reason.
+      return NextResponse.json(
+        { error: err.reason, code: 'PUBLISH_FAILED', postId: updated.id, status: updated.status },
+        { status: 502 }
+      )
     }
     throw err
   }

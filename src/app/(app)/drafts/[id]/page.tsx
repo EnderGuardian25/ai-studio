@@ -622,7 +622,12 @@ export default function DraftDetailPage() {
       {showPublish && (
         <PublishDialog
           draftId={draftId}
-          onClose={() => setShowPublish(false)}
+          onClose={() => {
+            // A partial failure closes here, not via onSuccess, and the
+            // channels that did publish can change the draft's status.
+            setShowPublish(false)
+            fetchDraft()
+          }}
           onSuccess={() => {
             setShowPublish(false)
             fetchDraft()

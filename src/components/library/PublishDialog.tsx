@@ -22,7 +22,11 @@ export interface PublishDialogProps {
 }
 
 // Per-channel outcome of the last Confirm — channels that succeeded are locked
-// so re-confirming after a partial failure can't double-post them.
+// so re-confirming after a partial failure can't double-post them. A channel
+// whose request rejects — a 502 PUBLISH_FAILED from the platform (017 FR-03),
+// or a 409 duplicate / 422 caption refusal — shows "✕ failed" with its reason,
+// stays unlocked, and keeps the dialog open: onSuccess (which closes it) fires
+// only when every checked channel worked.
 type ChannelOutcome = { ok: true } | { ok: false; message: string }
 
 export function PublishDialog({ draftId, onClose, onSuccess }: PublishDialogProps) {
@@ -110,28 +114,34 @@ export function PublishDialog({ draftId, onClose, onSuccess }: PublishDialogProp
         <div role="group" aria-labelledby={channelsId} className="flex flex-wrap gap-x-6 gap-y-2 pb-5 mb-5 border-b border-line-subtle">
           {CHANNELS.map((ch) => {
             const outcome = outcomes[ch]
+            const failure = outcome && !outcome.ok ? outcome.message : null
+            const reasonId = `${channelsId}-${ch}-reason`
             return (
-              <label
-                key={ch}
-                className="flex items-center gap-2 cursor-pointer text-ui-base text-fg"
-              >
-                <input
-                  type="checkbox"
-                  checked={checkedChannels.includes(ch)}
-                  onChange={() => toggleChannel(ch)}
-                  disabled={outcome?.ok === true}
-                  className="h-4 w-4 accent-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
-                />
-                {channelLabel(ch)}
-                {outcome?.ok === true && (
-                  <span className="text-ui-xs font-semibold text-status-published">✓ published</span>
+              <div key={ch} className="flex flex-col gap-1">
+                <label className="flex items-center gap-2 cursor-pointer text-ui-base text-fg">
+                  <input
+                    type="checkbox"
+                    checked={checkedChannels.includes(ch)}
+                    onChange={() => toggleChannel(ch)}
+                    disabled={outcome?.ok === true}
+                    aria-describedby={failure ? reasonId : undefined}
+                    className="h-4 w-4 accent-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+                  />
+                  {channelLabel(ch)}
+                  {outcome?.ok === true && (
+                    <span className="text-ui-xs font-semibold text-status-published">✓ published</span>
+                  )}
+                  {failure && (
+                    <span className="text-ui-xs font-semibold text-status-failed">✕ failed</span>
+                  )}
+                </label>
+                {/* The reason is shown, not tucked into a tooltip (017 FR-03). */}
+                {failure && (
+                  <p id={reasonId} className="text-ui-xs text-status-failed">
+                    {failure}
+                  </p>
                 )}
-                {outcome && !outcome.ok && (
-                  <span className="text-ui-xs font-semibold text-status-failed" title={outcome.message}>
-                    ✕ failed
-                  </span>
-                )}
-              </label>
+              </div>
             )
           })}
         </div>

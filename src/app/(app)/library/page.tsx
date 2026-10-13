@@ -15,7 +15,7 @@ import { PostCard } from '@/components/library/PostCard'
 import { PublishDialog } from '@/components/library/PublishDialog'
 import { PublishHistoryDrawer } from '@/components/library/PublishHistoryDrawer'
 import { cn } from '@/lib/utils'
-import { apiFetch } from '@/lib/apiFetch'
+import { apiFetch, ApiError } from '@/lib/apiFetch'
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser'
 import type { DraftRecord, PostRecord, LibraryResponse } from '@/lib/api-types'
 
@@ -122,9 +122,32 @@ export default function LibraryPage() {
     return queryClient.invalidateQueries({ queryKey: ['library'] })
   }
 
+  // A retry that fails again is a 502 PUBLISH_FAILED (017 FR-04): say so, and
+  // keep the drawer's row FAILED with the new reason. Either way the library
+  // refetches, so the cards reflect the row's real status.
   async function handleRetry(postId: string) {
-    await apiFetch(`/api/posts/${postId}/publish`, { method: 'POST' })
-    invalidateLibrary()
+    try {
+      const res = await apiFetch<{ postId: string; status: string }>(`/api/posts/${postId}/publish`, {
+        method: 'POST',
+      })
+      toast.success('Published')
+      patchHistoryRow(postId, { status: res.status, errorReason: null })
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Retry failed'
+      toast.error(`Retry failed: ${message}`)
+      if (e instanceof ApiError && e.code === 'PUBLISH_FAILED') {
+        patchHistoryRow(postId, { status: 'FAILED', errorReason: message })
+      }
+    } finally {
+      invalidateLibrary()
+    }
+  }
+
+  // The drawer shows a snapshot of the card's posts; keep it in step with a retry.
+  function patchHistoryRow(postId: string, patch: Partial<PostRecord>) {
+    setSelectedDraft((prev) =>
+      prev ? { ...prev, posts: prev.posts.map((p) => (p.id === postId ? { ...p, ...patch } : p)) } : prev
+    )
   }
 
   async function handleDelete(draftId: string) {
@@ -237,7 +260,11 @@ export default function LibraryPage() {
       {showPublishDialog && (
         <PublishDialog
           draftId={showPublishDialog.draftId}
-          onClose={() => setShowPublishDialog(null)}
+          onClose={() => {
+            // A failed channel leaves a FAILED row; show it once the dialog closes.
+            setShowPublishDialog(null)
+            invalidateLibrary()
+          }}
           onSuccess={() => {
             setShowPublishDialog(null)
             invalidateLibrary()
