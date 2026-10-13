@@ -1,7 +1,9 @@
 # 🦞 SpecClaw Dashboard
 
 **Project:** bistec-studio
-**Last Updated:** 2026-10-12 07:17 UTC
+**Last Updated:** 2026-10-13 06:39 UTC
+
+_1 unnumbered change · run `/specclaw:renumber` to order them_
 
 ## Active Changes
 
@@ -10,7 +12,7 @@
 - ✅ **003-async-draft-actions** — 12/12 tasks (100%) | 0 failed
 - 🔍 **004-design-instruction-fidelity** — verify PARTIAL | 23/24 tasks (95%) | 0 failed | 75h58m
 - 🔍 **005-provider-flexibility-onboarding** — verify PASS | 10/10 tasks (100%) | 0 failed | 122h0m
-- 📝 **008-model-selection** ▣ — tasks done | 0/19 tasks (0%) | 0 failed | 25m
+- 🔍 **008-model-selection** ▣ — verify PASS | 19/19 tasks (100%) | 0 failed | 27h54m
 - 🔍 **011-app-visual-redesign** — verify PASS | 13/13 tasks (100%) | 0 failed | 59h23m
 - 🔍 **012-per-channel-captions** ▣ — verify PASS | 16/16 tasks (100%) | 0 failed | 26h43m
 - 🔍 **013-fork-ci-checks-only** ▫ — verify PASS | 3/3 tasks (100%) | 0 failed | 13h13m
