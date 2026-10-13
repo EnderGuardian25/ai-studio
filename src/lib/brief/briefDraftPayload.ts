@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { modelKeySchema } from '@/lib/models/requests'
 
 // ─── BriefDraft payload — pure, client-safe ─────────────────────────────────
 // The wizard-shaped working state autosaved to a BriefDraft row. This module
@@ -36,6 +37,10 @@ export const briefDraftPayloadSchema = z.object({
       }),
     )
     .max(20),
+  // 008 FR-17: the Review step's model picks, so a resumed brief restores them.
+  // Absent = untouched picker (A5): the server resolves the default.
+  captionModel: modelKeySchema.optional(),
+  designModel: modelKeySchema.optional(),
 })
 
 export type BriefDraftPayload = z.infer<typeof briefDraftPayloadSchema>

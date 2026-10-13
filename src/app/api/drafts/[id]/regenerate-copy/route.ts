@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { withTeamAuth } from '@/lib/api/handler'
 import { canAccessContent } from '@/lib/authz/visibility'
-import { resolveCopyProvider } from '@/providers/registry'
+import { copyProviderIsClaude, resolveCopyProvider } from '@/providers/registry'
 import { resolveBrandKit } from '@/lib/brandkit/resolve'
 import { getActiveCampaignBriefing } from '@/lib/campaign/briefing'
 import { buildBriefInput } from '@/lib/agent/briefInput'
@@ -13,10 +13,12 @@ import { claimCaptionAction, loadDraftCaptions, settleCaptionAction } from '@/li
 import { releaseDraftAction, startDraftAction } from '@/lib/drafts/draftActions'
 import { resolveModel } from '@/lib/models/policy'
 import { regenerateStampTier, type ResolvedModel } from '@/lib/models/resolve'
+import { captionProviderNotClaudeError, modelError } from '@/lib/models/requests'
 
 // Regenerates captions for a draft (012 FR-11; the route name is a kept
 // contract): body {} → the three captions ("Regenerate all"), { channel } →
-// that caption, { headline: true } → the headline. Validation runs
+// that caption, { headline: true } → the headline, each with an optional
+// `model` pick (008 FR-17). Validation runs
 // synchronously, then the model work runs in-process fire-and-forget (the F1
 // pattern — see draftActions.ts) and the route returns 202; the draft page
 // polls pendingAction and the rows' status to completion. The design HTML/PNG
@@ -35,8 +37,11 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
     }
   }
   const parsed = parseRegenerateBody(raw)
-  if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 400 })
-  const targets = parsed.value
+  if (!parsed.ok) {
+    const body = 'code' in parsed ? { error: parsed.error, code: parsed.code } : { error: parsed.error }
+    return NextResponse.json(body, { status: 400 })
+  }
+  const { targets, model: requested } = parsed.value
 
   const draft = await prisma.draft.findUnique({
     where: { id: params.id },
@@ -69,14 +74,24 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
 
     // 008 FR-09: the regenerate default is the stamp of what is being replaced
     // — the row's model, the headline's, or for "Regenerate all" the common
-    // stamp (mixed or any null → no stamp tier, so the team default). Resolved
-    // before the claim, so a team with nothing allowed claims nothing (422).
+    // stamp (mixed or any null → no stamp tier, so the team default). An
+    // explicit pick (FR-17) is tier 1, above the stamp. Resolved before the
+    // claim, so a refused pick (400) or a team with nothing allowed (422)
+    // claims nothing.
+    // Spec open question 1: a caption pick needs a Claude caption provider (the
+    // one this run would use: the brief's key, else the team default).
+    if (requested && !(await copyProviderIsClaude(draft.brief.teamId, draft.brief.copyProviderKey ?? undefined))) {
+      return NextResponse.json(captionProviderNotClaudeError(), { status: 400 })
+    }
     const stamp = regenerateStampTier(targets, {
       captions: loaded?.captions ?? [],
       headlineModel: draft.headlineModel ?? null,
     })
-    const resolved = await resolveModel('CAPTION', { stamp, userId: user.userId, teamId: draft.teamId })
-    if (!resolved.ok) throw new Error(resolved.message)
+    const resolved = await resolveModel('CAPTION', { requested, stamp, userId: user.userId, teamId: draft.teamId })
+    if (!resolved.ok) {
+      if (requested) return NextResponse.json(modelError(resolved), { status: 400 })
+      throw new Error(resolved.message)
+    }
     model = resolved.resolved
 
     provider = await resolveCopyProvider(draft.brief.teamId, draft.brief.copyProviderKey ?? undefined)

@@ -11,6 +11,7 @@ import { prisma } from '@/lib/prisma'
 import { env } from '@/lib/env'
 import { pipelineMode } from '@/lib/agent/config'
 import type { ModelsView, TeamModelPolicyInfo } from '@/lib/api-types'
+import { copyProviderIsClaude } from '@/providers/registry'
 import {
   CATALOGUE,
   USER_SURFACES,
@@ -269,16 +270,19 @@ export async function resolveModel(
 /**
  * GET /api/models's payload (FR-13): the catalogue as a picker sees it (no
  * price, no apiId), the team's effective policy inputs, and the caller's mode,
- * credential and envDefault — exactly what the client-side decideModel needs.
+ * credential and envDefault — exactly what the client-side decideModel needs —
+ * plus whether the team's default caption provider is Claude (spec open
+ * question 1: the CAPTION picker is hidden when it isn't, FR-18).
  */
 export async function loadModelsView(user: {
   userId: string | null
   teamId: string
 }): Promise<ModelsView> {
   const mode = pipelineMode()
-  const [policy, credential] = await Promise.all([
+  const [policy, credential, captionProviderIsClaude] = await Promise.all([
     loadTeamPolicy(user.teamId),
     credentialTier(user.userId, mode),
+    copyProviderIsClaude(user.teamId),
   ])
   return {
     catalogue: CATALOGUE.map((e) => ({
@@ -295,5 +299,6 @@ export async function loadModelsView(user: {
     mode,
     credential,
     envDefault: envDefaultFor(mode),
+    captionProviderIsClaude,
   }
 }

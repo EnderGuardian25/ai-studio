@@ -151,7 +151,8 @@ describe('generation v1 "Original design" revision', () => {
 })
 
 describe('regenerate-design', () => {
-  const req = {} as never
+  // A real Request: the route reads its (optional) body (008 FR-17).
+  const req = new Request('http://test/x', { method: 'POST' }) as never
   const ctx = { params: { id: 'd1' } } as never
 
   it('the regenerated revision and the draft carry the same (current) stamp', async () => {

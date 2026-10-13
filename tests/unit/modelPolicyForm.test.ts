@@ -46,6 +46,7 @@ const view = (over: Partial<ModelsView> = {}): ModelsView => ({
   mode: 'api',
   credential: 'n/a',
   envDefault: null,
+  captionProviderIsClaude: true,
   ...over,
 })
 

@@ -44,6 +44,27 @@ describe('briefDraftPayloadSchema', () => {
     const legacy = { topic: 'old', prompt: 'shape' }
     expect(briefDraftPayloadSchema.safeParse(legacy).success).toBe(false)
   })
+
+  // 008 FR-17 / AC-25: the Review step's model picks survive autosave → resume.
+  it('round-trips captionModel and designModel through JSON (a resumed brief restores the picks)', () => {
+    const picked: BriefDraftPayload = { ...base, captionModel: 'HAIKU', designModel: 'OPUS' }
+    const parsed = briefDraftPayloadSchema.safeParse(JSON.parse(JSON.stringify(picked)))
+    expect(parsed.success && parsed.data).toStrictEqual(picked)
+  })
+
+  it('the picks are optional: a payload without them (untouched pickers, or saved before 008) still parses, with none', () => {
+    const parsed = briefDraftPayloadSchema.safeParse(base)
+    expect(parsed.success).toBe(true)
+    expect(parsed.success && 'captionModel' in parsed.data).toBe(false)
+    expect(parsed.success && 'designModel' in parsed.data).toBe(false)
+  })
+
+  it('rejects a pick outside the closed model keys', () => {
+    for (const bad of ['opus', 'gpt-4o', 'claude-opus-5-5', null]) {
+      expect(briefDraftPayloadSchema.safeParse({ ...base, captionModel: bad }).success).toBe(false)
+      expect(briefDraftPayloadSchema.safeParse({ ...base, designModel: bad }).success).toBe(false)
+    }
+  })
 })
 
 describe('isTrivialBriefDraft', () => {

@@ -44,6 +44,45 @@ function instantiateImageProvider(providerName: string, apiKey: string): ImagePr
   }
 }
 
+// The registered COPY row a caption run uses: the brief's explicit providerKey
+// (team-scoped, enabled), else the team's enabled default. null = no row, so
+// resolveCopyProvider falls to the CLI (CLI mode) or ANTHROPIC_API_KEY.
+async function findCopyProviderRecord(teamId: string, providerKey?: string) {
+  if (providerKey) {
+    const record = await prisma.availableProvider.findFirst({
+      where: { slot: "COPY", providerKey, teamId, isEnabled: true },
+    })
+    if (record) return record
+  }
+  return prisma.availableProvider.findFirst({
+    where: { slot: "COPY", teamId, isDefault: true, isEnabled: true },
+  })
+}
+
+// Which model family each COPY provider name runs — keep in step with
+// instantiateCopyProvider. A name outside it can't run at all (that switch
+// throws "Unsupported provider"); the E2E registers placeholder names under
+// MOCK_AI, so an unknown name is not treated as "not Claude".
+const COPY_PROVIDER_FAMILY: Readonly<Record<string, "claude" | "other">> = {
+  cli: "claude",
+  anthropic: "claude",
+  openai: "other",
+}
+
+/**
+ * 008 (spec open question 1, FR-17/FR-18): whether the provider a caption run
+ * would use is Claude, so a caption model can be chosen. The same lookup as
+ * resolveCopyProvider: a registered row decides by its providerName (OpenAI →
+ * false; COPY_PROVIDER_FAMILY). With no row, captions run on Claude — `claude
+ * -p` in CLI mode, the ANTHROPIC_API_KEY fallback in API mode (or no provider
+ * at all, which fails the run on its own). The MOCK_AI seam is deliberately
+ * NOT consulted: the mock stands in for whichever provider the team has.
+ */
+export async function copyProviderIsClaude(teamId: string, providerKey?: string): Promise<boolean> {
+  const record = await findCopyProviderRecord(teamId, providerKey)
+  return !record || COPY_PROVIDER_FAMILY[record.providerName.toLowerCase()] !== "other"
+}
+
 // teamId is required (team-tenancy fix): both lookups below used to run with
 // no teamId filter at all, so a brief could resolve — via an explicit
 // providerKey OR the unfiltered "the" default lookup — to a DIFFERENT team's
@@ -67,20 +106,9 @@ export async function resolveCopyProvider(teamId: string, providerKey?: string):
     }
   }
 
-  if (providerKey) {
-    const record = await prisma.availableProvider.findFirst({
-      where: { slot: "COPY", providerKey, teamId, isEnabled: true },
-    })
-    if (record) {
-      return instantiateCopyProvider(record.providerName, providerApiKey(record))
-    }
-  }
-
-  const defaultRecord = await prisma.availableProvider.findFirst({
-    where: { slot: "COPY", teamId, isDefault: true, isEnabled: true },
-  })
-  if (defaultRecord) {
-    return instantiateCopyProvider(defaultRecord.providerName, providerApiKey(defaultRecord))
+  const record = await findCopyProviderRecord(teamId, providerKey)
+  if (record) {
+    return instantiateCopyProvider(record.providerName, providerApiKey(record))
   }
 
   // CLI mode default (2026-07-23): with no registered API-key COPY provider,

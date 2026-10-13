@@ -260,6 +260,12 @@ export interface ModelsView {
   credential: CredentialTier
   /** CLAUDE_CLI_MODEL; null in API mode, where it is ignored (A4). */
   envDefault: ModelKey | null
+  /**
+   * Whether the team's default caption provider runs Claude (spec open
+   * question 1). false (an OpenAI COPY provider) → the CAPTION picker is
+   * hidden (FR-18), and an explicit caption pick is a 400.
+   */
+  captionProviderIsClaude: boolean
 }
 
 // ── Drafts ───────────────────────────────────────────────────────────────

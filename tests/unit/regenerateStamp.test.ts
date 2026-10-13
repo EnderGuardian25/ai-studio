@@ -4,7 +4,7 @@ import { CAPTION_CHANNELS } from '@/lib/channels'
 import { parseRegenerateBody } from '@/lib/captions/requests'
 import { decideModel, regenerateStampTier } from '@/lib/models/resolve'
 
-// 008 FR-09 / AC-06. The targets are what parseRegenerateBody returns: {} →
+// 008 FR-09 / AC-06. The targets are what parseRegenerateBody returns (as `targets`): {} →
 // every caption channel, { channel } → [channel], { headline: true } → ['HEADLINE'].
 
 const S = 'claude-sonnet-5-5'
@@ -17,7 +17,7 @@ const ALL_CHANNELS: Channel[] = CAPTION_CHANNELS.map((s) => s.channel)
 const targets = (body: unknown) => {
   const parsed = parseRegenerateBody(body)
   if (!parsed.ok) throw new Error(parsed.error)
-  return parsed.value
+  return parsed.value.targets
 }
 const draft = (stamps: (string | null)[], headlineModel: string | null = null) => ({
   captions: ALL_CHANNELS.map((channel, i) => ({ channel, model: stamps[i] ?? null })),

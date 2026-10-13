@@ -11,6 +11,7 @@ import {
   parseCaptionPatch,
   parseRegenerateBody,
 } from '@/lib/captions/requests'
+import { modelKeyMessage } from '@/lib/models/requests'
 
 describe('parseCaptionPatch (FR-12)', () => {
   it('accepts { channel, text } for every registry channel, WhatsApp included, text as typed', () => {
@@ -71,15 +72,15 @@ describe('parseCaptionPatch (FR-12)', () => {
 
 describe('parseRegenerateBody (FR-11)', () => {
   it('{} → "Regenerate all": the three captions, never the headline (A9)', () => {
-    expect(parseRegenerateBody({})).toEqual({ ok: true, value: ['INSTAGRAM', 'LINKEDIN', 'WHATSAPP'] })
+    expect(parseRegenerateBody({})).toStrictEqual({ ok: true, value: { targets: ['INSTAGRAM', 'LINKEDIN', 'WHATSAPP'] } })
   })
 
   it('{ channel } → that caption only', () => {
-    expect(parseRegenerateBody({ channel: 'WHATSAPP' })).toEqual({ ok: true, value: ['WHATSAPP'] })
+    expect(parseRegenerateBody({ channel: 'WHATSAPP' })).toStrictEqual({ ok: true, value: { targets: ['WHATSAPP'] } })
   })
 
   it('{ headline: true } → the headline only', () => {
-    expect(parseRegenerateBody({ headline: true })).toEqual({ ok: true, value: ['HEADLINE'] })
+    expect(parseRegenerateBody({ headline: true })).toStrictEqual({ ok: true, value: { targets: ['HEADLINE'] } })
   })
 
   it('both channel and headline → 400', () => {
@@ -97,5 +98,39 @@ describe('parseRegenerateBody (FR-11)', () => {
     expect(parseRegenerateBody({ headline: false })).toEqual({ ok: false, error: 'headline must be true' })
     expect(parseRegenerateBody({ copy: true })).toEqual({ ok: false, error: REGENERATE_SHAPE_MESSAGE })
     expect(parseRegenerateBody(null)).toEqual({ ok: false, error: REGENERATE_SHAPE_MESSAGE })
+  })
+
+  // 008 FR-17: `model` is optional on all three forms; the body stays strict.
+  it('each form takes an optional model, returned beside the targets', () => {
+    expect(parseRegenerateBody({ model: 'OPUS' })).toStrictEqual({
+      ok: true,
+      value: { targets: ['INSTAGRAM', 'LINKEDIN', 'WHATSAPP'], model: 'OPUS' },
+    })
+    expect(parseRegenerateBody({ channel: 'LINKEDIN', model: 'HAIKU' })).toStrictEqual({
+      ok: true,
+      value: { targets: ['LINKEDIN'], model: 'HAIKU' },
+    })
+    expect(parseRegenerateBody({ headline: true, model: 'SONNET' })).toStrictEqual({
+      ok: true,
+      value: { targets: ['HEADLINE'], model: 'SONNET' },
+    })
+  })
+
+  it('{ channel, headline, model } is still a 400, and so is an unknown extra key beside model', () => {
+    expect(parseRegenerateBody({ channel: 'LINKEDIN', headline: true, model: 'HAIKU' })).toEqual({
+      ok: false,
+      error: REGENERATE_BOTH_MESSAGE,
+    })
+    expect(parseRegenerateBody({ model: 'HAIKU', copy: true })).toEqual({ ok: false, error: REGENERATE_SHAPE_MESSAGE })
+  })
+
+  it('a model outside the closed keys is a 400 carrying MODEL_NOT_ALLOWED', () => {
+    for (const model of ['gpt-4o', 'opus', null, 3]) {
+      expect(parseRegenerateBody({ channel: 'LINKEDIN', model })).toEqual({
+        ok: false,
+        error: modelKeyMessage(),
+        code: 'MODEL_NOT_ALLOWED',
+      })
+    }
   })
 })

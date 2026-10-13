@@ -6,6 +6,8 @@
 import { z } from 'zod'
 import type { Channel } from '@prisma/client'
 import { CAPTION_CHANNELS, type CaptionTarget } from '@/lib/channels'
+import type { ModelKey } from '@/lib/models/catalogue'
+import { MODEL_NOT_ALLOWED, modelKeySchema } from '@/lib/models/requests'
 
 // A caption the user types is stored as typed, up to this length. Over a
 // channel's hard limit is allowed (the counter shows it; publish refuses it).
@@ -71,27 +73,44 @@ export function parseCaptionPatch(raw: unknown): ParseResult<CaptionPatch> {
 
 // ── POST /api/drafts/[id]/regenerate-copy ───────────────────────────────────
 
+/** The action's targets, plus the explicit model pick when one was sent (008 FR-17). */
+export interface RegenerateRequest {
+  targets: CaptionTarget[]
+  model?: ModelKey
+}
+
 const regenerateSchema = z
   .object(
     {
       channel: channelSchema.optional(),
       headline: z.literal(true, { errorMap: () => ({ message: 'headline must be true' }) }).optional(),
+      model: modelKeySchema.optional(),
     },
     { errorMap: shapeErrorMap(REGENERATE_SHAPE_MESSAGE) },
   )
   .strict(REGENERATE_SHAPE_MESSAGE)
-  .transform((b, ctx): CaptionTarget[] => {
+  .transform((b, ctx): RegenerateRequest => {
     if (b.channel !== undefined && b.headline !== undefined) {
       ctx.addIssue({ code: z.ZodIssueCode.custom, message: REGENERATE_BOTH_MESSAGE })
       return z.NEVER
     }
-    if (b.headline) return ['HEADLINE']
-    if (b.channel !== undefined) return [b.channel]
-    return [...CHANNELS] // "Regenerate all" is the captions, never the headline (A9)
+    const model = b.model === undefined ? {} : { model: b.model }
+    if (b.headline) return { targets: ['HEADLINE'], ...model }
+    if (b.channel !== undefined) return { targets: [b.channel], ...model }
+    // "Regenerate all" is the captions, never the headline (A9)
+    return { targets: [...CHANNELS], ...model }
   })
 
 // {} → the three captions; { channel } → that caption; { headline: true } →
-// the headline. Returns the action's targets.
-export function parseRegenerateBody(raw: unknown): ParseResult<CaptionTarget[]> {
-  return firstIssue(regenerateSchema.safeParse(raw))
+// the headline — each with an optional `model` (008 FR-17). Still strict: any
+// other key is a 400, and so is { channel, headline, model }. A bad `model`
+// carries FR-17's code, so the client can tell a refused pick from a bad shape.
+export function parseRegenerateBody(
+  raw: unknown,
+): ParseResult<RegenerateRequest> | { ok: false; error: string; code: typeof MODEL_NOT_ALLOWED } {
+  const parsed = regenerateSchema.safeParse(raw)
+  if (!parsed.success && parsed.error.issues[0].path[0] === 'model') {
+    return { ok: false, error: parsed.error.issues[0].message, code: MODEL_NOT_ALLOWED }
+  }
+  return firstIssue(parsed)
 }

@@ -261,7 +261,7 @@ Wave 2 adds per-post and per-chat pickers only.
 
 ### Wave 2 — Choice
 
-- [ ] `T13` — The `model` body fields and the `Brief` initial request
+- [x] `T13` — The `model` body fields and the `Brief` initial request
   - Files: `src/lib/models/requests.ts` (new), `src/app/api/briefs/route.ts`, `src/lib/brief/briefDraftPayload.ts`, `src/lib/captions/requests.ts`, `src/app/api/drafts/[id]/regenerate-copy/route.ts`, `src/app/api/drafts/[id]/regenerate-design/route.ts`, `src/app/api/drafts/[id]/refine/route.ts`, `src/app/api/campaigns/[id]/briefing/chat/route.ts`, `src/app/api/admin/brandkits/[id]/assistant/chat/route.ts`, `src/lib/campaign/briefingAssistant.ts`, `src/lib/brandkit/assistant.ts`, `tests/unit/modelRequests.test.ts` (new), `tests/unit/captionRequests.test.ts`, `tests/unit/briefDraftPayload.test.ts`
   - Estimate: medium
   - Kind: impl

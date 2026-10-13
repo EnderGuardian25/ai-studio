@@ -9,6 +9,10 @@ import { isAspectRatio } from '@/lib/aspectRatio'
 import { isCliMode } from '@/lib/agent/config'
 import { resolveBriefCopyKey } from '@/lib/brief/copyProvider'
 import { IMAGE_PROVIDERS } from '@/providers/imageCapabilities'
+import { resolveModel } from '@/lib/models/policy'
+import { captionProviderNotClaudeError, modelError, parseModelField } from '@/lib/models/requests'
+import { copyProviderIsClaude } from '@/providers/registry'
+import type { ModelKey, UserSurface } from '@/lib/models/catalogue'
 
 // Permissive schema: only guards the JSON parse. The thorough hand-rolled
 // validation below (exact error messages + channel normalization) is kept as-is.
@@ -34,6 +38,8 @@ export const POST = withTeamAuth(async (req: NextRequest, _ctx, user) => {
     additionalImageUrl?: string
     briefImages?: unknown
     referenceTemplateId?: string
+    captionModel?: unknown
+    designModel?: unknown
   }
 
   const {
@@ -85,6 +91,12 @@ export const POST = withTeamAuth(async (req: NextRequest, _ctx, user) => {
   if (aspectRatio != null && !isAspectRatio(aspectRatio)) {
     return NextResponse.json({ error: 'aspectRatio must be SQUARE, PORTRAIT, or STORY' }, { status: 400 })
   }
+  // 008 FR-17: the Review step's optional model picks — the initial request
+  // (FR-10). The design pick serves the surface of the chosen design path.
+  const captionPick = parseModelField(body.captionModel, 'captionModel')
+  if (!captionPick.ok) return NextResponse.json(captionPick.body, { status: 400 })
+  const designPick = parseModelField(body.designModel, 'designModel')
+  if (!designPick.ok) return NextResponse.json(designPick.body, { status: 400 })
   // CLI mode defaults copy to the local Claude CLI (OAuth chain) — no provider
   // key required; an explicit key overrides and is existence-checked below.
   const copyKeyDecision = resolveBriefCopyKey(copyProviderKey, isCliMode())
@@ -175,6 +187,26 @@ export const POST = withTeamAuth(async (req: NextRequest, _ctx, user) => {
     return NextResponse.json({ error: 'Brand kit not found' }, { status: 404 })
   }
 
+  // Each pick is checked against the caller's effective set for its surface
+  // now (tier 1: a refusal is FR-17's 400), so only an allowed model is
+  // stored. Once stored it is history: a later policy change makes the
+  // generation substitute it, never fail (FR-10).
+  const designSurface: UserSurface = designMode === 'TEMPLATE' ? 'DESIGN_TEMPLATE' : 'DESIGN_FREEFORM'
+  const picks: [UserSurface, ModelKey | undefined][] = [
+    ['CAPTION', captionPick.value],
+    [designSurface, designPick.value],
+  ]
+  // Spec open question 1: a caption pick needs a Claude caption provider — the
+  // one this brief's generation will use (its key, else the team default).
+  if (captionPick.value && !(await copyProviderIsClaude(user.teamId, resolvedCopyKey))) {
+    return NextResponse.json(captionProviderNotClaudeError(), { status: 400 })
+  }
+  for (const [surface, requested] of picks) {
+    if (!requested) continue
+    const resolved = await resolveModel(surface, { requested, userId: user.userId, teamId: user.teamId })
+    if (!resolved.ok) return NextResponse.json(modelError(resolved), { status: 400 })
+  }
+
   const brief = await prisma.brief.create({
     data: {
       teamId: user.teamId,
@@ -195,6 +227,8 @@ export const POST = withTeamAuth(async (req: NextRequest, _ctx, user) => {
       // (validated to a {url,intent}[] above when present).
       briefImages: briefImages == null ? Prisma.JsonNull : (briefImages as Prisma.InputJsonValue),
       referenceTemplateId: referenceTemplateId ?? null,
+      captionModel: captionPick.value ?? null,
+      designModel: designPick.value ?? null,
     },
   })
 

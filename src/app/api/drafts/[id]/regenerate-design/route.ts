@@ -8,6 +8,7 @@ import { getActiveCampaignBriefing } from '@/lib/campaign/briefing'
 import { runPathBDesign } from '@/lib/agent/pathB'
 import { currentRenderStamp, draftStampFields, withNextRevisionNumber } from '@/lib/drafts/revisions'
 import { resolveModel } from '@/lib/models/policy'
+import { modelError, parseRegenerateDesignBody } from '@/lib/models/requests'
 import { claimDraftAction, startDraftAction, touchDraftAction } from '@/lib/drafts/draftActions'
 import { generationSkipFields } from '@/lib/drafts/backgroundNotice'
 import { designHeadline, headlineFallbackMessage } from '@/lib/captions/headline'
@@ -19,7 +20,22 @@ import { designHeadline, headlineFallbackMessage } from '@/lib/captions/headline
 // polls pendingAction/pendingActionError to completion. Before overwriting,
 // the CURRENT design is snapshotted as a DraftRevision so the user can return
 // to it via the revision history. Path B only — Path A is a template fill.
-export const POST = withTeamAuth<{ id: string }>(async (_req, { params }, user) => {
+// Body: {} (an empty body reads as {}) or { model } — an explicit pick (008
+// FR-17), refused with a 400 before the claim.
+export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) => {
+  let raw: unknown = {}
+  const text = await req.text()
+  if (text.trim() !== '') {
+    try {
+      raw = JSON.parse(text)
+    } catch {
+      return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+    }
+  }
+  const parsed = parseRegenerateDesignBody(raw)
+  if (!parsed.ok) return NextResponse.json(parsed.body, { status: 400 })
+  const requested = parsed.model
+
   const draft = await prisma.draft.findUnique({
     where: { id: params.id },
     include: { brief: true },
@@ -55,13 +71,17 @@ export const POST = withTeamAuth<{ id: string }>(async (_req, { params }, user) 
   // 008 FR-09: like for like — the stamp tier is the model that made the
   // current design (after a refine, the refine's), then team → system. A
   // stamp no longer allowed falls through and is recorded as a substitution.
-  // Resolved before the claim, so a failure (422) claims nothing.
+  // An explicit pick (FR-17) is tier 1, above the stamp. Resolved before the
+  // claim, so a refused pick (400) or a team with nothing allowed (422)
+  // claims nothing.
   const resolvedModel = await resolveModel('DESIGN_FREEFORM', {
+    requested,
     stamp: draft.designModel ?? null,
     userId: user.userId,
     teamId: draft.teamId,
   })
   if (!resolvedModel.ok) {
+    if (requested) return NextResponse.json(modelError(resolvedModel), { status: 400 })
     return NextResponse.json({ code: resolvedModel.code, message: resolvedModel.message }, { status: 422 })
   }
   const model = resolvedModel.resolved

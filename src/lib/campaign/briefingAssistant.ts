@@ -8,6 +8,7 @@ import { resolveModel } from '@/lib/models/policy'
 import { createMessage, textOf } from '@/lib/models/anthropicCall'
 import { modelCallFor, recordModelCall } from '@/lib/models/modelCalls'
 import type { DecideErrorCode, ResolvedModel } from '@/lib/models/resolve'
+import type { ModelKey } from '@/lib/models/catalogue'
 import { getActiveCampaignBriefing } from '@/lib/campaign/briefing'
 import { collectCampaignDocsContext, collectCampaignDocImageUrls } from '@/lib/campaign/documents'
 import { runVisionModel } from '@/lib/agent/vision'
@@ -33,7 +34,8 @@ const MAX_TOKENS = 2048
 /**
  * An assistant surface's model could not be resolved (008 FR-03: e.g.
  * NO_ALLOWED_MODEL), so nothing ran. The calling route answers 422
- * { code, message }, the shape the design actions use.
+ * { code, message }, the shape the design actions use — or, when the caller
+ * sent an explicit pick that was refused, FR-17's 400 (models/requests.ts).
  */
 export class AssistantModelError extends Error {
   constructor(
@@ -49,13 +51,16 @@ export class AssistantModelError extends Error {
  * The model for an assistant entry point (008 FR-02, design §3): resolved from
  * the team (and the acting user's credential tier), before any model call.
  * Shared by the brand-kit assistant, image → template and the voice draft.
+ * `requested` is the chat header's explicit pick (FR-17, tier 1); the sites
+ * without a picker never pass one (A7).
  */
 export async function resolveAssistantModel(
   surface: 'ASSISTANT_BRIEFING' | 'ASSISTANT_BRANDKIT',
   teamId: string,
   userId: string | null,
+  requested?: ModelKey,
 ): Promise<ResolvedModel> {
-  const result = await resolveModel(surface, { userId, teamId })
+  const result = await resolveModel(surface, { requested, userId, teamId })
   if (!result.ok) throw new AssistantModelError(result.code, result.message)
   return result.resolved
 }
@@ -201,8 +206,9 @@ export async function runBriefingChat(
   messages: ChatMessage[],
   teamId: string,
   userId: string | null,
+  requested?: ModelKey,
 ): Promise<BriefingChatResult> {
-  const model = await resolveAssistantModel('ASSISTANT_BRIEFING', teamId, userId)
+  const model = await resolveAssistantModel('ASSISTANT_BRIEFING', teamId, userId, requested)
   if (MOCK_AI) {
     // 008 FR-16: the short-circuited call is recorded first.
     recordModelCall(modelCallFor(model, pipelineMode(), 'briefing'))

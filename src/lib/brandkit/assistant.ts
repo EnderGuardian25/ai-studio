@@ -4,6 +4,7 @@ import { runVisionModel } from '@/lib/agent/vision'
 import { resolveAssistantModel, runBriefingModel } from '@/lib/campaign/briefingAssistant'
 import { pipelineMode } from '@/lib/agent/config'
 import { modelCallFor, recordModelCall } from '@/lib/models/modelCalls'
+import type { ModelKey } from '@/lib/models/catalogue'
 import { buildDocsContext } from '@/lib/campaign/documents'
 import { sampleImageColors } from '@/lib/renderer/puppeteer'
 import { fenceUntrusted, UNTRUSTED_CONTENT_GUARD } from '@/lib/agent/untrusted'
@@ -173,10 +174,12 @@ export async function runBrandKitChat(
   messages: ChatMessage[],
   teamId: string,
   userId: string | null,
+  requested?: ModelKey,
 ): Promise<BrandKitChatResult> {
   const { imageUrls: urls, docs } = await collectBrandKitGrounding(kitId)
-  // 008 FR-02: the team's ASSISTANT_BRANDKIT model, for both the vision and the text call.
-  const model = await resolveAssistantModel('ASSISTANT_BRANDKIT', teamId, userId)
+  // 008 FR-02: the team's ASSISTANT_BRANDKIT model, for both the vision and the
+  // text call — or the chat header's explicit pick (FR-17), refused if not allowed.
+  const model = await resolveAssistantModel('ASSISTANT_BRANDKIT', teamId, userId, requested)
 
   if (MOCK_AI) {
     // 008 FR-16: the short-circuited call is recorded first.

@@ -502,7 +502,8 @@ describe('retry route (FR-10)', () => {
 })
 
 describe('regenerate-design uses designHeadline (FR-09)', () => {
-  const req = {} as never
+  // A real Request: the route reads its (optional) body (008 FR-17).
+  const req = new Request('http://test/x', { method: 'POST' }) as never
   const ctx = { params: { id: 'd1' } } as never
   const draftWith = (headline: string | null) => ({
     id: 'd1', teamId: 'team1', brief, headline, htmlContent: '<html>v1</html>', exportUrl: 'exports/v1.png',

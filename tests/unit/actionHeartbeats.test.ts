@@ -274,7 +274,7 @@ describe('sync generation (generateDraftForBrief: the scheduler, MCP, ACP)', () 
 describe('regenerate-design', () => {
   it('touches the REGENERATE_DESIGN claim after the background step, right before the design', async () => {
     h.state.draft = existingDraft()
-    const res = (await regenerateDesign({} as never, ctx)) as Response
+    const res = (await regenerateDesign(new Request('http://test/x', { method: 'POST' }) as never, ctx)) as Response
     expect(res.status).toBe(202)
     await settled()
     expect(h.log).toEqual([

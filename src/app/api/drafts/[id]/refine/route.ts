@@ -12,6 +12,7 @@ import { extractInlineAssets, restoreInlineAssets } from '@/lib/agent/inlineAsse
 import { dimensionsFor } from '@/lib/aspectRatio'
 import { pathForDesignMode, pipelineMode } from '@/lib/agent/config'
 import { resolveModel } from '@/lib/models/policy'
+import { modelError, parseModelField } from '@/lib/models/requests'
 import { buildRefineSystemPrompt, buildRefineUserMessage } from '@/lib/agent/prompts/refine'
 import { generateBackgroundForRefine } from '@/lib/agent/background'
 import { refineSkipFields } from '@/lib/drafts/backgroundNotice'
@@ -99,6 +100,11 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
   if (!overrideConflictId && (typeof instruction !== 'string' || !instruction.trim())) {
     return NextResponse.json({ error: 'instruction is required' }, { status: 400 })
   }
+  // 008 FR-17: an optional explicit model pick. A malformed one is a 400 on
+  // either path; the Override path makes no model call, so it ignores a valid one.
+  const pick = parseModelField((body.data as { model?: unknown }).model)
+  if (!pick.ok) return NextResponse.json(pick.body, { status: 400 })
+  const requested = pick.value
 
   const draft = await prisma.draft.findUnique({
     where: { id: params.id },
@@ -151,15 +157,18 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
   const mode = pipelineMode()
   // 008 FR-09 / A8: refine has no stamp tier (it is not a regenerate). The team
   // REFINE default applies to both paths; the system default follows the
-  // draft's path (Path A → Haiku, Path B → Sonnet). Resolved before the claim,
-  // so a team with nothing allowed claims nothing; the ResolvedModel then
-  // travels by value into the background run (both attempts, the commit stamp).
+  // draft's path (Path A → Haiku, Path B → Sonnet). An explicit pick (FR-17)
+  // is tier 1. Resolved before the claim, so a refused pick (400) or a team
+  // with nothing allowed (422) claims nothing; the ResolvedModel then travels
+  // by value into the background run (both attempts, the commit stamp).
   const resolvedModel = await resolveModel('REFINE', {
+    requested,
     userId: user.userId,
     teamId: draft.teamId,
     designPath: pathForDesignMode(draft.brief.designMode),
   })
   if (!resolvedModel.ok) {
+    if (requested) return NextResponse.json(modelError(resolvedModel), { status: 400 })
     return NextResponse.json({ code: resolvedModel.code, message: resolvedModel.message }, { status: 422 })
   }
   const model = resolvedModel.resolved

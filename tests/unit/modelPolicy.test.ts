@@ -9,6 +9,7 @@ import type { ZodType } from 'zod'
 const h = vi.hoisted(() => ({
   policyFindUnique: vi.fn(),
   tokenFindFirst: vi.fn(),
+  providerFindFirst: vi.fn(),
   transaction: vi.fn(),
   txUpsert: vi.fn(),
   txDeleteMany: vi.fn(),
@@ -21,6 +22,7 @@ vi.mock('@/lib/prisma', () => ({
   prisma: {
     teamModelPolicy: { findUnique: h.policyFindUnique },
     userClaudeToken: { findFirst: h.tokenFindFirst },
+    availableProvider: { findFirst: h.providerFindFirst },
     $transaction: h.transaction,
   },
 }))
@@ -78,6 +80,7 @@ beforeEach(() => {
   for (const fn of [
     h.policyFindUnique,
     h.tokenFindFirst,
+    h.providerFindFirst,
     h.txUpsert,
     h.txDeleteMany,
     h.txCreateMany,
@@ -86,6 +89,7 @@ beforeEach(() => {
   }
   h.policyFindUnique.mockResolvedValue(null)
   h.tokenFindFirst.mockResolvedValue(null)
+  h.providerFindFirst.mockResolvedValue(null)
   h.txUpsert.mockResolvedValue({})
   h.txDeleteMany.mockResolvedValue({ count: 0 })
   h.txCreateMany.mockResolvedValue({ count: 0 })
@@ -426,6 +430,7 @@ describe('loadModelsView — GET /api/models (FR-13)', () => {
       mode: 'cli',
       credential: 'personal',
       envDefault: 'SONNET',
+      captionProviderIsClaude: true,
     })
     expect(view.catalogue.map((e) => [e.key, e.tier, e.speed, e.personalTokenGated])).toEqual([
       ['HAIKU', '$', 'fast', false],
@@ -452,6 +457,26 @@ describe('loadModelsView — GET /api/models (FR-13)', () => {
     h.env.CLAUDE_CLI_MODEL = 'OPUS'
     const view = await loadModelsView({ userId: 'u1', teamId: 'team1' })
     expect(view).toMatchObject({ mode: 'api', credential: 'n/a', envDefault: null })
+  })
+
+  // Spec open question 1 → FR-18: the CAPTION picker is hidden when the team's
+  // default caption provider isn't Claude.
+  it.each([
+    ['no COPY row (claude -p / the ANTHROPIC_API_KEY fallback)', null, true],
+    ['a cli row', { providerName: 'cli' }, true],
+    ['an anthropic row', { providerName: 'Anthropic' }, true],
+    ['an OpenAI row', { providerName: 'openai' }, false],
+  ])('captionProviderIsClaude: %s → %s', async (_label, row, expected) => {
+    for (const mode of ['cli', 'api'] as const) {
+      h.mode.mockReturnValue(mode)
+      h.providerFindFirst.mockResolvedValue(row)
+      const view = await loadModelsView({ userId: 'u1', teamId: 'team1' })
+      expect(view.captionProviderIsClaude).toBe(expected)
+    }
+    // The team's DEFAULT COPY provider, scoped to the session team.
+    expect(h.providerFindFirst).toHaveBeenCalledWith({
+      where: { slot: 'COPY', teamId: 'team1', isDefault: true, isEnabled: true },
+    })
   })
 })
 
