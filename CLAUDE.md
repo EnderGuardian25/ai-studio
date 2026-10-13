@@ -4,7 +4,16 @@ This repo contains planning documents for **bistec-studio**, an internal marketi
 
 ## ✅ Outstanding work — START HERE (updated 2026-10-13)
 
-- **⏸️ 2026-10-13 (later) — PICK UP HERE: 008 model selection is BUILT 19/19 and VERIFIED PASS (32/32 gating ACs; [`verify-report.md`](.specclaw/changes/008-model-selection/verify-report.md)). CI green at `c78ce50c`. Next: the post-012/008 follow-ups (handoff "Still open after 008"); AC-32 (real Opus timings) stays optional.** Full detail: [`docs/handoff.md`](docs/handoff.md) top section; deploy, rollback and procedures in its **008 runbook** section.
+- **⏸️ 2026-10-13 (latest) — PICK UP HERE: the new system starts FRESH (no data import, user decision). 004 re-verified PASS at `e88b55b6` (CI green). Changes 016–020 are approved (bounded) and build one at a time: 016 fresh-start cleanup → 017 publish fixes → 018 small fixes → 019 claim token → 020 Create post button off the draft page.** Full detail: [`docs/handoff.md`](docs/handoff.md) top section.
+  - **Decisions:**
+    - no import or carry-over; `import-posts` is won't-fix and both scripts are deleted in 016;
+    - no pre-made "Bistec" team on fresh systems;
+    - the 012 and 008 rollbacks go;
+    - the `copyText` alias goes;
+    - the Create post button is hidden on `/drafts/[id]` (this amends 011 AC-01).
+  - **⚠️ Remote `upstream` → `bistec-oss/studio` has push enabled. Never push to it; removing it waits on the user.**
+  - **After 016–020:** 006, 007, 009 and 010 (proposals), plus the 005 AC-16 operator run.
+- **(superseded) 2026-10-13 (later) — 008 model selection is BUILT 19/19 and VERIFIED PASS (32/32 gating ACs; [`verify-report.md`](.specclaw/changes/008-model-selection/verify-report.md)). CI green at `c78ce50c`. Next: the post-012/008 follow-ups (handoff "Still open after 008"); AC-32 (real Opus timings) stays optional.** Full detail: [`docs/handoff.md`](docs/handoff.md) top section; deploy, rollback and procedures in its **008 runbook** section.
   - **Gates:** wave 1 **383/3/0/0** (CI run 38304451112 green); wave 2 **391/3/0/0**, a full clean mock E2E at `b36be415`. Unit **2604/2604**, tsc clean, lint 0 errors. Every task was reviewed: no BLOCK; T1's one WARN (a refused `CLAUDE_CLI_MODEL` must still try the table default) was fixed before commit and is unit-tested.
   - **Check first:** the CI run for `b36be415` (run 38354472914, in progress when the docs were written) and for the T19 docs commit (L21).
   - **T2 passed (2026-10-13):** the pinned CLI 2.1.287 accepts all three full IDs, so `cliArg = apiId`.

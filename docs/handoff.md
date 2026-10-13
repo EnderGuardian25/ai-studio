@@ -1,13 +1,61 @@
 # bistec-studio — Session Handoff
 
-**Date:** 2026-10-13 (latest: **008 model selection is BUILT 19/19 and VERIFIED PASS (32/32 gating ACs); the wave-2 gate is 391/3/0/0; CI green at `c78ce50c`.** Earlier the same day: 008 wave 1 built, reviewed and CI-green, and T2 passed). Previous: 2026-10-12, evening (**008 BUILD in progress — wave 1 T1–T7 committed, T7 unreviewed; T2 waiting on the user; next: review T7 then T8.** Earlier: **008 model selection APPROVED (architectural) after a deep party panel; a planner subagent was writing its spec/design/tasks at the context clear. 015 verified PASS, and fork CI on `v2` is GREEN**). Previous: 2026-10-12 (015 fixed the draft-page settle race behind the red CI; 012 per-channel captions BUILT 16/16 and VERIFIED PASS). Previous: 2026-10-11, earlier (013 and 014 verified PASS; 012 building, T1–T7 of 16 committed). Previous: 2026-10-09 (011 verified PASS; fork `main` merged into `v2`; 013 fork CI, checks only, building; 014 and 012 approved). Previous: 2026-10-08 (011 built 13/13 on `v2` in the fork). Previous: 2026-10-07 (005 verified PASS; 011 planned, wave 1 built; the move to the fork). Previous: 2026-10-03 (004 finished and verified PARTIAL, Phase 0 only; 005 built 9/10, waiting on one operator check). Before that: 2026-09-28 (build session — 004 Waves 1–3 built, MinIO → silo, PR #42 + draft PR #43). Before that: 2026-09-23 (later, later the same day: proposal **012** per-channel captions + copy→caption rename, a floating **Create post** button folded into 011, and a launch-video legibility pass. Before that: planning session — proposals 008–011 + roadmap, 004 re-planned to 24 tasks incl. Phase 0, and the deploy pipeline found broken: Coolify 401 since 2026-09-15). Previous: 2026-07-28 (copy-edit status clobber fix).
+**Date:** 2026-10-13 (latest: **fresh start decided — no data import; 004 re-verified PASS at `e88b55b6`; changes 016–020 approved and building in order.** Earlier the same day: **008 model selection is BUILT 19/19 and VERIFIED PASS (32/32 gating ACs); the wave-2 gate is 391/3/0/0; CI green at `c78ce50c`.** Earlier the same day: 008 wave 1 built, reviewed and CI-green, and T2 passed). Previous: 2026-10-12, evening (**008 BUILD in progress — wave 1 T1–T7 committed, T7 unreviewed; T2 waiting on the user; next: review T7 then T8.** Earlier: **008 model selection APPROVED (architectural) after a deep party panel; a planner subagent was writing its spec/design/tasks at the context clear. 015 verified PASS, and fork CI on `v2` is GREEN**). Previous: 2026-10-12 (015 fixed the draft-page settle race behind the red CI; 012 per-channel captions BUILT 16/16 and VERIFIED PASS). Previous: 2026-10-11, earlier (013 and 014 verified PASS; 012 building, T1–T7 of 16 committed). Previous: 2026-10-09 (011 verified PASS; fork `main` merged into `v2`; 013 fork CI, checks only, building; 014 and 012 approved). Previous: 2026-10-08 (011 built 13/13 on `v2` in the fork). Previous: 2026-10-07 (005 verified PASS; 011 planned, wave 1 built; the move to the fork). Previous: 2026-10-03 (004 finished and verified PARTIAL, Phase 0 only; 005 built 9/10, waiting on one operator check). Before that: 2026-09-28 (build session — 004 Waves 1–3 built, MinIO → silo, PR #42 + draft PR #43). Before that: 2026-09-23 (later, later the same day: proposal **012** per-channel captions + copy→caption rename, a floating **Create post** button folded into 011, and a launch-video legibility pass. Before that: planning session — proposals 008–011 + roadmap, 004 re-planned to 24 tasks incl. Phase 0, and the deploy pipeline found broken: Coolify 401 since 2026-09-15). Previous: 2026-07-28 (copy-edit status clobber fix).
 **Repo (since 2026-10-07):** https://github.com/EnderGuardian25/ai-studio — a public GitHub **fork** of the company repo `bistec-oss/studio`. All development continues here. The company repo is left as it is and receives nothing from this work. See the 2026-10-07 fork section below.
 **Branch:** work continues on **`v2`**, the fork's default branch. Fork `main` = `671ad6e9`, the company `main` at fork time. `v2` has contained fork `main` since the merge at `2506de0b` (2026-10-09).
 **Production:** none for the fork. `https://studio.bistecglobal.com` is the **company's** prod. It runs company `main` and is not ours to deploy.
 
 ---
 
-## ⏸️ 2026-10-13 (later) — PICK UP HERE: 008 model selection is BUILT 19/19 and VERIFIED PASS
+## ⏸️ 2026-10-13 (latest) — PICK UP HERE: fresh start decided; 004 re-verified PASS; 016–020 approved and building
+
+### User decisions (2026-10-13)
+
+- **The new system starts with fresh teams, users and data.** Nothing is imported or migrated from the company prod or the two dev machines. Data carry-over work is not proposed.
+  - **Change 016 (import-posts team tenancy) was dropped mid-panel for this reason.** Its folder was never committed. The "Still open after 008" item 1 (L22) is **won't-fix**; the scripts themselves are deleted by the new 016 below.
+- **Fresh-start cleanup (new 016):**
+  - remove the code that only serves old data;
+  - **remove the pre-made "Bistec" team on fresh systems.** Applied migration `20260721120000_team_tenancy_b` inserts it; a new migration deletes it only when it is empty, and the seeds create their own;
+  - **remove the rollbacks to before 012 and 008** (both `down.sql` scripts, TC-CAP-13, TC-MODEL-12);
+  - **remove the `copyText` alias** from MCP/ACP and `POST /api/generate/copy`.
+- **The floating Create post button is hidden on the draft page** (new 020). This amends 011 AC-01.
+- **"Fix all as per necessary":** every remaining follow-up is in 017–019.
+
+### 004 re-verified PASS (2026-10-13)
+
+- Every 004 gate was re-run at `e88b55b6`, after 008, 012 and 015 landed.
+  - **Local:** lint passed; unit 2604/2604; build passed; `test:render` 15/15.
+  - **Fork CI [run 38385695969](https://github.com/EnderGuardian25/ai-studio/actions/runs/38385695969):** E2E 391 passed / 3 skipped; unit and build green, including the render harness and `docker build`.
+  - **No Node-20 deprecation annotation.**
+- `state.json` now records PASS; it still said PARTIAL from 2026-10-01. T1 (the Coolify token) stays deferred, because the fork has no Coolify pipeline (013).
+- The full write-up is the last section of `.specclaw/changes/004-design-instruction-fidelity/verify-report.md`.
+
+### Changes 016–020: approved (all bounded), building one at a time in this order
+
+| #   | Change                                                                                           | What                                                                                                                                                                                                                                                                                                                    |
+| --- | ------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 016 | [Fresh-start cleanup](../.specclaw/changes/016-fresh-start-cleanup/)                             | Delete the export/import scripts and the 012 legacy caption machinery (a migration drops `copyText`, `captionMigration`, `needsReview`). Remove the copy-edit heal, two legacy guards, three one-off scripts, the 012/008 rollbacks and the `copyText` alias. No pre-made team; a zero-team dashboard for super admins. |
+| 017 | [Publish API fixes](../.specclaw/changes/017-publish-api-fixes/)                                 | **A failed immediate publish shows "✓ published" today:** return 502 with the reason (also on Retry). Duplicate check before the caption check. A batch caption load for the posts list.                                                                                                                                |
+| 018 | [Post-008 small fixes](../.specclaw/changes/018-post-008-small-fixes/)                           | ACP manifest output; the `/team` refine label; stale comments; the draft-GET provider lookup; caption/headline Undo settle-on-state; revision-list retry; the shared axe helper; TC-MODEL-14 caption pick; 014 gaps 5, 7 and 8.                                                                                         |
+| 019 | [Draft-action claim token](../.specclaw/changes/019-draft-action-claim-token/)                   | `Draft.pendingActionClaimId`, so a run swept as stuck can't settle or overwrite a newer run's claim. Additive migration plus a down script.                                                                                                                                                                             |
+| 020 | [Create post button off the draft page](../.specclaw/changes/020-create-post-button-draft-page/) | It covered the refine Send button.                                                                                                                                                                                                                                                                                      |
+
+- **016 goes first,** because 017–019 edit the caption code it simplifies.
+- **The party panel was skipped for all five** (no explicit approval this time).
+- **Not in any change:**
+  - 014 gap 6, the placeholders, which is a product call;
+  - the duplicate-publish check-then-act race;
+  - the 005 AC-16 operator run, which needs a real token. 🔴 Revoke the one pasted on 2026-10-06 first.
+- **After 016–020, the remaining roadmap is the four unbuilt proposals:**
+  - 006 product observability;
+  - 007 brand-kit design system;
+  - 009 hero imagery;
+  - 010 WhatsApp Channel posting.
+- **⚠️ Remotes:** a second remote, `upstream`, points at the company repo with **push enabled**. Removing it is waiting on the user's go-ahead. Never push to it.
+
+---
+
+## ⏸️ 2026-10-13 (later) — superseded by 2026-10-13 (latest) above: 008 model selection is BUILT 19/19 and VERIFIED PASS
 
 Both waves are committed and pushed to `v2`. Every task has a report in `.specclaw/changes/008-model-selection/reports/` and a review in `reviews/`; no review raised a BLOCK, and T1's one WARN was fixed before commit. T2, the operator check, passed. The deploy, rollback, `CLAUDE_CLI_MODEL` and procedure notes are in the **008 runbook** section just below.
 
@@ -60,7 +108,7 @@ Both waves are committed and pushed to `v2`. Every task has a report in `.speccl
 
 ### Still open after 008 (each its own change)
 
-1. **`import-posts.mjs` never sets `teamId` (L22).** A real import has been broken since team tenancy, and `--dry-run` hides it. 008 T12 made the scripts carry the stamps but did not fix this.
+1. ~~**`import-posts.mjs` never sets `teamId` (L22).**~~ **Won't fix (2026-10-13): fresh start, no import; the scripts are deleted in 016.** A real import has been broken since team tenancy, and `--dry-run` hides it. 008 T12 made the scripts carry the stamps but did not fix this.
 2. **The ACP manifest's `generate_post` output schema** is missing `headline` and `captions`.
 3. **`POST /api/posts` returns 201 for an immediate publish that ends FAILED.**
 4. **A per-claim token for draft actions.**
@@ -328,7 +376,7 @@ The session stopped to save usage. The user approved the plan ("continue") and t
 
 ### Still open after 008 (each its own change)
 
-1. **`import-posts.mjs` never sets `teamId` (L22).** A real import has been broken since team tenancy, and `--dry-run` hides it.
+1. ~~**`import-posts.mjs` never sets `teamId` (L22).**~~ **Won't fix (2026-10-13): fresh start, no import; the scripts are deleted in 016.** A real import has been broken since team tenancy, and `--dry-run` hides it.
 2. **The ACP manifest's `generate_post` output schema** is missing `headline` and `captions`.
 3. **`POST /api/posts` returns 201 for an immediate publish that ends FAILED.**
 4. **A per-claim token for draft actions.**

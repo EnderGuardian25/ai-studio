@@ -1,0 +1,16 @@
+# Status: Post-008 small fixes, the 015 tail and test hygiene
+
+**Change:** 018-post-008-small-fixes
+**Started:** 2026-10-13
+**Last Updated:** 2026-10-13
+
+## Progress
+
+| Phase    | Status      | Notes |
+| -------- | ----------- | ----- |
+| Proposal | ✅ Approved |       |
+| Spec     | ⏳ Pending  |       |
+| Design   | ⏳ Pending  |       |
+| Tasks    | ⏳ Pending  |       |
+| Build    | ⏳ Pending  |       |
+| Verify   | ⏳ Pending  |       |

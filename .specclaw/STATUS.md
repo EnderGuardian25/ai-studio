@@ -1,7 +1,7 @@
 # 🦞 SpecClaw Dashboard
 
 **Project:** bistec-studio
-**Last Updated:** 2026-10-13 11:02 UTC
+**Last Updated:** 2026-10-13 15:44 UTC
 
 _1 unnumbered change · run `/specclaw:renumber` to order them_
 
@@ -25,6 +25,11 @@ _1 unnumbered change · run `/specclaw:renumber` to order them_
 - 📋 **007-brandkit-design-system** — proposal ready, awaiting planning
 - 📋 **009-hero-image-design** — proposal ready, awaiting planning
 - 📋 **010-whatsapp-channel-posting** — proposal ready, awaiting planning
+- 📋 **016-fresh-start-cleanup** ▫ — proposal ready, awaiting planning
+- 📋 **017-publish-api-fixes** ▫ — proposal ready, awaiting planning
+- 📋 **018-post-008-small-fixes** ▫ — proposal ready, awaiting planning
+- 📋 **019-draft-action-claim-token** ▫ — proposal ready, awaiting planning
+- 📋 **020-create-post-button-draft-page** ▫ — proposal ready, awaiting planning
 
 ## Recently Completed
 
