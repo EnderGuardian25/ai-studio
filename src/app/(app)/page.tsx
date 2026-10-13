@@ -4,17 +4,16 @@ import {
   FilePlus2,
   BookOpen,
   Palette,
-  Users,
 } from 'lucide-react'
 import { prisma } from '@/lib/prisma'
 import { listBriefDrafts } from '@/lib/brief/briefDrafts'
 import { resolveTeamForServerComponent } from '@/lib/authz/serverTeam'
 import { draftVisibilityWhere, postVisibilityWhere } from '@/lib/authz/visibility'
 import type { TeamAuthedUser } from '@/lib/api/handler'
-import { Panel } from '@/components/ui/Panel'
 import { PageHead } from '@/components/ui/PageHead'
 import { EYEBROW, SECTION_HEAD } from '@/components/ui/folio'
 import { RecentDraftsCard } from '@/components/dashboard/RecentDraftsCard'
+import { NoTeamNotice } from '@/components/dashboard/NoTeamNotice'
 import { channelLabel as sharedChannelLabel } from '@/lib/channels'
 import { relativeTime } from '@/lib/format'
 
@@ -165,17 +164,7 @@ export default async function DashboardPage() {
   }
 
   if (!resolution || resolution.team.kind === 'no-team') {
-    return (
-      <Panel className="mx-auto mt-12 max-w-md p-8 text-center">
-        <Users size={28} strokeWidth={1.4} className="mx-auto mb-3 text-fg-muted" />
-        <h2 className="font-display text-ui-lg font-medium text-fg">
-          You&rsquo;re not in a team yet
-        </h2>
-        <p className="mt-2 text-ui-sm text-fg-muted">
-          Ask a super admin to add you to a team before you can create or view posts.
-        </p>
-      </Panel>
-    )
+    return <NoTeamNotice isSuperAdmin={resolution?.isSuperAdmin ?? false} />
   }
 
   const teamUser: TeamAuthedUser = {

@@ -60,7 +60,7 @@ This change has **5 tasks in 3 waves**, all built on `v2`. Each task is implemen
 
 ### Wave 2 — Fresh first run
 
-- [ ] `T4` — No pre-made team; the super-admin zero-team screen; the 016 down script
+- [x] `T4` — No pre-made team; the super-admin zero-team screen; the 016 down script
   - Files: `prisma/migrations/<ts>_drop_empty_default_team/migration.sql` (new), `prisma/rollback/016-fresh-start-cleanup.down.sql` (new), `scripts/seed-teams.mjs`, `scripts/seed-brandkit.mjs`, `scripts/seed-hearts-talk.mjs`, `scripts/seed-cli-provider.mjs`, `scripts/setup-test-db.mjs`, `src/app/(app)/page.tsx`, a unit or E2E test for FR-09
   - Estimate: medium
   - Kind: migration

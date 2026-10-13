@@ -14,8 +14,8 @@
  * Idempotent: every step is a find-or-create / upsert, safe to re-run.
  *
  * Produces:
- *   - Team "Bistec" (already created unconditionally by the team_tenancy_b
- *     migration's backfill — this script only adds memberships) with
+ *   - Team "Bistec" (found by name, or created here: a fresh database has
+ *     no team, since 016 FR-08 deletes the migration-made one) with
  *     adminBTG as TeamRole.ADMIN and editor as TeamRole.EDITOR.
  *   - Team "ClientX" (new) with a new user `clientx.admin` (fixed test
  *     password, platform role ADMIN, TeamRole.ADMIN in ClientX).
