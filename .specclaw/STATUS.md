@@ -1,7 +1,7 @@
 # 🦞 SpecClaw Dashboard
 
 **Project:** bistec-studio
-**Last Updated:** 2026-10-13 15:44 UTC
+**Last Updated:** 2026-10-13 15:50 UTC
 
 _1 unnumbered change · run `/specclaw:renumber` to order them_
 
@@ -18,6 +18,7 @@ _1 unnumbered change · run `/specclaw:renumber` to order them_
 - 🔍 **013-fork-ci-checks-only** ▫ — verify PASS | 3/3 tasks (100%) | 0 failed | 13h13m
 - 🔍 **014-ui-a11y-consistency-pass** ▣ — verify PASS | 18/18 tasks (100%) | 0 failed | 42h45m
 - 🔍 **015-draft-action-settle-race** ▫ — verify PASS | 3/3 tasks (100%) | 0 failed | 25m
+- 📝 **016-fresh-start-cleanup** ▫ — tasks done | 0/5 tasks (0%) | 0 failed
 
 ## Pending Proposals
 
@@ -25,7 +26,6 @@ _1 unnumbered change · run `/specclaw:renumber` to order them_
 - 📋 **007-brandkit-design-system** — proposal ready, awaiting planning
 - 📋 **009-hero-image-design** — proposal ready, awaiting planning
 - 📋 **010-whatsapp-channel-posting** — proposal ready, awaiting planning
-- 📋 **016-fresh-start-cleanup** ▫ — proposal ready, awaiting planning
 - 📋 **017-publish-api-fixes** ▫ — proposal ready, awaiting planning
 - 📋 **018-post-008-small-fixes** ▫ — proposal ready, awaiting planning
 - 📋 **019-draft-action-claim-token** ▫ — proposal ready, awaiting planning
@@ -37,6 +37,6 @@ _None._
 
 ## Stats
 
-- **Total changes:** 11
-- **Active:** 11
+- **Total changes:** 12
+- **Active:** 12
 - **Completed:** 0
