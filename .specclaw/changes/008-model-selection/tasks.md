@@ -274,7 +274,7 @@ Wave 2 adds per-post and per-chat pickers only.
     - **The order everywhere:** parse → resolve (400 on an explicit miss) → claim. A 400 claims nothing.
     - **The two chat lib functions** gain an optional `requested`.
 
-- [ ] `T14` — The shared `ModelPicker`, `useModels()` and the pure picker helpers
+- [x] `T14` — The shared `ModelPicker`, `useModels()` and the pure picker helpers
   - Files: `src/components/ui/ModelPicker.tsx` (new), `src/lib/hooks/useModels.ts` (new), `src/lib/models/pickerState.ts` (new), `tests/unit/modelPicker.test.ts` (new), `tests/unit/uiPrimitives.test.ts`
   - Estimate: medium
   - Kind: impl

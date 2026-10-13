@@ -21,11 +21,16 @@ export function Select({
   error,
   id,
   className,
+  'aria-describedby': describedBy,
   ...props
 }: SelectProps) {
   // Stable, collision-free fallback: an explicit id wins, otherwise React.useId.
   const generatedId = React.useId()
   const selectId = id ?? (label ? generatedId : undefined)
+  // An error is announced with the field: its paragraph joins the caller's
+  // aria-describedby, and the select is marked invalid (008 T14).
+  const errorId = error && selectId ? `${selectId}-error` : undefined
+  const describedByIds = [describedBy, errorId].filter(Boolean).join(' ') || undefined
 
   return (
     <div className="flex flex-col gap-1.5">
@@ -44,6 +49,8 @@ export function Select({
             className,
           )}
           {...props}
+          aria-describedby={describedByIds}
+          aria-invalid={error ? true : props['aria-invalid']}
         >
           {options.map(opt => (
             <option key={opt.value} value={opt.value}>
@@ -57,7 +64,11 @@ export function Select({
           className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-fg-muted"
         />
       </div>
-      {error && <p className={fieldErrorClasses}>{error}</p>}
+      {error && (
+        <p id={errorId} className={fieldErrorClasses}>
+          {error}
+        </p>
+      )}
     </div>
   )
 }
