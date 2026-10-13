@@ -42,3 +42,7 @@ ui-captures/
 
 # specclaw concurrency locks (per-run, never shared)
 .specclaw/changes/*/.lock/
+
+# specclaw machine-local state (version-check cache, eval journal)
+.specclaw/.update-check
+.specclaw/changes/eval/
