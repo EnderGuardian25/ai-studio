@@ -42,7 +42,7 @@ The file map:
   - **Guard:** before dropping anything, the migration raises when any `Draft` has a non-null `copyText` and no `DraftCaption` rows. A fresh DB never trips this; an old DB fails the deploy loudly instead of losing caption text.
   - The exception message names the fix: this system is fresh-start only; reset the database, or backfill on a pre-016 build first.
 - **FR-03 — The caption loader has no migrate-on-read path.**
-  - `loadDraftCaptions` reads the rows, and fills a missing registry channel with an empty PENDING row, as `store.ts:177-186` does today. Nothing else.
+  - `loadDraftCaptions` reads the rows, and fills a missing registry channel with an empty READY row (existing behaviour, kept per NFR-02; the T2 review agreed), as `store.ts:177-186` does today. Nothing else.
   - `migrationPlan.ts`, `backfill.ts`, `src/scripts/backfill-captions.ts`, the `captions:backfill` / `captions:report` scripts, the boot step in `docker-entrypoint.sh` and the esbuild step in `Dockerfile` are removed.
   - `needsReview` and `captionMigration` leave the API types, the draft GET and `CaptionPanel` (the "migrated from the old single caption" notice).
 - **FR-04 — The copy-edit status heal is removed.** `hasFinishedDesign`, `isStatusClobbered`, `healStatus` and the fields only they use are removed from `recovery.ts`, along with the call site in the draft GET.

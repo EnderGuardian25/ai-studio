@@ -16,7 +16,7 @@ import { GeneratedWith } from './GeneratedWith'
 
 export interface HeadlinePanelProps {
   draftId: string
-  /** null only on a draft migrated from the single caption. */
+  /** null until the caption call writes a valid one. */
   headline: string | null
   /** 008 FR-08: the model that wrote the headline, and the refused value it replaced. */
   headlineModel: string | null

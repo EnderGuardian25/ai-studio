@@ -56,15 +56,6 @@ RUN npx esbuild src/scheduler/worker.ts \
     --outfile=dist/scheduler/worker.js \
     --external:@prisma/client
 
-# The 012 caption backfill docker-entrypoint.sh runs after `migrate deploy`.
-# Same flags and the same reasoning as the worker bundle above.
-RUN npx esbuild src/scripts/backfill-captions.ts \
-    --bundle \
-    --platform=node \
-    --format=cjs \
-    --outfile=dist/scripts/backfill-captions.js \
-    --external:@prisma/client
-
 # ─── Stage 3: runner ─────────────────────────────────────────────────────────
 FROM node:22-alpine AS runner
 WORKDIR /app
@@ -126,8 +117,7 @@ COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 # scope copied above carries the linux-musl engines this image needs.
 COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
 
-# Copy the bundled scheduler worker and caption backfill (see the esbuild steps
-# in the builder stage).
+# Copy the bundled scheduler worker (see the esbuild step in the builder stage).
 COPY --from=builder /app/dist ./dist
 
 # Applies pending migrations, then execs CMD. chmod here rather than relying on

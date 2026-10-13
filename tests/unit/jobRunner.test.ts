@@ -77,8 +77,8 @@ function row(channel: Channel, text: string, over: Partial<Row> = {}): Row {
 let rows: Row[]
 
 // One draft row that serves both the routes' plain lookup and the caption
-// loader's select. Every registry channel has a row, so the loader neither
-// migrates nor fills in.
+// loader's select. Every registry channel has a row, so the loader fills
+// nothing in.
 function draftRow() {
   return {
     id: 'd1',
@@ -86,10 +86,8 @@ function draftRow() {
     exportUrl: 'exports/d1.png',
     status: 'EXPORTED',
     pendingAction: null,
-    captionMigration: null,
-    legacyCaptionText: null,
     updatedAt: new Date(),
-    captions: rows.map((r) => ({ ...r, needsReview: false, updatedAt: new Date() })),
+    captions: rows.map((r) => ({ ...r, updatedAt: new Date() })),
   }
 }
 

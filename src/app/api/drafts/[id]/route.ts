@@ -135,8 +135,8 @@ async function loadDraft(id: string) {
   // recovery.
   const effective = await recoverIfStuck(draft)
 
-  // The one caption reader (012 FR-13): a legacy draft is materialized here,
-  // after the sweep, so a draft it just un-stuck is no longer deferred.
+  // The one caption reader (012 FR-13), after the sweep, so a row it just
+  // settled reads settled.
   const captions = await loadDraftCaptions(id)
 
   // Surface a refine brand-kit conflict to the poll WITHOUT the stored
@@ -175,7 +175,6 @@ async function loadDraft(id: string) {
     headlineModelSubstitutedFrom: draft.headlineModelSubstitutedFrom,
     designModel: draft.designModel,
     designModelSubstitutedFrom: draft.designModelSubstitutedFrom,
-    captionMigration: captions?.captionMigration ?? null,
     captions: captions?.captions ?? [],
     captionProviderIsClaude,
     imageUrl: draft.imageUrl,
@@ -277,9 +276,8 @@ export const PATCH = withTeamAuth<Params>(async (req, { params }, user) => {
       return beingGenerated()
     }
   } else {
-    // Load first, so a legacy draft is materialized and every registry channel
-    // has its row; a PENDING row (or a deferred legacy draft's synthesized one)
-    // is being written and is refused.
+    // Load first, so every registry channel has its row; a PENDING row is
+    // being written and is refused.
     const { channel, text } = patch.value
     const loaded = await loadDraftCaptions(params.id)
     const row = loaded?.captions.find((c) => c.channel === channel)

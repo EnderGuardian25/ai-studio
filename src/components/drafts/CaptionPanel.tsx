@@ -103,7 +103,6 @@ export function CaptionPanel({
     setModelError(undefined)
   }, [setModel, setModelError])
   const headingId = useId()
-  const reviewId = useId()
   const failureId = useId()
   const helpId = useId()
   const counterId = useId()
@@ -177,7 +176,6 @@ export function CaptionPanel({
   // The field's description: the notices about it, the helper, the counter
   // and any limit warning.
   const describedBy = [
-    caption.needsReview && reviewId,
     (caption.status === 'FAILED' || lastFailed) && failureId,
     helper && helpId,
     counterId,
@@ -267,21 +265,6 @@ export function CaptionPanel({
           {pending ? <Loader2 {...ICON} className="animate-spin" /> : <Sparkles {...ICON} />} {verb}
         </Button>
       </SectionHead>
-
-      {/* Gone once the row is edited or regenerated: both clear needsReview. */}
-      {caption.needsReview && (
-        <Notice
-          id={reviewId}
-          tone="warning"
-          role="status"
-          className="mb-3"
-          icon={<AlertTriangle {...ICON} className="mt-0.5 flex-shrink-0" aria-hidden />}
-        >
-          {
-            "Migrated from the old single caption, which wasn't split by channel. Review this caption before publishing it."
-          }
-        </Notice>
-      )}
 
       {caption.status === 'FAILED' && (
         <Notice

@@ -276,7 +276,6 @@ describe('createPendingDraft', () => {
       },
     })
     expect(db.draftCreates[0]).not.toHaveProperty('headline')
-    expect(db.draftCreates[0]).not.toHaveProperty('legacyCaptionText')
   })
 })
 
@@ -356,7 +355,6 @@ describe('generateDraftForBrief (sync: scheduler, MCP, ACP)', () => {
     h.reply = json({ headline: 'H', instagram: 'IG text', whatsapp: 'WA text' })
     await generateDraftForBrief(brief, { userId: null, teamId: 'team1' })
     expect(h.pathB.mock.calls[0][2]).toBe('H')
-    expect(db.draftCreates[0]).not.toHaveProperty('legacyCaptionText')
     expect(db.draftCreates[0]).toMatchObject({
       headline: 'H',
       status: 'EXPORTED',

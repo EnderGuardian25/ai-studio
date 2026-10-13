@@ -19,7 +19,7 @@ export const PROMPT_VERSION = '2026-10-11.1'
 
 // The on-image headline block every design prompt carries (012 FR-09): the
 // one line the design prints, never a caption. It is model output (or, for a
-// migrated draft, the brief Topic), so it is fenced as untrusted data behind
+// draft without one, the brief Topic), so it is fenced as untrusted data behind
 // the guard, and capped at HEADLINE_MAX characters here, at the one point
 // where it enters a prompt, whatever the caller passes.
 export function onImageHeadline(headline: string): string {

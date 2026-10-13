@@ -3,9 +3,8 @@
 // mocked; the real tools, caption loader, resolver and extractor run. Extends
 // the Task 13 / 14b cases (the team-bound guard; generation under the team
 // Claude credential), which are kept.
-//   - getDraft: `copyText` is the Instagram caption (the A4 alias), never the
-//     legacy column; `headline`; `captions` is 3 × {channel,text,status} in
-//     registry order; a cross-team draft is still "not found";
+//   - getDraft: `copyText` is the Instagram caption (the A4 alias);
+//     `headline`; `captions` is 3 × {channel,text,status} in registry order; a cross-team draft is still "not found";
 //   - generatePost: adds `headline` and `captions`;
 //   - generate/copy: `{copyText, headline, captions}`, partial per field, and
 //     nothing is written;
@@ -96,7 +95,6 @@ const copyRoute = await import('@/app/api/generate/copy/route')
 const IG_TEXT = 'Instagram caption #launch'
 const LI_TEXT = 'LinkedIn caption, longer and more formal.'
 const WA_TEXT = 'WhatsApp *caption*'
-const LEGACY = 'THE LEGACY COMBINED CAPTION'
 
 type Row = { channel: Channel; text: string; status: 'PENDING' | 'READY' | 'FAILED'; failureReason: string | null }
 
@@ -108,8 +106,7 @@ let rows: Row[]
 let teamId: string
 
 // One draft row that serves the tools' own lookups and the caption loader's
-// select. Every registry channel has a row, so the loader neither migrates nor
-// fills in; the legacy column holds text the outputs must never return.
+// select. Every registry channel has a row, so the loader fills nothing in.
 function draftRow() {
   return {
     id: 'd1',
@@ -119,11 +116,7 @@ function draftRow() {
     exportUrl: 'exports/d1.png',
     htmlContent: '<html></html>',
     status: 'EXPORTED',
-    pendingAction: null,
-    captionMigration: null,
-    legacyCaptionText: LEGACY,
-    updatedAt: new Date(),
-    captions: rows.map((r) => ({ ...r, needsReview: false, updatedAt: new Date() })),
+    captions: rows.map((r) => ({ ...r, updatedAt: new Date() })),
   }
 }
 
@@ -166,13 +159,6 @@ describe('getDraft', () => {
       exportUrl: 'https://minio.test/signed.png',
       status: 'EXPORTED',
     })
-  })
-
-  it('never selects or returns the legacy column', async () => {
-    const out = await getDraft({ id: 'd1', teamId: 'team1' })
-    const ownSelect = h.draftFindUnique.mock.calls[0][0].select
-    expect(ownSelect).not.toHaveProperty('legacyCaptionText')
-    expect(JSON.stringify(out)).not.toContain(LEGACY)
   })
 
   it("copyText is '' when the Instagram caption is empty, and a row's status is passed through", async () => {

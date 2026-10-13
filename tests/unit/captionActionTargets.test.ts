@@ -70,12 +70,11 @@ describe('captionActionTargets', () => {
 })
 
 describe('settleCaptionRow (design §5 table, A7)', () => {
-  it('ok → READY with the new text, reason and review flag cleared, whatever was there', () => {
+  it('ok → READY with the new text and the reason cleared, whatever was there', () => {
     expect(settleCaptionRow({ text: 'old' }, { ok: true, text: 'new' })).toEqual({
       status: 'READY',
       text: 'new',
       failureReason: null,
-      needsReview: false,
     })
     expect(settleCaptionRow({ text: '' }, { ok: true, text: 'new' }).status).toBe('READY')
   })
@@ -101,10 +100,6 @@ describe('settleCaptionRow (design §5 table, A7)', () => {
       status: 'FAILED',
       text: '',
     })
-  })
-
-  it('a failure never touches the review flag (only a success or an edit clears it)', () => {
-    expect(settleCaptionRow({ text: 'x' }, { ok: false, reason: 'r' })).not.toHaveProperty('needsReview')
   })
 })
 

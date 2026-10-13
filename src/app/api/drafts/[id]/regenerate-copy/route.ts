@@ -67,9 +67,10 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
   let campaignBriefing: Awaited<ReturnType<typeof getActiveCampaignBriefing>>
   let model: ResolvedModel
   try {
-    // Materialize a legacy draft's rows BEFORE the claim marks them PENDING:
-    // on a draft with no rows yet the claim would mark nothing, and the settle
-    // would have no row to write. The rows also carry the stamps below.
+    // Load the rows BEFORE the claim marks them PENDING: the loader fills any
+    // registry channel the draft lacks, which the claim would otherwise not
+    // mark, leaving the settle no row to write. The rows also carry the stamps
+    // below.
     const loaded = await loadDraftCaptions(draft.id)
 
     // 008 FR-09: the regenerate default is the stamp of what is being replaced

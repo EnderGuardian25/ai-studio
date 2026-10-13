@@ -65,7 +65,7 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
   const campaignBriefing = await getActiveCampaignBriefing(draft.brief.campaignId)
 
   // The design reads the on-image headline, never a caption (012 FR-09). A
-  // migrated draft has none and falls back to the brief Topic, logged.
+  // draft without one falls back to the brief Topic, logged.
   const headline = designHeadline(draft, draft.brief)
 
   // 008 FR-09: like for like — the stamp tier is the model that made the

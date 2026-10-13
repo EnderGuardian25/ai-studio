@@ -21,7 +21,7 @@ This change has **5 tasks in 3 waves**, all built on `v2`. Each task is implemen
     - Leave live docs to T5, and list every doc hit in the report.
     - Fix the pre-tenancy null-`teamId` comments named in the inventory: `src/mcp/tools/generate.ts:82-84,121`, `src/mcp/tools/publish.ts:20`, `src/lib/publish/publishDraft.ts:90-91`. **Only if** they describe code being removed or a state a fresh DB can't reach; otherwise leave them.
 
-- [ ] `T2` — Drop the 012 legacy caption machinery (schema, loader, boot, API, UI, tests)
+- [x] `T2` — Drop the 012 legacy caption machinery (schema, loader, boot, API, UI, tests)
   - Files: `prisma/schema.prisma`, `prisma/migrations/<ts>_drop_legacy_captions/migration.sql` (new), `prisma/rollback/012-per-channel-captions.down.sql` (deleted), `src/lib/captions/store.ts`, `src/lib/captions/migrationPlan.ts` (deleted), `src/lib/captions/backfill.ts` (deleted), `src/scripts/backfill-captions.ts` (deleted), `package.json`, `docker-entrypoint.sh`, `Dockerfile`, `src/lib/api-types.ts`, `src/app/api/drafts/[id]/route.ts`, `src/app/api/drafts/[id]/regenerate-copy/route.ts`, `src/app/api/drafts/[id]/retry/route.ts`, `src/components/drafts/CaptionPanel.tsx`, `tests/unit/captionMigrationPlan.test.ts` (deleted), `tests/unit/captionBackfill.test.ts` (deleted), `tests/unit/legacyCaptionGuard.test.ts` (deleted), `tests/unit/captionStore.test.ts`, `tests/unit/captionRoutes.test.ts`, `tests/unit/captionWriters.test.ts`, `tests/e2e/captions.test.ts`, `tests/helpers/db.ts`
   - Estimate: large
   - Kind: migration

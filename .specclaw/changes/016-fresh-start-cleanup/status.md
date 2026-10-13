@@ -6,11 +6,11 @@
 
 ## Progress
 
-| Phase    | Status      | Notes |
-| -------- | ----------- | ----- |
-| Proposal | ✅ Approved |       |
-| Spec     | ✅ Done     |       |
-| Design   | ⏳ Pending  |       |
-| Tasks    | ✅ Done     |       |
-| Build    | ⏳ Pending  |       |
-| Verify   | ⏳ Pending  |       |
+| Phase    | Status         | Notes |
+| -------- | -------------- | ----- |
+| Proposal | ✅ Approved    |       |
+| Spec     | ✅ Done        |       |
+| Design   | ⏳ Pending     |       |
+| Tasks    | ✅ Done        |       |
+| Build    | 🔨 In-progress |       |
+| Verify   | ⏳ Pending     |       |

@@ -1,29 +1,26 @@
-// 012 T4 — the caption store (design §6): migrateDraft's transaction shape,
-// the materializer's conditions and deferral, the generation write and the
-// draft-level claim. Prisma is mocked; the planner is real.
+// 012 T4 / 016 T2 — the caption store (design §6): the loader (stored rows, and
+// a missing registry channel filled), the generation write and the draft-level
+// claim. Prisma is mocked.
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 const h = vi.hoisted(() => ({
   draftFindUnique: vi.fn(),
-  draftFindMany: vi.fn(),
   draftUpdateMany: vi.fn(),
   captionFindMany: vi.fn(),
   captionCreateMany: vi.fn(),
   captionUpdateMany: vi.fn(),
-  teamFindMany: vi.fn(),
   transaction: vi.fn(),
 }))
 
 vi.mock('@/lib/prisma', () => ({
   prisma: {
-    draft: { findUnique: h.draftFindUnique, findMany: h.draftFindMany, updateMany: h.draftUpdateMany },
+    draft: { findUnique: h.draftFindUnique, updateMany: h.draftUpdateMany },
     draftCaption: {
       findMany: h.captionFindMany,
       createMany: h.captionCreateMany,
       updateMany: h.captionUpdateMany,
     },
-    team: { findMany: h.teamFindMany },
     $transaction: h.transaction,
   },
 }))
@@ -32,8 +29,6 @@ const {
   captionRowsFromFields,
   claimCaptionAction,
   loadDraftCaptions,
-  materializeStep,
-  migrateDraft,
   saveCaptionEdit,
   saveGenerationCaptions,
   saveHeadlineEdit,
@@ -47,21 +42,8 @@ const row = (channel: string, text = '', status = 'READY') => ({
   text,
   status,
   failureReason: null,
-  needsReview: false,
   updatedAt: T,
 })
-
-function legacyDraft(over: Record<string, unknown> = {}) {
-  return {
-    status: 'EXPORTED',
-    pendingAction: null,
-    captionMigration: null,
-    legacyCaptionText: 'INSTAGRAM:\nig text\nLINKEDIN:\nli text',
-    updatedAt: T,
-    captions: [],
-    ...over,
-  }
-}
 
 beforeEach(() => {
   for (const fn of Object.values(h)) fn.mockReset()
@@ -72,187 +54,67 @@ beforeEach(() => {
   h.captionCreateMany.mockResolvedValue({ count: 3 })
   h.draftUpdateMany.mockResolvedValue({ count: 1 })
   h.captionUpdateMany.mockResolvedValue({ count: 1 })
-  h.draftFindMany.mockResolvedValue([])
-  vi.spyOn(console, 'info').mockImplementation(() => {})
-  vi.spyOn(console, 'warn').mockImplementation(() => {})
 })
 
-describe('migrateDraft — transaction shape', () => {
-  it('issues createMany(skipDuplicates) then the update guarded on captionMigration null, in ONE batch', async () => {
-    const createOp = Promise.resolve({ count: 3 })
-    const updateOp = Promise.resolve({ count: 1 })
-    h.captionCreateMany.mockReturnValue(createOp)
-    h.draftUpdateMany.mockReturnValue(updateOp)
-
-    const result = await migrateDraft('d1', 'INSTAGRAM:\nig text\nLINKEDIN:\nli text')
-
-    expect(h.transaction).toHaveBeenCalledTimes(1)
-    const ops = h.transaction.mock.calls[0][0]
-    expect(ops).toEqual([createOp, updateOp])
-    expect(ops[0]).toBe(createOp)
-    expect(ops[1]).toBe(updateOp)
-
-    expect(h.captionCreateMany).toHaveBeenCalledWith({
-      data: [
-        { draftId: 'd1', channel: 'INSTAGRAM', text: 'ig text', status: 'READY', needsReview: false },
-        { draftId: 'd1', channel: 'LINKEDIN', text: 'li text', status: 'READY', needsReview: false },
-        { draftId: 'd1', channel: 'WHATSAPP', text: '', status: 'READY', needsReview: false },
-      ],
-      skipDuplicates: true,
-    })
-    expect(h.draftUpdateMany).toHaveBeenCalledWith({
-      where: { id: 'd1', captionMigration: null },
-      data: { captionMigration: 'SPLIT' },
-    })
-    expect(result).toEqual({ outcome: 'SPLIT', written: true })
-  })
-
-  it('reports written=false when another writer already recorded the outcome', async () => {
-    h.draftUpdateMany.mockResolvedValue({ count: 0 })
-    expect(await migrateDraft('d1', 'just one caption')).toEqual({
-      outcome: 'UNSPLIT_FALLBACK',
-      written: false,
-    })
-  })
-
-  it('runs on the client it is given', async () => {
-    const db = {
-      draftCaption: { createMany: vi.fn().mockResolvedValue({ count: 3 }) },
-      draft: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) },
-      $transaction: vi.fn(async (ops: unknown[]) => Promise.all(ops)),
-    }
-    await migrateDraft('d1', '', db as never)
-    expect(db.$transaction).toHaveBeenCalledTimes(1)
-    expect(h.transaction).not.toHaveBeenCalled()
-  })
-})
-
-describe('materializeStep', () => {
-  const base = {
-    rowCount: 0,
-    legacyText: 'text',
-    captionMigration: null,
-    status: 'EXPORTED',
-    pendingAction: null,
-  } as const
-
-  it('migrates only with no rows, a legacy text and no recorded outcome', () => {
-    expect(materializeStep(base)).toBe('migrate')
-    expect(materializeStep({ ...base, legacyText: '' })).toBe('migrate')
-    expect(materializeStep({ ...base, rowCount: 1 })).toBeNull()
-    expect(materializeStep({ ...base, legacyText: null })).toBeNull()
-    expect(materializeStep({ ...base, captionMigration: 'SPLIT' })).toBeNull()
-  })
-
-  it('defers while generating or while a caption regenerate is in flight', () => {
-    expect(materializeStep({ ...base, status: 'IN_PROGRESS' })).toBe('defer')
-    expect(materializeStep({ ...base, pendingAction: 'REGENERATE_COPY' })).toBe('defer')
-    expect(materializeStep({ ...base, pendingAction: 'REGENERATE_DESIGN' })).toBe('migrate')
-    expect(materializeStep({ ...base, pendingAction: 'REFINE' })).toBe('migrate')
-    expect(materializeStep({ ...base, status: 'FAILED' })).toBe('migrate')
-  })
-})
-
-describe('loadDraftCaptions — the materializer', () => {
+describe('loadDraftCaptions (AC-03)', () => {
   it('returns null for an unknown draft', async () => {
     h.draftFindUnique.mockResolvedValue(null)
     expect(await loadDraftCaptions('nope')).toBeNull()
   })
 
-  it('migrates a legacy draft, then returns the stored rows in registry order', async () => {
-    h.draftFindUnique.mockResolvedValue(legacyDraft())
-    h.captionFindMany.mockResolvedValue([
-      row('WHATSAPP'),
-      row('LINKEDIN', 'li text'),
-      row('INSTAGRAM', 'ig text'),
-    ])
-
-    const result = await loadDraftCaptions('d1')
-
-    expect(h.transaction).toHaveBeenCalledTimes(1)
-    expect(h.captionCreateMany).toHaveBeenCalledWith(expect.objectContaining({ skipDuplicates: true }))
-    expect(result).toEqual({
-      deferred: false,
-      // The outcome this read just recorded, not the stale null it loaded.
-      captionMigration: 'SPLIT',
-      captions: [row('INSTAGRAM', 'ig text'), row('LINKEDIN', 'li text'), row('WHATSAPP')],
+  it('reads the stored rows, in registry order, and writes nothing', async () => {
+    h.draftFindUnique.mockResolvedValue({
+      captions: [row('LINKEDIN', 'b'), row('WHATSAPP', 'c', 'PENDING'), row('INSTAGRAM', 'a')],
     })
+
+    const result = await loadDraftCaptions('d1')
+
+    expect(result).toEqual({
+      captions: [row('INSTAGRAM', 'a'), row('LINKEDIN', 'b'), row('WHATSAPP', 'c', 'PENDING')],
+    })
+    expect(h.captionCreateMany).not.toHaveBeenCalled()
+    expect(h.captionFindMany).not.toHaveBeenCalled()
+    expect(h.transaction).not.toHaveBeenCalled()
+    expect(h.draftUpdateMany).not.toHaveBeenCalled()
   })
 
-  it('logs the REVIEW line for a fallback it migrated', async () => {
-    h.draftFindUnique.mockResolvedValue(legacyDraft({ legacyCaptionText: 'one caption for all' }))
-    h.captionFindMany.mockResolvedValue([row('INSTAGRAM'), row('LINKEDIN'), row('WHATSAPP')])
-    h.draftFindMany.mockResolvedValue([
-      {
-        id: 'd1',
-        teamId: 't1',
-        brief: { topic: 'Launch' },
-        posts: [{ channel: 'INSTAGRAM', scheduledAt: new Date('2026-10-12T09:00:00Z') }],
-      },
-    ])
-    h.teamFindMany.mockResolvedValue([{ id: 't1', name: 'Bistec' }])
-
+  it('selects the caption rows only — no legacy column is read (016 FR-03)', async () => {
+    h.draftFindUnique.mockResolvedValue({ captions: [] })
+    h.captionFindMany.mockResolvedValue([])
     await loadDraftCaptions('d1')
-
-    expect(h.draftFindMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({ id: 'd1', captionMigration: 'UNSPLIT_FALLBACK' }),
-      }),
-    )
-    expect(console.warn).toHaveBeenCalledWith(
-      expect.stringMatching(/^\[captions\] REVIEW draft d1 — team "Bistec", topic "Launch".*INSTAGRAM at 2026-10-12T09:00:00\.000Z/),
-    )
+    const { where, select } = h.draftFindUnique.mock.calls[0][0]
+    expect(where).toEqual({ id: 'd1' })
+    expect(Object.keys(select)).toEqual(['captions'])
   })
 
-  it.each([
-    ['IN_PROGRESS', null],
-    ['EXPORTED', 'REGENERATE_COPY'],
-  ])('defers (status %s, pendingAction %s): three synthesized PENDING rows, nothing written', async (status, pendingAction) => {
-    h.draftFindUnique.mockResolvedValue(legacyDraft({ status, pendingAction }))
+  it('fills a missing registry channel with an empty READY row, then returns one per channel', async () => {
+    h.draftFindUnique.mockResolvedValue({ captions: [row('INSTAGRAM', 'a'), row('LINKEDIN', 'b')] })
+    h.captionFindMany.mockResolvedValue([row('WHATSAPP'), row('INSTAGRAM', 'a'), row('LINKEDIN', 'b')])
 
     const result = await loadDraftCaptions('d1')
 
-    expect(result?.deferred).toBe(true)
-    expect(result?.captionMigration).toBeNull()
-    expect(result?.captions.map((c) => [c.channel, c.status, c.text])).toEqual([
-      ['INSTAGRAM', 'PENDING', ''],
-      ['LINKEDIN', 'PENDING', ''],
-      ['WHATSAPP', 'PENDING', ''],
-    ])
-    expect(h.transaction).not.toHaveBeenCalled()
-    expect(h.captionCreateMany).not.toHaveBeenCalled()
-    expect(h.draftUpdateMany).not.toHaveBeenCalled()
-  })
-
-  it('never migrates a draft that already has rows', async () => {
-    h.draftFindUnique.mockResolvedValue(
-      legacyDraft({
-        legacyCaptionText: '',
-        captions: [row('LINKEDIN', 'b'), row('INSTAGRAM', 'a'), row('WHATSAPP', 'c')],
-      }),
-    )
-    const result = await loadDraftCaptions('d1')
-    expect(h.transaction).not.toHaveBeenCalled()
-    expect(h.captionCreateMany).not.toHaveBeenCalled()
-    expect(result?.captions.map((c) => c.text)).toEqual(['a', 'b', 'c'])
-    expect(result?.captionMigration).toBeNull()
-  })
-
-  it('never re-migrates a draft with a recorded outcome; a missing channel gets an empty READY row', async () => {
-    h.draftFindUnique.mockResolvedValue(
-      legacyDraft({ captionMigration: 'SPLIT', captions: [row('INSTAGRAM', 'a'), row('LINKEDIN', 'b')] }),
-    )
-    h.captionFindMany.mockResolvedValue([row('INSTAGRAM', 'a'), row('LINKEDIN', 'b'), row('WHATSAPP')])
-
-    const result = await loadDraftCaptions('d1')
-
-    expect(h.transaction).not.toHaveBeenCalled()
-    expect(h.draftUpdateMany).not.toHaveBeenCalled()
     expect(h.captionCreateMany).toHaveBeenCalledWith({
       data: [{ draftId: 'd1', channel: 'WHATSAPP', text: '', status: 'READY' }],
       skipDuplicates: true,
     })
+    expect(result?.captions).toEqual([row('INSTAGRAM', 'a'), row('LINKEDIN', 'b'), row('WHATSAPP')])
+  })
+
+  it('fills every channel of a draft with no rows, on the client it is given', async () => {
+    const db = {
+      draft: { findUnique: vi.fn().mockResolvedValue({ captions: [] }) },
+      draftCaption: {
+        createMany: vi.fn().mockResolvedValue({ count: 3 }),
+        findMany: vi.fn().mockResolvedValue([row('INSTAGRAM'), row('LINKEDIN'), row('WHATSAPP')]),
+      },
+    }
+    const result = await loadDraftCaptions('d1', db as never)
+    expect(db.draftCaption.createMany).toHaveBeenCalledWith({
+      data: ['INSTAGRAM', 'LINKEDIN', 'WHATSAPP'].map((channel) => ({ draftId: 'd1', channel, text: '', status: 'READY' })),
+      skipDuplicates: true,
+    })
     expect(result?.captions).toHaveLength(3)
+    expect(h.draftFindUnique).not.toHaveBeenCalled()
   })
 })
 
@@ -284,7 +146,6 @@ describe('saveGenerationCaptions', () => {
           failureReason: null,
           model: 'claude-haiku-4-5',
           modelSubstitutedFrom: 'OPUS',
-          needsReview: false,
         },
       },
       {
@@ -295,7 +156,6 @@ describe('saveGenerationCaptions', () => {
           failureReason: 'empty',
           model: null,
           modelSubstitutedFrom: null,
-          needsReview: false,
         },
       },
       {
@@ -306,7 +166,6 @@ describe('saveGenerationCaptions', () => {
           failureReason: null,
           model: 'claude-haiku-4-5',
           modelSubstitutedFrom: 'OPUS',
-          needsReview: false,
         },
       },
     ])
@@ -396,7 +255,7 @@ describe('settleCaptionAction (FR-11, design §5)', () => {
     expect(h.captionUpdateMany.mock.calls.map(([a]) => a)).toEqual([
       {
         where: { draftId: 'd1', channel: 'INSTAGRAM', status: 'PENDING' },
-        data: { status: 'READY', text: 'new ig', failureReason: null, needsReview: false },
+        data: { status: 'READY', text: 'new ig', failureReason: null },
       },
       {
         where: { draftId: 'd1', channel: 'LINKEDIN', status: 'PENDING' },
@@ -451,11 +310,11 @@ describe('settlePendingCaptions (the stale sweep)', () => {
 })
 
 describe('saveCaptionEdit / saveHeadlineEdit (FR-12)', () => {
-  it('stores the text exactly as typed, READY, flags cleared, refused on a PENDING row', async () => {
+  it('stores the text exactly as typed, READY, failure cleared, refused on a PENDING row', async () => {
     expect(await saveCaptionEdit('d1', 'LINKEDIN', '  **as typed**  ')).toBe(true)
     expect(h.captionUpdateMany).toHaveBeenCalledWith({
       where: { draftId: 'd1', channel: 'LINKEDIN', status: { not: 'PENDING' } },
-      data: { text: '  **as typed**  ', status: 'READY', failureReason: null, needsReview: false },
+      data: { text: '  **as typed**  ', status: 'READY', failureReason: null },
     })
     h.captionUpdateMany.mockResolvedValue({ count: 0 })
     expect(await saveCaptionEdit('d1', 'LINKEDIN', 'x')).toBe(false)
@@ -503,7 +362,6 @@ describe('008 FR-08: settleCaptionAction stamps validated fields only', () => {
       status: 'READY',
       text: 'new ig',
       failureReason: null,
-      needsReview: false,
       model: 'claude-sonnet-5-5',
       modelSubstitutedFrom: 'claude-opus-5-5',
     })
@@ -566,11 +424,6 @@ describe('008 A6: a user edit writes no stamp field', () => {
 describe('008 FR-09: loadDraftCaptions exposes each row stamp', () => {
   it('selects model and modelSubstitutedFrom with the row (the regenerate stamp tier reads them)', async () => {
     h.draftFindUnique.mockResolvedValue({
-      status: 'EXPORTED',
-      pendingAction: null,
-      captionMigration: null,
-      legacyCaptionText: null,
-      updatedAt: T,
       captions: ['INSTAGRAM', 'LINKEDIN', 'WHATSAPP'].map((c) => ({
         ...row(c, 't'),
         model: c === 'LINKEDIN' ? 'claude-opus-5-5' : null,
@@ -581,12 +434,5 @@ describe('008 FR-09: loadDraftCaptions exposes each row stamp', () => {
     const select = h.draftFindUnique.mock.calls[0][0].select.captions.select
     expect(select).toMatchObject({ model: true, modelSubstitutedFrom: true })
     expect(loaded!.captions.map((c) => c.model)).toEqual([null, 'claude-opus-5-5', null])
-  })
-
-  it('a deferred legacy draft synthesizes rows with null stamps', async () => {
-    h.draftFindUnique.mockResolvedValue(legacyDraft({ status: 'IN_PROGRESS' }))
-    const loaded = await loadDraftCaptions('d1')
-    expect(loaded!.deferred).toBe(true)
-    for (const c of loaded!.captions) expect(c).toMatchObject({ model: null, modelSubstitutedFrom: null })
   })
 })

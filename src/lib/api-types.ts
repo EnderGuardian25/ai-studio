@@ -301,7 +301,6 @@ export interface DraftCaptionDetail {
   text: string
   status: 'PENDING' | 'READY' | 'FAILED'
   failureReason: string | null
-  needsReview: boolean
   updatedAt: string
   // 008 FR-08: the model whose output this caption is (null = unknown / none),
   // and the refused value the resolver substituted away from.
@@ -312,7 +311,7 @@ export interface DraftCaptionDetail {
 export interface DraftDetail {
   id: string
   briefId: string
-  // The on-image headline; null only on a draft migrated from the single caption.
+  // The on-image headline; null until the caption call writes a valid one.
   headline: string | null
   // 008 FR-08: the model that wrote the headline / the current design (the
   // current revision's stamp), each with the refused value it replaced. Null
@@ -321,7 +320,6 @@ export interface DraftDetail {
   headlineModelSubstitutedFrom: string | null
   designModel: string | null
   designModelSubstitutedFrom: string | null
-  captionMigration: 'SPLIT' | 'UNSPLIT_FALLBACK' | 'EMPTY' | null
   // Always one per registry channel, in registry order.
   captions: DraftCaptionDetail[]
   // 008 FR-20 / spec open question 1: whether THIS draft's caption provider

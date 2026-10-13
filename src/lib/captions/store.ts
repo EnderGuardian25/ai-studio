@@ -1,29 +1,13 @@
-// The caption store (012 FR-02/FR-04/FR-10, design §6): the only module that
-// reads or writes DraftCaption rows. Every reader gets captions through
-// loadDraftCaptions, which materializes a legacy draft (the pre-012 single
-// caption, no rows yet) BEFORE returning, so no reader ever has a "rows, or
-// else the legacy column" branch.
+// The caption store (012 FR-02/FR-10, design §6): the only module that reads
+// or writes DraftCaption rows. Every reader gets captions through
+// loadDraftCaptions, which returns one row per registry channel.
 //
-// The legacy column is the read-only, nullable Prisma field `legacyCaptionText`
-// (`@map("copyText")`, FR-03). The materializer is its only runtime reader.
-//
-// What to write is decided by pure modules (migrationPlan.ts for a legacy
-// draft, actionTargets.ts for a caption write's settle). This file only issues
-// the queries.
+// What to write is decided by a pure module (actionTargets.ts for a caption
+// write's settle). This file only issues the queries.
 
-import type {
-  CaptionMigration,
-  CaptionStatus,
-  Channel,
-  DraftAction,
-  DraftStatus,
-  PostStatus,
-  Prisma,
-  PrismaClient,
-} from '@prisma/client'
+import type { CaptionStatus, Channel, Prisma, PrismaClient } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { CAPTION_CHANNELS, type CaptionTarget } from '@/lib/channels'
-import { planCaptionMigration, type CaptionMigrationOutcome } from '@/lib/captions/migrationPlan'
 import type { FieldResult } from '@/lib/captions/extract'
 import { settleCaptionRow, type CaptionStamp } from '@/lib/captions/actionTargets'
 import { resolveCaptionForPublish, type CaptionResolution } from '@/lib/captions/resolve'
@@ -33,7 +17,6 @@ export interface CaptionRow {
   text: string
   status: CaptionStatus
   failureReason: string | null
-  needsReview: boolean
   updatedAt: Date
   /** 008 FR-08: the model whose output this row's text is (null = unknown / none). */
   model: string | null
@@ -43,10 +26,6 @@ export interface CaptionRow {
 export interface DraftCaptions {
   /** One per registry channel, in registry order. */
   captions: CaptionRow[]
-  /** True while a legacy draft waits to be migrated; its captions are synthesized. */
-  deferred: boolean
-  /** The legacy migration outcome, including one this read just recorded. */
-  captionMigration: CaptionMigration | null
 }
 
 const ROW_SELECT = {
@@ -54,75 +33,15 @@ const ROW_SELECT = {
   text: true,
   status: true,
   failureReason: true,
-  needsReview: true,
   updatedAt: true,
   model: true,
   modelSubstitutedFrom: true,
 } satisfies Prisma.DraftCaptionSelect
 
-// ── Materialization (FR-04) ─────────────────────────────────────────────────
-
-export interface MaterializeInput {
-  rowCount: number
-  legacyText: string | null
-  captionMigration: CaptionMigration | null
-  status: DraftStatus
-  pendingAction: DraftAction | null
-}
-
-// The one rule for "is this a legacy draft, and may it be migrated now?",
-// shared by the loader and the boot backfill. A legacy draft has no caption
-// rows, a legacy text and no recorded outcome. "No rows" is the key: a draft
-// created after 012 always has rows and a null legacy text. A draft still
-// being generated, or with a caption regenerate in flight (possibly an old
-// container's, which writes the legacy column), is deferred: migrating it now
-// would freeze a text that is about to change.
-export function materializeStep(d: MaterializeInput): 'migrate' | 'defer' | null {
-  if (d.rowCount > 0 || d.legacyText == null || d.captionMigration != null) return null
-  if (d.status === 'IN_PROGRESS' || d.pendingAction === 'REGENERATE_COPY') return 'defer'
-  return 'migrate'
-}
-
-// Migrate one legacy draft: the planned rows and the outcome in one
-// transaction. Idempotent and race-safe — skipDuplicates absorbs rows another
-// writer already inserted, and the outcome is set only while still null.
-// `written` is true only for the call that recorded the outcome, so a race
-// counts and logs each draft once.
-export async function migrateDraft(
-  draftId: string,
-  legacyText: string,
-  db: PrismaClient = prisma,
-): Promise<{ outcome: CaptionMigrationOutcome; written: boolean }> {
-  const plan = planCaptionMigration(legacyText)
-  const [, marked] = await db.$transaction([
-    db.draftCaption.createMany({
-      data: plan.rows.map((r) => ({ draftId, ...r })),
-      skipDuplicates: true,
-    }),
-    db.draft.updateMany({
-      where: { id: draftId, captionMigration: null },
-      data: { captionMigration: plan.outcome },
-    }),
-  ])
-  return { outcome: plan.outcome, written: marked.count === 1 }
-}
+// ── Reading ─────────────────────────────────────────────────────────────────
 
 function orderByRegistry(rows: CaptionRow[]): CaptionRow[] {
   return CAPTION_CHANNELS.flatMap(({ channel }) => rows.filter((r) => r.channel === channel))
-}
-
-// Shown while a legacy draft is deferred. Never stored.
-function synthesizePending(updatedAt: Date): CaptionRow[] {
-  return CAPTION_CHANNELS.map(({ channel }) => ({
-    channel,
-    text: '',
-    status: 'PENDING' as const,
-    failureReason: null,
-    needsReview: false,
-    updatedAt,
-    model: null,
-    modelSubstitutedFrom: null,
-  }))
 }
 
 function findRows(draftId: string, db: PrismaClient): Promise<CaptionRow[]> {
@@ -137,45 +56,13 @@ export async function loadDraftCaptions(
 ): Promise<DraftCaptions | null> {
   const draft = await db.draft.findUnique({
     where: { id: draftId },
-    select: {
-      status: true,
-      pendingAction: true,
-      captionMigration: true,
-      legacyCaptionText: true,
-      updatedAt: true,
-      captions: { select: ROW_SELECT },
-    },
+    select: { captions: { select: ROW_SELECT } },
   })
   if (!draft) return null
 
-  const step = materializeStep({
-    rowCount: draft.captions.length,
-    legacyText: draft.legacyCaptionText,
-    captionMigration: draft.captionMigration,
-    status: draft.status,
-    pendingAction: draft.pendingAction,
-  })
-  if (step === 'defer') {
-    return { captions: synthesizePending(draft.updatedAt), deferred: true, captionMigration: null }
-  }
-
-  let rows = draft.captions
-  let captionMigration = draft.captionMigration
-  if (step === 'migrate') {
-    // 'migrate' implies a non-null legacy text (materializeStep).
-    const { outcome, written } = await migrateDraft(draftId, draft.legacyCaptionText!, db)
-    // A racing reader that recorded it first planned the same text, so the
-    // outcome is the same either way.
-    captionMigration = outcome
-    if (written) {
-      console.info(`[captions] draft ${draftId} migrated on read: ${outcome}`)
-      if (outcome === 'UNSPLIT_FALLBACK') await logCaptionReview({ id: draftId }, db)
-    }
-    rows = await findRows(draftId, db)
-  }
-
   // A registry channel the draft lacks (a channel added after the draft was
   // created) gets an empty READY row, so every reader sees one per channel.
+  let rows = draft.captions
   const missing = CAPTION_CHANNELS.filter((s) => !rows.some((r) => r.channel === s.channel))
   if (missing.length > 0) {
     await db.draftCaption.createMany({
@@ -184,14 +71,14 @@ export async function loadDraftCaptions(
     })
     rows = await findRows(draftId, db)
   }
-  return { captions: orderByRegistry(rows), deferred: false, captionMigration }
+  return { captions: orderByRegistry(rows) }
 }
 
 // ── Publishing (FR-14) ──────────────────────────────────────────────────────
 
 // The publish-time decision for one channel: the draft's row for it, through
-// the loader (so a legacy draft materializes first), run through the pure
-// resolver. A missing draft has no row, so it is refused like one.
+// the loader, run through the pure resolver. A missing draft has no row, so it
+// is refused like one.
 export async function loadCaptionForPublish(
   draftId: string,
   channel: Channel,
@@ -209,64 +96,6 @@ export async function loadCaptionText(
 ): Promise<string> {
   const loaded = await loadDraftCaptions(draftId, db)
   return loaded?.captions.find((r) => r.channel === channel)?.text ?? ''
-}
-
-// ── REVIEW lines (FR-04) ────────────────────────────────────────────────────
-
-// A post that may still go out with whatever caption the draft has now.
-const LIVE_POST_STATUSES: PostStatus[] = ['SCHEDULED', 'PENDING', 'PUBLISHING']
-
-// One line per fallback-migrated draft (its caption was not split, so both
-// feeds carry the whole legacy text) that still has a live post. Matches the
-// drafts in `where` that are UNSPLIT_FALLBACK.
-export async function captionReviewLines(
-  where: Prisma.DraftWhereInput,
-  db: PrismaClient = prisma,
-): Promise<string[]> {
-  const drafts = await db.draft.findMany({
-    where: {
-      ...where,
-      captionMigration: 'UNSPLIT_FALLBACK',
-      posts: { some: { status: { in: LIVE_POST_STATUSES } } },
-    },
-    orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
-    select: {
-      id: true,
-      teamId: true,
-      brief: { select: { topic: true } },
-      posts: {
-        where: { status: { in: LIVE_POST_STATUSES } },
-        orderBy: { scheduledAt: 'asc' },
-        select: { channel: true, scheduledAt: true },
-      },
-    },
-  })
-  if (drafts.length === 0) return []
-
-  const teams = await db.team.findMany({
-    where: { id: { in: [...new Set(drafts.map((d) => d.teamId))] } },
-    select: { id: true, name: true },
-  })
-  const teamName = new Map(teams.map((t) => [t.id, t.name]))
-  return drafts.map((d) => {
-    const posts = d.posts
-      .map((p) => `${p.channel} at ${p.scheduledAt ? p.scheduledAt.toISOString() : 'unscheduled'}`)
-      .join(', ')
-    // Collapse control characters so a topic or team name can't forge a log line.
-    const oneLine = (s: string) => s.replace(/[\r\n\t\u0000-\u001f]+/g, ' ')
-    return (
-      `[captions] REVIEW draft ${d.id} — team "${oneLine(teamName.get(d.teamId) ?? d.teamId)}", ` +
-      `topic "${oneLine(d.brief.topic)}": caption not split (both feeds carry the whole legacy text); ` +
-      `live posts: ${posts}`
-    )
-  })
-}
-
-async function logCaptionReview(
-  where: Prisma.DraftWhereInput,
-  db: PrismaClient = prisma,
-): Promise<void> {
-  for (const line of await captionReviewLines(where, db)) console.warn(line)
 }
 
 // ── Writers ─────────────────────────────────────────────────────────────────
@@ -340,10 +169,7 @@ export async function saveGenerationCaptions(
   const headline = fields.HEADLINE
   await prisma.$transaction([
     ...captionRowsFromFields(fields, stamp).map(({ channel, ...data }) =>
-      prisma.draftCaption.updateMany({
-        where: { draftId, channel, status: 'PENDING' },
-        data: { ...data, needsReview: false },
-      }),
+      prisma.draftCaption.updateMany({ where: { draftId, channel, status: 'PENDING' }, data }),
     ),
     ...(headline?.ok
       ? [
@@ -361,8 +187,8 @@ export async function saveGenerationCaptions(
 // same transaction. False when another action holds the draft (the caller
 // answers 409). Released by startDraftAction as today.
 //
-// The rows must exist: call loadDraftCaptions first, so a legacy draft is
-// materialized before its rows are claimed. Otherwise the PENDING update finds
+// The rows must exist: call loadDraftCaptions first, so a channel the draft
+// lacks gets its row before it is claimed. Otherwise the PENDING update finds
 // nothing and the settle has no row to write.
 export async function claimCaptionAction(
   draftId: string,
@@ -462,8 +288,8 @@ export async function settlePendingCaptions(
 }
 
 // A user's edit to one caption (FR-12): stored exactly as typed, READY, the
-// failure and review flags cleared. Refused (false) while the row is PENDING,
-// so an edit never races the write that claimed it.
+// failure cleared. Refused (false) while the row is PENDING, so an edit never
+// races the write that claimed it.
 export async function saveCaptionEdit(
   draftId: string,
   channel: Channel,
@@ -472,7 +298,7 @@ export async function saveCaptionEdit(
 ): Promise<boolean> {
   const { count } = await db.draftCaption.updateMany({
     where: { draftId, channel, status: { not: 'PENDING' } },
-    data: { text, status: 'READY', failureReason: null, needsReview: false },
+    data: { text, status: 'READY', failureReason: null },
   })
   return count === 1
 }

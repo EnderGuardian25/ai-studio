@@ -27,15 +27,15 @@ interface RegisterUploadResponse {
 
 export async function publish(
   exportUrl: string,
-  copyText: string,
+  caption: string,
   teamId: string,
 ): Promise<{ platformId: string }> {
   // Test seam: skip the LinkedIn UGC flow. The failure path (MOCK_SOCIAL_FAIL
   // global, or a __FAIL_ALWAYS__/__FAIL_ONCE__ sentinel in the caption) drives
   // FAILED/retry coverage deterministically.
   if (MOCK_SOCIAL) {
-    if (shouldMockPublishFail(copyText)) throw new PublishError("LINKEDIN", "Mock LinkedIn publish failure")
-    return { platformId: mockPlatformId("LINKEDIN", copyText) }
+    if (shouldMockPublishFail(caption)) throw new PublishError("LINKEDIN", "Mock LinkedIn publish failure")
+    return { platformId: mockPlatformId("LINKEDIN", caption) }
   }
 
   const { accessToken, organizationId } = await resolveCredentials(teamId)
@@ -126,7 +126,7 @@ export async function publish(
     lifecycleState: "PUBLISHED",
     specificContent: {
       "com.linkedin.ugc.ShareContent": {
-        shareCommentary: { text: copyText },
+        shareCommentary: { text: caption },
         shareMediaCategory: "IMAGE",
         media: [
           {

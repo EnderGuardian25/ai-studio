@@ -34,7 +34,7 @@ export const POST = withTeamAuth<Params>(async (_req, { params }, user) => {
   // One update (one transaction): IN_PROGRESS and every caption row back to
   // PENDING, so the rerun's caption write (guarded on PENDING) lands on all
   // three (012 FR-10). createMany fills any registry channel the draft has no
-  // row for (a draft from before 012 that failed before it was migrated).
+  // row for (a channel added to the registry after the draft was created).
   await prisma.draft.update({
     where: { id: params.id },
     data: {

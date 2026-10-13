@@ -38,8 +38,6 @@ export interface CaptionRowSettle {
   status: 'READY' | 'FAILED'
   text: string
   failureReason: string | null
-  /** Set only by a successful write, which clears the migration review flag. */
-  needsReview?: false
   /**
    * 008 FR-08: the model that wrote the new text — set only by a successful
    * write given its stamp. A failed write leaves the row's stamp as it was.
@@ -75,7 +73,6 @@ export function settleCaptionRow(
       status: 'READY',
       text: field.text,
       failureReason: null,
-      needsReview: false,
       ...(stamp ? { model: stamp.model, modelSubstitutedFrom: stamp.substitutedFrom } : {}),
     }
   }

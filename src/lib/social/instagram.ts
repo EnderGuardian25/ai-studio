@@ -15,15 +15,15 @@ async function resolveCredentials(teamId: string): Promise<{ accessToken: string
 
 export async function publish(
   exportUrl: string,
-  copyText: string,
+  caption: string,
   teamId: string,
 ): Promise<{ platformId: string }> {
   // Test seam: skip the Graph API round-trip. The failure path (MOCK_SOCIAL_FAIL
   // global, or a __FAIL_ALWAYS__/__FAIL_ONCE__ sentinel in the caption) drives
   // FAILED/retry coverage deterministically.
   if (MOCK_SOCIAL) {
-    if (shouldMockPublishFail(copyText)) throw new PublishError("INSTAGRAM", "Mock Instagram publish failure")
-    return { platformId: mockPlatformId("INSTAGRAM", copyText) }
+    if (shouldMockPublishFail(caption)) throw new PublishError("INSTAGRAM", "Mock Instagram publish failure")
+    return { platformId: mockPlatformId("INSTAGRAM", caption) }
   }
 
   const { accessToken, businessAccountId } = await resolveCredentials(teamId)
@@ -40,7 +40,7 @@ export async function publish(
   // Step 1: Create media container
   const createParams = new URLSearchParams({
     image_url: exportUrl,
-    caption: copyText,
+    caption,
   })
 
   const createResponse = await fetch(`${baseUrl}/media`, {

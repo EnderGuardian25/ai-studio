@@ -106,7 +106,7 @@ export async function generatePost(args: GeneratePostArgs) {
 
 // The external caption list (012 FR-17): one `{channel, text, status}` per
 // registry channel, in registry order, WhatsApp included. Read through the
-// loader, so a legacy draft is migrated first.
+// loader, so every registry channel has its row.
 async function captionList(draftId: string) {
   const loaded = await loadDraftCaptions(draftId)
   return (loaded?.captions ?? []).map(({ channel, text, status }) => ({ channel, text, status }))

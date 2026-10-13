@@ -1,20 +1,16 @@
 import { test, expect, type Locator, type Page } from '@playwright/test'
 import { createHash } from 'node:crypto'
-import { spawnSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
-import { PrismaClient } from '@prisma/client'
 import { loginAs, waitForDraft, waitForAction, type ApiClient } from '../helpers/api'
-import { prisma, dbAvailable, readEnvTest, makeLegacyDraft } from '../helpers/db'
+import { prisma, dbAvailable } from '../helpers/db'
 import { ADMIN_EMAIL, ADMIN_PASSWORD, pageLogin } from '../helpers/ui'
 
-// §W — Per-channel captions (change 012, wave 1: AC-12 → AC-20, AC-22, AC-23,
-// AC-26; wave 2, T13: AC-21 and AC-24, at the end of this file).
+// §W — Per-channel captions (change 012, wave 1: AC-12 → AC-20, AC-22, AC-26;
+// wave 2, T13: AC-21 and AC-24, at the end of this file). The legacy-caption
+// cases (AC-23: TC-CAP-11/12/13, TC-CAP-19) were removed by 016.
 //
 // Contract (spec FR-08 → FR-17):
-//   GET /api/drafts/[id] → headline, captionMigration, captions[] (one per
-//     registry channel, INSTAGRAM, LINKEDIN, WHATSAPP, in that order), and no
-//     copyText.
+//   GET /api/drafts/[id] → headline, captions[] (one per registry channel,
+//     INSTAGRAM, LINKEDIN, WHATSAPP, in that order).
 //   POST regenerate-copy {} | {channel} | {headline:true} → 202; one
 //     draft-level REGENERATE_COPY claim, the target rows PENDING.
 //   PATCH {channel, text} | {headline}; never touches Draft.status.
@@ -38,7 +34,6 @@ type Caption = {
   text: string
   status: 'PENDING' | 'READY' | 'FAILED'
   failureReason: string | null
-  needsReview: boolean
   updatedAt: string
 }
 
@@ -101,21 +96,18 @@ test.describe('§W — per-channel captions', () => {
   })
 
   // TC-CAP-01 — AC-12 (FR-10): three READY captions and a headline.
-  test('a generated draft has a headline and three READY captions, normalised, with no copyText', async () => {
+  test('a generated draft has a headline and three READY captions, normalised', async () => {
     if (!MOCKED()) { test.skip(); return }
     const topic = `Cap Gen ${Date.now()}`
     const draft = await exportedDraft(api, topic)
 
     expect(draft.headline).toBe(`Mock headline ${topic}`)
-    expect(draft.captionMigration).toBeNull()
-    expect('copyText' in draft).toBe(false)
 
     const captions = captionsOf(draft)
     expect(captions.map((c) => c.channel)).toEqual(['INSTAGRAM', 'LINKEDIN', 'WHATSAPP'])
     for (const c of captions) {
       expect(c.status).toBe('READY')
       expect(c.failureReason).toBeNull()
-      expect(c.needsReview).toBe(false)
       expect(c.text).toContain(topic)
       expect(c.text).not.toContain('**')
     }
@@ -401,289 +393,6 @@ test.describe('§W — per-channel captions', () => {
   })
 })
 
-// ── AC-23: legacy drafts — lazy migration, the backfill, the rollback ───────
-
-// The test DB URL, and a refusal to go on with anything else: the backfill and
-// the rollback must never meet the dev DB.
-function testDbUrl(): string {
-  const url = readEnvTest('DATABASE_URL')
-  if (!url || !new URL(url).pathname.endsWith('_test')) {
-    throw new Error(`refusing to run against a non-test database (${url ? new URL(url).pathname : 'unset'})`)
-  }
-  return url
-}
-
-// .env.test's variables (absent in CI, where the workflow env carries them).
-function envTestVars(): Record<string, string> {
-  const vars: Record<string, string> = {}
-  try {
-    for (const line of readFileSync(resolve(process.cwd(), '.env.test'), 'utf8').split(/\r?\n/)) {
-      const m = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$/)
-      if (m) vars[m[1]] = m[2].replace(/^(['"])(.*)\1$/, '$2')
-    }
-  } catch {
-    // .env.test absent.
-  }
-  return vars
-}
-
-// Runs an npm script / npx command as `dotenv -o -e .env.test -- <cmd>` would:
-// .env.test wins over the runner's environment, which may carry dev values
-// (Prisma's client loads .env into it) that neither the scripts' --env-file nor
-// a plain dotenv-cli would override. DATABASE_URL is pinned explicitly, last.
-function run(cmd: string, databaseUrl: string): { status: number | null; output: string } {
-  const res = spawnSync(cmd, {
-    shell: true,
-    encoding: 'utf8',
-    env: { ...process.env, ...envTestVars(), DATABASE_URL: databaseUrl },
-    timeout: 120_000,
-  })
-  return { status: res.status, output: `${res.stdout ?? ''}${res.stderr ?? ''}` }
-}
-
-const SPLIT_LEGACY =
-  '**INSTAGRAM:** Hello IG **world** #t\n\n**LINKEDIN:** Hello LinkedIn **pro**\n\n**WHATSAPP:** Hi **WA** friends'
-const FALLBACK_LEGACY = 'One caption for both, with **bold** and #tags'
-
-test.describe('§W — legacy caption migration (AC-23)', () => {
-  let api: ApiClient
-  test.beforeEach(async ({ request }) => {
-    test.skip(!dbAvailable, 'requires test DB access')
-    api = await loginAs(request, ADMIN_EMAIL, ADMIN_PASSWORD)
-  })
-  test.afterEach(async () => {
-    await api?.dispose()
-  })
-
-  // TC-CAP-11 — legacy drafts materialize on their first read.
-  test('header-split, header-less and empty legacy drafts migrate on first GET with the planner texts', async () => {
-    if (!MOCKED()) { test.skip(); return }
-    const stamp = Date.now()
-    const split = await exportedDraft(api, `Cap Legacy Split ${stamp}`)
-    const fallback = await exportedDraft(api, `Cap Legacy Fallback ${stamp}`)
-    const empty = await exportedDraft(api, `Cap Legacy Empty ${stamp}`)
-    await makeLegacyDraft(split.id as string, SPLIT_LEGACY)
-    await makeLegacyDraft(fallback.id as string, FALLBACK_LEGACY)
-    await makeLegacyDraft(empty.id as string, '  \n ')
-
-    const read = async (d: Record<string, unknown>) => (await api.get(`/api/drafts/${d.id}`)).json()
-    const texts = (d: Record<string, unknown>) =>
-      captionsOf(d).map((c) => ({ channel: c.channel, text: c.text, status: c.status, needsReview: c.needsReview }))
-
-    const s = await read(split)
-    expect(s.captionMigration).toBe('SPLIT')
-    expect(s.headline).toBeNull()
-    expect(texts(s)).toEqual([
-      { channel: 'INSTAGRAM', text: 'Hello IG world #t', status: 'READY', needsReview: false },
-      { channel: 'LINKEDIN', text: 'Hello LinkedIn pro', status: 'READY', needsReview: false },
-      { channel: 'WHATSAPP', text: 'Hi *WA* friends', status: 'READY', needsReview: false },
-    ])
-
-    const f = await read(fallback)
-    expect(f.captionMigration).toBe('UNSPLIT_FALLBACK')
-    expect(texts(f)).toEqual([
-      { channel: 'INSTAGRAM', text: FALLBACK_LEGACY, status: 'READY', needsReview: true },
-      { channel: 'LINKEDIN', text: FALLBACK_LEGACY, status: 'READY', needsReview: true },
-      { channel: 'WHATSAPP', text: '', status: 'READY', needsReview: false },
-    ])
-
-    const e = await read(empty)
-    expect(e.captionMigration).toBe('EMPTY')
-    expect(texts(e)).toEqual([
-      { channel: 'INSTAGRAM', text: '', status: 'READY', needsReview: false },
-      { channel: 'LINKEDIN', text: '', status: 'READY', needsReview: false },
-      { channel: 'WHATSAPP', text: '', status: 'READY', needsReview: false },
-    ])
-
-    // The rows are stored, not synthesized per read; the legacy text is kept.
-    expect(await prisma!.draftCaption.count({ where: { draftId: split.id as string } })).toBe(3)
-    const kept = await prisma!.draft.findUniqueOrThrow({
-      where: { id: split.id as string },
-      select: { legacyCaptionText: true },
-    })
-    expect(kept.legacyCaptionText).toBe(SPLIT_LEGACY)
-
-    // regenerate-design on a migrated draft (headline null) uses the Topic.
-    const regen = await api.post(`/api/drafts/${split.id}/regenerate-design`, {})
-    expect(regen.status()).toBe(202)
-    const done = await waitForAction(api, split.id as string)
-    expect(done.pendingActionError).toBeNull()
-    expect(done.status).toBe('EXPORTED')
-    expect(done.currentRevisionNumber).toBe(2)
-    expect(done.headline).toBeNull()
-  })
-
-  // TC-CAP-12 — the boot backfill and its --report, run against the test DB.
-  test('captions:backfill migrates legacy drafts once, and captions:report lists a fallback with a live post', async () => {
-    if (!MOCKED()) { test.skip(); return }
-    test.setTimeout(240_000)
-    const url = testDbUrl()
-
-    // Clear any legacy draft a previous attempt left, so the counts below are this case's.
-    const clear = run('npm run captions:backfill', url)
-    expect(clear.status, clear.output).toBe(0)
-
-    const stamp = Date.now()
-    const split = await exportedDraft(api, `Cap Backfill Split ${stamp}`)
-    const fallback = await exportedDraft(api, `Cap Backfill Fallback ${stamp}`)
-    await makeLegacyDraft(split.id as string, SPLIT_LEGACY)
-    await makeLegacyDraft(fallback.id as string, FALLBACK_LEGACY)
-    const row = await prisma!.draft.findUniqueOrThrow({
-      where: { id: fallback.id as string },
-      select: { teamId: true, brief: { select: { userId: true } } },
-    })
-    const scheduledAt = new Date(Date.now() + 30 * 24 * 3600_000)
-    const post = await prisma!.post.create({
-      data: {
-        teamId: row.teamId,
-        draftId: fallback.id as string,
-        userId: row.brief.userId,
-        channel: 'LINKEDIN',
-        status: 'SCHEDULED',
-        scheduledAt,
-      },
-    })
-
-    try {
-      const first = run('npm run captions:backfill', url)
-      expect(first.status, first.output).toBe(0)
-      expect(first.output).toContain(
-        '[captions] backfill: 2 drafts — split 1, unsplit-fallback 1, empty 0, deferred 0, errors 0',
-      )
-      expect(first.output).toContain(`[captions] REVIEW draft ${fallback.id}`)
-
-      // The run wrote the test DB (not some other database): both drafts now
-      // carry their outcome and three rows.
-      for (const [d, outcome] of [
-        [split, 'SPLIT'],
-        [fallback, 'UNSPLIT_FALLBACK'],
-      ] as const) {
-        const migrated = await prisma!.draft.findUniqueOrThrow({
-          where: { id: d.id as string },
-          select: { captionMigration: true, _count: { select: { captions: true } } },
-        })
-        expect(migrated.captionMigration).toBe(outcome)
-        expect(migrated._count.captions).toBe(3)
-      }
-
-      // Idempotent: a second run writes nothing.
-      const second = run('npm run captions:backfill', url)
-      expect(second.status, second.output).toBe(0)
-      expect(second.output).toContain(
-        '[captions] backfill: 0 drafts — split 0, unsplit-fallback 0, empty 0, deferred 0, errors 0',
-      )
-
-      // --report prints the REVIEW line again, without writing.
-      const report = run('npm run captions:report', url)
-      expect(report.status, report.output).toBe(0)
-      const line = report.output.split(/\r?\n/).find((l) => l.includes(`[captions] REVIEW draft ${fallback.id}`))
-      expect(line, report.output).toBeTruthy()
-      expect(line).toContain(`LINKEDIN at ${scheduledAt.toISOString()}`)
-      expect(line).toContain(`Cap Backfill Fallback ${stamp}`)
-    } finally {
-      await prisma!.post.delete({ where: { id: post.id } })
-    }
-  })
-
-  // TC-CAP-13 — the rollback data fix (FR-06), on a scratch database.
-  //
-  // CREATE DATABASE … TEMPLATE needs the source to have no other sessions, and
-  // the running test server holds connections to the test DB. So the scratch
-  // DB is built from empty by the same `prisma migrate deploy` the test DB was
-  // (an identical schema), seeded with each shape the file must handle, and the
-  // file itself is applied with `prisma db execute`.
-  test('the down.sql leaves no NULL copyText and restores NOT NULL, and a 012 roll-forward re-applies migration 3, on a scratch database', async () => {
-    test.setTimeout(240_000)
-    const testUrl = testDbUrl()
-    const scratchName = 'bistec_studio_test_012_rollback'
-    const scratch = new URL(testUrl)
-    scratch.pathname = `/${scratchName}`
-    const scratchUrl = scratch.toString()
-
-    await prisma!.$executeRawUnsafe(`DROP DATABASE IF EXISTS "${scratchName}" WITH (FORCE)`)
-    await prisma!.$executeRawUnsafe(`CREATE DATABASE "${scratchName}"`)
-    const db = new PrismaClient({ datasources: { db: { url: scratchUrl } } })
-    try {
-      const migrate = run('npx prisma migrate deploy', scratchUrl)
-      expect(migrate.status, migrate.output).toBe(0)
-
-      const stamp = Date.now()
-      const team = await db.team.create({ data: { name: `Rollback Team ${stamp}` } })
-      const user = await db.user.create({ data: { name: 'Rollback', email: `rollback-${stamp}@example.test` } })
-      const brief = await db.brief.create({
-        data: {
-          teamId: team.id,
-          userId: user.id,
-          topic: 'Rollback',
-          goal: 'g',
-          tone: 'professional',
-          channels: ['INSTAGRAM'],
-          designMode: 'GENERATE',
-          copyProviderKey: 'cli',
-        },
-      })
-      const draft = (captions: { channel: 'INSTAGRAM' | 'LINKEDIN' | 'WHATSAPP'; text: string }[], legacy?: string) =>
-        db.draft.create({
-          data: {
-            teamId: team.id,
-            briefId: brief.id,
-            ...(legacy !== undefined && { legacyCaptionText: legacy }),
-            captions: { create: captions.map((c) => ({ ...c, status: 'READY' as const })) },
-          },
-        })
-      const native = await draft([
-        { channel: 'INSTAGRAM', text: 'IG text' },
-        { channel: 'LINKEDIN', text: 'LI text' },
-        { channel: 'WHATSAPP', text: 'WA text' },
-      ])
-      const linkedInOnly = await draft([
-        { channel: 'INSTAGRAM', text: '' },
-        { channel: 'LINKEDIN', text: 'Only LI text' },
-      ])
-      const noRows = await draft([])
-      const legacy = await draft([], 'The legacy caption')
-
-      const nullable = () => db.$queryRaw<{ is_nullable: string }[]>`
-        SELECT is_nullable FROM information_schema.columns
-        WHERE table_name = 'Draft' AND column_name = 'copyText'`
-      expect((await nullable())[0].is_nullable).toBe('YES')
-
-      const down = run(
-        `npx prisma db execute --file prisma/rollback/012-per-channel-captions.down.sql --url "${scratchUrl}"`,
-        scratchUrl,
-      )
-      expect(down.status, down.output).toBe(0)
-
-      expect((await nullable())[0].is_nullable).toBe('NO')
-      const rows = await db.$queryRaw<{ id: string; copyText: string | null }[]>`SELECT id, "copyText" FROM "Draft"`
-      expect(rows.filter((r) => r.copyText === null)).toEqual([])
-      const copyText = new Map(rows.map((r) => [r.id, r.copyText]))
-      expect(copyText.get(native.id)).toBe('IG text')
-      expect(copyText.get(linkedInOnly.id)).toBe('Only LI text')
-      expect(copyText.get(noRows.id)).toBe('')
-      expect(copyText.get(legacy.id)).toBe('The legacy caption')
-      // The table stays: what a roll-forward resumes from.
-      expect(await db.draftCaption.count()).toBe(5)
-
-      // Roll forward: down.sql un-recorded migration 3, so redeploying 012's
-      // boot `migrate deploy` re-applies it and a new draft (no copyText) saves.
-      const applied = () => db.$queryRaw<{ n: bigint }[]>`
-        SELECT count(*) AS n FROM "_prisma_migrations"
-        WHERE migration_name = '20261011140000_legacy_caption_text' AND finished_at IS NOT NULL`
-      expect(Number((await applied())[0].n)).toBe(0)
-      const forward = run('npx prisma migrate deploy', scratchUrl)
-      expect(forward.status, forward.output).toBe(0)
-      expect(Number((await applied())[0].n)).toBe(1)
-      expect((await nullable())[0].is_nullable).toBe('YES')
-      const afterForward = await draft([{ channel: 'INSTAGRAM', text: 'Created after the roll-forward' }])
-      expect(afterForward.legacyCaptionText).toBeNull()
-    } finally {
-      await db.$disconnect()
-      await prisma!.$executeRawUnsafe(`DROP DATABASE IF EXISTS "${scratchName}" WITH (FORCE)`)
-    }
-  })
-})
-
 // ── AC-17 (ACP part) and AC-26: the machine surface ─────────────────────────
 
 test.describe('§W — captions on the ACP surface', () => {
@@ -739,13 +448,10 @@ test.describe('§W — captions on the ACP surface', () => {
 
 // ── Wave 2 (T13): AC-21 (Regenerate all, the headline) and AC-24 (the panels) ─
 
-const REVIEW_NOTICE =
-  "Migrated from the old single caption, which wasn't split by channel. Review this caption before publishing it."
 const LABELS = { INSTAGRAM: 'Instagram', LINKEDIN: 'LinkedIn', WHATSAPP: 'WhatsApp' } as const
 const n = (x: number) => x.toLocaleString('en-US')
 const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 const startsWith = (s: string) => new RegExp(`^${escapeRe(s)}`)
-const mentions = (s: string) => new RegExp(escapeRe(s))
 
 // 014's AC-19 axe rules (a11y.test.ts, T18), run here over the draft page in
 // the caption states 014's own scan never sees: notices, warnings, a FAILED row
@@ -827,15 +533,15 @@ test.describe('§W — wave 2: Regenerate all, the headline and the caption pane
   })
 
   // TC-CAP-16 — AC-21 (FR-11): {headline:true} sets the headline and touches
-  // no caption. A migrated draft starts with no headline, so "set" is visible.
+  // no caption. The headline is nulled first, so "set" is visible.
   test('a headline-only regenerate sets the headline and leaves every caption row unchanged', async () => {
     if (!MOCKED()) { test.skip(); return }
     test.skip(!dbAvailable, 'requires test DB access')
     const topic = `Cap Regen HL ${Date.now()}`
     const draft = await exportedDraft(api, topic)
-    await makeLegacyDraft(draft.id as string, SPLIT_LEGACY)
-    const migrated = await read(draft.id)
-    expect(migrated.headline).toBeNull()
+    await prisma!.draft.update({ where: { id: draft.id as string }, data: { headline: null } })
+    const cleared = await read(draft.id)
+    expect(cleared.headline).toBeNull()
 
     const res = await api.post(`/api/drafts/${draft.id}/regenerate-copy`, { headline: true })
     expect(res.status()).toBe(202)
@@ -843,8 +549,8 @@ test.describe('§W — wave 2: Regenerate all, the headline and the caption pane
     expect(done.pendingActionError).toBeNull()
 
     expect(done.headline).toBe(`Mock headline ${topic}`)
-    expect(done.captions).toEqual(migrated.captions) // text, status, updatedAt: every field
-    expect(done.currentRevisionNumber).toBe(migrated.currentRevisionNumber)
+    expect(done.captions).toEqual(cleared.captions) // text, status, updatedAt: every field
+    expect(done.currentRevisionNumber).toBe(cleared.currentRevisionNumber)
   })
 
   // TC-CAP-17 — AC-24 (FR-18, FR-19): the desk's structure, names, counters
@@ -940,35 +646,6 @@ test.describe('§W — wave 2: Regenerate all, the headline and the caption pane
     expect(after.headline).toBe(beforeRegen.headline)
     await expect(field(page, 'INSTAGRAM')).toHaveValue(captionOf(beforeRegen, 'INSTAGRAM').text)
     await expect(field(page, 'LINKEDIN')).toHaveValue(liText)
-  })
-
-  // TC-CAP-19 — AC-24 (FR-19): the review notice on a migrated fallback draft.
-  // T12 review R1: the notice goes only once the panel's caption prop
-  // refreshes after the blur-save, so this asserts it on the same page, with
-  // no reload.
-  test('a header-less migrated draft shows the review notice on Instagram and LinkedIn, and editing Instagram clears only its own', async ({ page }) => {
-    if (!MOCKED()) { test.skip(); return }
-    test.skip(!dbAvailable, 'requires test DB access')
-    const draft = await exportedDraft(api, `Cap Review ${Date.now()}`)
-    await makeLegacyDraft(draft.id as string, FALLBACK_LEGACY)
-    await openDraft(page, draft.id) // the page's GET migrates it: UNSPLIT_FALLBACK
-
-    const notices = page.getByRole('status').filter({ hasText: REVIEW_NOTICE })
-    await expect(notices).toHaveCount(2)
-    await expect(field(page, 'INSTAGRAM')).toHaveAccessibleDescription(startsWith(REVIEW_NOTICE))
-    await expect(field(page, 'LINKEDIN')).toHaveAccessibleDescription(startsWith(REVIEW_NOTICE))
-    await expect(field(page, 'WHATSAPP')).not.toHaveAccessibleDescription(mentions(REVIEW_NOTICE))
-    await expectNoAxeViolations(page, '/drafts/[id] with the review notices showing')
-
-    await field(page, 'INSTAGRAM').fill('Reviewed for Instagram.')
-    await field(page, 'INSTAGRAM').blur()
-    await expect(notices).toHaveCount(1)
-    await expect(field(page, 'INSTAGRAM')).not.toHaveAccessibleDescription(mentions(REVIEW_NOTICE))
-    await expect(field(page, 'LINKEDIN')).toHaveAccessibleDescription(startsWith(REVIEW_NOTICE))
-
-    const after = await read(draft.id)
-    expect(captionOf(after, 'INSTAGRAM')).toMatchObject({ text: 'Reviewed for Instagram.', needsReview: false })
-    expect(captionOf(after, 'LINKEDIN')).toMatchObject({ text: FALLBACK_LEGACY, needsReview: true })
   })
 
   // TC-CAP-20 — AC-24 (FR-19): a FAILED row shows its error notice and Generate.

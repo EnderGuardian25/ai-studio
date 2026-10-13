@@ -87,7 +87,7 @@ beforeEach(() => {
   )
   h.draftFindUnique.mockResolvedValue(exportedDraft())
   h.resolveCopyProvider.mockResolvedValue({})
-  h.loadDraftCaptions.mockResolvedValue({ captions: [], deferred: false, captionMigration: null })
+  h.loadDraftCaptions.mockResolvedValue({ captions: [] })
   h.claimCaptionAction.mockResolvedValue(true)
   h.settleCaptionAction.mockResolvedValue(undefined)
   h.releaseDraftAction.mockResolvedValue(undefined)
@@ -192,8 +192,6 @@ describe('regenerate-copy — 008 FR-09 stamp tier, resolved before the claim', 
 
   function rows(ig: string | null, li: string | null, wa: string | null) {
     return {
-      deferred: false,
-      captionMigration: null,
       captions: [
         { channel: 'INSTAGRAM', text: 'ig', status: 'READY', model: ig, modelSubstitutedFrom: null },
         { channel: 'LINKEDIN', text: 'li', status: 'READY', model: li, modelSubstitutedFrom: null },

@@ -26,7 +26,7 @@ vi.mock('@/lib/brandkit/resolve', () => ({ resolveBrandKit: async () => null }))
 vi.mock('@/lib/storage/minio', () => ({ resolveExportUrl: async () => null }))
 vi.mock('@/lib/drafts/revisions', () => ({ COMMITTED_REVISION: {}, resolveNotAppliedOutcome: async () => null }))
 vi.mock('@/lib/captions/store', () => ({
-  loadDraftCaptions: async () => ({ captionMigration: null, captions: [] }),
+  loadDraftCaptions: async () => ({ captions: [] }),
   saveCaptionEdit: vi.fn(),
   saveHeadlineEdit: vi.fn(),
   settlePendingCaptions: vi.fn(),

@@ -59,14 +59,6 @@ enum CaptionStatus {
   FAILED
 }
 
-// How a pre-012 draft's single legacy caption became per-channel rows
-// (012 FR-05).
-enum CaptionMigration {
-  SPLIT
-  UNSPLIT_FALLBACK
-  EMPTY
-}
-
 enum PostStatus {
   PENDING
   SCHEDULED
@@ -516,13 +508,6 @@ model Draft {
   teamId          String
   briefId         String
   brief           Brief           @relation(fields: [briefId], references: [id])
-  // The pre-012 single caption (012 FR-03, A1): renamed in code only, so the
-  // column keeps the name "copyText" and the previous container keeps working
-  // during cutover. Read-only — nothing writes it (tests/unit/
-  // legacyCaptionGuard.test.ts); its one reader is captions/store.ts, which
-  // migrates it into DraftCaption rows. New drafts leave it null. Dropped in a
-  // later change.
-  legacyCaptionText String?       @map("copyText")
   imageUrl        String?
   htmlContent     String?         @db.Text
   templateId      String?
@@ -572,13 +557,9 @@ model Draft {
   backgroundSkipReason String?
   backgroundSkipDetail String?
   // The short line printed on the post image (012 FR-03/FR-09), written by the
-  // caption call. Null only on drafts migrated from a legacy caption — design
-  // then falls back to the brief topic (captions/headline.ts designHeadline).
+  // caption call. Null until it writes a valid one — design then falls back
+  // to the brief topic (captions/headline.ts designHeadline).
   headline        String?
-  // How the legacy caption became DraftCaption rows (012 FR-04/FR-05). Set
-  // once, guarded on null, by captions/store.ts migrateDraft. Null on drafts
-  // created after 012.
-  captionMigration CaptionMigration?
   // The model that wrote `headline` (008 FR-08): the arg that crossed the
   // boundary (apiId in API mode, cliArg in CLI mode). Plain TEXT, so a retired
   // or non-Claude ID is kept as history. Null = unknown (pre-008). A headline
@@ -827,9 +808,6 @@ model DraftCaption {
   // regenerate that left good text READY (A7). Cleared by the next successful
   // write or by an edit.
   failureReason String?
-  // True only on fallback-migrated Instagram/LinkedIn rows (FR-05). Cleared by
-  // an edit or a successful regenerate.
-  needsReview   Boolean       @default(false)
   // The model whose output is this row's text (008 FR-08), as plain TEXT: set
   // by the generation and a successful regenerate of this channel, left by a
   // user edit (A6) and by a failed field. Null = unknown (pre-008, or a FAILED

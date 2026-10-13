@@ -30,9 +30,9 @@ export function validateHeadline(raw: string): HeadlineResult {
   return { ok: true, text }
 }
 
-// The headline a design for an existing draft uses. A draft created after 012
-// always has one (a generation without it fails, A6); only a migrated draft has
-// `headline = null`, and it falls back to the brief Topic.
+// The headline a design for an existing draft uses. A generated draft always
+// has one (a generation without it fails, A6); a draft with `headline = null`
+// falls back to the brief Topic.
 export function designHeadline(
   draft: { headline: string | null },
   brief: { topic: string }
