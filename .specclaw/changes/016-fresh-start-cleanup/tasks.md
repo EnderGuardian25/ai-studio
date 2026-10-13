@@ -10,7 +10,7 @@ This change has **5 tasks in 3 waves**, all built on `v2`. Each task is implemen
 
 ### Wave 1 — Removals
 
-- [ ] `T1` — Delete the transfer and one-off data scripts
+- [x] `T1` — Delete the transfer and one-off data scripts
   - Files: `scripts/export-posts.mjs`, `scripts/import-posts.mjs`, `scripts/fix-data-uri-logos.mjs`, `scripts/migrate-to-teams.mjs`, `scripts/reseed-single-admin.mjs` (all deleted)
   - Estimate: small
   - Kind: refactor
