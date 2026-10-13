@@ -21,7 +21,7 @@ This change has **3 tasks in 2 waves**. Each task is implemented by a subagent, 
     - The dialog must not call `onSuccess` (which closes it) when any channel failed.
     - Add the AC-03 dialog case to `tests/e2e/publish.test.ts` (or the UI spec where the dialog is already exercised).
 
-- [ ] `T2` — Check order, and the posts list's batch caption load
+- [x] `T2` — Check order, and the posts list's batch caption load
   - Files: `src/app/api/posts/route.ts`, `src/lib/captions/store.ts`, `tests/unit/jobRunner.test.ts`, `tests/unit/captionStore.test.ts`
   - Estimate: small
   - Kind: impl

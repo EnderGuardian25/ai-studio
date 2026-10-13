@@ -31,6 +31,7 @@ const h = vi.hoisted(() => ({
   resolveExportUrl: vi.fn(),
   igPublish: vi.fn(),
   liPublish: vi.fn(),
+  captionFindMany: vi.fn(),
 }))
 
 vi.mock('@/lib/prisma', () => ({
@@ -45,7 +46,7 @@ vi.mock('@/lib/prisma', () => ({
       count: h.postCount,
     },
     draft: { findUnique: h.draftFindUnique, findUniqueOrThrow: h.draftFindUniqueOrThrow },
-    draftCaption: { createMany: vi.fn(), findMany: vi.fn() },
+    draftCaption: { createMany: vi.fn(), findMany: h.captionFindMany },
   },
 }))
 vi.mock('@/lib/storage/minio', () => ({ resolveExportUrl: h.resolveExportUrl }))
@@ -121,6 +122,10 @@ beforeEach(() => {
   h.postUpdate.mockImplementation(async ({ where, data }) => ({ id: where.id, ...data }))
   h.postCreate.mockImplementation(async ({ data }) => ({ id: 'new-post', ...data }))
   h.postFindFirst.mockResolvedValue(null)
+  // The posts list's batch read (017 FR-06): draft d1 holds `rows`; any other draft has none.
+  h.captionFindMany.mockImplementation(async ({ where }: { where: { draftId: { in: string[] } } }) =>
+    where.draftId.in.flatMap((id) => (id === 'd1' ? rows.map((r) => ({ draftId: id, channel: r.channel, text: r.text })) : [])),
+  )
 })
 
 describe('runScheduledJobs — terminal vs retryable (AC-06)', () => {
@@ -308,6 +313,41 @@ describe('posts GET routes — draft.caption', () => {
     const res = await postsRoute.GET(new Request('http://test/api/posts') as never, undefined as never)
     const body = await res.json()
     expect(body.posts.map((p: { draft: { caption: string } }) => p.draft.caption)).toEqual([IG_TEXT, LI_TEXT])
+  })
+
+  it('GET /api/posts reads every caption in one query, and a draft with no row reads as empty (017 AC-05)', async () => {
+    h.postFindMany.mockResolvedValue([
+      { id: 'p1', channel: 'INSTAGRAM', draft: { id: 'd1', exportUrl: 'k' } },
+      { id: 'p2', channel: 'LINKEDIN', draft: { id: 'd1', exportUrl: 'k' } },
+      { id: 'p3', channel: 'INSTAGRAM', draft: { id: 'd2', exportUrl: 'k' } },
+    ])
+    h.postCount.mockResolvedValue(3)
+    const res = await postsRoute.GET(new Request('http://test/api/posts') as never, undefined as never)
+    const body = await res.json()
+    expect(body.posts.map((p: { draft: { caption: string } }) => p.draft.caption)).toEqual([IG_TEXT, LI_TEXT, ''])
+    expect(h.captionFindMany).toHaveBeenCalledTimes(1)
+    expect(h.captionFindMany.mock.calls[0][0].where).toEqual({ draftId: { in: ['d1', 'd2'] } })
+    expect(h.draftFindUnique).not.toHaveBeenCalled()
+  })
+})
+
+// 017 FR-05 (AC-04): the duplicate check runs before the caption check, so a
+// double-click on a live post is a 409 even when the caption has since become
+// unpublishable.
+describe('POST /api/posts — check order (017)', () => {
+  it('a live post with a refused caption is 409 with the existing postId, not 422', async () => {
+    rows = rows.map((r) => (r.channel === 'INSTAGRAM' ? { ...r, text: '' } : r))
+    h.postFindFirst.mockResolvedValue({ id: 'live-1', status: 'PUBLISHED' })
+    const res = await postsRoute.POST(
+      new Request('http://test/api/posts', {
+        method: 'POST',
+        body: JSON.stringify({ draftId: 'd1', channel: 'INSTAGRAM' }),
+      }) as never,
+      undefined as never,
+    )
+    expect(res.status).toBe(409)
+    expect(await res.json()).toMatchObject({ postId: 'live-1', status: 'PUBLISHED' })
+    expect(h.postCreate).not.toHaveBeenCalled()
   })
 })
 

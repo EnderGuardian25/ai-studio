@@ -98,6 +98,25 @@ export async function loadCaptionText(
   return loaded?.captions.find((r) => r.channel === channel)?.text ?? ''
 }
 
+// loadCaptionText for a page of posts in one query (017 FR-06): the text keyed
+// `${draftId}/${channel}`. A missing row reads as '', the value loadCaptionText
+// returns for it; the fill is left to the single-draft readers.
+export async function loadCaptionTexts(
+  posts: readonly { draftId: string; channel: Channel }[],
+  db: PrismaClient = prisma,
+): Promise<Map<string, string>> {
+  const draftIds = [...new Set(posts.map((p) => p.draftId))]
+  const rows =
+    draftIds.length === 0
+      ? []
+      : await db.draftCaption.findMany({
+          where: { draftId: { in: draftIds } },
+          select: { draftId: true, channel: true, text: true },
+        })
+  const byKey = new Map(rows.map((r) => [`${r.draftId}/${r.channel}`, r.text]))
+  return new Map(posts.map((p) => [`${p.draftId}/${p.channel}`, byKey.get(`${p.draftId}/${p.channel}`) ?? '']))
+}
+
 // ── Writers ─────────────────────────────────────────────────────────────────
 
 // The caption stamp (008 FR-08) is defined beside the pure settle rule.

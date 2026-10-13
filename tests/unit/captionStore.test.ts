@@ -28,6 +28,7 @@ vi.mock('@/lib/prisma', () => ({
 const {
   captionRowsFromFields,
   claimCaptionAction,
+  loadCaptionTexts,
   loadDraftCaptions,
   saveCaptionEdit,
   saveGenerationCaptions,
@@ -115,6 +116,32 @@ describe('loadDraftCaptions (AC-03)', () => {
     })
     expect(result?.captions).toHaveLength(3)
     expect(h.draftFindUnique).not.toHaveBeenCalled()
+  })
+})
+
+describe('loadCaptionTexts (017 FR-06)', () => {
+  it('runs no query for an empty page', async () => {
+    expect(await loadCaptionTexts([])).toEqual(new Map())
+    expect(h.captionFindMany).not.toHaveBeenCalled()
+  })
+
+  it('reads every draft once, keys by draft and channel, and reads a missing row as empty, writing nothing', async () => {
+    h.captionFindMany.mockResolvedValue([
+      { draftId: 'd1', channel: 'INSTAGRAM', text: 'a' },
+      { draftId: 'd1', channel: 'LINKEDIN', text: 'b' },
+    ])
+
+    const texts = await loadCaptionTexts([
+      { draftId: 'd1', channel: 'INSTAGRAM' },
+      { draftId: 'd1', channel: 'LINKEDIN' },
+      { draftId: 'd1', channel: 'WHATSAPP' },
+      { draftId: 'd2', channel: 'INSTAGRAM' },
+    ])
+
+    expect(h.captionFindMany).toHaveBeenCalledTimes(1)
+    expect(h.captionFindMany.mock.calls[0][0].where).toEqual({ draftId: { in: ['d1', 'd2'] } })
+    expect(Object.fromEntries(texts)).toEqual({ 'd1/INSTAGRAM': 'a', 'd1/LINKEDIN': 'b', 'd1/WHATSAPP': '', 'd2/INSTAGRAM': '' })
+    expect(h.captionCreateMany).not.toHaveBeenCalled()
   })
 })
 
