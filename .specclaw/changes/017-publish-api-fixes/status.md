@@ -9,8 +9,8 @@
 | Phase    | Status      | Notes |
 | -------- | ----------- | ----- |
 | Proposal | ✅ Approved |       |
-| Spec     | ⏳ Pending  |       |
+| Spec     | ✅ Done     |       |
 | Design   | ⏳ Pending  |       |
-| Tasks    | ⏳ Pending  |       |
+| Tasks    | ✅ Done     |       |
 | Build    | ⏳ Pending  |       |
 | Verify   | ⏳ Pending  |       |
