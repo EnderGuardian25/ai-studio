@@ -119,31 +119,8 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
     // is an append-only log, so the live state is already the current revision —
     // we do NOT snapshot "the previous" here (doing so, plus overwriting live with
     // an unrecorded new design, is exactly what lost the regenerated design on Undo).
-    let previousRevisionNumber: number | null = draft.currentRevisionNumber ?? null
-
-    // Legacy guard: a draft created before currentRevisionNumber existed may have
-    // live content not captured as a revision. Snapshot it so Undo has a target.
-    if (previousRevisionNumber === null && draft.htmlContent) {
-      previousRevisionNumber = await withNextRevisionNumber(draft.id, async (tx, revisionNumber) => {
-        await tx.draftRevision.create({
-          data: {
-            draftId: draft.id,
-            revisionNumber,
-            instruction: 'Design before regenerate',
-            htmlSnapshot: draft.htmlContent!,
-            exportUrl: draft.exportUrl ?? '',
-            // The snapshot IS the draft's current render, so it keeps the
-            // draft's own stamp (null when the draft predates the stamps),
-            // its model included (008 FR-08).
-            promptVersion: draft.promptVersion ?? null,
-            fontSet: draft.fontSet ?? null,
-            model: draft.designModel ?? null,
-            modelSubstitutedFrom: draft.designModelSubstitutedFrom ?? null,
-          },
-        })
-        return revisionNumber
-      })
-    }
+    // Every writer of htmlContent also sets currentRevisionNumber, so a draft
+    // with a design always has its live state in the log already.
 
     // Append the NEW design as a revision and point the draft at it — so the user
     // can jump forward to it again after an Undo, not just back.

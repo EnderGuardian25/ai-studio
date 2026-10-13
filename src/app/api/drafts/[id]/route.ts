@@ -25,9 +25,6 @@ interface DraftRecoveryRow {
   pendingAction: DraftAction | null
   pendingActionError: string | null
   updatedAt: Date
-  exportUrl: string | null
-  htmlContent: string | null
-  currentRevisionNumber: number | null
 }
 
 // Applies the recovery plan (decided purely in lib/drafts/recovery.ts) and
@@ -58,21 +55,6 @@ async function recoverIfStuck(draft: DraftRecoveryRow): Promise<{
     await settlePendingCaptions(id, plan.failStuckGeneration ? STUCK_REASON : STUCK_ACTION_REASON).catch(() => {
       /* best-effort recovery */
     })
-  }
-
-  // A live post whose status was clobbered by the old copy-edit flip — restore
-  // it instead of letting the generation sweep declare it FAILED.
-  if (plan.healStatus) {
-    await prisma.draft
-      .updateMany({
-        where: { id, status, exportUrl: { not: null } },
-        data: { status: 'EXPORTED', failureReason: null },
-      })
-      .catch(() => {
-        /* best-effort recovery */
-      })
-    effective.status = 'EXPORTED'
-    effective.failureReason = null
   }
 
   // A draft stranded IN_PROGRESS by an interrupted run (e.g. a server restart)
@@ -129,10 +111,8 @@ async function loadDraft(id: string) {
   })
   if (!draft) return null
 
-  // Heal a draft whose status was clobbered while its design is intact →
-  // EXPORTED, sweep one stranded IN_PROGRESS by an interrupted run → FAILED, and
-  // clear a stale in-flight action, so the effective fields below reflect the
-  // recovery.
+  // Sweep one stranded IN_PROGRESS by an interrupted run → FAILED, and clear a
+  // stale in-flight action, so the effective fields below reflect the recovery.
   const effective = await recoverIfStuck(draft)
 
   // The one caption reader (012 FR-13), after the sweep, so a row it just

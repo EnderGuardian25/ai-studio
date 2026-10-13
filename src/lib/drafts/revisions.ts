@@ -67,7 +67,7 @@ export function modelStampOf(model: ResolvedModel | ModelStamp | null | undefine
 }
 
 // The draft's CURRENT design stamp, carried forward by a write whose HTML is
-// still that model's output (008 A6: inline edit; a pre-008 Override).
+// still that model's output (008 A6: an inline edit).
 export function draftModelStamp(draft: {
   designModel?: string | null
   designModelSubstitutedFrom?: string | null

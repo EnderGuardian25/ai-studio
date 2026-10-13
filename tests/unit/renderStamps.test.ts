@@ -195,37 +195,6 @@ describe('regenerate-design', () => {
     expect(db.draftWrites).toHaveLength(0)
   })
 
-  it("a legacy draft's 'Design before regenerate' snapshot keeps the DRAFT's own stamp (it is that render)", async () => {
-    db.draft = {
-      id: 'd1', teamId: 'team1', brief, headline: 'h', htmlContent: '<html>legacy</html>', exportUrl: 'exports/l.png',
-      currentRevisionNumber: null, promptVersion: 'pv-old', fontSet: 'fonts-old',
-      designModel: 'claude-sonnet-4-6', designModelSubstitutedFrom: 'HAIKU',
-    }
-    await regenerateDesign(req, ctx)
-    expect(db.revisionCreates).toHaveLength(2)
-    expect(db.revisionCreates[0]).toMatchObject({
-      instruction: 'Design before regenerate',
-      promptVersion: 'pv-old',
-      fontSet: 'fonts-old',
-      // 008 FR-08: the model of that render, too.
-      model: 'claude-sonnet-4-6',
-      modelSubstitutedFrom: 'HAIKU',
-    })
-    expect(db.revisionCreates[1]).toMatchObject({ instruction: 'Regenerated design', ...STAMP })
-  })
-
-  it('a legacy snapshot of an unstamped draft is null, never undefined', async () => {
-    db.draft = {
-      id: 'd1', teamId: 'team1', brief, headline: 'h', htmlContent: '<html>legacy</html>', exportUrl: 'exports/l.png',
-      currentRevisionNumber: null, promptVersion: null, fontSet: null,
-    }
-    await regenerateDesign(req, ctx)
-    expect(db.revisionCreates[0]).toHaveProperty('promptVersion', null)
-    expect(db.revisionCreates[0]).toHaveProperty('fontSet', null)
-    expect(db.revisionCreates[0]).toHaveProperty('model', null)
-    expect(db.revisionCreates[0]).toHaveProperty('modelSubstitutedFrom', null)
-  })
-
   // ── 008 FR-09: like for like — Draft.designModel is the stamp tier ────────
   const stamped = (designModel: string | null) => ({
     id: 'd1', teamId: 'team1', brief, headline: 'h', htmlContent: '<html>v1</html>', exportUrl: 'exports/v1.png',

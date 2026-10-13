@@ -284,7 +284,7 @@ describe('POST /api/posts — the up-front caption check (A10)', () => {
 })
 
 describe('posts GET routes — draft.caption', () => {
-  it("GET /api/posts/[id] returns the post channel's caption and no copyText", async () => {
+  it("GET /api/posts/[id] returns the post channel's caption and nothing else", async () => {
     h.postFindUnique.mockResolvedValue({
       id: 'p1',
       teamId: 'team1',

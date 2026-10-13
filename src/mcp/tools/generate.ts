@@ -125,9 +125,6 @@ export async function getDraft(args: { id: string; teamId: string }) {
   // exportUrl is stored as an EXPORTS object key — sign it for the caller.
   const { teamId: _teamId, ...rest } = draft
   return {
-    // Deprecated alias (A4): the Instagram caption, so pre-012 callers still
-    // get a caption, never the combined legacy text.
-    copyText: captions.find((c) => c.channel === 'INSTAGRAM')?.text ?? '',
     ...rest,
     captions,
     exportUrl: await resolveExportUrl(draft.exportUrl),

@@ -16,7 +16,7 @@ import { modelError, parseModelField } from '@/lib/models/requests'
 import { buildRefineSystemPrompt, buildRefineUserMessage } from '@/lib/agent/prompts/refine'
 import { generateBackgroundForRefine } from '@/lib/agent/background'
 import { refineSkipFields } from '@/lib/drafts/backgroundNotice'
-import { commitDraftRevision, draftModelStamp, recordRejectedRender, type ModelStamp } from '@/lib/drafts/revisions'
+import { commitDraftRevision, recordRejectedRender, type ModelStamp } from '@/lib/drafts/revisions'
 import { claimDraftAction, startDraftAction, touchDraftAction } from '@/lib/drafts/draftActions'
 import { runRefineAttempts, settleRefine } from '@/lib/drafts/refineAttempt'
 import { verifyRefine } from '@/lib/drafts/refineVerify'
@@ -27,20 +27,9 @@ interface PendingConflict {
   pendingHtml: string
   explanation: string
   // 008 A6: the refine model that wrote pendingHtml, so an Override commits
-  // with it. Absent on a conflict stored before 008.
-  model?: string | null
-  modelSubstitutedFrom?: string | null
-}
-
-// The stamp an Override commits with (A6): the model recorded with the
-// conflict, or — a pre-008 conflict, which recorded none — the draft's current
-// design model carried forward, the same rule as an inline edit.
-function overrideModelStamp(
-  pending: PendingConflict,
-  draft: { designModel: string | null; designModelSubstitutedFrom: string | null },
-): ModelStamp {
-  if (pending.model === undefined) return draftModelStamp(draft)
-  return { model: pending.model, modelSubstitutedFrom: pending.modelSubstitutedFrom ?? null }
+  // with it (the stamp an Override commits with).
+  model: string | null
+  modelSubstitutedFrom: string | null
 }
 
 interface ConflictMarker {
@@ -133,7 +122,7 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
       pending.pendingHtml,
       width,
       height,
-      overrideModelStamp(pending, draft),
+      { model: pending.model, modelSubstitutedFrom: pending.modelSubstitutedFrom },
     )
   }
 

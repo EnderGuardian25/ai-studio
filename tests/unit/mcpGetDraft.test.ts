@@ -3,11 +3,13 @@
 // mocked; the real tools, caption loader, resolver and extractor run. Extends
 // the Task 13 / 14b cases (the team-bound guard; generation under the team
 // Claude credential), which are kept.
-//   - getDraft: `copyText` is the Instagram caption (the A4 alias);
-//     `headline`; `captions` is 3 × {channel,text,status} in registry order; a cross-team draft is still "not found";
+//   - getDraft: `headline`; `captions` is 3 × {channel,text,status} in
+//     registry order; a cross-team draft is still "not found";
 //   - generatePost: adds `headline` and `captions`;
-//   - generate/copy: `{copyText, headline, captions}`, partial per field, and
-//     nothing is written;
+//   - generate/copy: `{headline, captions}`, partial per field, and nothing
+//     is written;
+//   - none of the three returns the pre-012 `copyText` alias (removed by
+//     change 016, FR-07 / AC-06);
 //   - publishPost: WhatsApp is rejected up front, with no row (FR-15); a
 //     refused caption (failed, pending, empty, over the limit) leaves one FAILED
 //     row with the resolver's reason and is never signed or sent (FR-17), in the
@@ -145,10 +147,10 @@ beforeEach(() => {
 // ── getDraft (AC-10) ────────────────────────────────────────────────────────
 
 describe('getDraft', () => {
-  it('returns copyText as the Instagram caption, the headline and 3 captions in registry order', async () => {
+  it('returns the headline and 3 captions in registry order, and no copyText', async () => {
     const out = await getDraft({ id: 'd1', teamId: 'team1' })
+    expect(out).not.toHaveProperty('copyText')
     expect(out).toEqual({
-      copyText: IG_TEXT,
       headline: 'Launch day',
       captions: [
         { channel: 'INSTAGRAM', text: IG_TEXT, status: 'READY' },
@@ -161,11 +163,12 @@ describe('getDraft', () => {
     })
   })
 
-  it("copyText is '' when the Instagram caption is empty, and a row's status is passed through", async () => {
+  it("an empty Instagram caption is returned as is, and a row's status is passed through", async () => {
     rows[0] = row('INSTAGRAM', '')
     rows[1] = row('LINKEDIN', '', { status: 'FAILED', failureReason: 'missing' })
     const out = await getDraft({ id: 'd1', teamId: 'team1' })
-    expect(out.copyText).toBe('')
+    expect(out).not.toHaveProperty('copyText')
+    expect(out.captions[0]).toEqual({ channel: 'INSTAGRAM', text: '', status: 'READY' })
     expect(out.captions[1]).toEqual({ channel: 'LINKEDIN', text: '', status: 'FAILED' })
   })
 
@@ -207,6 +210,7 @@ describe('generatePost', () => {
       userId: null,
       teamId: 'team1',
     })
+    expect(out).not.toHaveProperty('copyText')
     expect(out).toEqual({
       draftId: 'd1',
       exportUrl: 'https://minio.test/signed.png',
@@ -272,14 +276,14 @@ describe('POST /api/generate/copy', () => {
     expect(h.briefCreate).not.toHaveBeenCalled()
   }
 
-  it('returns {copyText (IG), headline, captions} for the headline and every channel, writing nothing', async () => {
+  it('returns {headline, captions} for the headline and every channel, with no copyText, writing nothing', async () => {
     const { status, body } = await post('Launch')
     expect(status).toBe(200)
     expect(h.generateCaptions.mock.calls[0][1]).toEqual(['HEADLINE', 'INSTAGRAM', 'LINKEDIN', 'WHATSAPP'])
     // 008: the CAPTION system default, resolved by the route.
     expect(h.generateCaptions.mock.calls[0][2]).toMatchObject({ surface: 'CAPTION', key: 'HAIKU', source: 'system' })
+    expect(body).not.toHaveProperty('copyText')
     expect(body).toEqual({
-      copyText: 'Mock Instagram caption [Launch]',
       headline: 'Mock headline Launch',
       captions: [
         { channel: 'INSTAGRAM', text: 'Mock Instagram caption [Launch]', status: 'READY', failureReason: null },
@@ -296,14 +300,15 @@ describe('POST /api/generate/copy', () => {
     expect(body.headline).toBeNull()
     expect(body.captions[1]).toEqual({ channel: 'LINKEDIN', text: '', status: 'FAILED', failureReason: 'missing' })
     expect(body.captions[0].status).toBe('READY')
-    expect(body.copyText).toBe(body.captions[0].text)
+    expect(body).not.toHaveProperty('copyText')
     expectNoWrites()
   })
 
-  it("copyText is '' when the Instagram caption failed", async () => {
+  it('a failed Instagram caption is reported in captions, with no copyText fallback', async () => {
     const { body } = await post('Launch __DROP_CAPTION_INSTAGRAM__')
-    expect(body.copyText).toBe('')
-    expect(body.captions[0].status).toBe('FAILED')
+    expect(body).not.toHaveProperty('copyText')
+    expect(body.headline).toMatch(/^Mock headline Launch/)
+    expect(body.captions[0]).toMatchObject({ channel: 'INSTAGRAM', text: '', status: 'FAILED' })
   })
 
   it('a provider error is still a 422 COPY_ERROR', async () => {

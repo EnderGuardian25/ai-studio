@@ -46,7 +46,7 @@ This change has **5 tasks in 3 waves**, all built on `v2`. Each task is implemen
       - remove `makeLegacyDraft`, and the "no copyText" / `needsReview:false` asserts.
     - Run the caption unit tests and `tests/e2e/captions.test.ts` against a server; the T5 gate runs everything.
 
-- [ ] `T3` — Remove the copy-edit heal, two legacy guards, the `copyText` alias and the 008 rollback
+- [x] `T3` — Remove the copy-edit heal, two legacy guards, the `copyText` alias and the 008 rollback
   - Files: `src/lib/drafts/recovery.ts`, `src/app/api/drafts/[id]/route.ts`, `src/app/api/drafts/[id]/regenerate-design/route.ts`, `src/app/api/drafts/[id]/refine/route.ts`, `src/mcp/tools/generate.ts`, `src/app/api/generate/copy/route.ts`, `prisma/rollback/008-model-selection.down.sql` (deleted), `tests/unit/draftRecovery.test.ts`, `tests/unit/mcpGetDraft.test.ts`, `tests/unit/jobRunner.test.ts`, `tests/e2e/model-selection.test.ts`, `tests/e2e/rejected-revisions.test.ts`
   - Estimate: medium
   - Kind: refactor

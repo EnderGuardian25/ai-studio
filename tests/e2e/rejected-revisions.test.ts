@@ -109,7 +109,7 @@ test.describe('§U — rejected revisions stay out of the chain', () => {
     expect(revisions.some((r) => r.instruction === REJECTED_INSTRUCTION)).toBe(false)
 
     // Draft GET: count is the chain only; pointer, status and content untouched;
-    // the lazy recovery neither heals, fails nor errors on it.
+    // the lazy recovery neither fails nor errors on it.
     const got = await (await api.get(`/api/drafts/${draft.id}`)).json()
     expect(got.revisionCount).toBe(1)
     expect(got.currentRevisionNumber).toBe(1)

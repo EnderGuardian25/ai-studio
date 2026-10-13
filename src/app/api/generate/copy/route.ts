@@ -40,8 +40,7 @@ export const POST = withTeamAuth(async (req: NextRequest, _ctx, user) => {
     const campaignBriefing = await getActiveCampaignBriefing(brief.campaignId)
 
     // Nothing is persisted (012 FR-10). Each caption reports its own result,
-    // so a partial reply still returns the fields that validated. `copyText`
-    // is the deprecated alias (A4): the Instagram caption, or ''.
+    // so a partial reply still returns the fields that validated.
     const { fields, stamp } = await writeCaptions(
       provider,
       buildBriefInput(brief, kit, campaignBriefing),
@@ -54,7 +53,6 @@ export const POST = withTeamAuth(async (req: NextRequest, _ctx, user) => {
       ({ model: _model, modelSubstitutedFrom: _from, ...row }) => row,
     )
     return NextResponse.json({
-      copyText: captions.find((c) => c.channel === 'INSTAGRAM')?.text ?? '',
       headline: fields.HEADLINE?.ok ? fields.HEADLINE.text : null,
       captions,
     })

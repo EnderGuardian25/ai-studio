@@ -47,7 +47,7 @@ The key is read **once from the `MCP_API_KEY` env var** (`server.ts:13`) but **r
 | `list_brand_kits`       | List active kits                                                                                                                                   |
 | `get_brand_kit`         | Full kit details + templates + active prompt                                                                                                       |
 | `generate_post`         | Brief → finished post (captions + headline + design → render → export). Returns `draftId`, `exportUrl`, `htmlContent`, `headline`, `captions` (§4) |
-| `get_draft`             | Fetch a draft by id: `copyText` (deprecated alias), `headline`, `captions`, `imageUrl`, `exportUrl`, `status` (§4)                                 |
+| `get_draft`             | Fetch a draft by id: `headline`, `captions`, `imageUrl`, `exportUrl`, `status` (§4)                                                                |
 | `publish_post`          | Publish a draft to Instagram / LinkedIn, with that channel's own caption (§4)                                                                      |
 
 ### Client configuration
@@ -131,15 +131,15 @@ Since 012 every draft has an on-image **headline** and **one caption per channel
 
 ### Output fields
 
-| Tool / route                            | Returns                                                                           |
-| --------------------------------------- | --------------------------------------------------------------------------------- |
-| MCP `get_draft`                         | `{ copyText, headline, captions, imageUrl, exportUrl, status }`                   |
-| MCP / ACP `generate_post`               | `{ draftId, exportUrl, htmlContent, headline, captions }` (no `copyText`)         |
-| `POST /api/generate/copy` (session API) | `{ copyText, headline, captions }`, where `captions` also carries `failureReason` |
+| Tool / route                            | Returns                                                                 |
+| --------------------------------------- | ----------------------------------------------------------------------- |
+| MCP `get_draft`                         | `{ headline, captions, imageUrl, exportUrl, status }`                   |
+| MCP / ACP `generate_post`               | `{ draftId, exportUrl, htmlContent, headline, captions }`               |
+| `POST /api/generate/copy` (session API) | `{ headline, captions }`, where `captions` also carries `failureReason` |
 
 - **`captions`** is `[{ channel, text, status }]`: always three entries, in registry order (`INSTAGRAM`, `LINKEDIN`, `WHATSAPP`), WhatsApp included. Read through the caption loader, so a legacy draft is migrated first.
 - **`headline`** is the text drawn on the image (at most 100 characters). It is null only on drafts migrated from before 012, whose designs fall back to the brief topic.
-- **`copyText` is a deprecated alias:** the **Instagram** caption's text, or `''`. It is never the old combined caption. Read `captions` instead; the alias goes when the legacy column is dropped in a later change.
+- **There is no `copyText` field.** The pre-012 alias (the Instagram caption's text) was removed by change 016. Read the channel's entry in `captions`.
 - **The ACP manifest** still advertises `generate_post`'s output as `draftId`, `exportUrl`, `htmlContent` only (`src/acp/agent.ts`); the real output has `headline` and `captions` too. Updating the advertised schema is a follow-up. Its channel enums stay `['INSTAGRAM', 'LINKEDIN']`.
 
 ### `publish_post` (MCP and ACP)

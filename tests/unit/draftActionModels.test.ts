@@ -195,16 +195,6 @@ describe('Override commits with the model the conflict recorded (A6)', () => {
     })
   })
 
-  it("a pre-008 conflict (no model recorded) carries the draft's current design stamp forward, not null", async () => {
-    h.draft = draft({
-      designModel: OPUS,
-      designModelSubstitutedFrom: 'HAIKU',
-      pendingConflict: { conflictId: 'c1', pendingHtml: '<html>p</html>', explanation: 'x' },
-    })
-    await post({ overrideConflictId: 'c1' })
-    expect(h.commit.mock.calls[0][0].model).toEqual({ model: OPUS, modelSubstitutedFrom: 'HAIKU' })
-  })
-
   it('a conflict that recorded a null model stays null (it was recorded, as unknown)', async () => {
     h.draft = draft({
       pendingConflict: { conflictId: 'c1', pendingHtml: '<html>p</html>', explanation: 'x', model: null, modelSubstitutedFrom: null },
