@@ -8,6 +8,6 @@
     "design": { "status": "done", "at": "2026-09-15T06:42:05Z" },
     "tasks": { "status": "done", "at": "2026-09-15T06:43:12Z" },
     "build": { "status": "in-progress", "at": "2026-09-27T12:26:05Z" },
-    "verify": { "status": "partial", "at": "2026-10-01T14:45:12Z", "verdict": "PARTIAL" }
+    "verify": { "status": "passed", "at": "2026-10-13T11:02:39Z", "verdict": "PASS" }
   }
 }

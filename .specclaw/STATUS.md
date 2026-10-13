@@ -1,7 +1,7 @@
 # 🦞 SpecClaw Dashboard
 
 **Project:** bistec-studio
-**Last Updated:** 2026-10-13 10:44 UTC
+**Last Updated:** 2026-10-13 11:02 UTC
 
 _1 unnumbered change · run `/specclaw:renumber` to order them_
 
@@ -10,7 +10,7 @@ _1 unnumbered change · run `/specclaw:renumber` to order them_
 - 🔨 **001-marketing-post-studio-v1** — 18/29 tasks (62%) | 0 failed
 - ✅ **002-brief-draft-recovery** — 6/6 tasks (100%) | 0 failed
 - ✅ **003-async-draft-actions** — 12/12 tasks (100%) | 0 failed
-- 🔍 **004-design-instruction-fidelity** — verify PARTIAL | 23/24 tasks (95%) | 0 failed | 75h58m
+- 🔍 **004-design-instruction-fidelity** — verify PASS | 23/24 tasks (95%) | 0 failed | 369h59m
 - 🔍 **005-provider-flexibility-onboarding** — verify PASS | 10/10 tasks (100%) | 0 failed | 122h0m
 - 🔍 **008-model-selection** ▣ — verify PASS | 19/19 tasks (100%) | 0 failed | 27h54m
 - 🔍 **011-app-visual-redesign** — verify PASS | 13/13 tasks (100%) | 0 failed | 59h23m

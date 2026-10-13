@@ -2,7 +2,7 @@
 
 **Verified:** 2026-10-01
 **Model:** Claude Opus 5.5 (claude-opus-5-5[1m])
-**Verdict:** PASS (as of 2026-10-09, after the Phase 0 closure in the fork; it was PARTIAL on 2026-10-01)
+**Verdict:** PASS (re-verified 2026-10-13 at `e88b55b6`, see the last section; PASS since the 2026-10-09 Phase 0 closure; PARTIAL on 2026-10-01)
 
 **Update (2026-10-09):** Phase 0 is now closed in the fork. AC-P0-3 and AC-P0-5 pass on the merged `v2`. AC-P0-1 and AC-P0-2 are superseded by change 013, because the fork has no deploy target. **AC-P0-4 passes:** the first `v2` CI run ([run 37886671270](https://github.com/EnderGuardian25/ai-studio/actions/runs/37886671270), all 3 jobs green) shows no Node-20 deprecation annotation. See "Phase 0 closure in the fork (2026-10-09)" at the end. The original 2026-10-01 verdict and reasons are kept below for history.
 
@@ -334,3 +334,30 @@ The deferred can-wait items are in `.superpowers/sdd/tasks/final-{1,2,3}-review.
 - ✅ **AC-P0-4: no Node-20 deprecation warnings.** The first `v2` CI run, [run 37886671270](https://github.com/EnderGuardian25/ai-studio/actions/runs/37886671270) (2026-10-09, `cc92ba0a`): e2e, unit and build all ✓. Its only annotations are GitHub's notice that `ubuntu-latest` moves to Ubuntu 26 from 2026-10-19. There is no Node-20 deprecation annotation. `docker-publish.yml` no longer exists, so `e2e.yml` is the only workflow to check.
 
 **Phase 0 now:** 3 passed, 2 superseded. **Verdict: PASS.** Phases 1–3 were already 29/29 after the F3 addendum (AC-04).
+
+## Re-verification at HEAD (2026-10-13)
+
+The user asked for 004 to be tested again now that fork CI is green. Changes 008, 012 and 015 landed after the 2026-10-09 closure, so every 004 gate was re-run at `e88b55b6` (v2 HEAD; the last code commit is `b36be415`).
+
+**Local (`specclaw-verify collect`, plus the render harness):**
+
+- lint: passed (0 errors; the 7 known warnings);
+- unit: **2604/2604** (93 files);
+- build: passed;
+- `npm run test:render` (004's real-Chromium render-fidelity harness): **15/15**.
+
+**Fork CI, [run 38385695969](https://github.com/EnderGuardian25/ai-studio/actions/runs/38385695969) at `e88b55b6`: all 3 jobs green.**
+
+- e2e: **391 passed, 3 skipped** (the intentional TC-REG-H11a/b/c), 0 failed, 0 flaky. This includes 004's Phase 1–3 E2E cases: the rejected-revision / "Use anyway" suite, the font-set and render-stamp cases, and the refine not-applied cases.
+- unit: 2604/2604.
+- build: passed, including the render-fidelity harness (15/15, real Chromium) and `docker build`.
+- Annotations: only GitHub's "ubuntu-latest migrates to Ubuntu 26 from 2026-10-19" notice. **No Node-20 deprecation annotation** (AC-P0-4 still holds).
+
+**Phase 0 code, rechecked at HEAD:**
+
+- `src/app/api/health/route.ts` exists (AC-P0-3);
+- every `Dockerfile` stage is `node:22-alpine`, and `engines.node` is `>=22` (AC-P0-5).
+
+**T1 (Coolify token rotation)** stays deferred: it belongs to the company deploy pipeline, which the fork removed (change 013). It is the only task not complete, which is why the change reads 23/24.
+
+**Result:** Phases 1–3 29/29; Phase 0: 3 passed, 2 superseded. **Verdict: PASS.**

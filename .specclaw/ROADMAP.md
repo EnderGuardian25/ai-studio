@@ -1,7 +1,9 @@
 # bistec-studio roadmap — changes 004–012
 
 **Updated:** 2026-09-23 · **Branch:** all of this lands on `v2` (see Branching at the bottom); handoff in `docs/handoff.md` top section.
-**Status (2026-10-13):** **008** (model selection) is **built, 19/19**, on `v2`. Wave 1 (catalogue, resolver, `/team` → Models, stamps, time budget) gated at 383/3/0/0 with CI green; wave 2 (the pickers) gated at 391/3/0/0. T2, the operator CLI full-ID check, passed. **Next: `/specclaw:verify 008-model-selection`.** Handoff and the 008 runbook: `docs/handoff.md` top section.
+**Status (2026-10-13, later):** **004** re-verified PASS at `e88b55b6` (CI green: E2E 391/3/0/0, unit 2604, render 15/15). **008** is **verified PASS** (32/32). The new system starts teams and users fresh, so the post export/import scripts are dropped. Next: a fresh-start cleanup of old-data-only code, then the post-008 follow-ups, then 006/007/009/010.
+
+**(Superseded) Status (2026-10-13):** **008** (model selection) is **built, 19/19**, on `v2`. Wave 1 (catalogue, resolver, `/team` → Models, stamps, time budget) gated at 383/3/0/0 with CI green; wave 2 (the pickers) gated at 391/3/0/0. T2, the operator CLI full-ID check, passed. **Next: `/specclaw:verify 008-model-selection`.** Handoff and the 008 runbook: `docs/handoff.md` top section.
 
 **(Superseded) Status (2026-10-12, later):** **015** (the draft-page settle race behind the red fork CI) is verified PASS, and fork CI on `v2` is green again. **008** (model selection) is **approved (architectural)** after a deep party panel; its rulings are recorded in its proposal and **planning is in progress**. Work lands directly on `v2`, with no per-change PRs; one `v2`→`main` PR follows later, on request.
 
@@ -15,17 +17,17 @@ This file sequences the open changes. Each change's own `proposal.md` is the sou
 
 ## The changes
 
-| #   | Change                                                                            | What it fixes / adds                                                                        | Size         | State                                      |
-| --- | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | ------------ | ------------------------------------------ |
-| 004 | [Design instruction fidelity](changes/004-design-instruction-fidelity/)           | Refine edits that don't stick; tofu glyphs; a real-render test harness                      | medium       | ✅ built — verify PARTIAL (Phase 0 on #42) |
-| 005 | [Provider flexibility + onboarding](changes/005-provider-flexibility-onboarding/) | Guided Claude connect; COPY provider route; `isDefault` image bug; Gemini; CLI sandbox      | medium       | ✅ built 10/10 — verify PASS (2026-10-06)  |
-| 006 | [Product observability](changes/006-product-observability/)                       | Self-hosted PostHog, generation traces, scheduler heartbeat, stale-export badge             | large        | 📋 proposal                                |
-| 007 | [Brand-kit design system](changes/007-brandkit-design-system/)                    | Turn adjectival kit prose into measurable rules; typography dataset                         | medium-large | 📋 proposal                                |
-| 008 | [Model selection](changes/008-model-selection/)                                   | Choose Haiku / Sonnet / Opus per caption, design, refine and assistant chat                 | medium-large | ✅ built 19/19 — verify next               |
-| 009 | [Hero imagery](changes/009-hero-image-design/)                                    | Image model makes the hero subject, not wallpaper; layout archetypes; reference images      | large        | 📋 proposal (new)                          |
-| 010 | [WhatsApp Channel posting](changes/010-whatsapp-channel-posting/)                 | WhatsApp as a channel, with assisted handoff (Meta has no official Channel posting API)     | medium       | 📋 proposal (new)                          |
-| 011 | [App visual redesign](changes/011-app-visual-redesign/)                           | New visual direction; opaque surfaces; floating bottom-right **Create post** button         | large        | 🔨 wave 1 built (T1–T2) — awaiting pick    |
-| 012 | [Per-channel captions](changes/012-per-channel-captions/)                         | Instagram / LinkedIn / WhatsApp captions, each published to its own channel; copy → caption | medium       | ✅ verified PASS (28/28)                   |
+| #   | Change                                                                            | What it fixes / adds                                                                        | Size         | State                                     |
+| --- | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | ------------ | ----------------------------------------- |
+| 004 | [Design instruction fidelity](changes/004-design-instruction-fidelity/)           | Refine edits that don't stick; tofu glyphs; a real-render test harness                      | medium       | ✅ verified PASS (re-run 2026-10-13)      |
+| 005 | [Provider flexibility + onboarding](changes/005-provider-flexibility-onboarding/) | Guided Claude connect; COPY provider route; `isDefault` image bug; Gemini; CLI sandbox      | medium       | ✅ built 10/10 — verify PASS (2026-10-06) |
+| 006 | [Product observability](changes/006-product-observability/)                       | Self-hosted PostHog, generation traces, scheduler heartbeat, stale-export badge             | large        | 📋 proposal                               |
+| 007 | [Brand-kit design system](changes/007-brandkit-design-system/)                    | Turn adjectival kit prose into measurable rules; typography dataset                         | medium-large | 📋 proposal                               |
+| 008 | [Model selection](changes/008-model-selection/)                                   | Choose Haiku / Sonnet / Opus per caption, design, refine and assistant chat                 | medium-large | ✅ verified PASS (32/32)                  |
+| 009 | [Hero imagery](changes/009-hero-image-design/)                                    | Image model makes the hero subject, not wallpaper; layout archetypes; reference images      | large        | 📋 proposal (new)                         |
+| 010 | [WhatsApp Channel posting](changes/010-whatsapp-channel-posting/)                 | WhatsApp as a channel, with assisted handoff (Meta has no official Channel posting API)     | medium       | 📋 proposal (new)                         |
+| 011 | [App visual redesign](changes/011-app-visual-redesign/)                           | New visual direction; opaque surfaces; floating bottom-right **Create post** button         | large        | 🔨 wave 1 built (T1–T2) — awaiting pick   |
+| 012 | [Per-channel captions](changes/012-per-channel-captions/)                         | Instagram / LinkedIn / WhatsApp captions, each published to its own channel; copy → caption | medium       | ✅ verified PASS (28/28)                  |
 
 ## Hard dependencies
 
