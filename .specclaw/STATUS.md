@@ -1,7 +1,7 @@
 # 🦞 SpecClaw Dashboard
 
 **Project:** bistec-studio
-**Last Updated:** 2026-10-13 16:42 UTC
+**Last Updated:** 2026-10-13 16:59 UTC
 
 _1 unnumbered change · run `/specclaw:renumber` to order them_
 
@@ -18,8 +18,8 @@ _1 unnumbered change · run `/specclaw:renumber` to order them_
 - 🔍 **013-fork-ci-checks-only** ▫ — verify PASS | 3/3 tasks (100%) | 0 failed | 13h13m
 - 🔍 **014-ui-a11y-consistency-pass** ▣ — verify PASS | 18/18 tasks (100%) | 0 failed | 42h45m
 - 🔍 **015-draft-action-settle-race** ▫ — verify PASS | 3/3 tasks (100%) | 0 failed | 25m
-- 🔨 **016-fresh-start-cleanup** ▫ — build in-progress | 5/5 tasks (100%) | 0 failed | 2m
-- 📝 **017-publish-api-fixes** ▫ — tasks done | 0/3 tasks (0%) | 0 failed
+- 🔍 **016-fresh-start-cleanup** ▫ — verify PASS | 5/5 tasks (100%) | 0 failed | 2m
+- 🔨 **017-publish-api-fixes** ▫ — build in-progress | 0/3 tasks (0%) | 0 failed
 
 ## Pending Proposals
 

@@ -4,7 +4,7 @@ This repo contains planning documents for **bistec-studio**, an internal marketi
 
 ## ✅ Outstanding work — START HERE (updated 2026-10-13)
 
-- **⏸️ 2026-10-13 (latest) — PICK UP HERE: **016 fresh-start cleanup is BUILT 5/5 (full clean mock E2E 386/3/0/0, build green); verify next, then 017.** The new system starts FRESH (no data import, user decision). 004 re-verified PASS at `e88b55b6` (CI green). Changes 016–020 are approved (bounded) and build one at a time: 016 fresh-start cleanup → 017 publish fixes → 018 small fixes → 019 claim token → 020 Create post button off the draft page.** Full detail: [`docs/handoff.md`](docs/handoff.md) top section.
+- **⏸️ 2026-10-13 (latest) — PICK UP HERE: **016 fresh-start cleanup is BUILT 5/5 and VERIFIED PASS (E2E 386/3/0/0; CI green, run 38432519271); 017 building.** The new system starts FRESH (no data import, user decision). 004 re-verified PASS at `e88b55b6` (CI green). Changes 016–020 are approved (bounded) and build one at a time: 016 fresh-start cleanup → 017 publish fixes → 018 small fixes → 019 claim token → 020 Create post button off the draft page.** Full detail: [`docs/handoff.md`](docs/handoff.md) top section.
   - **Decisions:**
     - no import or carry-over; `import-posts` is won't-fix and both scripts are deleted in 016;
     - no pre-made "Bistec" team on fresh systems;
