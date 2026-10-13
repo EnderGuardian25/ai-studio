@@ -1,16 +1,19 @@
 'use client'
 
-import React, { useEffect, useId, useImperativeHandle, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useId, useImperativeHandle, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { Loader2, Check, AlertTriangle, Copy, Sparkles, Undo2 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { SectionHead } from '@/components/ui/SectionHead'
 import { Notice } from '@/components/ui/Notice'
+import { ModelPicker } from '@/components/ui/ModelPicker'
 import { ICON } from '@/components/ui/folio'
 import { apiFetch } from '@/lib/apiFetch'
 import { captionLength, captionSpec } from '@/lib/channels'
 import { useUndoableAction } from '@/lib/hooks/useUndoableAction'
 import type { DraftCaptionDetail } from '@/lib/api-types'
+import type { ModelKey } from '@/lib/models/catalogue'
+import { GeneratedWith } from './GeneratedWith'
 
 // The ruled caption field (DESIGN_SYSTEM.md §8.3): a 1 px --line-subtle rule
 // every 26 px, scrolling with the text. Only captions are ruled.
@@ -53,6 +56,10 @@ export interface CaptionUndoHandle {
   flush: () => Promise<void>
 }
 
+/** A regenerate's answer. A refused model pick (400 MODEL_NOT_ALLOWED) carries
+ *  its message, which the firing panel shows on its picker (008 FR-20). */
+export type RegenerateResult = { ok: true } | { ok: false; modelError: string | null }
+
 export interface CaptionPanelProps {
   draftId: string
   caption: DraftCaptionDetail
@@ -60,8 +67,11 @@ export interface CaptionPanelProps {
   ready: boolean
   /** Any action is firing or running on the draft (single-flight, A2). */
   locked: boolean
-  /** Fires this channel's regenerate; resolves false when it was refused. */
-  onRegenerate: () => Promise<boolean>
+  /** Whether this draft's own caption provider is Claude (GET /api/drafts/[id]),
+   *  so the picker hides exactly when the server would refuse a pick. */
+  captionProviderIsClaude?: boolean
+  /** Fires this channel's regenerate, with the model pick when one was made (A5). */
+  onRegenerate: (model?: ModelKey) => Promise<RegenerateResult>
   undoRef?: React.Ref<CaptionUndoHandle>
   /** Called after an edit is saved, so the parent refetches the draft. */
   onSaved: () => void
@@ -78,11 +88,20 @@ export function CaptionPanel({
   caption,
   ready,
   locked,
+  captionProviderIsClaude,
   onRegenerate,
   undoRef,
   onSaved,
 }: CaptionPanelProps) {
   const spec = captionSpec(caption.channel)
+  // 008 FR-20: this channel's model pick (undefined = the stamp's pre-selection,
+  // A5) and a refused pick's 400 message.
+  const [model, setModel] = useState<ModelKey | undefined>(undefined)
+  const [modelError, setModelError] = useState<string | undefined>(undefined)
+  const pickModel = useCallback((next: ModelKey | undefined) => {
+    setModel(next)
+    setModelError(undefined)
+  }, [setModel, setModelError])
   const headingId = useId()
   const reviewId = useId()
   const failureId = useId()
@@ -194,7 +213,12 @@ export function CaptionPanel({
     // target BEFORE firing, and put the previous one back if refused.
     await flushSave()
     const revert = captureUndo()
-    if (!(await onRegenerate())) revert()
+    setModelError(undefined)
+    const result = await onRegenerate(model)
+    if (!result.ok) {
+      revert()
+      if (result.modelError) setModelError(result.modelError)
+    }
   }
 
   async function copy() {
@@ -333,6 +357,28 @@ export function CaptionPanel({
             </p>
           )}
         </>
+      )}
+
+      {/* The panel's tail (008 FR-20): the model that wrote this caption (not
+          while it is rewritten, and not for a FAILED row, whose stamp may
+          belong to text since cleared), then this channel's regenerate model,
+          pre-selected from that stamp (FR-09). */}
+      {!pending && caption.status !== 'FAILED' && (
+        <GeneratedWith stamp={caption.model} substitutedFrom={caption.modelSubstitutedFrom} className="mt-2" />
+      )}
+      {ready && (
+        <ModelPicker
+          id={`draft-caption-model-${caption.channel.toLowerCase()}`}
+          surface="CAPTION"
+          context={{ stamp: caption.model }}
+          value={model}
+          onChange={pickModel}
+          label={`${spec.label} caption model`}
+          disabled={locked || undo.undoing}
+          captionProviderIsClaude={captionProviderIsClaude}
+          error={modelError}
+          className="mt-3 sm:max-w-xs"
+        />
       )}
     </div>
   )

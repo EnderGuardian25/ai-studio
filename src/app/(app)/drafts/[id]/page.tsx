@@ -25,15 +25,19 @@ import { CaptionPanels } from '@/components/drafts/CaptionPanels'
 import { RefinementPanel } from '@/components/drafts/RefinementPanel'
 import { InlineEditModal } from '@/components/drafts/InlineEditModal'
 import { BackgroundNotice } from '@/components/drafts/BackgroundNotice'
+import { GeneratedWith } from '@/components/drafts/GeneratedWith'
+import { ModelPicker } from '@/components/ui/ModelPicker'
 import { PageTitle } from '@/components/ui/PageHead'
 import { EYEBROW, FOCUS, ICON, SMALL_CAPS, SUB_HEAD } from '@/components/ui/folio'
-import { apiFetch } from '@/lib/apiFetch'
+import { ApiError, apiFetch } from '@/lib/apiFetch'
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser'
 import { useUndoableAction } from '@/lib/hooks/useUndoableAction'
 import type { DraftDetail } from '@/lib/api-types'
 import { ASPECT_LABELS, aspectClassFor, dimensionsFor } from '@/lib/aspectRatio'
 import { channelLabel } from '@/lib/channels'
 import { formatDateTime } from '@/lib/format'
+import type { ModelKey } from '@/lib/models/catalogue'
+import { generatedWith } from '@/lib/models/stampLabel'
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -43,6 +47,10 @@ interface Revision {
   instruction: string
   exportUrl: string | null
   createdAt: string
+  // 008 FR-16: the model whose output this version's HTML is (null = unknown).
+  model: string | null
+  // …and the refused value it replaced, or null (FR-20's "(substituted)").
+  modelSubstitutedFrom: string | null
 }
 
 const STATUS_TO_CHIP: Record<DraftDetail['status'], 'draft' | 'exported' | 'published' | 'failed'> = {
@@ -80,6 +88,14 @@ export default function DraftDetailPage() {
   const [showPreview, setShowPreview] = useState(false)
   const [showInlineEdit, setShowInlineEdit] = useState(false)
   const [regenDesign, setRegenDesign] = useState(false)
+  // 008 FR-20: the design regenerate's model pick (undefined = the current
+  // design's stamp, A5) and a refused pick's 400 message.
+  const [designModel, setDesignModel] = useState<ModelKey | undefined>(undefined)
+  const [designModelError, setDesignModelError] = useState<string | undefined>(undefined)
+  const pickDesignModel = useCallback((next: ModelKey | undefined) => {
+    setDesignModel(next)
+    setDesignModelError(undefined)
+  }, [])
   // Snapshot = revisionNumber of the design taken before the last regenerate (Undo target).
   const designUndo = useUndoableAction<number>(async (rev) => {
     await apiFetch(`/api/drafts/${draftId}/revisions/${rev}/restore`, { method: 'POST' })
@@ -186,17 +202,33 @@ export default function DraftDetailPage() {
     // The action runs in the background (202, no payload) — capture the Undo
     // target (the revision we're on right now) BEFORE firing. Legacy drafts
     // without a revision pointer have nothing to undo to.
+    const previousUndo = designUndo.snapshot
     if (draft.currentRevisionNumber != null) {
       designUndo.capture(draft.currentRevisionNumber)
     } else {
       designUndo.clear()
     }
+    setDesignModelError(undefined)
     try {
-      await apiFetch(`/api/drafts/${draftId}/regenerate-design`, { method: 'POST' })
+      // {} or { model }: an undefined pick is dropped, so the server resolves
+      // the stamp default (A5).
+      await apiFetch(`/api/drafts/${draftId}/regenerate-design`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: designModel }),
+      })
       // Refetch immediately to pick up pendingAction; the poll takes over.
       await fetchDraft()
     } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : 'Failed to regenerate design')
+      // A refused model pick (400, nothing claimed) shows on the design
+      // picker, not as a toast, and puts back the Undo target it replaced.
+      if (e instanceof ApiError && e.code === 'MODEL_NOT_ALLOWED') {
+        setDesignModelError(e.message)
+        if (previousUndo === null) designUndo.clear()
+        else designUndo.capture(previousUndo)
+      } else {
+        toast.error(e instanceof Error ? e.message : 'Failed to regenerate design')
+      }
     } finally {
       setRegenDesign(false)
     }
@@ -340,6 +372,15 @@ export default function DraftDetailPage() {
             </span>
           </div>
 
+          {/* 008 FR-20: the model that made the current design. */}
+          {!isFailed && (
+            <GeneratedWith
+              stamp={draft.designModel}
+              substitutedFrom={draft.designModelSubstitutedFrom}
+              className="mt-1"
+            />
+          )}
+
           {/* 005 FR-07: why this design has no AI background, when that
               was not the model's choice. Non-blocking. */}
           {draft.backgroundSkipped && <BackgroundNotice skipped={draft.backgroundSkipped} />}
@@ -367,6 +408,10 @@ export default function DraftDetailPage() {
             <ul className="grid grid-cols-4 gap-3 sm:gap-5">
               {versions.map((r) => {
                 const isCurrent = r.revisionNumber === draft.currentRevisionNumber
+                // 008 FR-20: the model that made this version. The cell is too
+                // narrow for the sentence, so it shows the name and keeps the
+                // sentence for the tooltip and screen readers.
+                const madeWith = generatedWith(r.model, r.modelSubstitutedFrom)
                 const frame = (
                   <>
                     {/* A version's own render, shown as rendered (§8.12). */}
@@ -395,6 +440,22 @@ export default function DraftDetailPage() {
                     <span className="mt-0.5 block text-ui-2xs leading-snug text-fg-muted">
                       {formatDateTime(r.createdAt)}
                     </span>
+                    {madeWith && (
+                      <span
+                        className="mt-0.5 block break-words text-ui-2xs leading-snug text-fg-muted"
+                        title={madeWith.text}
+                      >
+                        <span className="sr-only">Generated with </span>
+                        {madeWith.name}
+                        {madeWith.substitutedTitle && (
+                          <>
+                            {' '}
+                            <span title={madeWith.substitutedTitle}>(substituted)</span>
+                            <span className="sr-only">: {madeWith.substitutedTitle}</span>
+                          </>
+                        )}
+                      </span>
+                    )}
                   </>
                 )
                 return (
@@ -488,6 +549,21 @@ export default function DraftDetailPage() {
               )}
             </div>
           </div>
+          {/* The design regenerate's model (008 FR-20), pre-selected from the
+              current design's stamp (FR-09). Path B only, like the button. */}
+          {isPathB && ready && (
+            <ModelPicker
+              id="draft-design-model"
+              surface="DESIGN_FREEFORM"
+              context={{ stamp: draft.designModel, designPath: 'B' }}
+              value={designModel}
+              onChange={pickDesignModel}
+              label="Design model"
+              disabled={regenDesign || designUndo.undoing || actionPending}
+              error={designModelError}
+              className="mt-3 sm:max-w-xs"
+            />
+          )}
           {isPathB && regenDesign && (
             <p className="mt-3 flex items-center gap-1.5 text-ui-xs text-fg-muted">
               <Loader2 {...ICON} className="animate-spin" /> Designing a new variant — up to a minute…
@@ -517,6 +593,7 @@ export default function DraftDetailPage() {
             {ready && (
               <RefinementPanel
                 draftId={draftId}
+                designPath={isPathB ? 'B' : 'A'}
                 pendingAction={draft.pendingAction}
                 pendingActionError={draft.pendingActionError}
                 conflict={draft.conflict}

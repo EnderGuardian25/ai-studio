@@ -1,20 +1,28 @@
 'use client'
 
-import React, { useEffect, useId, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { Loader2, Sparkles, Undo2 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Input, fieldErrorClasses } from '@/components/ui/Input'
 import { SectionHead } from '@/components/ui/SectionHead'
+import { ModelPicker } from '@/components/ui/ModelPicker'
 import { ICON } from '@/components/ui/folio'
 import { apiFetch } from '@/lib/apiFetch'
 import { HEADLINE_MAX, validateHeadline } from '@/lib/captions/headline'
 import { useUndoableAction } from '@/lib/hooks/useUndoableAction'
-import { SaveState, count } from './CaptionPanel'
+import type { ModelKey } from '@/lib/models/catalogue'
+import { SaveState, count, type RegenerateResult } from './CaptionPanel'
+import { GeneratedWith } from './GeneratedWith'
 
 export interface HeadlinePanelProps {
   draftId: string
   /** null only on a draft migrated from the single caption. */
   headline: string | null
+  /** 008 FR-08: the model that wrote the headline, and the refused value it replaced. */
+  headlineModel: string | null
+  headlineModelSubstitutedFrom: string | null
+  /** Whether this draft's own caption provider is Claude (it writes the headline too). */
+  captionProviderIsClaude?: boolean
   /** The headline is being written: a generation, or a headline-only action
    *  (captionActionTargets). */
   busy: boolean
@@ -24,8 +32,8 @@ export interface HeadlinePanelProps {
   locked: boolean
   /** A caption action holds the draft, so a headline edit would 409. */
   editLocked: boolean
-  /** Fires the headline-only regenerate; resolves false when it was refused. */
-  onRegenerate: () => Promise<boolean>
+  /** Fires the headline-only regenerate, with the model pick when one was made (A5). */
+  onRegenerate: (model?: ModelKey) => Promise<RegenerateResult>
   /** Called after an edit is saved, so the parent refetches the draft. */
   onSaved: () => void
 }
@@ -38,6 +46,9 @@ export interface HeadlinePanelProps {
 export function HeadlinePanel({
   draftId,
   headline,
+  headlineModel,
+  headlineModelSubstitutedFrom,
+  captionProviderIsClaude,
   busy,
   ready,
   locked,
@@ -54,6 +65,14 @@ export function HeadlinePanel({
   const [saved, setSaved] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // 008 FR-20: the headline's model pick (undefined = the stamp's
+  // pre-selection, A5) and a refused pick's 400 message.
+  const [model, setModel] = useState<ModelKey | undefined>(undefined)
+  const [modelError, setModelError] = useState<string | undefined>(undefined)
+  const pickModel = useCallback((next: ModelKey | undefined) => {
+    setModel(next)
+    setModelError(undefined)
+  }, [])
   // The headline before the last regenerate; Undo restores only the headline.
   const undo = useUndoableAction<string>(async (previous) => {
     await apiFetch(`/api/drafts/${draftId}`, {
@@ -136,9 +155,12 @@ export function HeadlinePanel({
     if (target) undo.capture(target)
     else undo.clear()
     // Refused: put back the snapshot this call replaced, never an earlier one.
-    if (!(await onRegenerate())) {
+    setModelError(undefined)
+    const result = await onRegenerate(model)
+    if (!result.ok) {
       if (previous === null) undo.clear()
       else undo.capture(previous)
+      if (result.modelError) setModelError(result.modelError)
     }
   }
 
@@ -203,6 +225,27 @@ export function HeadlinePanel({
             </span>
           </div>
         </>
+      )}
+
+      {/* The panel's tail (008 FR-20): the model that wrote the headline (not
+          while it is rewritten), then the headline's regenerate model,
+          pre-selected from that stamp (FR-09). */}
+      {!busy && (
+        <GeneratedWith stamp={headlineModel} substitutedFrom={headlineModelSubstitutedFrom} className="mt-2" />
+      )}
+      {ready && (
+        <ModelPicker
+          id="draft-headline-model"
+          surface="CAPTION"
+          context={{ stamp: headlineModel, stampNoun: 'headline' }}
+          value={model}
+          onChange={pickModel}
+          label="Headline model"
+          disabled={locked || undo.undoing}
+          captionProviderIsClaude={captionProviderIsClaude}
+          error={modelError}
+          className="mt-3 sm:max-w-xs"
+        />
       )}
     </div>
   )

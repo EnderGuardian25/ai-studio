@@ -414,7 +414,7 @@ describe('listCommittedRevisions (version-switch list)', () => {
     expect(list.every((x) => typeof x.revisionNumber === 'number')).toBe(true)
   })
 
-  it('selects only the listing fields (no htmlSnapshot) — 008 FR-16 adds the model', async () => {
+  it('selects only the listing fields (no htmlSnapshot) — 008 FR-16 adds the model, FR-20 its substitution', async () => {
     db.rows = [{ ...committed('d1', 1), model: 'claude-sonnet-5-5', modelSubstitutedFrom: 'OPUS' }]
     const [row] = await listCommittedRevisions('d1')
     expect(Object.keys(row).sort()).toEqual([
@@ -423,9 +423,12 @@ describe('listCommittedRevisions (version-switch list)', () => {
       'id',
       'instruction',
       'model',
+      'modelSubstitutedFrom',
       'revisionNumber',
     ])
     expect(row.model).toBe('claude-sonnet-5-5')
+    // The Versions sheet's "(substituted)" title (008 FR-20).
+    expect(row.modelSubstitutedFrom).toBe('OPUS')
   })
 })
 

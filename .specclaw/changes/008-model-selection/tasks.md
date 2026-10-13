@@ -295,7 +295,7 @@ Wave 2 adds per-post and per-chat pickers only.
     - **The picks live in wizard state and the autosave payload** (T13 widened the schema). `designModel` resets to `undefined` when the design path makes it ineligible, with the hint.
     - **The submit** omits a field that is `undefined`.
 
-- [ ] `T16` — The draft page pickers and "Generated with"
+- [x] `T16` — The draft page pickers and "Generated with"
   - Files: `src/components/drafts/RefinementPanel.tsx`, `src/components/drafts/CaptionPanel.tsx`, `src/components/drafts/CaptionPanels.tsx`, `src/components/drafts/HeadlinePanel.tsx`, `src/app/(app)/drafts/[id]/page.tsx`
   - Estimate: medium
   - Kind: impl

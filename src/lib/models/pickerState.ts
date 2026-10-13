@@ -11,7 +11,6 @@
 import type { ModelsView } from '@/lib/api-types'
 import {
   entryFor,
-  entryForStamp,
   familyName,
   modelTier,
   type DesignPath,
@@ -26,6 +25,9 @@ import {
   type DecideResult,
   type ResolvedModel,
 } from './resolve'
+// A stamp as a person reads it: the current entry's name, or the raw ID for a
+// retired or foreign one ('claude-sonnet-4-6', 'gpt-4o').
+import { stampName } from './stampLabel'
 
 /** The slice of GET /api/models a picker reads. */
 export type PickerModels = Pick<
@@ -89,13 +91,6 @@ export function preselection(
   context: PickerContext = {},
 ): DecideResult {
   return decideModel(surface, decideInput(models, context))
-}
-
-// A stamp as a person reads it: the current entry's name, or the raw ID for a
-// retired or foreign one ('claude-sonnet-4-6', 'gpt-4o').
-function stampName(stamp: string): string {
-  const match = entryForStamp(stamp)
-  return match && !match.previous ? match.entry.displayName : stamp
 }
 
 /** The hint line for a pre-selection (FR-18). A refused stamp names itself first. */

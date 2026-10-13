@@ -324,6 +324,11 @@ export interface DraftDetail {
   captionMigration: 'SPLIT' | 'UNSPLIT_FALLBACK' | 'EMPTY' | null
   // Always one per registry channel, in registry order.
   captions: DraftCaptionDetail[]
+  // 008 FR-20 / spec open question 1: whether THIS draft's caption provider
+  // (the brief's own key, else the team default) is Claude — the provider a
+  // caption or headline regenerate runs on, so the caption pickers hide
+  // exactly when the server would refuse a pick.
+  captionProviderIsClaude: boolean
   imageUrl: string | null
   htmlContent: string | null
   exportUrl: string | null

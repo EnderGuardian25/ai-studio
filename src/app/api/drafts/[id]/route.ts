@@ -12,6 +12,7 @@ import { backgroundSkippedFor } from '@/lib/drafts/backgroundNotice'
 import { parseCaptionPatch } from '@/lib/captions/requests'
 import { validateHeadline } from '@/lib/captions/headline'
 import { loadDraftCaptions, saveCaptionEdit, saveHeadlineEdit, settlePendingCaptions } from '@/lib/captions/store'
+import { copyProviderIsClaude } from '@/providers/registry'
 
 type Params = { id: string }
 
@@ -153,6 +154,14 @@ async function loadDraft(id: string) {
   // every poll (Ruling E), never trusted off the stored FK alone.
   const notApplied = await resolveNotAppliedOutcome(draft)
 
+  // 008 FR-20: the caption pickers hide when this draft's own caption provider
+  // isn't Claude — the same lookup regenerate-copy refuses a pick on (the
+  // brief's key, else the team default), not GET /api/models' team default.
+  const captionProviderIsClaude = await copyProviderIsClaude(
+    draft.brief.teamId,
+    draft.brief.copyProviderKey ?? undefined,
+  )
+
   return {
     ownerId: draft.brief.userId,
     teamId: draft.teamId,
@@ -168,6 +177,7 @@ async function loadDraft(id: string) {
     designModelSubstitutedFrom: draft.designModelSubstitutedFrom,
     captionMigration: captions?.captionMigration ?? null,
     captions: captions?.captions ?? [],
+    captionProviderIsClaude,
     imageUrl: draft.imageUrl,
     htmlContent: draft.htmlContent,
     // exportUrl is stored as an EXPORTS object key — sign it for the browser.

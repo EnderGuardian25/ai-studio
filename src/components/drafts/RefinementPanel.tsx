@@ -1,15 +1,17 @@
 'use client'
 
-import React, { useEffect, useId, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { Send as SendIcon, Loader2, AlertTriangle, Check } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/Button'
 import { Notice } from '@/components/ui/Notice'
+import { ModelPicker } from '@/components/ui/ModelPicker'
 import { SectionHead } from '@/components/ui/SectionHead'
 import { FOCUS, ICON, SCROLL_FOCUS, SMALL_CAPS } from '@/components/ui/folio'
 import { NotAppliedCard } from '@/components/drafts/NotAppliedCard'
-import { apiFetch } from '@/lib/apiFetch'
+import { ApiError, apiFetch } from '@/lib/apiFetch'
 import type { DraftAction, DraftNotApplied } from '@/lib/api-types'
+import type { DesignPath, ModelKey } from '@/lib/models/catalogue'
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -52,6 +54,8 @@ const SUGGESTIONS = [
 
 export interface RefinementPanelProps {
   draftId: string
+  /** The draft's path: REFINE's system default follows it (008 A8). */
+  designPath: DesignPath
   /** Polled draft state driving the async-refine lifecycle. */
   pendingAction: DraftAction | null
   pendingActionError: string | null
@@ -72,6 +76,7 @@ export interface RefinementPanelProps {
 
 export function RefinementPanel({
   draftId,
+  designPath,
   pendingAction,
   pendingActionError,
   conflict,
@@ -96,6 +101,14 @@ export function RefinementPanel({
   // describe this refine, never the state from before it was sent.
   const [settleArmed, setSettleArmed] = useState(false)
   const listRef = useRef<HTMLDivElement>(null)
+  // 008 FR-20: the refine model pick (undefined = the team or system default
+  // by path, A5) and a refused pick's 400 message.
+  const [model, setModel] = useState<ModelKey | undefined>(undefined)
+  const [modelError, setModelError] = useState<string | undefined>(undefined)
+  const pickModel = useCallback((next: ModelKey | undefined) => {
+    setModel(next)
+    setModelError(undefined)
+  }, [])
 
   useEffect(() => {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: 'smooth' })
@@ -143,6 +156,7 @@ export function RefinementPanel({
     setInput('')
     setRunning(true)
     setConflictCard(null)
+    setModelError(undefined)
     try {
       if (overrideConflictId) {
         // Override commits stored HTML synchronously — unchanged contract.
@@ -167,7 +181,8 @@ export function RefinementPanel({
         await apiFetch(`/api/drafts/${draftId}/refine`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ instruction }),
+          // An undefined pick is dropped, so the server resolves the default (A5).
+          body: JSON.stringify({ instruction, model }),
         })
         // Refetch so the parent picks up pendingAction and polls; the message
         // stays 'pending' until the resolution effect settles it. The refetch
@@ -177,6 +192,15 @@ export function RefinementPanel({
       }
     } catch (e: unknown) {
       resolutionRef.current = null
+      // A refused model pick (400, before any claim): nothing ran, so the
+      // request leaves the log, the instruction goes back in the field, and
+      // the reason shows on the picker.
+      if (e instanceof ApiError && e.code === 'MODEL_NOT_ALLOWED') {
+        setMessages((prev) => prev.filter((m) => m.id !== msgId))
+        setInput(instruction)
+        setModelError(e.message)
+        return
+      }
       const detail = e instanceof Error ? e.message : 'Error'
       setMessages((prev) =>
         prev.map((m) => (m.id === msgId ? { ...m, status: 'error', detail } : m))
@@ -361,6 +385,21 @@ export function RefinementPanel({
           )}
         </button>
       </form>
+
+      {/* The refine model (008 FR-20), pre-selected to the team or system
+          default by the draft's path; refine has no stamp tier (FR-09). Its
+          team-token notice is the picker's own (FR-22). */}
+      <ModelPicker
+        id="draft-refine-model"
+        surface="REFINE"
+        context={{ designPath }}
+        value={model}
+        onChange={pickModel}
+        label="Refine model"
+        disabled={busy}
+        error={modelError}
+        className="mt-3 sm:max-w-xs"
+      />
     </section>
   )
 }

@@ -163,6 +163,9 @@ export async function listCommittedRevisions(draftId: string) {
       createdAt: true,
       // 008 FR-16: the model whose output the revision's HTML is (additive).
       model: true,
+      // 008 FR-20: the refused value it replaced, for the Versions sheet's
+      // "(substituted)" (additive).
+      modelSubstitutedFrom: true,
     },
   })
   return numbered(rows)

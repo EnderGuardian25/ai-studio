@@ -1,21 +1,35 @@
 'use client'
 
-import React, { createRef, useState } from 'react'
+import React, { createRef, useCallback, useState } from 'react'
 import { toast } from 'sonner'
 import { Loader2, Sparkles } from 'lucide-react'
 import type { Channel } from '@prisma/client'
 import { Button } from '@/components/ui/Button'
 import { SectionHead } from '@/components/ui/SectionHead'
+import { ModelPicker } from '@/components/ui/ModelPicker'
 import { ICON } from '@/components/ui/folio'
-import { apiFetch } from '@/lib/apiFetch'
+import { ApiError, apiFetch } from '@/lib/apiFetch'
 import { CAPTION_CHANNELS } from '@/lib/channels'
 import { captionActionTargets } from '@/lib/captions/actionTargets'
 import type { DraftDetail } from '@/lib/api-types'
-import { CaptionPanel, type CaptionUndoHandle } from './CaptionPanel'
+import type { ModelKey } from '@/lib/models/catalogue'
+import { regenerateStampTier } from '@/lib/models/resolve'
+import { CaptionPanel, type CaptionUndoHandle, type RegenerateResult } from './CaptionPanel'
 import { HeadlinePanel } from './HeadlinePanel'
 
 export interface CaptionPanelsProps {
-  draft: Pick<DraftDetail, 'id' | 'headline' | 'captions' | 'pendingAction' | 'pendingActionError' | 'status'>
+  draft: Pick<
+    DraftDetail,
+    | 'id'
+    | 'headline'
+    | 'headlineModel'
+    | 'headlineModelSubstitutedFrom'
+    | 'captions'
+    | 'captionProviderIsClaude'
+    | 'pendingAction'
+    | 'pendingActionError'
+    | 'status'
+  >
   /** Called after an edit is saved, so the parent refetches the draft. */
   onSaved: () => void
   /** Called right after an async action is accepted (202) so the parent can
@@ -24,8 +38,12 @@ export interface CaptionPanelsProps {
 }
 
 // The regenerate-copy bodies (012 FR-11): {} is "Regenerate all" (the three
-// captions, never the headline — A9).
-type RegenerateBody = Record<string, never> | { channel: Channel } | { headline: true }
+// captions, never the headline — A9). Each takes the model pick when one was
+// made (008 FR-17); JSON.stringify drops an undefined pick (A5).
+type RegenerateBody = ({ channel?: Channel } | { headline: true }) & { model?: ModelKey }
+
+// "Regenerate all"'s targets, as the route reads {} (captions/requests.ts).
+const ALL_CAPTIONS = CAPTION_CHANNELS.map((s) => s.channel)
 
 // The caption desk (012 FR-18): "i. Captions" with "Regenerate all" in its
 // tail, then the headline and one panel per registry channel, in registry
@@ -42,6 +60,14 @@ export function CaptionPanels({ draft, onSaved, onActionStarted }: CaptionPanels
   const [undoRefs] = useState(
     () => new Map(CAPTION_CHANNELS.map((s) => [s.channel, createRef<CaptionUndoHandle>()]))
   )
+  // 008 FR-20: "Regenerate all"'s model pick (undefined = the pre-selection,
+  // A5) and a refused pick's 400 message.
+  const [allModel, setAllModel] = useState<ModelKey | undefined>(undefined)
+  const [allModelError, setAllModelError] = useState<string | undefined>(undefined)
+  const pickAllModel = useCallback((next: ModelKey | undefined) => {
+    setAllModel(next)
+    setAllModelError(undefined)
+  }, [])
 
   const ready = draft.status === 'EXPORTED' || draft.status === 'PUBLISHED'
   const writing = draft.status === 'IN_PROGRESS' && draft.captions.some((c) => c.status === 'PENDING')
@@ -50,7 +76,7 @@ export function CaptionPanels({ draft, onSaved, onActionStarted }: CaptionPanels
   // panel's Regenerate and Undo — the server would 409 anyway.
   const locked = firing || draft.pendingAction !== null
 
-  async function regenerate(body: RegenerateBody, failure: string): Promise<boolean> {
+  async function regenerate(body: RegenerateBody, failure: string): Promise<RegenerateResult> {
     setFiring(true)
     try {
       await apiFetch(`/api/drafts/${draft.id}/regenerate-copy`, {
@@ -59,9 +85,11 @@ export function CaptionPanels({ draft, onSaved, onActionStarted }: CaptionPanels
         body: JSON.stringify(body),
       })
     } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : failure)
       setFiring(false)
-      return false
+      // A refused model pick is shown on the picker that sent it, not as a toast.
+      if (e instanceof ApiError && e.code === 'MODEL_NOT_ALLOWED') return { ok: false, modelError: e.message }
+      toast.error(e instanceof Error ? e.message : failure)
+      return { ok: false, modelError: null }
     }
     // Accepted (202). Refetch so the parent picks up pendingAction and polls;
     // a failed refetch never turns the accept into a refusal.
@@ -72,7 +100,7 @@ export function CaptionPanels({ draft, onSaved, onActionStarted }: CaptionPanels
     } finally {
       setFiring(false)
     }
-    return true
+    return { ok: true }
   }
 
   async function regenerateAll() {
@@ -80,7 +108,12 @@ export function CaptionPanels({ draft, onSaved, onActionStarted }: CaptionPanels
     // target BEFORE firing; put the previous ones back if refused.
     await Promise.all([...undoRefs.values()].map((r) => r.current?.flush()))
     const reverts = [...undoRefs.values()].flatMap((r) => (r.current ? [r.current.capture()] : []))
-    if (!(await regenerate({}, 'Failed to regenerate the captions'))) reverts.forEach((revert) => revert())
+    setAllModelError(undefined)
+    const result = await regenerate({ model: allModel }, 'Failed to regenerate the captions')
+    if (!result.ok) {
+      reverts.forEach((revert) => revert())
+      if (result.modelError) setAllModelError(result.modelError)
+    }
   }
 
   return (
@@ -95,6 +128,22 @@ export function CaptionPanels({ draft, onSaved, onActionStarted }: CaptionPanels
           {regenerating ? <Loader2 {...ICON} className="animate-spin" /> : <Sparkles {...ICON} />} Regenerate all
         </Button>
       </SectionHead>
+      {/* "Regenerate all"'s model (008 FR-20), pre-selected per FR-09's
+          mixed-stamp rule: the three rows' common stamp, else the team default. */}
+      {ready && (
+        <ModelPicker
+          id="draft-all-captions-model"
+          surface="CAPTION"
+          context={{ stamp: regenerateStampTier(ALL_CAPTIONS, draft) }}
+          value={allModel}
+          onChange={pickAllModel}
+          label="All captions model"
+          disabled={locked}
+          captionProviderIsClaude={draft.captionProviderIsClaude}
+          error={allModelError}
+          className="mb-4 sm:max-w-xs"
+        />
+      )}
       {writing && (
         <p className="mb-3 flex items-center gap-1.5 text-ui-xs text-fg-muted">
           <Loader2 {...ICON} className="animate-spin" aria-hidden /> Writing the captions…
@@ -104,11 +153,14 @@ export function CaptionPanels({ draft, onSaved, onActionStarted }: CaptionPanels
         <HeadlinePanel
           draftId={draft.id}
           headline={draft.headline}
+          headlineModel={draft.headlineModel}
+          headlineModelSubstitutedFrom={draft.headlineModelSubstitutedFrom}
+          captionProviderIsClaude={draft.captionProviderIsClaude}
           busy={captionActionTargets(draft).includes('HEADLINE')}
           ready={ready}
           locked={locked}
           editLocked={draft.pendingAction === 'REGENERATE_COPY'}
-          onRegenerate={() => regenerate({ headline: true }, 'Failed to regenerate the headline')}
+          onRegenerate={(model) => regenerate({ headline: true, model }, 'Failed to regenerate the headline')}
           onSaved={onSaved}
         />
         {draft.captions.map((caption) => (
@@ -118,7 +170,10 @@ export function CaptionPanels({ draft, onSaved, onActionStarted }: CaptionPanels
             caption={caption}
             ready={ready}
             locked={locked}
-            onRegenerate={() => regenerate({ channel: caption.channel }, 'Failed to regenerate the caption')}
+            captionProviderIsClaude={draft.captionProviderIsClaude}
+            onRegenerate={(model) =>
+              regenerate({ channel: caption.channel, model }, 'Failed to regenerate the caption')
+            }
             undoRef={undoRefs.get(caption.channel)}
             onSaved={onSaved}
           />
