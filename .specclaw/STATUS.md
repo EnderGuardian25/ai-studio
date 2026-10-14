@@ -1,7 +1,7 @@
 # 🦞 SpecClaw Dashboard
 
 **Project:** bistec-studio
-**Last Updated:** 2026-10-13 16:59 UTC
+**Last Updated:** 2026-10-14 00:11 UTC
 
 _1 unnumbered change · run `/specclaw:renumber` to order them_
 
@@ -19,7 +19,8 @@ _1 unnumbered change · run `/specclaw:renumber` to order them_
 - 🔍 **014-ui-a11y-consistency-pass** ▣ — verify PASS | 18/18 tasks (100%) | 0 failed | 42h45m
 - 🔍 **015-draft-action-settle-race** ▫ — verify PASS | 3/3 tasks (100%) | 0 failed | 25m
 - 🔍 **016-fresh-start-cleanup** ▫ — verify PASS | 5/5 tasks (100%) | 0 failed | 2m
-- 🔨 **017-publish-api-fixes** ▫ — build in-progress | 0/3 tasks (0%) | 0 failed
+- 🔍 **017-publish-api-fixes** ▫ — verify PASS | 3/3 tasks (100%) | 0 failed
+- 🔨 **018-post-008-small-fixes** ▫ — build in-progress | 0/4 tasks (0%) | 0 failed
 
 ## Pending Proposals
 
@@ -27,7 +28,6 @@ _1 unnumbered change · run `/specclaw:renumber` to order them_
 - 📋 **007-brandkit-design-system** — proposal ready, awaiting planning
 - 📋 **009-hero-image-design** — proposal ready, awaiting planning
 - 📋 **010-whatsapp-channel-posting** — proposal ready, awaiting planning
-- 📋 **018-post-008-small-fixes** ▫ — proposal ready, awaiting planning
 - 📋 **019-draft-action-claim-token** ▫ — proposal ready, awaiting planning
 - 📋 **020-create-post-button-draft-page** ▫ — proposal ready, awaiting planning
 
@@ -37,6 +37,6 @@ _None._
 
 ## Stats
 
-- **Total changes:** 13
-- **Active:** 13
+- **Total changes:** 14
+- **Active:** 14
 - **Completed:** 0
