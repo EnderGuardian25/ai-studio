@@ -1,7 +1,9 @@
 # bistec-studio roadmap — changes 004–012
 
 **Updated:** 2026-09-23 · **Branch:** all of this lands on `v2` (see Branching at the bottom); handoff in `docs/handoff.md` top section.
-**Status (2026-10-13, later):** **004** re-verified PASS at `e88b55b6` (CI green: E2E 391/3/0/0, unit 2604, render 15/15). **008** is **verified PASS** (32/32). The new system starts teams and users fresh, so the post export/import scripts are dropped. Next: a fresh-start cleanup of old-data-only code, then the post-008 follow-ups, then 006/007/009/010.
+**Status (2026-10-14):** **016** (fresh-start cleanup) and **017** (publish API fixes) are **verified PASS**, with CI green. **018** (post-008 small fixes) is building; T1 is a committed WIP. **019** (claim token) and **020** (Create post button off the draft page) are approved and not yet planned. After them: 006, 007, 009 and 010 (proposals).
+
+**(Superseded) Status (2026-10-13, later):** **004** re-verified PASS at `e88b55b6` (CI green: E2E 391/3/0/0, unit 2604, render 15/15). **008** is **verified PASS** (32/32). The new system starts teams and users fresh, so the post export/import scripts are dropped. Next: a fresh-start cleanup of old-data-only code, then the post-008 follow-ups, then 006/007/009/010.
 
 **(Superseded) Status (2026-10-13):** **008** (model selection) is **built, 19/19**, on `v2`. Wave 1 (catalogue, resolver, `/team` → Models, stamps, time budget) gated at 383/3/0/0 with CI green; wave 2 (the pickers) gated at 391/3/0/0. T2, the operator CLI full-ID check, passed. **Next: `/specclaw:verify 008-model-selection`.** Handoff and the 008 runbook: `docs/handoff.md` top section.
 

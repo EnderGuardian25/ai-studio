@@ -2,9 +2,16 @@
 
 This repo contains planning documents for **bistec-studio**, an internal marketing post generation tool for the Bistec marketing team.
 
-## ✅ Outstanding work — START HERE (updated 2026-10-13)
+## ✅ Outstanding work — START HERE (updated 2026-10-14)
 
-- **⏸️ 2026-10-13 (latest) — PICK UP HERE: **016 fresh-start cleanup VERIFIED PASS (E2E 386/3/0/0; CI green). 017 publish fixes BUILT 3/3 (E2E 387/3/0/0); 018 next.** The new system starts FRESH (no data import, user decision). 004 re-verified PASS at `e88b55b6` (CI green). Changes 016–020 are approved (bounded) and build one at a time: 016 fresh-start cleanup → 017 publish fixes → 018 small fixes → 019 claim token → 020 Create post button off the draft page.** Full detail: [`docs/handoff.md`](docs/handoff.md) top section.
+- **⏸️ 2026-10-14 — PICK UP HERE: 016 and 017 are VERIFIED PASS (CI green). 018 is building: T1 is a committed WIP (`8546451b`), interrupted by a usage limit. Resume at 018 T1 FR-04, using [`reports/T1-wip.md`](.specclaw/changes/018-post-008-small-fixes/reports/T1-wip.md).** Full detail: [`docs/handoff.md`](docs/handoff.md) top section.
+  - **Resume order:**
+    1. Finish 018 T1: FR-04 (the draft-GET provider lookup), the AC-01 mutation proof, the targeted E2E, a `specclaw:code-reviewer` pass, then mark T1 complete.
+    2. 018 T2 (Undo settle-on-state, revision-list retry), T3 (test hygiene) and T4 (gate and CI), then verify.
+    3. 019 (claim token) and 020 (Create post button off the draft page). Both are approved (bounded) but **not yet planned**: run `/specclaw:plan` first.
+  - **Gates at the last verified point (017, `e539395d`):** E2E 387/3/0/0; unit 2546; CI run 38436823300 green. At the 018 WIP: tsc clean, lint 0 errors, unit 2551.
+  - **Process (unchanged):** one task at a time. An implementer subagent does the work, `specclaw:code-reviewer` reviews it, and the orchestrator re-runs tsc, lint and unit and commits. A full clean mock E2E and a CI check close each change. No real model calls.
+- **(superseded) 2026-10-13 (latest) — 016 fresh-start cleanup VERIFIED PASS (E2E 386/3/0/0; CI green). 017 publish fixes VERIFIED PASS (E2E 387/3/0/0; CI green). The new system starts FRESH (no data import, user decision). 004 re-verified PASS at `e88b55b6` (CI green). Changes 016–020 are approved (bounded) and build one at a time: 016 fresh-start cleanup → 017 publish fixes → 018 small fixes → 019 claim token → 020 Create post button off the draft page.** Full detail: [`docs/handoff.md`](docs/handoff.md) top section.
   - **Decisions:**
     - no import or carry-over; `import-posts` is won't-fix and both scripts are deleted in 016;
     - no pre-made "Bistec" team on fresh systems;
