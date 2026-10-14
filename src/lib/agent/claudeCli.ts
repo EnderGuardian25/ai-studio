@@ -343,6 +343,14 @@ export async function runClaudeCli(prompt: string, opts: ClaudeCliOptions): Prom
 // mode and stream-json mode). `attempt` runs one spawn under the
 // token it is handed (undefined ⇒ spawnClaude reads the ALS context, and with
 // none throws the no-credential error).
+//
+// Known edge case (008 spec Edge Cases): the model is resolved once, before
+// the call, with the acting user's credential tier. If this wrapper then falls
+// back from a rejected personal token to the team token, the one fallback
+// attempt runs the already-resolved model — so a personalTokenGated model
+// admitted on 'personal' can run once on the team token. Accepted: it is one
+// call, the personal token is marked INVALID, and the user's next resolution
+// is 'team'.
 async function withAuthRetry<T>(
   opts: Pick<ClaudeCliOptions, "authToken" | "label">,
   attempt: (token: string | undefined) => Promise<T>,
@@ -386,6 +394,10 @@ async function withAuthRetry<T>(
 }
 
 // One text-mode attempt: the prompt is the whole stdin payload.
+//
+// The 008 FR-07 boundary: both input modes record the call just before each
+// spawn — so withAuthRetry's second attempt records a second call, which is
+// correct: two spawns happened.
 export async function runClaudeCliOnce(
   prompt: string,
   opts: ClaudeCliOptions,
@@ -397,17 +409,6 @@ export async function runClaudeCliOnce(
   recordModelCall(modelCallFor(opts.model, "cli", opts.label))
   return spawnClaude(args, prompt, { ...opts, command, tokenOverride })
 }
-
-// The 008 FR-07 boundary: both input modes record the call just before each
-// spawn — so withAuthRetry's second attempt records a second call, which is
-// correct: two spawns happened.
-//
-// Known edge case (spec Edge Cases): resolution happens once, before the call,
-// with the acting user's credential tier. If withAuthRetry then falls back from
-// a rejected personal token to the team token, the one fallback attempt runs
-// the already-resolved model — so a personalTokenGated model admitted on
-// 'personal' can run once on the team token. Accepted: it is one call, the
-// personal token is marked INVALID, and the user's next resolution is 'team'.
 
 // ─── stream-json mode (005 FR-09) ────────────────────────────────────────────
 //

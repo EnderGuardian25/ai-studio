@@ -10,7 +10,7 @@ This change has **4 tasks in 2 waves**. Each task is implemented by a subagent, 
 
 ### Wave 1 — Fixes
 
-- [ ] `T1` — The ACP manifest, the refine label, the comments and the draft-GET lookup
+- [~] `T1` — The ACP manifest, the refine label, the comments and the draft-GET lookup
   - Files: `src/acp/agent.ts`, `src/mcp/server.ts`, `src/mcp/tools/generate.ts`, `docs/mcp-acp-guide.md`, `src/lib/models/policyForm.ts`, `src/components/team/ModelsCard.tsx`, `src/lib/agent/claudeCli.ts`, `src/app/api/drafts/[id]/route.ts`, `src/providers/registry.ts`, `tests/unit/mcpGetDraft.test.ts`, `tests/unit/modelPolicyForm.test.ts`, `tests/unit/draftDetailGet.test.ts`, `tests/e2e/model-selection.test.ts`
   - Estimate: medium
   - Kind: impl

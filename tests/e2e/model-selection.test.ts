@@ -684,7 +684,8 @@ test.describe('§Y — /team → Models', () => {
       ['Captions', 'Haiku 4.5'],
       ['Template fill (Path A)', 'Haiku 4.5'],
       ['Freeform design (Path B)', 'Sonnet 5.5'],
-      ['Refine', 'Sonnet 5.5'],
+      // 018 FR-02: refine's system default follows the draft's path.
+      ['Refine', 'Sonnet 5.5; Haiku 4.5 on template drafts'],
       ['Campaign briefing assistant', 'Sonnet 5.5'],
       ['Brand-kit assistant', 'Sonnet 5.5'],
     ]

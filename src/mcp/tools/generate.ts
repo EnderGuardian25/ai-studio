@@ -21,8 +21,9 @@ interface GeneratePostArgs {
 
 // ACP entry point for post generation — a thin adapter over the same Path B
 // pipeline the web routes use (runPathBDesign), so aspect ratio, brand-kit
-// precedence, per-path models, and CLI/API dispatch can never drift from the
-// app. TEMPLATE mode needs a template selection this surface doesn't have.
+// precedence, the team's model policy and system defaults (src/lib/models),
+// and CLI/API dispatch can never drift from the app. TEMPLATE mode needs a
+// template selection this surface doesn't have.
 export async function generatePost(args: GeneratePostArgs) {
   // Channel enum values are uppercase; tolerate lowercase from older callers.
   // Only publishable channels are accepted (WhatsApp has no publisher yet).

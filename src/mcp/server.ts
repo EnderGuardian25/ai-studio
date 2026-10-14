@@ -74,7 +74,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     },
     {
       name: 'generate_post',
-      description: 'Generate a social media post from a brief. Returns draftId, exportUrl, and htmlContent.',
+      description:
+        'Generate a social media post from a brief. Returns draftId, exportUrl, htmlContent, headline (the on-image headline, or null), and captions ([{channel, text, status}], one per channel in registry order).',
       inputSchema: {
         type: 'object',
         properties: {

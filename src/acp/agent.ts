@@ -1,8 +1,15 @@
 // ACP agent manifest — describes bistec-studio's capabilities to peer agents
+import { CaptionStatus } from '@prisma/client'
+import { CAPTION_CHANNELS } from '@/lib/channels'
+
+// 018 FR-01: the advertised output must match what `generatePost`
+// (src/mcp/tools/generate.ts) returns; tests/unit/mcpGetDraft.test.ts fails on
+// any drift in the key set. The version is semver: a minor bump per additive
+// change to a capability's schema.
 export const AGENT_MANIFEST = {
   name: 'bistec-studio',
   description: 'On-brand social media post generation and publishing for Instagram and LinkedIn.',
-  version: '1.0.0',
+  version: '1.1.0',
   capabilities: [
     {
       name: 'generate_post',
@@ -34,6 +41,23 @@ export const AGENT_MANIFEST = {
           draftId: { type: 'string' },
           exportUrl: { type: 'string' },
           htmlContent: { type: 'string' },
+          headline: {
+            type: ['string', 'null'],
+            description: 'The on-image headline (at most 100 characters); null if it was never written',
+          },
+          captions: {
+            type: 'array',
+            description: 'One caption per registry channel, in registry order (WhatsApp included)',
+            items: {
+              type: 'object',
+              required: ['channel', 'text', 'status'],
+              properties: {
+                channel: { type: 'string', enum: CAPTION_CHANNELS.map((s) => s.channel) },
+                text: { type: 'string' },
+                status: { type: 'string', enum: Object.values(CaptionStatus) },
+              },
+            },
+          },
         },
       },
     },

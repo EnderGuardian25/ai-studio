@@ -91,6 +91,7 @@ vi.mock('@/lib/brandkit/resolve', () => ({ resolveBrandKit: async () => null }))
 vi.mock('@/lib/campaign/briefing', () => ({ getActiveCampaignBriefing: async () => null }))
 
 const { getDraft, generatePost } = await import('@/mcp/tools/generate')
+const { AGENT_MANIFEST } = await import('@/acp/agent')
 const { publishPost } = await import('@/mcp/tools/publish')
 const copyRoute = await import('@/app/api/generate/copy/route')
 
@@ -222,6 +223,24 @@ describe('generatePost', () => {
         { channel: 'WHATSAPP', text: WA_TEXT, status: 'READY' },
       ],
     })
+  })
+
+  // 018 FR-01 / AC-01: the drift guard. The ACP manifest advertises exactly
+  // the keys the handler returns, at the top level and per caption entry, and
+  // its caption channel enum is the registry order the handler emits.
+  it('the ACP manifest advertises exactly the output generatePost returns', async () => {
+    h.generateDraftForBrief.mockResolvedValue({ draft: draftRow(), backgroundImageUrl: null })
+    const out = await generatePost(args)
+    const capability = AGENT_MANIFEST.capabilities.find((c) => c.name === 'generate_post')
+    type Schema = { properties: Record<string, { items?: Schema; enum?: unknown[] }> }
+    const output = capability!.output as unknown as Schema
+    expect(Object.keys(out).sort()).toEqual(Object.keys(output.properties).sort())
+    const item = output.properties.captions.items!
+    for (const caption of out.captions) {
+      expect(Object.keys(caption).sort()).toEqual(Object.keys(item.properties).sort())
+    }
+    expect(item.properties.channel.enum).toEqual(out.captions.map((c) => c.channel))
+    expect(item.properties.status.enum).toEqual(['PENDING', 'READY', 'FAILED'])
   })
 
   it('a team with no Claude credential surfaces the no-credential error from inside the wrap', async () => {

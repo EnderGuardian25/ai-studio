@@ -110,6 +110,39 @@ describe('systemDefaultName', () => {
   it('is null when nothing ticked can run the surface (the save would 400)', () => {
     expect(systemDefaultName('DESIGN_TEMPLATE', ['OPUS'], 'api', null)).toBeNull()
   })
+
+  // 018 FR-02 / AC-02: REFINE's system default follows the draft's path (A8).
+  it('names both REFINE defaults when Path B and Path A differ', () => {
+    const all: ModelKey[] = ['HAIKU', 'SONNET', 'OPUS']
+    expect(systemDefaultName('REFINE', all, 'api', null)).toBe(
+      'Sonnet 5.5; Haiku 4.5 on template drafts',
+    )
+    expect(systemDefaultName('REFINE', ['HAIKU', 'SONNET'], 'cli', null)).toBe(
+      'Sonnet 5.5; Haiku 4.5 on template drafts',
+    )
+  })
+
+  it('names one REFINE default when both paths resolve to the same model', () => {
+    // Haiku not ticked: Path A falls to the cheapest allowed, which is Sonnet.
+    expect(systemDefaultName('REFINE', ['SONNET', 'OPUS'], 'api', null)).toBe('Sonnet 5.5')
+    // Sonnet not ticked: Path B falls to the cheapest allowed, which is Haiku.
+    expect(systemDefaultName('REFINE', ['HAIKU', 'OPUS'], 'api', null)).toBe('Haiku 4.5')
+    // CLAUDE_CLI_MODEL applies to both paths in CLI mode.
+    expect(systemDefaultName('REFINE', ['HAIKU', 'SONNET', 'OPUS'], 'cli', 'OPUS')).toBe('Opus 5.5')
+  })
+
+  it('leaves every other surface on one name', () => {
+    const all: ModelKey[] = ['HAIKU', 'SONNET', 'OPUS']
+    for (const surface of [
+      'CAPTION',
+      'DESIGN_TEMPLATE',
+      'DESIGN_FREEFORM',
+      'ASSISTANT_BRIEFING',
+      'ASSISTANT_BRANDKIT',
+    ] as const) {
+      expect(systemDefaultName(surface, all, 'api', null)).not.toContain(';')
+    }
+  })
 })
 
 describe('defaultOptions', () => {
@@ -123,6 +156,14 @@ describe('defaultOptions', () => {
     expect(
       defaultOptions('CAPTION', toggleAllowed(form, 'SONNET', false), view()).map((o) => o.value),
     ).toEqual(['', 'HAIKU', 'OPUS'])
+  })
+
+  it('labels the REFINE system default with both paths', () => {
+    const form = formFromPolicy(info())
+    expect(defaultOptions('REFINE', form, view())[0]).toEqual({
+      value: '',
+      label: 'System default (Sonnet 5.5; Haiku 4.5 on template drafts)',
+    })
   })
 
   it('says so when nothing ticked can run the surface', () => {

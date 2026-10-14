@@ -5,7 +5,13 @@
 // Pure and client-safe: the catalogue, the resolver and API types only.
 
 import type { ModelsView, TeamModelPolicyInfo } from '@/lib/api-types'
-import { MODEL_KEYS, USER_SURFACES, type ModelKey, type UserSurface } from './catalogue'
+import {
+  MODEL_KEYS,
+  USER_SURFACES,
+  type DesignPath,
+  type ModelKey,
+  type UserSurface,
+} from './catalogue'
 import { decideModel, type PipelineMode } from './resolve'
 
 export interface PolicyForm {
@@ -57,6 +63,10 @@ export function toggleAllowed(form: PolicyForm, key: ModelKey, checked: boolean)
  * models: decideModel's own tiers 4–5 (CLAUDE_CLI_MODEL where it applies, the
  * table default, then the cheapest allowed), so the label can't disagree with
  * the server. null when nothing ticked can run the surface (the save will 400).
+ *
+ * REFINE depends on the draft's design path (A8): when the Path B and Path A
+ * defaults differ, both are named — "Sonnet 5.5; Haiku 4.5 on template drafts"
+ * (018 FR-02). When they agree, one name, as for every other surface.
  */
 export function systemDefaultName(
   surface: UserSurface,
@@ -64,13 +74,21 @@ export function systemDefaultName(
   mode: PipelineMode,
   envDefault: ModelKey | null,
 ): string | null {
-  const result = decideModel(surface, {
-    policy: { allowed, defaults: {}, gateOn: false },
-    credential: 'n/a',
-    mode,
-    envDefault,
-  })
-  return result.ok ? result.resolved.entry.displayName : null
+  const nameFor = (designPath?: DesignPath): string | null => {
+    const result = decideModel(surface, {
+      policy: { allowed, defaults: {}, gateOn: false },
+      credential: 'n/a',
+      mode,
+      envDefault,
+      designPath,
+    })
+    return result.ok ? result.resolved.entry.displayName : null
+  }
+  if (surface !== 'REFINE') return nameFor()
+  const pathB = nameFor('B')
+  const pathA = nameFor('A')
+  if (!pathB || !pathA || pathA === pathB) return pathB
+  return `${pathB}; ${pathA} on template drafts`
 }
 
 /** A surface's Select options: "System default (<name>)", then each ticked, eligible model. */
