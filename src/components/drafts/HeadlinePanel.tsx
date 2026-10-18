@@ -30,9 +30,12 @@ export interface HeadlinePanelProps {
   ready: boolean
   /** Any action is firing or running on the draft (single-flight, A2). */
   locked: boolean
+  /** The polled `pendingAction` is non-null: an action is running on the draft. */
+  actionPending: boolean
   /** A caption action holds the draft, so a headline edit would 409. */
   editLocked: boolean
-  /** Fires the headline-only regenerate, with the model pick when one was made (A5). */
+  /** Fires the headline-only regenerate, with the model pick when one was made (A5).
+   *  Resolves once the post-202 refetch has landed. */
   onRegenerate: (model?: ModelKey) => Promise<RegenerateResult>
   /** Called after an edit is saved, so the parent refetches the draft. */
   onSaved: () => void
@@ -52,6 +55,7 @@ export function HeadlinePanel({
   busy,
   ready,
   locked,
+  actionPending,
   editLocked,
   onRegenerate,
   onSaved,
@@ -106,15 +110,24 @@ export function HeadlinePanel({
   // The blur-save in flight, if any (see regenerate).
   const inFlightSave = useRef<Promise<void>>(Promise.resolve())
 
+  // Set once the post-202 refetch has landed: from then on the polled props
+  // describe this regenerate, never the state from before it was fired.
+  const [settleArmed, setSettleArmed] = useState(false)
+
   // A regenerate that settled without changing the headline (it failed; the
-  // reason is the page's pendingActionError) leaves nothing to undo.
-  const wasBusy = useRef(busy)
+  // reason is the page's pendingActionError) leaves nothing to undo. This
+  // settles on state once armed, not on an observed busy → idle edge: a
+  // regenerate that finishes before the refetch is served is never seen
+  // running, and the edge never comes (change 015, L25).
   const clearUndo = undo.clear
   useEffect(() => {
-    const was = wasBusy.current
-    wasBusy.current = busy
-    if (was && !busy && headline === undo.snapshot) clearUndo()
-  }, [busy, headline, undo.snapshot, clearUndo])
+    if (!settleArmed || actionPending || busy) return
+    // Settle on state (018 FR-05, the 015 pattern): the reset also calls
+    // clearUndo, so it stays in the effect rather than in render.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSettleArmed(false)
+    if (headline === undo.snapshot) clearUndo()
+  }, [settleArmed, actionPending, busy, headline, undo.snapshot, clearUndo])
 
   const over = value.length > HEADLINE_MAX
   const verb = stored === '' ? 'Generate headline' : 'Regenerate headline'
@@ -157,7 +170,8 @@ export function HeadlinePanel({
     // Refused: put back the snapshot this call replaced, never an earlier one.
     setModelError(undefined)
     const result = await onRegenerate(model)
-    if (!result.ok) {
+    if (result.ok) setSettleArmed(true)
+    else {
       if (previous === null) undo.clear()
       else undo.capture(previous)
       if (result.modelError) setModelError(result.modelError)

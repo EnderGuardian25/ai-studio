@@ -50,10 +50,12 @@ export function SaveState({ saving, saved }: { saving: boolean; saved: boolean }
 
 /** Lets "Regenerate all" take every caption panel's undo snapshot before it
  *  fires. `capture` returns how to put back the snapshot it replaced; `flush`
- *  resolves once the panel's blur-save, if any, has landed. */
+ *  resolves once the panel's blur-save, if any, has landed; `arm` is called
+ *  once the post-202 refetch has landed, so the panel settles its Undo. */
 export interface CaptionUndoHandle {
   capture: () => () => void
   flush: () => Promise<void>
+  arm: () => void
 }
 
 /** A regenerate's answer. A refused model pick (400 MODEL_NOT_ALLOWED) carries
@@ -67,10 +69,13 @@ export interface CaptionPanelProps {
   ready: boolean
   /** Any action is firing or running on the draft (single-flight, A2). */
   locked: boolean
+  /** The polled `pendingAction` is non-null: an action is running on the draft. */
+  actionPending: boolean
   /** Whether this draft's own caption provider is Claude (GET /api/drafts/[id]),
    *  so the picker hides exactly when the server would refuse a pick. */
   captionProviderIsClaude?: boolean
-  /** Fires this channel's regenerate, with the model pick when one was made (A5). */
+  /** Fires this channel's regenerate, with the model pick when one was made (A5).
+   *  Resolves once the post-202 refetch has landed. */
   onRegenerate: (model?: ModelKey) => Promise<RegenerateResult>
   undoRef?: React.Ref<CaptionUndoHandle>
   /** Called after an edit is saved, so the parent refetches the draft. */
@@ -88,6 +93,7 @@ export function CaptionPanel({
   caption,
   ready,
   locked,
+  actionPending,
   captionProviderIsClaude,
   onRegenerate,
   undoRef,
@@ -143,17 +149,26 @@ export function CaptionPanel({
   // so a regenerate waits for that PATCH to land; racing the claim, it would 409.
   const inFlightSave = useRef<Promise<void>>(Promise.resolve())
   const flushSave = () => inFlightSave.current
-  useImperativeHandle(undoRef, () => ({ capture: captureUndo, flush: flushSave }))
+  // Set once the post-202 refetch has landed: from then on the polled props
+  // describe this regenerate, never the state from before it was fired.
+  const [settleArmed, setSettleArmed] = useState(false)
+  const arm = () => setSettleArmed(true)
+  useImperativeHandle(undoRef, () => ({ capture: captureUndo, flush: flushSave, arm }))
 
   // A regenerate that settled without changing the text (it failed, and A7
-  // kept the caption) leaves nothing to undo.
-  const wasPending = useRef(pending)
+  // kept the caption) leaves nothing to undo. This settles on state once
+  // armed, not on an observed PENDING → READY edge: a regenerate that finishes
+  // before the refetch is served is never seen running, and the edge never
+  // comes (change 015, L25).
   const clearUndo = undo.clear
   useEffect(() => {
-    const was = wasPending.current
-    wasPending.current = pending
-    if (was && !pending && caption.text === undo.snapshot) clearUndo()
-  }, [pending, caption.text, undo.snapshot, clearUndo])
+    if (!settleArmed || actionPending || pending) return
+    // Settle on state (018 FR-05, the 015 pattern): the reset also calls
+    // clearUndo, so it stays in the effect rather than in render.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setSettleArmed(false)
+    if (caption.text === undo.snapshot) clearUndo()
+  }, [settleArmed, actionPending, pending, caption.text, undo.snapshot, clearUndo])
 
   const length = captionLength(value)
   const over = spec.hardLimit !== null && length > spec.hardLimit
@@ -213,7 +228,8 @@ export function CaptionPanel({
     const revert = captureUndo()
     setModelError(undefined)
     const result = await onRegenerate(model)
-    if (!result.ok) {
+    if (result.ok) arm()
+    else {
       revert()
       if (result.modelError) setModelError(result.modelError)
     }

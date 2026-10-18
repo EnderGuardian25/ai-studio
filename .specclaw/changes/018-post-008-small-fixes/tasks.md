@@ -19,7 +19,7 @@ This change has **4 tasks in 2 waves**. Each task is implemented by a subagent, 
     - **Covers:** FR-01–FR-04, AC-01–AC-04.
     - Find the real file that renders the Models defaults (`ModelsCard.tsx` per the sweep); adjust if it moved.
 
-- [ ] `T2` — Caption and headline Undo settle on state; the revision list retries
+- [x] `T2` — Caption and headline Undo settle on state; the revision list retries
   - Files: `src/components/drafts/CaptionPanel.tsx`, `src/components/drafts/HeadlinePanel.tsx`, `src/components/drafts/CaptionPanels.tsx`, `src/app/(app)/drafts/[id]/page.tsx`, `src/lib/testHooks.ts` (only if a new sentinel is needed), `tests/e2e/settle-race.test.ts`
   - Estimate: medium
   - Kind: impl

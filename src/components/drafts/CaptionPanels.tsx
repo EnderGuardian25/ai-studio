@@ -33,7 +33,8 @@ export interface CaptionPanelsProps {
   /** Called after an edit is saved, so the parent refetches the draft. */
   onSaved: () => void
   /** Called right after an async action is accepted (202) so the parent can
-   *  refetch the draft and start polling `pendingAction`. */
+   *  refetch the draft and start polling `pendingAction`. Awaited: each panel
+   *  settles its Undo only on state read after this refetch (change 015). */
   onActionStarted: () => void | Promise<unknown>
 }
 
@@ -110,7 +111,9 @@ export function CaptionPanels({ draft, onSaved, onActionStarted }: CaptionPanels
     const reverts = [...undoRefs.values()].flatMap((r) => (r.current ? [r.current.capture()] : []))
     setAllModelError(undefined)
     const result = await regenerate({ model: allModel }, 'Failed to regenerate the captions')
-    if (!result.ok) {
+    // Accepted: every panel captured a snapshot, so every panel settles it.
+    if (result.ok) undoRefs.forEach((r) => r.current?.arm())
+    else {
       reverts.forEach((revert) => revert())
       if (result.modelError) setAllModelError(result.modelError)
     }
@@ -159,6 +162,7 @@ export function CaptionPanels({ draft, onSaved, onActionStarted }: CaptionPanels
           busy={captionActionTargets(draft).includes('HEADLINE')}
           ready={ready}
           locked={locked}
+          actionPending={draft.pendingAction !== null}
           editLocked={draft.pendingAction === 'REGENERATE_COPY'}
           onRegenerate={(model) => regenerate({ headline: true, model }, 'Failed to regenerate the headline')}
           onSaved={onSaved}
@@ -170,6 +174,7 @@ export function CaptionPanels({ draft, onSaved, onActionStarted }: CaptionPanels
             caption={caption}
             ready={ready}
             locked={locked}
+            actionPending={draft.pendingAction !== null}
             captionProviderIsClaude={draft.captionProviderIsClaude}
             onRegenerate={(model) =>
               regenerate({ channel: caption.channel, model }, 'Failed to regenerate the caption')

@@ -60,6 +60,9 @@ const STATUS_TO_CHIP: Record<DraftDetail['status'], 'draft' | 'exported' | 'publ
   FAILED: 'failed',
 }
 
+// The revision list's retry backoff after a failed fetch (018 FR-06).
+const REVISION_RETRY_DELAYS_MS = [2000, 4000, 8000]
+
 // A proof-plate crop mark (DESIGN_SYSTEM.md §8.12): 18 px, 1 px --line, inset
 // 20 px from its corner; each mark draws two of its four edges.
 const CROP = 'pointer-events-none absolute h-[18px] w-[18px] border-line'
@@ -113,11 +116,14 @@ export default function DraftDetailPage() {
     }
   }, [draftId])
 
-  const fetchRevisions = useCallback(async () => {
+  // Resolves true when the list loaded, false when the request failed.
+  const fetchRevisions = useCallback(async (): Promise<boolean> => {
     try {
       setRevisions(await apiFetch<Revision[]>(`/api/drafts/${draftId}/revisions`))
+      return true
     } catch {
       // Non-fatal — revision list is supplementary.
+      return false
     }
   }, [draftId])
 
@@ -140,15 +146,38 @@ export default function DraftDetailPage() {
   // refetch the list. State, not a pendingAction non-null → null edge — an
   // action that finishes before its post-202 refetch is served is never seen
   // running, so that edge never comes (change 015). One request per missing
-  // number, so a list that still lacks it can't loop.
+  // number, so a list that still lacks it can't loop. A request that FAILED
+  // resets the guard and tries again after 2, 4 then 8 s (018 FR-06); a
+  // success that still lacks the number is never retried.
   const requestedRevisionRef = useRef<number | null>(null)
+  const revisionRetryRef = useRef<{ revision: number | null; tries: number }>({ revision: null, tries: 0 })
+  const revisionRetryTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [revisionRetryTick, setRevisionRetryTick] = useState(0)
   useEffect(() => {
     const current = draft?.currentRevisionNumber
     if (current == null || revisions.some((r) => r.revisionNumber === current)) return
     if (requestedRevisionRef.current === current) return
     requestedRevisionRef.current = current
-    fetchRevisions()
-  }, [draft?.currentRevisionNumber, revisions, fetchRevisions])
+    void fetchRevisions().then((ok) => {
+      if (ok) return
+      const prior = revisionRetryRef.current
+      const tries = prior.revision === current ? prior.tries : 0
+      if (tries >= REVISION_RETRY_DELAYS_MS.length) return
+      revisionRetryRef.current = { revision: current, tries: tries + 1 }
+      revisionRetryTimer.current = setTimeout(() => {
+        // Only while this number is still the one asked for.
+        if (requestedRevisionRef.current !== current) return
+        requestedRevisionRef.current = null
+        setRevisionRetryTick((t) => t + 1)
+      }, REVISION_RETRY_DELAYS_MS[tries])
+    })
+  }, [draft?.currentRevisionNumber, revisions, fetchRevisions, revisionRetryTick])
+  useEffect(
+    () => () => {
+      if (revisionRetryTimer.current) clearTimeout(revisionRetryTimer.current)
+    },
+    []
+  )
 
   function refreshAfterChange() {
     fetchDraft()
