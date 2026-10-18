@@ -178,19 +178,20 @@ Both waves are committed and pushed to `v2`. Every task has a report in `.speccl
 ### Still open after 008 (each its own change)
 
 1. ~~**`import-posts.mjs` never sets `teamId` (L22).**~~ **Won't fix (2026-10-13): fresh start, no import; the scripts are deleted in 016.** A real import has been broken since team tenancy, and `--dry-run` hides it. 008 T12 made the scripts carry the stamps but did not fix this.
-2. **The ACP manifest's `generate_post` output schema** is missing `headline` and `captions`.
+2. ~~**The ACP manifest's `generate_post` output schema** is missing `headline` and `captions`.~~ **Fixed by 018 FR-01 (2026-10-18):** the manifest lists both, and a unit drift guard compares it with the handler.
 3. ~~**`POST /api/posts` returns 201 for an immediate publish that ends FAILED.**~~ **Fixed by 017 (2026-10-13): 502 `PUBLISH_FAILED`; the dialog shows ✕ failed and stays open.**
 4. **A per-claim token for draft actions.**
 5. **The floating Create post button overlaps content** at some widths.
-6. **The caption/headline undo-clear uses the observed-edge pattern** (a 015 follow-up).
-7. **The 015 revision-list guard doesn't retry after a transient `fetchRevisions` failure.**
-8. **Small 008 items:**
-   - `/team` → Models names refine's "System default" for Path B only; Path A drafts refine on Haiku (T11);
-   - the "Known edge case" comment in `claudeCli.ts` lost the function it described (T10);
-   - `src/mcp/tools/generate.ts` still has a comment about "per-path models", which the catalogue replaced;
-   - the axe rule list is now copied into `captions.test.ts` and `model-selection.test.ts`; make it a shared helper;
-   - the draft poll makes one extra `copyProviderIsClaude` lookup per GET (T16).
-9. **Small 012/014 items:** the trailing `---` in split sections; the caption check runs before the duplicate-post 409; per-post caption loads in the posts list; the 014 verify gaps 5–8.
+6. ~~**The caption/headline undo-clear uses the observed-edge pattern** (a 015 follow-up).~~ **Fixed by 018 FR-05 (2026-10-18):** `CaptionPanel` and `HeadlinePanel` use the armed `settleArmed` settle; TC-RACE-03/04.
+7. ~~**The 015 revision-list guard doesn't retry after a transient `fetchRevisions` failure.**~~ **Fixed by 018 FR-06 (2026-10-18):** retries after 2, 4 and 8 s; TC-RACE-05.
+8. ~~**Small 008 items:**~~ **All fixed by 018 (2026-10-18):**
+   - ~~`/team` → Models names refine's "System default" for Path B only; Path A drafts refine on Haiku (T11);~~ FR-02, the dual label;
+   - ~~the "Known edge case" comment in `claudeCli.ts` lost the function it described (T10);~~ FR-03;
+   - ~~`src/mcp/tools/generate.ts` still has a comment about "per-path models", which the catalogue replaced;~~ FR-03;
+   - ~~the axe rule list is now copied into `captions.test.ts` and `model-selection.test.ts`; make it a shared helper;~~ FR-07, `tests/helpers/axe.ts`;
+   - ~~the draft poll makes one extra `copyProviderIsClaude` lookup per GET (T16).~~ FR-04, a narrowed select in `Promise.all`.
+   - Also closed by 018 FR-07: TC-MODEL-14 now picks Sonnet for Caption (008 verify gap 4), and the wave-2 `afterEach` no longer throws when `beforeEach` skipped (gap 6b).
+9. **Small 012/014 items:** the trailing `---` in split sections; the caption check runs before the duplicate-post 409; per-post caption loads in the posts list; the 014 verify gaps 5–8. **The 014 gaps 5, 7 and 8 are fixed by 018 FR-07/FR-08 (2026-10-18)** (`EYEBROW` in `BriefingAssistantPanel`, the digit-suffixed token guard plus logged axe `incomplete` results, and `COMPACT_TEXTAREA` in §8.18). Gap 6 (the placeholders) is left as a product call.
 10. **The 005 AC-16 operator run.** 🔴 Revoke the OAuth token pasted into chat on 2026-10-06 first.
 
 ---
@@ -449,13 +450,13 @@ The session stopped to save usage. The user approved the plan ("continue") and t
 ### Still open after 008 (each its own change)
 
 1. ~~**`import-posts.mjs` never sets `teamId` (L22).**~~ **Won't fix (2026-10-13): fresh start, no import; the scripts are deleted in 016.** A real import has been broken since team tenancy, and `--dry-run` hides it.
-2. **The ACP manifest's `generate_post` output schema** is missing `headline` and `captions`.
+2. ~~**The ACP manifest's `generate_post` output schema** is missing `headline` and `captions`.~~ **Fixed by 018 FR-01 (2026-10-18).**
 3. ~~**`POST /api/posts` returns 201 for an immediate publish that ends FAILED.**~~ **Fixed by 017 (2026-10-13): 502 `PUBLISH_FAILED`; the dialog shows ✕ failed and stays open.**
 4. **A per-claim token for draft actions.**
 5. **The floating Create post button overlaps content** at some widths.
-6. **The caption/headline undo-clear uses the observed-edge pattern** (a 015 follow-up). After a fast failed regenerate, an Undo can linger that restores identical text.
-7. **The 015 revision-list guard doesn't retry after a transient `fetchRevisions` failure.**
-8. **Small items:** the trailing `---` in split sections (012 T3); the caption check runs before the duplicate-post 409 (012 T7/T8); per-post caption loads in the posts list (012 T7); the axe rule list copied into `captions.test.ts` (012 T13); the 014 verify gaps 5–8.
+6. ~~**The caption/headline undo-clear uses the observed-edge pattern** (a 015 follow-up). After a fast failed regenerate, an Undo can linger that restores identical text.~~ **Fixed by 018 FR-05 (2026-10-18):** an armed settle; TC-RACE-03/04.
+7. ~~**The 015 revision-list guard doesn't retry after a transient `fetchRevisions` failure.**~~ **Fixed by 018 FR-06 (2026-10-18):** 2/4/8 s backoff; TC-RACE-05.
+8. **Small items:** the trailing `---` in split sections (012 T3); the caption check runs before the duplicate-post 409 (012 T7/T8); per-post caption loads in the posts list (012 T7); ~~the axe rule list copied into `captions.test.ts` (012 T13)~~ (fixed by 018 FR-07, `tests/helpers/axe.ts`); the 014 verify gaps 5–8 (**5, 7 and 8 fixed by 018**; gap 6 is left as a product call).
 9. **The 005 AC-16 operator run.** 🔴 Revoke the OAuth token pasted into chat on 2026-10-06 first.
 
 ### Rules and gotchas in force
@@ -503,7 +504,7 @@ The session stopped to save usage. The user approved the plan ("continue") and t
 - **Root cause:** `RefinementPanel` settled a refine row, and the draft page refreshed its version list, only on an _observed_ `pendingAction` transition. A refine that finished before the post-202 refetch was served went from `null` to `null` as far as the client could see. The row then hung on "Applying…", and the version list stayed at v1.
 - **The fix:** settle on state, not on an observed edge. The panel awaits the refetch, then resolves once `pendingAction` is `null`; the page refetches revisions whenever the current revision is missing from the list.
 - **The test:** `tests/e2e/settle-race.test.ts` (§X) forces the race. `surfaces.test.ts` is untouched.
-- **Leftover (small follow-up):** the caption and headline undo-clear uses the same edge pattern. Its only effect is a leftover Undo that restores identical text after a regenerate that fails faster than the refetch.
+- **Leftover (small follow-up):** the caption and headline undo-clear uses the same edge pattern. Its only effect is a leftover Undo that restores identical text after a regenerate that fails faster than the refetch. **Fixed by 018 FR-05 (2026-10-18).**
 
 The original finding:
 
@@ -517,9 +518,9 @@ The original finding:
 
 1. ~~**`/specclaw:verify 012-per-channel-captions`.**~~ **Done 2026-10-12: PASS, 28/28 gating ACs** (`.specclaw/changes/012-per-channel-captions/verify-report.md`). A fresh full mock E2E at HEAD `3d645899` gave 369/3/0/0, unit 2025/2025, lint 0 errors, build, `test:render` 15/15. Gaps noted but not blocking: AC-25 points 2–3 rest on code plus the static guard, not a running test; AC-03 "discarded text logged" is proven in two halves; AC-29 (optional operator live check) not run; the T6 settle-guard WARN was accepted as the per-claim-token follow-up, not fixed. Next: `/specclaw:pr` only if the user wants a PR (`v2` is the integration branch), or go straight to the follow-ups.
 2. **Follow-ups after 012, each its own change:**
-   1. ~~**The red-CI refine race,** together with the refine "Applying…" follow-up (`/specclaw:debug`).~~ **Done: change 015, CI green 2026-10-12.** A small leftover is the caption and headline undo-clear on the same edge pattern (a leftover Undo that restores identical text).
+   1. ~~**The red-CI refine race,** together with the refine "Applying…" follow-up (`/specclaw:debug`).~~ **Done: change 015, CI green 2026-10-12.** A small leftover is the caption and headline undo-clear on the same edge pattern (a leftover Undo that restores identical text). **That leftover is fixed by 018 FR-05.**
    2. ~~**`import-posts.mjs` never sets `teamId`,**~~ **Won't fix; the script was removed by 016 (2026-10-13).** A real import has been broken since team tenancy (2026-07-21); `--dry-run` never calls `create` and hides it (learning L22). Needs a `--team` remap, then a real import into a scratch test DB.
-   3. **The ACP manifest's advertised `generate_post` output schema** (`src/acp/agent.ts`) lists only `draftId`, `exportUrl`, `htmlContent`; it lacks `headline` and `captions`. The real output has them (AC-26).
+   3. ~~**The ACP manifest's advertised `generate_post` output schema** (`src/acp/agent.ts`) lists only `draftId`, `exportUrl`, `htmlContent`; it lacks `headline` and `captions`. The real output has them (AC-26).~~ **Fixed by 018 FR-01 (2026-10-18).**
    4. **`POST /api/posts` returns 201 for an immediate publish that ends FAILED,** and `PublishDialog` shows it as a success. Predates 012; caption refusals no longer reach it (422), a platform failure still does.
    5. **A per-claim token for draft actions** (the settle guards key on state, not on the claim).
    6. **The floating Create post button overlaps content** at some widths.

@@ -40,7 +40,7 @@ This change has **4 tasks in 2 waves**. Each task is implemented by a subagent, 
 
 ### Wave 2 — Gate
 
-- [ ] `T4` — Full gate, docs and CI
+- [x] `T4` — Full gate, docs and CI
   - Files: `docs/handoff.md`, `CLAUDE.md`, `docs/e2e-test-plan.md`
   - Estimate: small
   - Kind: docs

@@ -704,12 +704,12 @@ Picker names are matched with `exact: true`, because "Instagram caption model" c
 
   The recorder is empty, and the draft's revision, captions, headline and stamps are unchanged. With every model allowed, `designModel: 'OPUS'` on a TEMPLATE brief → 400 "Opus 5.5 isn't available for template fill", and no row is written.
 
-- **TC-MODEL-14 — The wizard (AC-28, and AC-33's Review-step axe scan).** It walks Path B to Review.
-  - "Caption model" is Haiku and "Design model" is Sonnet, each with the hint "Default". The summary has 12 rows, and names both models. Axe (014's 12 rules) runs with the pickers present.
-  - Picking Opus updates the summary, and the autosave payload carries `designModel: 'OPUS'`.
-  - Switching to Path A resets the picker to Haiku, with the hint "Opus 5.5 isn't available for template fill". Opus is not offered, and the summary says Haiku. Back on Path B, the pick stays reset and the note is gone.
-  - After Opus is picked again, `/brief?resume=<id>` restores it.
-  - Generate sends `designModel: 'OPUS'` and no `captionModel`. `Brief` stores `{ captionModel: null, designModel: 'OPUS' }`, and the draft's `designModel` is Opus (recorder `request`), with Haiku captions (`system`). The unfinished brief is deleted.
+- **TC-MODEL-14 — The wizard (AC-28, and AC-33's Review-step axe scan).** It walks Path B to Review. Since 018 FR-07 (008 verify gap 4) it also changes the Caption picker, and its title ends "…a resume restores both picks, and they reach the brief".
+  - "Caption model" is Haiku and "Design model" is Sonnet, each with the hint "Default". The summary has 12 rows, and names both models. Axe (014's 12 rules, through the shared `tests/helpers/axe.ts`) runs with the pickers present.
+  - Picking **Sonnet for Caption** updates the summary ("Sonnet 5.5") and clears that picker's "Default" hint. Picking Opus for Design updates the summary too, and the autosave payload carries `captionModel: 'SONNET'` and `designModel: 'OPUS'`.
+  - Switching to Path A resets the design picker to Haiku, with the hint "Opus 5.5 isn't available for template fill". Opus is not offered, and the summary says Haiku. The caption pick stays `SONNET`. Back on Path B, the design pick stays reset and the note is gone.
+  - After Opus is picked again, the second autosave still carries `captionModel: 'SONNET'`, and `/brief?resume=<id>` restores both picks (the caption picker is `SONNET`, summary "Sonnet 5.5").
+  - Generate sends `captionModel: 'SONNET'` and `designModel: 'OPUS'`. `Brief` stores `{ captionModel: 'SONNET', designModel: 'OPUS' }`. The draft's `designModel` is Opus (recorder `DESIGN_FREEFORM` `request`), every caption is stamped `claude-sonnet-5-5`, and the recorder has a `CAPTION` → Sonnet `request` run. The unfinished brief is deleted.
 - **TC-MODEL-15 — Untouched wizard pickers (AC-28).** The POST body has neither field. `Brief` stores null for both, and the draft runs on the defaults (Sonnet design, Haiku captions, both `system`).
 - **TC-MODEL-16 — The draft page (AC-29, and AC-33's draft-page axe scan).** The LinkedIn row is seeded with a Sonnet stamp.
   - **The pre-selections and hints:** LinkedIn Sonnet, Instagram and WhatsApp Haiku ("Same model as the current caption"); Headline Haiku ("…headline"); "All captions model" Haiku ("Default", mixed stamps); Design Sonnet ("…design"); Refine Sonnet ("Default").
@@ -751,6 +751,26 @@ Picker names are matched with `exact: true`, because "Instagram caption model" c
 | AC-30 the chat headers                                          | TC-MODEL-19                                                             |
 | AC-31 the team-token notice and the gated state                 | TC-MODEL-20                                                             |
 | AC-33 the wave-2 gate; the Review-step and draft-page axe scans | the wave-2 gate; TC-MODEL-14, TC-MODEL-16, `a11y` "AC-19: /drafts/[id]" |
+
+### X. Draft-page settle race (`settle-race.test.ts`, change 015 AC-01/AC-02, change 018 AC-05/AC-06)
+
+Each case mints an EXPORTED draft (`mintExportedDraft`) and acts on it in the browser. The race is forced with `page.route`: the first `GET /api/drafts/<id>` after the action POST is held for 3 s, so the in-process mock action always finishes before the post-202 refetch is served. That is the order the slower CI runner produces on its own. Every case skips without `MOCK_AI` + `MOCK_PUPPETEER`.
+
+- **TC-RACE-01 — Refine (015 AC-01).** A refine that finishes before the held refetch still resolves its log row to "Applied", re-enables the input, offers "Switch to v1" and lists `v2` as Current. The hold happened.
+- **TC-RACE-02 — Regenerate design (015 AC-02).** The same race on Regenerate design still lists `v2` as Current, offers "Switch to v1" and re-enables the button.
+- **TC-RACE-03 — The caption Undo settles on state (018 AC-05, FR-05).** The mock caption reply is deterministic (`Mock Instagram caption [<topic>]`), so regenerating the Instagram caption writes the same text again.
+  - The POST is 202, and "Undo Instagram caption" shows while the refetch is held.
+  - Once the refetch lands, the Undo is gone (count 0), Regenerate is enabled again and the text is unchanged. The hold happened.
+  - Mutation check (T2 report): with the arm removed from `CaptionPanel`/`HeadlinePanel`, this case and TC-RACE-04 go red (the Undo stays).
+- **TC-RACE-04 — The headline Undo settles on state (018 AC-05, FR-05).** The same race for the headline panel (`Mock headline <topic>`): "Undo headline" shows during the hold and is gone after it, with the headline unchanged.
+- **TC-RACE-05 — The revision list retries a failed fetch (018 AC-06, FR-06).** After the `regenerate-design` POST, the first `GET /revisions` is answered with a 500. The page retries (2, 4, then 8 s, at most 3 tries), so Current reads `v2` and "Switch to v1" shows **without a reload**. The 500 was served, and at least one later `/revisions` GET went through.
+
+| AC                                                       | E2E                    |
+| -------------------------------------------------------- | ---------------------- |
+| 015 AC-01 refine settles on state                        | TC-RACE-01             |
+| 015 AC-02 regenerate design lists the new revision       | TC-RACE-02             |
+| 018 AC-05 the caption/headline Undo settles on state     | TC-RACE-03, TC-RACE-04 |
+| 018 AC-06 the revision list retries after a failed fetch | TC-RACE-05             |
 
 ---
 
