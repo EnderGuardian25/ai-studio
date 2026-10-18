@@ -10,6 +10,15 @@
 // CLAUDE_CLI_MODEL against it (and config.ts imports env.ts, so any import here
 // risks a cycle), and wave 2's picker imports it on the client.
 //
+// ── Prod boot depends on this file (change 022 FR-05) ────────────────────────
+// The container's env preflight (src/scripts/env-preflight.ts, run by
+// docker-entrypoint.sh before `migrate deploy`) validates CLAUDE_CLI_MODEL
+// against MODEL_KEYS and the CURRENT apiIds below. If prod's CLAUDE_CLI_MODEL
+// names a key or apiId this file no longer accepts, the preflight blocks prod's
+// boot and the deploy fails. So before you remove or rename a key, or retire an
+// apiId into previousApiIds, check the CLAUDE_CLI_MODEL value set on prod's
+// Coolify resources (app and scheduler) and change it there first if needed.
+//
 // ── Adding a model (design §2) ───────────────────────────────────────────────
 //   1. Add one CATALOGUE entry: key, apiId, cliArg, prices with a dated
 //      priceSource, speed, the eligible `surfaces` with their timeouts, and the

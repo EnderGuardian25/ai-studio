@@ -56,6 +56,18 @@ RUN npx esbuild src/scheduler/worker.ts \
     --outfile=dist/scheduler/worker.js \
     --external:@prisma/client
 
+# Bundle the boot-time env preflight (change 022 FR-04) the same way, with the
+# same flags. docker-entrypoint.sh runs it before `prisma migrate deploy`, so an
+# env value the app would reject (e.g. an unknown CLAUDE_CLI_MODEL) stops the
+# boot before any schema change. It loads src/lib/env.ts, which imports nothing
+# from @prisma/client; the external flag is kept only to mirror the worker.
+RUN npx esbuild src/scripts/env-preflight.ts \
+    --bundle \
+    --platform=node \
+    --format=cjs \
+    --outfile=dist/scripts/env-preflight.js \
+    --external:@prisma/client
+
 # ─── Stage 3: runner ─────────────────────────────────────────────────────────
 FROM node:22-alpine AS runner
 WORKDIR /app
@@ -117,10 +129,11 @@ COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 # scope copied above carries the linux-musl engines this image needs.
 COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
 
-# Copy the bundled scheduler worker (see the esbuild step in the builder stage).
+# Copy the bundled scheduler worker and the env preflight (see the esbuild steps
+# in the builder stage).
 COPY --from=builder /app/dist ./dist
 
-# Applies pending migrations, then execs CMD. chmod here rather than relying on
+# Runs the env preflight, applies pending migrations, then execs CMD. chmod here rather than relying on
 # the committed file mode — this repo is developed on Windows, where git does not
 # track the executable bit.
 COPY docker-entrypoint.sh ./docker-entrypoint.sh

@@ -32,7 +32,7 @@ No real model calls. Never run two implementers in this checkout. Use `export MS
     - **Report:** paste the scenario PASS lines and the scenario-3 guard message into `reports/T1.md`.
     - Add the CI step to the `e2e` job only.
 
-- [ ] `T2` — The env preflight before migrate, the catalogue comment and the restored deploy workflow
+- [x] `T2` — The env preflight before migrate, the catalogue comment and the restored deploy workflow
   - Files: `src/scripts/env-preflight.ts` (new), `Dockerfile`, `docker-entrypoint.sh`, `src/lib/models/catalogue.ts`, `.github/workflows/docker-publish.yml` (restored), `.github/workflows/e2e.yml`
   - Estimate: medium
   - Kind: config
