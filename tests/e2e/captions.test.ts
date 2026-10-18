@@ -2,6 +2,7 @@ import { test, expect, type Locator, type Page } from '@playwright/test'
 import { createHash } from 'node:crypto'
 import { loginAs, waitForDraft, waitForAction, type ApiClient } from '../helpers/api'
 import { prisma, dbAvailable } from '../helpers/db'
+import { expectNoAxeViolations } from '../helpers/axe'
 import { ADMIN_EMAIL, ADMIN_PASSWORD, pageLogin } from '../helpers/ui'
 
 // §W — Per-channel captions (change 012, wave 1: AC-12 → AC-20, AC-22, AC-26;
@@ -453,35 +454,10 @@ const n = (x: number) => x.toLocaleString('en-US')
 const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 const startsWith = (s: string) => new RegExp(`^${escapeRe(s)}`)
 
-// 014's AC-19 axe rules (a11y.test.ts, T18), run here over the draft page in
-// the caption states 014's own scan never sees: notices, warnings, a FAILED row
-// (NFR-07). The list is copied, not imported: importing a spec file would
-// register its tests a second time.
-const AXE_RULES = [
-  'label',
-  'select-name',
-  'aria-input-field-name',
-  'aria-toggle-field-name',
-  'button-name',
-  'link-name',
-  'page-has-heading-one',
-  'scrollable-region-focusable',
-  'target-size',
-  'aria-allowed-attr',
-  'aria-valid-attr-value',
-  'aria-required-attr',
-]
-async function expectNoAxeViolations(page: Page, what: string) {
-  if (!(await page.evaluate(() => 'axe' in window))) {
-    await page.addScriptTag({ path: require.resolve('axe-core/axe.min.js') })
-  }
-  const violations = await page.evaluate(async (rules) => {
-    const { axe } = window as unknown as { axe: typeof import('axe-core') }
-    const result = await axe.run(document, { runOnly: { type: 'rule', values: rules } })
-    return result.violations.flatMap((v) => v.nodes.map((node) => `${v.id}: ${node.target.join(' ')}`))
-  }, AXE_RULES)
-  expect(violations, `axe (014 AC-19) on ${what}`).toEqual([])
-}
+// 014's AC-19 axe scan (tests/helpers/axe.ts, 018 FR-07), run here over the
+// draft page in the caption states 014's own scan never sees: notices,
+// warnings, a FAILED row (NFR-07). No settle step: each case waits for the
+// state it asserts on, as it always has.
 
 test.describe('§W — wave 2: Regenerate all, the headline and the caption panels', () => {
   let api: ApiClient

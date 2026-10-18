@@ -11,7 +11,7 @@ import { ModelPicker } from '@/components/ui/ModelPicker'
 import { ApiError, apiFetch } from '@/lib/apiFetch'
 import type { ModelKey } from '@/lib/models/catalogue'
 import { CHANNEL_VALUES } from '@/lib/channels'
-import { COMPACT_FIELD, FOCUS, ICON, ICON_BUTTON, SCROLL_FOCUS, SMALL_CAPS } from '@/components/ui/folio'
+import { COMPACT_FIELD, EYEBROW, FOCUS, ICON, ICON_BUTTON, SCROLL_FOCUS } from '@/components/ui/folio'
 
 // Shape the model proposes inside a ```schedule block (see briefingAssistant.ts).
 interface SchedulePlanItem {
@@ -275,7 +275,7 @@ export function BriefingAssistantPanel({ campaignId, open, onClose, onApply }: B
         {/* Documents */}
         <div className="space-y-2 border-b border-line-subtle px-5 py-4">
           <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-            <p className={`${SMALL_CAPS} text-fg-muted`}>
+            <p className={EYEBROW}>
               Source documents &amp; images ({docs.length}/5)
             </p>
             <Button
@@ -348,7 +348,7 @@ export function BriefingAssistantPanel({ campaignId, open, onClose, onApply }: B
             <ol className="border-t border-line-subtle">
               {messages.map((m, i) => (
                 <li key={i} className="border-b border-line-subtle py-3">
-                  <p className={`${SMALL_CAPS} mb-1 text-fg-muted`}>
+                  <p className={`${EYEBROW} mb-1`}>
                     {m.role === 'user' ? 'You' : 'Assistant'}
                   </p>
                   <p
@@ -390,7 +390,7 @@ export function BriefingAssistantPanel({ campaignId, open, onClose, onApply }: B
           >
             <div className="mb-2 flex items-center gap-2">
               <CalendarClock {...ICON} aria-hidden className="flex-shrink-0 text-fg-muted" />
-              <p className={`${SMALL_CAPS} text-fg-muted`}>
+              <p className={EYEBROW}>
                 Proposed schedule ({plan.length}) — review, edit, then schedule
               </p>
             </div>

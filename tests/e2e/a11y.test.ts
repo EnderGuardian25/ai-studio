@@ -1,5 +1,6 @@
 import { test, expect, type Locator, type Page } from '@playwright/test'
 import { loginAs, type ApiClient } from '../helpers/api'
+import { expectNoAxeViolations } from '../helpers/axe'
 import {
   ADMIN_EMAIL,
   ADMIN_PASSWORD,
@@ -1045,45 +1046,9 @@ test.describe('ARIA states (T17)', () => {
 
 // ── T18: the axe-core scan (AC-19) ───────────────────────────────────────────
 
-// The rules AC-19 names, and only those (runOnly keeps the scan scoped to what
-// 014 fixes). `nested-interactive` is deliberately absent: the library tile's
-// nested button predates 014 (011 T7). A rule is never removed to make the
-// scan pass.
-const AXE_RULES = [
-  'label',
-  'select-name',
-  'aria-input-field-name',
-  'aria-toggle-field-name',
-  'button-name',
-  'link-name',
-  'page-has-heading-one',
-  'scrollable-region-focusable',
-  'target-size',
-  'aria-allowed-attr',
-  'aria-valid-attr-value',
-  'aria-required-attr',
-]
-
-type Axe = typeof import('axe-core')
-
-// Inject axe-core (the declared devDependency, design.md §6) once the page has
-// settled, run the AC-19 rules over the whole document, and expect no
-// violation. Each one is reported as `rule: node target`.
-async function expectNoAxeViolations(page: Page, what: string) {
-  await page.waitForLoadState('networkidle')
-  await page.evaluate(async () => {
-    await document.fonts.ready
-  })
-  if (!(await page.evaluate(() => 'axe' in window))) {
-    await page.addScriptTag({ path: require.resolve('axe-core/axe.min.js') })
-  }
-  const violations = await page.evaluate(async (rules) => {
-    const { axe } = window as unknown as { axe: Axe }
-    const result = await axe.run(document, { runOnly: { type: 'rule', values: rules } })
-    return result.violations.flatMap((v) => v.nodes.map((n) => `${v.id}: ${n.target.join(' ')}`))
-  }, AXE_RULES)
-  expect(violations, `axe (AC-19) on ${what}`).toEqual([])
-}
+// The scan itself (the AC-19 rules, axe injection, `incomplete` logging) is
+// the shared tests/helpers/axe.ts (018 FR-07). Every call here opts into
+// its settle step, the networkidle + fonts wait this suite always ran.
 
 test.describe('axe scan (T18)', () => {
   let api: ApiClient
@@ -1112,45 +1077,45 @@ test.describe('axe scan (T18)', () => {
   test('AC-19: /login', async ({ page }) => {
     await page.goto('/login')
     await expect(page.getByRole('button', { name: 'Sign in' })).toBeVisible()
-    await expectNoAxeViolations(page, '/login')
+    await expectNoAxeViolations(page, '/login', { settle: true })
   })
 
   test('AC-19: the dashboard, /library, /campaigns, /settings and /admin/users', async ({ page }) => {
     await pageLogin(page)
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
-    await expectNoAxeViolations(page, '/')
+    await expectNoAxeViolations(page, '/', { settle: true })
 
     await page.goto('/library')
     await expect(page.getByRole('heading', { name: 'Library', level: 1 })).toBeVisible()
-    await expectNoAxeViolations(page, '/library')
+    await expectNoAxeViolations(page, '/library', { settle: true })
 
     await page.goto('/campaigns')
     await expect(page.getByRole('heading', { name: 'Campaigns', level: 1 })).toBeVisible()
-    await expectNoAxeViolations(page, '/campaigns')
+    await expectNoAxeViolations(page, '/campaigns', { settle: true })
 
     await page.goto('/settings')
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
-    await expectNoAxeViolations(page, '/settings')
+    await expectNoAxeViolations(page, '/settings', { settle: true })
 
     await page.goto('/admin/users')
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
     await expect(page.getByRole('row').nth(1)).toBeVisible()
-    await expectNoAxeViolations(page, '/admin/users')
+    await expectNoAxeViolations(page, '/admin/users', { settle: true })
   })
 
   test('AC-19: /brief steps 1, 2 and 3', async ({ page }) => {
     await pageLogin(page)
     await page.goto('/brief')
     await expect(page.getByRole('heading', { name: 'Select Campaign' })).toBeVisible()
-    await expectNoAxeViolations(page, '/brief step 1')
+    await expectNoAxeViolations(page, '/brief step 1', { settle: true })
 
     await briefStepTwo(page)
-    await expectNoAxeViolations(page, '/brief step 2')
+    await expectNoAxeViolations(page, '/brief step 2', { settle: true })
 
     await page.getByRole('button', { name: /Path B — Freeform/ }).click()
     await page.getByRole('button', { name: /continue/i }).click()
     await expect(page.getByRole('heading', { name: 'Brief & Caption Direction' })).toBeVisible()
-    await expectNoAxeViolations(page, '/brief step 3')
+    await expectNoAxeViolations(page, '/brief step 3', { settle: true })
   })
 
   test('AC-19: /drafts/[id]', async ({ page }) => {
@@ -1164,7 +1129,7 @@ test.describe('axe scan (T18)', () => {
     for (const name of ['Design model', 'Headline model', 'Instagram caption model', 'Refine model']) {
       await expect(page.getByRole('combobox', { name, exact: true })).toBeVisible()
     }
-    await expectNoAxeViolations(page, '/drafts/[id]')
+    await expectNoAxeViolations(page, '/drafts/[id]', { settle: true })
   })
 
   test('AC-19: /campaigns/[id] and /projects/[id]', async ({ page }) => {
@@ -1176,11 +1141,11 @@ test.describe('axe scan (T18)', () => {
     await page.goto(`/campaigns/${camp.id}`)
     await expect(page.getByRole('heading', { name: camp.name, level: 1 })).toBeVisible()
     await expect(page.getByText(`T10 pending`, { exact: false }).first()).toBeVisible()
-    await expectNoAxeViolations(page, '/campaigns/[id]')
+    await expectNoAxeViolations(page, '/campaigns/[id]', { settle: true })
 
     await page.goto(`/projects/${project.id}`)
     await expect(page.getByRole('heading', { name: project.name, level: 1 })).toBeVisible()
-    await expectNoAxeViolations(page, '/projects/[id]')
+    await expectNoAxeViolations(page, '/projects/[id]', { settle: true })
   })
 
   test('AC-19: /admin/brandkits with a kit open in edit mode', async ({ page }) => {
@@ -1190,7 +1155,7 @@ test.describe('axe scan (T18)', () => {
     const kitPanel = await openKit(page, kit.name)
     await kitPanel.getByRole('button', { name: 'Edit', exact: true }).click()
     await expect(kitPanel.getByPlaceholder('#1A2B3C', { exact: true })).toBeVisible()
-    await expectNoAxeViolations(page, '/admin/brandkits (kit in edit mode)')
+    await expectNoAxeViolations(page, '/admin/brandkits (kit in edit mode)', { settle: true })
   })
 
   test('AC-19: /team with the register form open', async ({ page }) => {
@@ -1204,6 +1169,6 @@ test.describe('axe scan (T18)', () => {
     await expect(
       page.getByRole('region', { name: 'Models', exact: true }).getByRole('button', { name: 'Save', exact: true }),
     ).toBeVisible()
-    await expectNoAxeViolations(page, '/team (register form open)')
+    await expectNoAxeViolations(page, '/team (register form open)', { settle: true })
   })
 })

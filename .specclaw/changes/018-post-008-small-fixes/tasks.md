@@ -29,7 +29,7 @@ This change has **4 tasks in 2 waves**. Each task is implemented by a subagent, 
     - Copy RefinementPanel's `settleArmed` pattern exactly.
     - Do the mutation check for AC-05 and record it.
 
-- [ ] `T3` — Test hygiene and small UI/docs
+- [x] `T3` — Test hygiene and small UI/docs
   - Files: `tests/helpers/axe.ts` (new), `tests/e2e/a11y.test.ts`, `tests/e2e/captions.test.ts`, `tests/e2e/model-selection.test.ts`, `tests/unit/uiTokenGuard.test.ts`, `src/components/campaigns/BriefingAssistantPanel.tsx`, `docs/ui-reference/DESIGN_SYSTEM.md`
   - Estimate: medium
   - Kind: test

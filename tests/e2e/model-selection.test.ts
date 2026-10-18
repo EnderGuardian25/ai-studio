@@ -1,6 +1,7 @@
 import { test, expect, type APIResponse, type Locator, type Page, type Request } from '@playwright/test'
 import { loginAs, waitForDraft, waitForAction, type ApiClient } from '../helpers/api'
 import { prisma, dbAvailable } from '../helpers/db'
+import { expectNoAxeViolations } from '../helpers/axe'
 import { ADMIN_EMAIL, ADMIN_PASSWORD, briefDraftIds, pageLogin } from '../helpers/ui'
 
 // §Y — Model selection (change 008, wave 1: AC-15 → AC-22; wave 2: AC-27 →
@@ -618,33 +619,8 @@ test.describe('§Y — model selection: stamps, policy and the recorder', () => 
 
 // ── AC-22: /team → Models ────────────────────────────────────────────────────
 
-// 014's AC-19 axe rules (a11y.test.ts, T18). Copied, not imported: importing a
-// spec file would register its tests a second time (the §W precedent).
-const AXE_RULES = [
-  'label',
-  'select-name',
-  'aria-input-field-name',
-  'aria-toggle-field-name',
-  'button-name',
-  'link-name',
-  'page-has-heading-one',
-  'scrollable-region-focusable',
-  'target-size',
-  'aria-allowed-attr',
-  'aria-valid-attr-value',
-  'aria-required-attr',
-]
-async function expectNoAxeViolations(page: Page, what: string) {
-  if (!(await page.evaluate(() => 'axe' in window))) {
-    await page.addScriptTag({ path: require.resolve('axe-core/axe.min.js') })
-  }
-  const violations = await page.evaluate(async (rules) => {
-    const { axe } = window as unknown as { axe: typeof import('axe-core') }
-    const result = await axe.run(document, { runOnly: { type: 'rule', values: rules } })
-    return result.violations.flatMap((v) => v.nodes.map((node) => `${v.id}: ${node.target.join(' ')}`))
-  }, AXE_RULES)
-  expect(violations, `axe (014 AC-19) on ${what}`).toEqual([])
-}
+// 014's AC-19 axe scan is tests/helpers/axe.ts (018 FR-07). No settle step:
+// each case waits for the state it asserts on, as it always has.
 
 test.describe('§Y — /team → Models', () => {
   let api: ApiClient
@@ -881,6 +857,8 @@ test.describe('§Y — the pickers (wave 2)', () => {
     briefDraftsBefore = new Set(await briefDraftIds(api))
   })
   test.afterEach(async () => {
+    // beforeEach skipped (no test DB): nothing was set up, and `api` is unset.
+    if (!dbAvailable) return
     await resetPolicy(teamId)
     // A wizard walk autosaves an unfinished brief; discard any this suite left.
     for (const id of await briefDraftIds(api)) {
@@ -966,7 +944,10 @@ test.describe('§Y — the pickers (wave 2)', () => {
   })
 
   // TC-MODEL-14 — AC-28 (FR-19, A5) and AC-33 (the Review step's axe scan).
-  test('the wizard: the Review pickers pre-select the defaults, a path change resets an Opus pick with the reason, a resume restores it, and it reaches the brief', async ({ page }) => {
+  // 018 FR-07 (008 verify gap 4): the Caption picker is changed too, so a
+  // regression that drops `captionModel` from the autosave, the resume or the
+  // POST turns this case red.
+  test('the wizard: the Review pickers pre-select the defaults, a path change resets an Opus pick with the reason, a resume restores both picks, and they reach the brief', async ({ page }) => {
     if (!MOCKED()) { test.skip(); return }
     test.setTimeout(180_000)
     const f = await suiteFixture(api)
@@ -989,8 +970,12 @@ test.describe('§Y — the pickers (wave 2)', () => {
     await expect(summary(page, 'Design model')).toHaveText('Sonnet 5.5')
     await expectNoAxeViolations(page, '/brief Review step (with the model pickers)')
 
-    // Pick Opus: the summary follows, and the autosave carries the pick.
-    const savedOpus = autosaved(page, (p) => p.designModel === 'OPUS')
+    // Pick Sonnet for the caption and Opus for the design: the summary follows,
+    // and the autosave carries both picks.
+    const savedOpus = autosaved(page, (p) => p.captionModel === 'SONNET' && p.designModel === 'OPUS')
+    await caption.selectOption('SONNET')
+    await expect(summary(page, 'Caption model')).toHaveText('Sonnet 5.5')
+    await expect(hintOf(page, 'brief-caption-model')).toHaveCount(0)
     await design.selectOption('OPUS')
     await expect(summary(page, 'Design model')).toHaveText('Opus 5.5')
     await expect(hintOf(page, 'brief-design-model')).toHaveCount(0) // the default's reason no longer applies
@@ -1003,6 +988,7 @@ test.describe('§Y — the pickers (wave 2)', () => {
     await choosePath(page, 'A', f.templateName)
     await continueToReview(page)
     await expect(design).toHaveValue('HAIKU')
+    await expect(caption).toHaveValue('SONNET') // the path never touches the caption pick
     await expect(hintOf(page, 'brief-design-model')).toContainText("Opus 5.5 isn't available for template fill")
     expect(await optionValues(design)).toEqual(['HAIKU', 'SONNET'])
     await expect(summary(page, 'Design model')).toHaveText('Haiku 4.5')
@@ -1015,30 +1001,35 @@ test.describe('§Y — the pickers (wave 2)', () => {
     await expect(design).toHaveValue('SONNET')
     await expect(hintOf(page, 'brief-design-model')).toHaveText('Default')
 
-    // Pick Opus again; a resumed brief restores it.
-    const savedAgain = autosaved(page, (p) => p.designModel === 'OPUS' && p.designMode === 'GENERATE')
+    // Pick Opus again; a resumed brief restores both picks.
+    const savedAgain = autosaved(
+      page,
+      (p) => p.captionModel === 'SONNET' && p.designModel === 'OPUS' && p.designMode === 'GENERATE',
+    )
     await design.selectOption('OPUS')
     expect(((await (await savedAgain).json()) as { id: string }).id).toBe(briefDraftId)
     await page.goto(`/brief?resume=${briefDraftId}`)
     await expect(page.getByRole('heading', { name: 'Review & Generate' })).toBeVisible({ timeout: 20_000 })
     await expect(design).toHaveValue('OPUS', { timeout: 20_000 })
-    await expect(caption).toHaveValue('HAIKU')
+    await expect(caption).toHaveValue('SONNET')
     await expect(summary(page, 'Design model')).toHaveText('Opus 5.5')
+    await expect(summary(page, 'Caption model')).toHaveText('Sonnet 5.5')
 
-    // Generate: the body carries the changed pick only (A5); the brief stores
-    // it, and the design runs it as the request.
+    // Generate: the body carries both changed picks (A5); the brief stores
+    // them, the captions are stamped Sonnet, and both run as the request.
     await clearCalls(api)
     const { body, draft } = await generateFromReview(page, api)
     expect(body.designModel).toBe('OPUS')
-    expect(body).not.toHaveProperty('captionModel')
+    expect(body.captionModel).toBe('SONNET')
     expect(draft.designModel).toBe(OPUS)
-    for (const c of captionsOf(draft)) expect(c.model, c.channel).toBe(HAIKU)
+    expect(captionsOf(draft).length).toBeGreaterThan(0)
+    for (const c of captionsOf(draft)) expect(c.model, c.channel).toBe(SONNET)
     expect(
       await prisma!.brief.findFirstOrThrow({ where: { topic }, select: { captionModel: true, designModel: true } }),
-    ).toEqual({ captionModel: null, designModel: 'OPUS' })
+    ).toEqual({ captionModel: 'SONNET', designModel: 'OPUS' })
     const calls = await readCalls(api)
     expectRan(calls, 'DESIGN_FREEFORM', OPUS, 'request')
-    expectRan(calls, 'CAPTION', HAIKU, 'system')
+    expectRan(calls, 'CAPTION', SONNET, 'request')
     // The unfinished brief went with the generation.
     await expect.poll(() => briefDraftIds(api)).not.toContain(briefDraftId)
   })

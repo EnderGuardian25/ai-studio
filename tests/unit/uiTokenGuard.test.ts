@@ -11,7 +11,8 @@ import { join, relative, resolve } from 'node:path'
 //
 // 014 FR-11 adds four tokens to that guard, matched as whole class tokens:
 // glow-blob, animate-scale-in, font-inter and the legacy primary colour family
-// (text-primary, hover:bg-primary-light, text-primary/50, …).
+// (text-primary, hover:bg-primary-light, text-primary/50, …). 018 FR-07 widens
+// the family to digit-suffixed shades (text-primary-500, bg-primary-600/20).
 //
 // 014 FR-05: the shared Folio atoms and page primitives are defined once, in
 // src/components/ui/. Any other file under src/ that declares one of their
@@ -51,13 +52,13 @@ const PATTERNS: Array<[string, RegExp]> = [
   [
     'legacy primary colour',
     new RegExp(
-      `${START}(?:bg|text|border|ring|from|to|via|fill|stroke|divide|outline|placeholder|decoration|shadow)-primary(?:-[a-z]+)*${END}`
+      `${START}(?:bg|text|border|ring|from|to|via|fill|stroke|divide|outline|placeholder|decoration|shadow)-primary(?:-[a-z0-9]+)*${END}`
     ),
   ],
 ]
 
 const SHARED_NAME =
-  /^\s*(?:export\s+(?:default\s+)?)?(?:async\s+)?(?:const|let|function)\s+(FOCUS|SCROLL_FOCUS|SMALL_CAPS|EYEBROW|FIELD_LABEL|PAGE_TITLE|PAGE_LEAD|SECTION_HEAD|SECTION_NUMERAL|SUB_HEAD|KIT_TITLE|STEP_HEAD|STEP_NUMERAL|STEP_LEAD|GROUP_HEAD|ASIDE_HEAD|NOTICE|WARN_NOTICE|ICON|ICON_SM|ICON_BUTTON|TEXT_LINK|TAG|TABLE_HEAD_ROW|COMPACT_FIELD|PageHead|PageTitle|SectionHead|SectionHeader|Notice|FieldLabel|StatusWord)\b/
+  /^\s*(?:export\s+(?:default\s+)?)?(?:async\s+)?(?:const|let|function)\s+(FOCUS|SCROLL_FOCUS|SMALL_CAPS|EYEBROW|FIELD_LABEL|PAGE_TITLE|PAGE_LEAD|SECTION_HEAD|SECTION_NUMERAL|SUB_HEAD|KIT_TITLE|STEP_HEAD|STEP_NUMERAL|STEP_LEAD|GROUP_HEAD|ASIDE_HEAD|NOTICE|WARN_NOTICE|ICON|ICON_SM|ICON_BUTTON|TEXT_LINK|TAG|TABLE_HEAD_ROW|COMPACT_FIELD|COMPACT_TEXTAREA|PageHead|PageTitle|SectionHead|SectionHeader|Notice|FieldLabel|StatusWord)\b/
 const SMALL_CAPS_LITERAL = /tracking-\[0\.14em\]/
 const UI_DIR = 'src/components/ui/'
 
@@ -137,6 +138,9 @@ describe('UI token guard (AC-14)', () => {
     ['<span className="text-primary/50">', 'text-primary'],
     ['<div className={`bg-primary-light ${x}`}>', 'bg-primary-light'],
     ['<svg className="[&_path]:fill-primary">', 'fill-primary'],
+    // 018 FR-07: the digit-suffixed shades of the legacy family.
+    ['<p className="text-primary-500">', 'text-primary-500'],
+    ['<div className="hover:bg-primary-600/20">', 'bg-primary-600'],
   ])('flags %s', (line, token) => {
     const hits = findViolations('sample.tsx', line)
     expect(hits).toHaveLength(1)
@@ -147,6 +151,7 @@ describe('UI token guard (AC-14)', () => {
     '<Button variant="primary">',
     '<div className="my-glow-blob-x" />',
     '<p className="xtext-primary">',
+    '<p className="xtext-primary-500">',
     '<p className="animate-scale-in-out font-interface">',
     '<p className="text-fg">Primary text</p>',
     '// animate-modal-in, not the old scale-in keyframe: the keyframes must carry',
