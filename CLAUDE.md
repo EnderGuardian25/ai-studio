@@ -4,7 +4,7 @@ This repo contains planning documents for **bistec-studio**, an internal marketi
 
 ## ✅ Outstanding work — START HERE (updated 2026-10-19)
 
-- **⏸️ 2026-10-19 — PICK UP HERE. This repo is `bistec-oss/studio`, and since 2026-10-18 it carries the fork's `v2`. 018 is VERIFIED PASS. 022 (prod data and deploy restore) is building: T1 and T2 are done, T3 (these docs) is in review, and T4 (the full gate and CI) is next. After 022: 021 Graphite, then 019 and 020.** Full detail: [`docs/handoff.md`](docs/handoff.md) top section and its **pre-merge prod checklist**.
+- **⏸️ 2026-10-19 — PICK UP HERE. This repo is `bistec-oss/studio`, and since 2026-10-18 it carries the fork's `v2`. 018 is VERIFIED PASS. 022 (prod data and deploy restore) is building: T1–T3 are done; T4 gate passed locally; CI pending (the orchestrator records the run ID). After 022: 021 Graphite, then 019 and 020.** Full detail: [`docs/handoff.md`](docs/handoff.md) top section and its **pre-merge prod checklist**.
   - **The fork era (2026-10-07 to 2026-10-14) is in [`docs/fork-history.md`](docs/fork-history.md).** It is superseded context, not instructions. That file also holds the procedure for importing code from the fork.
   - **Repo rules. This entry is authoritative; `docs/handoff.md` links here.**
     - This repo is **`bistec-oss/studio`**, and **`origin` points to it**.
@@ -27,11 +27,12 @@ This repo contains planning documents for **bistec-studio**, an internal marketi
     - **022:**
       - T1 (`8b5c551`): the carry-over migration `20261012130000_legacy_caption_carryover`, the `LegacyCaptionArchive` table and `npm run test:upgrade`;
       - T2 (`6d02d6b`): the env preflight before migrate, the catalogue comment and the restored `docker-publish.yml`;
-      - T3: these docs; T4: the full gate and CI, then verify.
+      - T3 (`7982636`): these docs;
+      - T4: gate passed locally (E2E 390/3/0/0, unit 2556/2556, `test:upgrade` 3/3); CI pending (the orchestrator records the run ID). Then verify.
       - 022 does not merge or deploy. After verify, the merge waits on the checklist's operator steps and the user's go-ahead.
     - **021 Graphite re-theme:** planned, 8 tasks in 3 waves. It builds after 022.
     - **019 (claim token) and 020 (Create post button off the draft page):** approved (bounded), not planned yet. Run `/specclaw:plan` first.
-  - **Gates now:** unit 2556/2556, lint 0 errors / 7 warnings. The last full clean mock E2E was 390/3/0/0 (018 verify).
+  - **Gates now:** unit 2556/2556, lint 0 errors / 7 warnings. The last full clean mock E2E was 390/3/0/0 (022 T4, 2026-10-19).
   - **The company prod items are live to-dos again.** The fork era called them "company history"; they are not.
     - **B4:** the prod scheduler resource isn't running. Read [`docs/scheduler-b4-diagnosis-2026-08-03.md`](docs/scheduler-b4-diagnosis-2026-08-03.md) first.
     - **Team Claude tokens:** neither prod team has one, so scheduled and MCP runs fail on credentials.

@@ -70,7 +70,7 @@ No real model calls. Never run two implementers in this checkout. Use `export MS
 
 ### Wave 3 — Gate
 
-- [ ] `T4` — Full gate and CI
+- [x] `T4` — Full gate and CI
   - Files: `docs/handoff.md`, `CLAUDE.md`
   - Estimate: small
   - Kind: test
