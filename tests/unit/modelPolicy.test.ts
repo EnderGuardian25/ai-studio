@@ -473,9 +473,11 @@ describe('loadModelsView — GET /api/models (FR-13)', () => {
       const view = await loadModelsView({ userId: 'u1', teamId: 'team1' })
       expect(view.captionProviderIsClaude).toBe(expected)
     }
-    // The team's DEFAULT COPY provider, scoped to the session team.
+    // The team's DEFAULT COPY provider, scoped to the session team, reading
+    // the provider name only (018 FR-04).
     expect(h.providerFindFirst).toHaveBeenCalledWith({
       where: { slot: 'COPY', teamId: 'team1', isDefault: true, isEnabled: true },
+      select: { providerName: true },
     })
   })
 })

@@ -127,20 +127,19 @@ async function loadDraft(id: string) {
     explanation: string
   } | null
 
-  const kit = await resolveBrandKit(draft.teamId, draft.brief.campaignId ?? undefined, draft.brief.brandKitId ?? undefined)
-
-  // FR-14/AC-18: a twice-failed refine is a distinct outcome, not the
-  // existing error channel — re-derived from the retained rejected row on
-  // every poll (Ruling E), never trusted off the stored FK alone.
-  const notApplied = await resolveNotAppliedOutcome(draft)
-
-  // 008 FR-20: the caption pickers hide when this draft's own caption provider
-  // isn't Claude — the same lookup regenerate-copy refuses a pick on (the
-  // brief's key, else the team default), not GET /api/models' team default.
-  const captionProviderIsClaude = await copyProviderIsClaude(
-    draft.brief.teamId,
-    draft.brief.copyProviderKey ?? undefined,
-  )
+  // Three independent reads, run together (018 FR-04: this GET is the 4 s poll).
+  const [kit, notApplied, captionProviderIsClaude] = await Promise.all([
+    resolveBrandKit(draft.teamId, draft.brief.campaignId ?? undefined, draft.brief.brandKitId ?? undefined),
+    // FR-14/AC-18: a twice-failed refine is a distinct outcome, not the
+    // existing error channel — re-derived from the retained rejected row on
+    // every poll (Ruling E), never trusted off the stored FK alone.
+    resolveNotAppliedOutcome(draft),
+    // 008 FR-20: the caption pickers hide when this draft's own caption
+    // provider isn't Claude — the same lookup regenerate-copy refuses a pick on
+    // (the brief's key, else the team default), not GET /api/models' team
+    // default. It selects the provider name only.
+    copyProviderIsClaude(draft.brief.teamId, draft.brief.copyProviderKey ?? undefined),
+  ])
 
   return {
     ownerId: draft.brief.userId,

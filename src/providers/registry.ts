@@ -1,3 +1,4 @@
+import type { Prisma } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
 import { decrypt } from "@/lib/crypto"
 import type { CopyProvider } from "./interfaces/CopyProvider"
@@ -47,15 +48,24 @@ function instantiateImageProvider(providerName: string, apiKey: string): ImagePr
 // The registered COPY row a caption run uses: the brief's explicit providerKey
 // (team-scoped, enabled), else the team's enabled default. null = no row, so
 // resolveCopyProvider falls to the CLI (CLI mode) or ANTHROPIC_API_KEY.
-async function findCopyProviderRecord(teamId: string, providerKey?: string) {
+// Each caller selects only the columns it reads (018 FR-04): the draft poll
+// asks copyProviderIsClaude on every GET and needs the name alone, never the
+// encrypted key.
+async function findCopyProviderRecord<S extends Prisma.AvailableProviderSelect>(
+  teamId: string,
+  providerKey: string | undefined,
+  select: S,
+): Promise<Prisma.AvailableProviderGetPayload<{ select: S }> | null> {
   if (providerKey) {
     const record = await prisma.availableProvider.findFirst({
       where: { slot: "COPY", providerKey, teamId, isEnabled: true },
+      select,
     })
     if (record) return record
   }
   return prisma.availableProvider.findFirst({
     where: { slot: "COPY", teamId, isDefault: true, isEnabled: true },
+    select,
   })
 }
 
@@ -79,7 +89,7 @@ const COPY_PROVIDER_FAMILY: Readonly<Record<string, "claude" | "other">> = {
  * NOT consulted: the mock stands in for whichever provider the team has.
  */
 export async function copyProviderIsClaude(teamId: string, providerKey?: string): Promise<boolean> {
-  const record = await findCopyProviderRecord(teamId, providerKey)
+  const record = await findCopyProviderRecord(teamId, providerKey, { providerName: true })
   return !record || COPY_PROVIDER_FAMILY[record.providerName.toLowerCase()] !== "other"
 }
 
@@ -106,7 +116,10 @@ export async function resolveCopyProvider(teamId: string, providerKey?: string):
     }
   }
 
-  const record = await findCopyProviderRecord(teamId, providerKey)
+  const record = await findCopyProviderRecord(teamId, providerKey, {
+    providerName: true,
+    encryptedApiKey: true,
+  })
   if (record) {
     return instantiateCopyProvider(record.providerName, providerApiKey(record))
   }

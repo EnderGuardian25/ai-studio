@@ -1,0 +1,2 @@
+{"ev":"start","span":"W1","kind":"wave","label":"wave 1","at":"2026-10-18T16:46:39Z","ts":1792341999}
+{"ev":"start","span":"T1","kind":"task","label":"T1 resume","parent":"W1","model":"opus","attempt":"2","at":"2026-10-18T16:46:40Z","ts":1792342000}

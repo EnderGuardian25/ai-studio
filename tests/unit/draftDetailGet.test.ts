@@ -8,10 +8,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 const h = vi.hoisted(() => ({
   draftFindUnique: vi.fn(),
+  providerFindFirst: vi.fn(),
   copyProviderIsClaude: vi.fn(),
+  resolveBrandKit: vi.fn(),
 }))
 
-vi.mock('@/lib/prisma', () => ({ prisma: { draft: { findUnique: h.draftFindUnique } } }))
+vi.mock('@/lib/prisma', () => ({
+  prisma: { draft: { findUnique: h.draftFindUnique }, availableProvider: { findFirst: h.providerFindFirst } },
+}))
 vi.mock('@/lib/api/handler', () => {
   const wrap =
     (handler: (req: unknown, ctx: { params: unknown }, user: unknown) => unknown) =>
@@ -21,8 +25,14 @@ vi.mock('@/lib/api/handler', () => {
   return { parseBody, withTeamAuth: wrap, withTeamAdmin: wrap }
 })
 vi.mock('@/lib/authz/visibility', () => ({ canAccessContent: () => true }))
-vi.mock('@/providers/registry', () => ({ copyProviderIsClaude: h.copyProviderIsClaude }))
-vi.mock('@/lib/brandkit/resolve', () => ({ resolveBrandKit: async () => null }))
+// The real copyProviderIsClaude behind a spy: the call-argument cases stub it,
+// and the select case (018 FR-04) lets it run against the faked Prisma row.
+vi.mock('@/providers/registry', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/providers/registry')>()
+  h.copyProviderIsClaude.mockImplementation(actual.copyProviderIsClaude)
+  return { copyProviderIsClaude: h.copyProviderIsClaude }
+})
+vi.mock('@/lib/brandkit/resolve', () => ({ resolveBrandKit: h.resolveBrandKit }))
 vi.mock('@/lib/storage/minio', () => ({ resolveExportUrl: async () => null }))
 vi.mock('@/lib/drafts/revisions', () => ({ COMMITTED_REVISION: {}, resolveNotAppliedOutcome: async () => null }))
 vi.mock('@/lib/captions/store', () => ({
@@ -33,6 +43,7 @@ vi.mock('@/lib/captions/store', () => ({
 }))
 
 const { GET } = await import('@/app/api/drafts/[id]/route')
+const realCopyProviderIsClaude = h.copyProviderIsClaude.getMockImplementation()!
 
 // A settled, exported draft: nothing for the recovery sweep to write.
 function exportedDraft(copyProviderKey: string | null) {
@@ -85,7 +96,11 @@ async function get() {
 
 beforeEach(() => {
   h.draftFindUnique.mockReset()
+  h.providerFindFirst.mockReset()
   h.copyProviderIsClaude.mockReset()
+  h.copyProviderIsClaude.mockImplementation(realCopyProviderIsClaude)
+  h.resolveBrandKit.mockReset()
+  h.resolveBrandKit.mockResolvedValue(null)
 })
 
 describe("GET /api/drafts/[id] — captionProviderIsClaude is the draft's own", () => {
@@ -111,5 +126,38 @@ describe("GET /api/drafts/[id] — captionProviderIsClaude is the draft's own", 
     const { status } = await get()
     expect(status).toBe(404)
     expect(h.copyProviderIsClaude).not.toHaveBeenCalled()
+  })
+})
+
+describe('GET /api/drafts/[id] — the provider lookup per poll (018 FR-04)', () => {
+  it('selects the provider name only, on both tiers of the lookup', async () => {
+    h.draftFindUnique.mockResolvedValue(exportedDraft('openai-copy'))
+    // The brief's own key misses, so the team default is read too.
+    h.providerFindFirst.mockResolvedValueOnce(null).mockResolvedValueOnce({ providerName: 'openai' })
+    const { status, body } = await get()
+    expect(status).toBe(200)
+    expect(h.providerFindFirst).toHaveBeenCalledTimes(2)
+    expect(h.providerFindFirst).toHaveBeenNthCalledWith(1, {
+      where: { slot: 'COPY', providerKey: 'openai-copy', teamId: 'team1', isEnabled: true },
+      select: { providerName: true },
+    })
+    expect(h.providerFindFirst).toHaveBeenNthCalledWith(2, {
+      where: { slot: 'COPY', teamId: 'team1', isDefault: true, isEnabled: true },
+      select: { providerName: true },
+    })
+    expect(body.captionProviderIsClaude).toBe(false)
+  })
+
+  it('runs the provider lookup alongside the brand-kit read, not after it', async () => {
+    h.draftFindUnique.mockResolvedValue(exportedDraft(null))
+    h.providerFindFirst.mockResolvedValue(null)
+    let releaseKit!: (kit: { name: string }) => void
+    h.resolveBrandKit.mockReturnValue(new Promise((resolve) => (releaseKit = resolve)))
+    const pending = get()
+    await vi.waitFor(() => expect(h.copyProviderIsClaude).toHaveBeenCalled())
+    releaseKit({ name: 'Kit' })
+    const { body } = await pending
+    expect(body.brandKitName).toBe('Kit')
+    expect(body.captionProviderIsClaude).toBe(true)
   })
 })
