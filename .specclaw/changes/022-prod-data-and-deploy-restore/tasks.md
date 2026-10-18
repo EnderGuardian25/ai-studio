@@ -16,7 +16,7 @@ No real model calls. Never run two implementers in this checkout. Use `export MS
 
 ### Wave 1 — Migration, boot and CI
 
-- [ ] `T1` — The carry-over migration, the archive model and the upgrade-path test
+- [x] `T1` — The carry-over migration, the archive model and the upgrade-path test
   - Files: `prisma/migrations/20261012130000_legacy_caption_carryover/migration.sql` (new), `prisma/schema.prisma`, `scripts/test-upgrade-path.mjs` (new), `package.json`, `.github/workflows/e2e.yml`
   - Estimate: large
   - Kind: migration

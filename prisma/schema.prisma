@@ -820,3 +820,16 @@ model DraftCaption {
   @@unique([draftId, channel])
   @@index([draftId])
 }
+
+// The original single caption of every pre-012 draft that a database coming
+// from `main` still held when 016 dropped Draft."copyText" (022 FR-01/FR-02).
+// Written once by prisma/migrations/20261012130000_legacy_caption_carryover,
+// which also copied the text into DraftCaption rows. A recovery record only:
+// no app code reads it, nothing ever drops it, and on a fork-era database it
+// is empty. Deliberately NO relation to Draft: it must survive a draft delete
+// and must never block one.
+model LegacyCaptionArchive {
+  draftId    String   @id
+  copyText   String   @db.Text
+  archivedAt DateTime @default(now())
+}

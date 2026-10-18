@@ -105,6 +105,15 @@ jobs:
           npx prisma generate
           npx prisma migrate deploy
 
+      # Change 022 FR-03: the upgrade path from main's schema (company prod).
+      # Builds its own scratch database (bistec_studio_upgrade) on the same
+      # service, migrates it from main's head with prod-shaped legacy drafts,
+      # and proves the carry-over converts them before 016's drop, is a no-op
+      # on an already-dropped database, and fails atomically on bad content.
+      # It never touches bistec_studio_test and drops its scratch DB at the end.
+      - name: Upgrade path from main's schema (022)
+        run: npm run test:upgrade
+
       - name: Seed baseline (admin, editor, teams, kits, cli provider)
         # ORDER MATTERS — mirrors scripts/setup-test-db.mjs exactly:
         #   seed-teams runs AFTER admin+editor (it looks both up by email and
