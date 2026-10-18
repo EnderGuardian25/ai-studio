@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/Button'
 import type { DraftNotApplied } from '@/lib/api-types'
 import { formatDateTime } from '@/lib/format'
 import { Notice } from '@/components/ui/Notice'
-import { ICON } from '@/components/ui/folio'
+import { ICON } from '@/components/ui/atoms'
 
 export interface NotAppliedCardProps {
   notApplied: DraftNotApplied

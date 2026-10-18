@@ -105,11 +105,11 @@ export function TeamSwitcher() {
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>
         {/* .surface-raised: opaque menu (FR-08) with the §8.7 item styles;
-            under reduced motion globals.css swaps the drop for a 150 ms fade. */}
+            under reduced motion globals.css swaps the pop for a 150 ms fade. */}
         <DropdownMenu.Content
           align="start"
           sideOffset={6}
-          className="surface-raised z-50 min-w-56 max-w-72 py-1.5 animate-drop"
+          className="surface-raised z-50 min-w-56 max-w-72 origin-top-left py-1.5 animate-pop"
         >
           {teams.map(team => (
             <DropdownMenu.Item

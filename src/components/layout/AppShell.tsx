@@ -13,7 +13,7 @@ import { TeamSwitcher } from '@/components/layout/TeamSwitcher'
 import { CreatePostButton } from '@/components/layout/CreatePostButton'
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser'
 import { authClient } from '@/lib/auth-client'
-import { EYEBROW } from '@/components/ui/folio'
+import { EYEBROW } from '@/components/ui/atoms'
 
 // Folio nav is text only, no icons (DESIGN_SYSTEM.md §8.6).
 interface NavItem {

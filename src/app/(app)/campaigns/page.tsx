@@ -12,9 +12,9 @@ import { Select } from '@/components/ui/Select'
 import { QueryError } from '@/components/ui/QueryError'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { PageHead } from '@/components/ui/PageHead'
-import { FOCUS, ICON, ICON_BUTTON, ICON_SM, SECTION_HEAD, TAG } from '@/components/ui/folio'
+import { FOCUS, ICON, ICON_BUTTON, ICON_SM, SECTION_HEAD, TAG } from '@/components/ui/atoms'
 import { apiFetch } from '@/lib/apiFetch'
-import { ROW_TITLE } from '@/components/campaigns/folio'
+import { ROW_TITLE } from '@/components/campaigns/classes'
 import type { Campaign, BrandKitSummary, ProjectSummary, ProjectRef } from '@/lib/api-types'
 
 export default function CampaignsPage() {

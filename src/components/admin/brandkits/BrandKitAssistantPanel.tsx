@@ -9,7 +9,7 @@ import { ModelPicker } from '@/components/ui/ModelPicker'
 import { ApiError, apiFetch } from '@/lib/apiFetch'
 import type { ModelKey } from '@/lib/models/catalogue'
 import { ColorEditor } from './ColorEditor'
-import { COMPACT_TEXTAREA, EYEBROW, FOCUS, ICON, ICON_BUTTON, SCROLL_FOCUS, TAG } from '@/components/ui/folio'
+import { COMPACT_TEXTAREA, EYEBROW, FOCUS, ICON, ICON_BUTTON, SCROLL_FOCUS, TAG } from '@/components/ui/atoms'
 import { FieldLabel } from '@/components/ui/FieldLabel'
 
 // F5 — conversational brand-kit extraction from reference images. Mirrors the

@@ -8,13 +8,13 @@ import { Button } from '@/components/ui/Button'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { QueryError } from '@/components/ui/QueryError'
 import { PageHead } from '@/components/ui/PageHead'
-import { FOCUS, ICON, ICON_BUTTON, SCROLL_FOCUS } from '@/components/ui/folio'
+import { FOCUS, ICON, ICON_BUTTON, SCROLL_FOCUS } from '@/components/ui/atoms'
 import { apiFetch } from '@/lib/apiFetch'
 import type { AdminBrandKitSummary, AdminBrandKitDetail } from '@/lib/api-types'
 import { AddKitModal } from '@/components/admin/brandkits/AddKitModal'
 import { KitDetail } from '@/components/admin/brandkits/KitDetail'
 import { ColorSwatch } from '@/components/admin/brandkits/shared'
-import { rowCls } from '@/components/admin/brandkits/folio'
+import { rowCls } from '@/components/admin/brandkits/classes'
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 

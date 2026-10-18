@@ -13,7 +13,7 @@ import { ASPECT_LABELS } from '@/lib/aspectRatio'
 import { channelLabel } from '@/lib/channels'
 import { QueueEntryModal } from './QueueEntryModal'
 import { SectionHead } from '@/components/ui/SectionHead'
-import { FOCUS, ICON, ICON_BUTTON, SCROLL_FOCUS, TABLE_HEAD_ROW, TEXT_LINK } from '@/components/ui/folio'
+import { FOCUS, ICON, ICON_BUTTON, SCROLL_FOCUS, TABLE_HEAD_ROW, TEXT_LINK } from '@/components/ui/atoms'
 import type { ScheduledGeneration, GenerationStatus } from '@/lib/api-types'
 
 // Planned-posts queue under a campaign: table of scheduled generations with

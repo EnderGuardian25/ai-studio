@@ -4,7 +4,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import { GOOGLE_FONTS, googleFontsUrl } from './googleFonts'
 import { inputClasses, fieldEdge } from '@/components/ui/Input'
 import { cn } from '@/lib/utils'
-import { FOCUS } from '@/components/ui/folio'
+import { FOCUS } from '@/components/ui/atoms'
 import { FieldLabel } from '@/components/ui/FieldLabel'
 
 // ─── Font Editor ─────────────────────────────────────────────────────────────

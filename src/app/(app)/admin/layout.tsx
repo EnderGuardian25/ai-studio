@@ -1,5 +1,5 @@
 import { resolveTeamForServerComponent } from '@/lib/authz/serverTeam'
-import { GateNotice } from '@/components/team/folio'
+import { GateNotice } from '@/components/ui/GateNotice'
 
 // Server-side gate for every /admin page. The sidebar already hides the Admin
 // entries for non-admins; this enforces it for direct navigation.

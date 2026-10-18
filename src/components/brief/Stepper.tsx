@@ -3,7 +3,7 @@
 import React from 'react'
 import { Check } from 'lucide-react'
 import { STEPS } from './constants'
-import { FOCUS, SMALL_CAPS } from '@/components/ui/folio'
+import { FOCUS, SMALL_CAPS } from '@/components/ui/atoms'
 
 // ─── Stepper ─────────────────────────────────────────────────────────────────
 // Folio (DESIGN_SYSTEM.md §5.2, §6): one ruled column per step. The rule on top

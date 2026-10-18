@@ -9,10 +9,10 @@ import { ArrowLeft, ArrowRight, Megaphone, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Select } from '@/components/ui/Select'
 import { PageTitle } from '@/components/ui/PageHead'
-import { EYEBROW, FOCUS, ICON, ICON_SM, SECTION_HEAD, SECTION_NUMERAL } from '@/components/ui/folio'
+import { EYEBROW, FOCUS, ICON, ICON_SM, SECTION_HEAD, SECTION_NUMERAL } from '@/components/ui/atoms'
 import { apiFetch } from '@/lib/apiFetch'
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser'
-import { ASIDE_BLOCK, CRUMB_CURRENT, CRUMB_LINK } from '@/components/campaigns/folio'
+import { ASIDE_BLOCK, CRUMB_CURRENT, CRUMB_LINK } from '@/components/campaigns/classes'
 import type { ProjectDetail, BrandKitSummary } from '@/lib/api-types'
 
 export default function ProjectDetailPage() {

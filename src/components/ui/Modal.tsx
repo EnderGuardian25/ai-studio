@@ -4,6 +4,7 @@ import React from 'react'
 import * as Dialog from '@radix-ui/react-dialog'
 import { X } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { FOCUS, ICON, ICON_BUTTON, SECTION_HEAD } from './atoms'
 
 // Shared overlay for both the centered Modal and the right-side Drawer.
 // Radix gives us focus trap, Escape-to-close, aria-modal, and return-focus
@@ -22,12 +23,10 @@ function Overlay({ className }: { className?: string }) {
   )
 }
 
-// The header's close (X) button, shared by Modal and Drawer.
-const CLOSE_BUTTON = cn(
-  'p-1 -m-1 rounded-ui-sm flex-shrink-0 text-fg-muted hover:text-fg',
-  'transition-colors duration-fast ease-standard',
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus',
-)
+// The header's close (X) button, shared by Modal and Drawer: the round quiet
+// icon button (the study's .x). The dialog is already --surface-2, so the
+// hover is the canvas, as the study's menu rows do it.
+const CLOSE_BUTTON = cn(ICON_BUTTON, 'hover:bg-canvas hover:text-fg', FOCUS)
 
 interface BaseProps {
   open: boolean
@@ -89,8 +88,8 @@ export function Modal({
           )}
         >
           {!hideHeader && (
-            <div className="flex items-start justify-between gap-4 mb-4 flex-shrink-0">
-              <Dialog.Title className="text-ui-xl font-medium leading-tight text-fg">
+            <div className="flex items-center justify-between gap-4 mb-4 flex-shrink-0">
+              <Dialog.Title className={cn(SECTION_HEAD, 'text-fg')}>
                 {title}
               </Dialog.Title>
               <Dialog.Close asChild>
@@ -98,7 +97,7 @@ export function Modal({
                   aria-label="Close"
                   className={CLOSE_BUTTON}
                 >
-                  <X size={18} />
+                  <X {...ICON} aria-hidden />
                 </button>
               </Dialog.Close>
             </div>
@@ -142,8 +141,8 @@ export function Drawer({
           )}
         >
           {!hideHeader && (
-            <div className="flex items-center justify-between px-5 py-4 border-b border-line-subtle flex-shrink-0">
-              <Dialog.Title className="text-ui-lg font-medium text-fg">
+            <div className="flex items-center justify-between gap-4 px-5 py-3 border-b border-line-subtle flex-shrink-0">
+              <Dialog.Title className={cn(SECTION_HEAD, 'text-fg')}>
                 {title}
               </Dialog.Title>
               <Dialog.Close asChild>
@@ -151,7 +150,7 @@ export function Drawer({
                   aria-label="Close"
                   className={CLOSE_BUTTON}
                 >
-                  <X size={16} />
+                  <X {...ICON} aria-hidden />
                 </button>
               </Dialog.Close>
             </div>

@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { X, KeyRound } from 'lucide-react'
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser'
 import { Notice } from '@/components/ui/Notice'
-import { FOCUS, ICON, ICON_BUTTON, TEXT_LINK } from '@/components/ui/folio'
+import { FOCUS, ICON, ICON_BUTTON, TEXT_LINK } from '@/components/ui/atoms'
 
 // Dismissible post-login banner nudging the user to connect (or reconnect)
 // their personal Claude account. Rendered only in CLI mode — the only mode

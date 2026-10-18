@@ -11,7 +11,7 @@ import { ModelPicker } from '@/components/ui/ModelPicker'
 import { ApiError, apiFetch } from '@/lib/apiFetch'
 import type { ModelKey } from '@/lib/models/catalogue'
 import { CHANNEL_VALUES } from '@/lib/channels'
-import { COMPACT_FIELD, EYEBROW, FOCUS, ICON, ICON_BUTTON, SCROLL_FOCUS } from '@/components/ui/folio'
+import { COMPACT_FIELD, EYEBROW, FOCUS, ICON, ICON_BUTTON, SCROLL_FOCUS } from '@/components/ui/atoms'
 
 // Shape the model proposes inside a ```schedule block (see briefingAssistant.ts).
 interface SchedulePlanItem {

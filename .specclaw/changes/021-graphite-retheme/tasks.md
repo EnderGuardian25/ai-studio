@@ -56,7 +56,7 @@ There are 8 tasks in 3 waves. All the work lands on `v2`, after 018 and 022 (R12
     - **Targeted E2E:** `surfaces.test.ts`, `a11y.test.ts`, `create-post-button.test.ts`, `auth.test.ts`, `ui.test.ts`.
     - **Visual:** capture login and the dashboard in both themes at 1440 and 375, as a review artifact.
 
-- [ ] `T2` — Primitives on Graphite; surface classes; fold the four folio modules into `ui/atoms.ts` and two feature-local `classes.ts`
+- [x] `T2` — Primitives on Graphite; surface classes; fold the four folio modules into `ui/atoms.ts` and two feature-local `classes.ts`
   - Files: `src/app/globals.css` (surface classes; `pop` / `rise` replace `drop`; the reduced-motion selectors), `src/components/ui/folio.ts` → `src/components/ui/atoms.ts` (`git mv`), `src/components/ui/GateNotice.tsx` (new, from `src/components/team/folio.tsx`, which is deleted), `src/components/campaigns/folio.ts` → `src/components/campaigns/classes.ts` (`git mv`), `src/components/admin/brandkits/folio.ts` → `src/components/admin/brandkits/classes.ts` (`git mv`), `src/components/ui/{Button,Panel,Input,Select,FieldLabel,SectionHead,PageHead,StatusChip,Notice,SegmentedToggle,Modal,ConfirmDialog,ImageLightbox,QueryError,ModelPicker,index}.tsx/ts`, `src/components/providers/ToastProvider.tsx`, every importer of the four modules (import paths only; about 60 files), `tests/unit/uiPrimitives.test.ts`, `tests/unit/designTokens.test.ts` (import path, walk list), `tests/unit/uiTokenGuard.test.ts`, `tests/e2e/a11y.test.ts` (the AC-05 expectation), `tests/e2e/surfaces.test.ts` (the press-under-reduced-motion case)
   - Estimate: large
   - Kind: impl

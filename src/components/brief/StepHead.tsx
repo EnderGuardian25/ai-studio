@@ -1,7 +1,7 @@
 'use client'
 
 import React from 'react'
-import { SECTION_HEAD, SECTION_NUMERAL } from '@/components/ui/folio'
+import { SECTION_HEAD, SECTION_NUMERAL } from '@/components/ui/atoms'
 
 // ─── Step head ───────────────────────────────────────────────────────────────
 // Folio section head (DESIGN_SYSTEM.md §8.14): an italic --accent numeral, the

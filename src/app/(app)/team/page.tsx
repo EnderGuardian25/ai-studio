@@ -15,19 +15,21 @@ import { SectionHead } from '@/components/ui/SectionHead'
 import { Notice } from '@/components/ui/Notice'
 import { StatusChip } from '@/components/ui/StatusChip'
 import {
+  BLOCK,
   EYEBROW,
   FOCUS,
   ICON,
   ICON_BUTTON,
   ICON_SM,
+  ROW,
   SMALL_CAPS,
   SUB_HEAD,
   TAG,
-} from '@/components/ui/folio'
+} from '@/components/ui/atoms'
 import { TeamClaudeTokenCard } from '@/components/team/TeamClaudeTokenCard'
 import { ApiKeysCard } from '@/components/team/ApiKeysCard'
 import { ModelsCard } from '@/components/team/ModelsCard'
-import { BLOCK, GateNotice, ROW } from '@/components/team/folio'
+import { GateNotice } from '@/components/ui/GateNotice'
 import { apiFetch } from '@/lib/apiFetch'
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser'
 import { pickServingImageProvider } from '@/providers/imageCapabilities'

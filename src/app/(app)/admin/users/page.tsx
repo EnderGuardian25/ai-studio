@@ -12,8 +12,8 @@ import { Modal } from '@/components/ui/Modal'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { PageHead } from '@/components/ui/PageHead'
 import { StatusChip } from '@/components/ui/StatusChip'
-import { ICON, ICON_SM, SCROLL_FOCUS, TABLE_HEAD_ROW, TAG } from '@/components/ui/folio'
-import { GateNotice } from '@/components/team/folio'
+import { ICON, ICON_SM, SCROLL_FOCUS, TABLE_HEAD_ROW, TAG } from '@/components/ui/atoms'
+import { GateNotice } from '@/components/ui/GateNotice'
 
 interface ManagedUser {
   id: string

@@ -28,6 +28,8 @@ import {
 //          theme toggle, and the Create post button's motion.
 //   021 T1: the Bistec Studio PNG logo is back (AC-10), and the body font is
 //          Plus Jakarta Sans (AC-04).
+//   021 T2: a pressed primary Button computes no scale under reduced motion
+//          (AC-18).
 //   T7–T12, the screen groups: AC-12 (375 px, no horizontal scroll), AC-17
 //          (visible focus on a screen's first three stops) and FR-12 (each
 //          screen's controls, by role and name).
@@ -1330,6 +1332,53 @@ test.describe('AC-18 reduced motion', () => {
     })
     expect(toastAnim.name).toBe('fade')
     expect(durationMs(toastAnim.duration)).toBe(150)
+  })
+
+  // 021 AC-18 (NFR-03): the Button press is a 0.98 scale, switched off under
+  // reduced motion. The same press with motion allowed first proves that the
+  // press lands (so the reduced-motion read is not vacuous). The pointer
+  // leaves before it lifts, so no click submits the form.
+  test('a pressed primary Button computes no scale transform (021)', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await page.goto('/login')
+    const signIn = page.getByRole('button', { name: 'Sign in', exact: true })
+    await expect(signIn).toBeVisible()
+    // The computed x scale: `none` is 1, `matrix(a, b, c, d, e, f)` is a.
+    const scale = () =>
+      signIn.evaluate((el) => {
+        const t = getComputedStyle(el).transform
+        if (t === 'none') return 1
+        const m = t.match(/^matrix\(([^)]+)\)$/)
+        return m ? Number(m[1].split(',')[0]) : Number.NaN
+      })
+    const active = () => signIn.evaluate((el) => el.matches(':active'))
+    const press = async () => {
+      const box = await signIn.boundingBox()
+      if (!box) throw new Error('Sign in has no box')
+      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2)
+      await page.mouse.down()
+      await expect.poll(active).toBe(true)
+    }
+    const release = async () => {
+      await page.mouse.move(2, 2)
+      await page.mouse.up()
+      await expect.poll(scale).toBe(1)
+    }
+
+    await page.emulateMedia({ reducedMotion: 'no-preference' })
+    await press()
+    await expect.poll(scale).toBeCloseTo(0.98, 3)
+    await release()
+
+    await page.emulateMedia({ reducedMotion: 'reduce' })
+    await press()
+    // The 1 ms reduced-motion transition settles at once; poll anyway (011 T2
+    // note 2), then hold the read for a moment to see it stays put.
+    await expect.poll(scale).toBe(1)
+    await page.waitForTimeout(200)
+    expect(await active()).toBe(true)
+    expect(await scale()).toBe(1)
+    await release()
   })
 
   test('the Create post button does not move on hover (shell)', async ({ page }) => {

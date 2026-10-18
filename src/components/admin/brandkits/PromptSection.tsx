@@ -9,7 +9,7 @@ import { fieldClasses, fieldEdge } from '@/components/ui/Input'
 import { FieldLabel } from '@/components/ui/FieldLabel'
 import { apiFetch } from '@/lib/apiFetch'
 import { cn } from '@/lib/utils'
-import { COMPACT_FIELD, ICON, SCROLL_FOCUS, SMALL_CAPS } from '@/components/ui/folio'
+import { COMPACT_FIELD, ICON, SCROLL_FOCUS, SMALL_CAPS } from '@/components/ui/atoms'
 import type { BrandKitPrompt as Prompt } from '@/lib/api-types'
 
 // ─── Prompt Section ───────────────────────────────────────────────────────────

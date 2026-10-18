@@ -7,7 +7,7 @@ import tailwindConfig from '../../tailwind.config'
 import { Button } from '@/components/ui/Button'
 import { Input, fieldClasses, inputClasses } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
-import { COMPACT_FIELD, COMPACT_TEXTAREA, ICON_BUTTON } from '@/components/ui/folio'
+import { COMPACT_FIELD, COMPACT_TEXTAREA, ICON_BUTTON } from '@/components/ui/atoms'
 
 // AC-07 (011 FR-06/FR-07): the semantic tokens live in globals.css, per
 // theme where they vary, and tailwind.config.ts exposes every semantic colour
@@ -173,6 +173,44 @@ describe('semantic tokens in globals.css (AC-07)', () => {
     const bodies = [...css.matchAll(/(?:^|\n)\s*body\s*\{([^}]*)\}/g)].map((m) => m[1])
     expect(bodies).toHaveLength(1)
     expect(bodies[0]).toMatch(/(?:^|[;{\s])font-variant-numeric:\s*tabular-nums\s*;/)
+  })
+
+  // 021 FR-05 (design.md §4.1): the four surface classes are opaque, set
+  // background-COLOR (never the shorthand), and have no backdrop-filter. The
+  // hairlines are box-shadow rings; the bezel's tray is its 6 px border.
+  it.each([
+    ['surface', 'surface-1', 'radius-lg'],
+    ['surface-bezel', 'surface-1', 'radius-xl'],
+    ['surface-raised', 'surface-2', 'radius-md'],
+    ['surface-overlay', 'surface-2', 'radius-lg'],
+  ])('.%s is opaque --%s at --%s', (cls, fill, radius) => {
+    const body = css.match(new RegExp(`\\n\\s*\\.${cls}\\s*\\{([^}]*)\\}`))?.[1]
+    expect(body, `.${cls}`).toBeTruthy()
+    expect(body).toMatch(new RegExp(`background-color:\\s*rgb\\(var\\(--${fill}\\)\\);`))
+    expect(body).toMatch(new RegExp(`border-radius:\\s*var\\(--${radius}\\);`))
+    expect(body).not.toMatch(/backdrop-filter|background:|\/\s*0?\.\d/)
+  })
+
+  it('draws the raised and overlay hairlines as rings, and the bezel tray as a 6 px border', () => {
+    const body = (cls: string) => css.match(new RegExp(`\\n\\s*\\.${cls}\\s*\\{([^}]*)\\}`))?.[1] ?? ''
+    for (const cls of ['surface-raised', 'surface-overlay']) {
+      expect(body(cls)).toMatch(/0 0 0 1px rgb\(var\(--line-subtle\)\)/)
+      expect(body(cls)).not.toMatch(/border:/)
+    }
+    expect(body('surface-bezel')).toMatch(/border:\s*6px solid rgb\(var\(--line-subtle\)\);/)
+    expect(body('surface-bezel')).toMatch(/background-clip:\s*padding-box;/)
+  })
+
+  // 021 FR-05: pop (menus) and rise (toasts) replace the drop entrance, and
+  // the reduced-motion fade covers the pop.
+  it('replaces the drop entrance with pop and rise', () => {
+    expect(css).not.toMatch(/@keyframes drop\b|\.animate-drop\b/)
+    expect(css).toMatch(/@keyframes pop\s*\{[\s\S]*?translateY\(-4px\) scale\(0\.97\)/)
+    expect(css).toMatch(/@keyframes rise\s*\{[\s\S]*?translateY\(12px\) scale\(0\.98\)/)
+    expect(css).toMatch(/\.animate-pop\s*\{\s*animation: pop var\(--dur-base\) var\(--ease-standard\)/)
+    expect(css).toMatch(/\.animate-rise\s*\{\s*animation: rise var\(--dur-slow\) var\(--ease-standard\)/)
+    const reduced = css.match(/@media \(prefers-reduced-motion: reduce\) \{([\s\S]*?)\n\}/)?.[1] ?? ''
+    expect(reduced).toMatch(/\.surface-raised,\s*\.animate-pop,\s*\[data-sonner-toaster\] \[data-sonner-toast\] \{/)
   })
 })
 
@@ -395,7 +433,7 @@ describe('control heights (014 AC-06, 021 A1)', () => {
   it('walks the whole source tree, including the FR-07 files and KitDetail', () => {
     for (const file of [
       'src/components/ui/Button.tsx',
-      'src/components/ui/folio.ts',
+      'src/components/ui/atoms.ts',
       'src/components/layout/AppShell.tsx',
       'src/app/(app)/library/page.tsx',
       'src/components/admin/brandkits/KitDetail.tsx',

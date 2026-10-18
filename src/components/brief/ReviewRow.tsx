@@ -1,7 +1,7 @@
 'use client'
 
 import React from 'react'
-import { EYEBROW } from '@/components/ui/folio'
+import { EYEBROW } from '@/components/ui/atoms'
 
 // ─── Review row ──────────────────────────────────────────────────────────────
 // One ruled row of the Review step's <dl> (DESIGN_SYSTEM.md §8.15): a

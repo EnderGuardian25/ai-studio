@@ -124,7 +124,7 @@ test.describe('Field labels (T9)', () => {
     await api.dispose()
   })
 
-  test('AC-05: Input and Select labels share the brief FieldLabel style (small caps)', async ({ page }) => {
+  test('AC-05: Input and Select labels share the brief FieldLabel style (sentence case, 021 AC-09)', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 })
     await pageLogin(page)
 
@@ -135,8 +135,9 @@ test.describe('Field labels (T9)', () => {
     await page.getByRole('button', { name: /continue/i }).click()
     await expect(page.getByRole('heading', { name: 'Brief & Caption Direction' })).toBeVisible()
     const reference = await labelStyle(page.locator('label').filter({ hasText: /^Topic$/ }))
-    expect(reference.textTransform).toBe('uppercase')
-    expect(reference.fontSize).toBe('11px')
+    // 021 FR-07: field labels are sentence case at 13 px (no longer small caps).
+    expect(reference.textTransform).toBe('none')
+    expect(reference.fontSize).toBe('13px')
 
     // The campaign create form: an Input label and a Select label.
     await page.goto('/campaigns')

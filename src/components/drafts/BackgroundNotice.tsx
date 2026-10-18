@@ -5,7 +5,7 @@ import { ImageOff } from 'lucide-react'
 import type { BackgroundSkipped } from '@/lib/drafts/backgroundNotice'
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser'
 import { Notice } from '@/components/ui/Notice'
-import { FOCUS, ICON } from '@/components/ui/folio'
+import { FOCUS, ICON } from '@/components/ui/atoms'
 
 export interface BackgroundNoticeProps {
   skipped: BackgroundSkipped

@@ -9,7 +9,7 @@ import { apiFetch } from '@/lib/apiFetch'
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser'
 import { cn } from '@/lib/utils'
 import { PageTitle } from '@/components/ui/PageHead'
-import { FOCUS } from '@/components/ui/folio'
+import { FOCUS } from '@/components/ui/atoms'
 
 // Reached when /api/me reports teamChoiceRequired (AppShell redirects here).
 // Deliberately fires no team-scoped query itself — useCurrentUser()'s /api/me

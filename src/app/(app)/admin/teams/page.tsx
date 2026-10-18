@@ -14,14 +14,16 @@ import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { PageHead } from '@/components/ui/PageHead'
 import { SectionHead } from '@/components/ui/SectionHead'
 import {
+  BLOCK,
   FOCUS,
   ICON,
   ICON_BUTTON,
   ICON_SM,
+  ROW,
   SCROLL_FOCUS,
   TABLE_HEAD_ROW,
-} from '@/components/ui/folio'
-import { BLOCK, GateNotice, ROW } from '@/components/team/folio'
+} from '@/components/ui/atoms'
+import { GateNotice } from '@/components/ui/GateNotice'
 import type { AdminTeamSummary, AdminTeamMember } from '@/lib/api-types'
 
 // Super-admin platform-wide team management — models admin/users/page.tsx

@@ -4,7 +4,7 @@ import React, { useState } from 'react'
 import { Button } from '@/components/ui/Button'
 import { FieldLabel } from '@/components/ui/FieldLabel'
 import { ColorSwatch } from './shared'
-import { COMPACT_FIELD, FOCUS } from '@/components/ui/folio'
+import { COMPACT_FIELD, FOCUS } from '@/components/ui/atoms'
 
 // ─── Color Palette Editor ─────────────────────────────────────────────────────
 

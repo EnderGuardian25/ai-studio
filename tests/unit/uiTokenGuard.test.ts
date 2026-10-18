@@ -72,10 +72,18 @@ const FOLIO_PATTERNS: Array<[string, RegExp, string[]]> = [
   ['removed font utility', new RegExp(`${START}font-(?:display|text)${END}`), []],
   // 3 (T1)
   ['opsz font-variation setting', /opsz|font-variation-settings/, []],
+  // 4a (T2), the import-path half. The file-name half is FOLIO_FILE_NAME.
+  ['Folio module import', /from\s+['"][^'"]*folio[^'"]*['"]/i, []],
+  // 10 (T2)
+  ['drop entrance', new RegExp(`${START}animate-drop${END}`), []],
 ]
 
+// 021 design.md §6 pattern 4a (T2), the file-name half: no module under src/
+// is named after Folio (FR-06).
+const FOLIO_FILE_NAME = /folio/i
+
 const SHARED_NAME =
-  /^\s*(?:export\s+(?:default\s+)?)?(?:async\s+)?(?:const|let|function)\s+(FOCUS|SCROLL_FOCUS|SMALL_CAPS|EYEBROW|FIELD_LABEL|PAGE_TITLE|PAGE_LEAD|SECTION_HEAD|SECTION_NUMERAL|SUB_HEAD|KIT_TITLE|STEP_HEAD|STEP_NUMERAL|STEP_LEAD|GROUP_HEAD|ASIDE_HEAD|NOTICE|WARN_NOTICE|ICON|ICON_SM|ICON_BUTTON|TEXT_LINK|TAG|TABLE_HEAD_ROW|COMPACT_FIELD|COMPACT_TEXTAREA|PageHead|PageTitle|SectionHead|SectionHeader|Notice|FieldLabel|StatusWord)\b/
+  /^\s*(?:export\s+(?:default\s+)?)?(?:async\s+)?(?:const|let|function)\s+(FOCUS|SCROLL_FOCUS|SMALL_CAPS|EYEBROW|FIELD_LABEL|PAGE_TITLE|PAGE_LEAD|SECTION_HEAD|SECTION_NUMERAL|SUB_HEAD|KIT_TITLE|STEP_HEAD|STEP_NUMERAL|STEP_LEAD|GROUP_HEAD|ASIDE_HEAD|NOTICE|WARN_NOTICE|ICON|ICON_SM|ICON_BUTTON|TEXT_LINK|TAG|TABLE_HEAD_ROW|COMPACT_FIELD|COMPACT_TEXTAREA|PILL_BADGE|PageHead|PageTitle|SectionHead|SectionHeader|Notice|FieldLabel|StatusWord|GateNotice)\b/
 const SMALL_CAPS_LITERAL = /tracking-\[0\.14em\]/
 const UI_DIR = 'src/components/ui/'
 
@@ -181,6 +189,8 @@ describe('UI token guard (AC-14)', () => {
 // 021 FR-13. `file` is the repo-relative path with forward slashes.
 function findFolioLeftovers(file: string, text: string): string[] {
   const hits: string[] = []
+  const name = file.split('/').pop() ?? file
+  if (FOLIO_FILE_NAME.test(name)) hits.push(`${file}: ${name} (Folio module name)`)
   text.split(/\r?\n/).forEach((line, i) => {
     for (const [label, re, excluded] of FOLIO_PATTERNS) {
       if (excluded.includes(file)) continue
@@ -214,6 +224,13 @@ describe('Folio deny-list (021 FR-13, AC-05)', () => {
     // 3
     ['<h1 className="[font-variation-settings:\'opsz\'_144]">', 'font-variation-settings'],
     ["  axes: ['opsz'],", 'opsz'],
+    // 4a, the import path
+    ["import { EYEBROW } from '@/components/ui/folio'", "from '@/components/ui/folio'"],
+    ["import { BLOCK, ROW } from './folio'", "from './folio'"],
+    ['export * from "./Folio"', 'from "./Folio"'],
+    // 10
+    ['<div className="surface-raised animate-drop">', 'animate-drop'],
+    ["cn('menu', open && 'motion-safe:animate-drop')", 'animate-drop'],
   ])('flags %s', (line, token) => {
     const hits = findFolioLeftovers('src/components/x.tsx', line)
     expect(hits).toHaveLength(1)
@@ -225,6 +242,13 @@ describe('Folio deny-list (021 FR-13, AC-05)', () => {
     '<p className="font-textual xfont-display font-display-x">',
     "const jakarta = Plus_Jakarta_Sans({ variable: '--font-sans' })",
     '<span className="font-mono">token</span>',
+    // 4a: a use of the word that is not an import path (4b, T8, covers words)
+    "import { BLOCK, ROW } from '@/components/ui/atoms'",
+    "import { ROW_TITLE } from '@/components/campaigns/classes'",
+    '// a portfolio of posts',
+    // 10: other animations
+    '<div className="surface-raised origin-top-left animate-pop">',
+    '<div className="animate-dropdown xanimate-drop">',
   ])('passes %s', (line) => {
     expect(findFolioLeftovers('src/components/x.tsx', line)).toEqual([])
   })
@@ -238,6 +262,27 @@ describe('Folio deny-list (021 FR-13, AC-05)', () => {
     expect(
       findFolioLeftovers('src/components/admin/brandkits/googleFonts.ts', '<p className="font-text" />')
     ).toHaveLength(1)
+  })
+
+  it('flags a module named after Folio, whatever its case or extension (4a)', () => {
+    for (const file of ['src/components/ui/folio.ts', 'src/components/team/folio.tsx', 'src/app/Folio.css']) {
+      expect(findFolioLeftovers(file, ''), file).toEqual([`${file}: ${file.split('/').pop()} (Folio module name)`])
+    }
+    for (const file of ['src/components/ui/atoms.ts', 'src/components/campaigns/classes.ts']) {
+      expect(findFolioLeftovers(file, ''), file).toEqual([])
+    }
+  })
+
+  // 021 T2 (FR-07): SMALL_CAPS uses tracking-label, so the small-caps literal is
+  // gone from ui/ too. Pattern 5 (T6) generalises this to every positive
+  // arbitrary tracking.
+  it('finds the small-caps tracking literal nowhere in src/, ui/ included', () => {
+    const hits = files.flatMap((f) =>
+      readFileSync(f, 'utf8')
+        .split(/\r?\n/)
+        .flatMap((line, i) => (SMALL_CAPS_LITERAL.test(line) ? [`${relative(ROOT, f)}:${i + 1}`] : [])),
+    )
+    expect(hits, hits.join('\n')).toEqual([])
   })
 })
 
@@ -261,19 +306,23 @@ describe('Shared-name guard (014 FR-05, AC-02)', () => {
       "export const EYEBROW = 'x' // ui-exception: not honoured by this guard", // 6
       "const SHELL_ICON_BUTTON = 'x'", // 7: a different name
       'const ICON_SIZE = 15', // 8: a longer name
-      "import { EYEBROW, SectionHead } from '@/components/ui/folio'", // 9: a use, not a copy
+      "import { EYEBROW, SectionHead } from '@/components/ui/atoms'", // 9: a use, not a copy
       '<span className={`${EYEBROW} mb-3`}>', // 10
       '<th className="tracking-[0.1em]">', // 11: another tracking value
+      "export const PILL_BADGE = 'x'", // 12 (021 T2)
+      'export function GateNotice({ title }: Props) {', // 13 (021 T2)
     ].join('\n')
     const lines = (hits: string[]) => hits.map((h) => h.split(':')[1])
-    expect(lines(findSharedCopies('src/components/team/folio.tsx', sample))).toEqual([
+    expect(lines(findSharedCopies('src/components/team/ApiKeysCard.tsx', sample))).toEqual([
       '1',
       '2',
       '3',
       '4',
       '5',
       '6',
+      '12',
+      '13',
     ])
-    expect(findSharedCopies('src/components/ui/folio.ts', sample)).toEqual([])
+    expect(findSharedCopies('src/components/ui/atoms.ts', sample)).toEqual([])
   })
 })

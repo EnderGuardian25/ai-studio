@@ -12,7 +12,7 @@ import {
   SECTION_HEAD,
   TABLE_HEAD_ROW,
   TEXT_LINK,
-} from '@/components/ui/folio'
+} from '@/components/ui/atoms'
 import { apiFetch } from '@/lib/apiFetch'
 import type { DraftStatus } from '@prisma/client'
 import { channelLabel as sharedChannelLabel } from '@/lib/channels'

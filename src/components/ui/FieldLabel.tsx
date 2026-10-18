@@ -1,6 +1,5 @@
 import React from 'react'
 import { cn } from '@/lib/utils'
-import { EYEBROW } from './folio'
 
 interface FieldLabelProps {
   htmlFor?: string
@@ -10,11 +9,12 @@ interface FieldLabelProps {
   children: React.ReactNode
 }
 
-// A Folio field label (DESIGN_SYSTEM.md §5.2): small caps in --fg-muted.
-// as="span" is for the caption of a group that carries its own aria-label.
-// No spacing of its own: the caller, or the Input/Select wrapper, sets it.
+// A field label (021 design.md §4.3, FR-07): sentence case, 13 px / 600, in
+// --fg, one style app-wide (014 FR-06). as="span" is for the caption of a
+// group that carries its own aria-label. No spacing of its own: the caller,
+// or the Input/Select wrapper, sets it.
 export function FieldLabel({ htmlFor, id, as = 'label', className, children }: FieldLabelProps) {
-  const classes = cn(`${EYEBROW} block`, className)
+  const classes = cn('block text-ui-sm font-semibold text-fg', className)
   if (as === 'span') {
     return (
       <span id={id} className={classes}>

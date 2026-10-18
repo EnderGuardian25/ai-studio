@@ -1,9 +1,10 @@
-// The brand kits admin's own Folio class helpers (DESIGN_SYSTEM.md §6, §8.3,
-// §8.4, §8.6). The shared atoms (FOCUS, SMALL_CAPS, the heading strings, ICON,
-// TAG, COMPACT_FIELD…) come from @/components/ui/folio; this module keeps only
-// what this screen group alone uses (014 FR-02's residue rule).
+// The brand kits admin's own class helpers (DESIGN_SYSTEM.md §6, §8.3, §8.4,
+// §8.6; 021 design.md §7). The shared atoms (FOCUS, SMALL_CAPS, the heading
+// strings, ICON, TAG, COMPACT_FIELD…) come from @/components/ui/atoms; this
+// module keeps only what this screen group alone uses (014 FR-02's residue
+// rule). Restyled with the screen in 021 T6.
 
-import { FOCUS } from '@/components/ui/folio'
+import { FOCUS } from '@/components/ui/atoms'
 
 // A ruled list row (the kit list): no box, a --line-subtle rule beneath.
 // Selected: paper fill, --fg weight and a 2 px --accent bar at the left edge,

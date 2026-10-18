@@ -5,7 +5,7 @@ import { toast } from 'sonner'
 import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
 import { SectionHead } from '@/components/ui/SectionHead'
-import { BLOCK } from '@/components/team/folio'
+import { BLOCK } from '@/components/ui/atoms'
 import { authClient } from '@/lib/auth-client'
 
 // Self-service password change. better-auth's base client always exposes

@@ -1,7 +1,8 @@
 // Class helpers used only by the campaigns and projects screens
-// (DESIGN_SYSTEM.md §6, §8.6). The shared atoms (FOCUS, EYEBROW, PAGE_TITLE,
-// SECTION_HEAD, ICON, TAG and the rest) come from @/components/ui/folio
-// (014 FR-02); only these screen-specific strings live here.
+// (DESIGN_SYSTEM.md §6, §8.6; 021 design.md §7). The shared atoms (FOCUS,
+// EYEBROW, PAGE_TITLE, SECTION_HEAD, ICON, TAG and the rest) come from
+// @/components/ui/atoms (014 FR-02); only these screen-specific strings live
+// here. Restyled with their screens in 021 T6.
 
 // A row's title link: --fg in the display face, --accent on hover.
 export const ROW_TITLE =

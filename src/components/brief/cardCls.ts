@@ -3,7 +3,7 @@
 // atoms (FOCUS, SMALL_CAPS, the section-head strings, NOTICE) come from
 // @/components/ui; this module keeps only the brief's own pickers (014 FR-02).
 
-import { FOCUS } from '@/components/ui/folio'
+import { FOCUS } from '@/components/ui/atoms'
 
 // An option card (size, generation path, template, reference). Idle: a 1 px
 // --line control edge on the canvas, --fg on hover. Selected: paper fill and a

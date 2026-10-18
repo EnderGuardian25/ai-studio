@@ -9,7 +9,7 @@ import { apiFetch } from '@/lib/apiFetch'
 import { fieldClasses, fieldEdge, inputClasses } from '@/components/ui/Input'
 import { cn } from '@/lib/utils'
 import { FieldLabel } from '@/components/ui/FieldLabel'
-import { EYEBROW, SCROLL_FOCUS, SMALL_CAPS } from '@/components/ui/folio'
+import { EYEBROW, SCROLL_FOCUS, SMALL_CAPS } from '@/components/ui/atoms'
 import { StepHead } from './StepHead'
 import { GOAL_OPTIONS, TONE_OPTIONS } from './constants'
 

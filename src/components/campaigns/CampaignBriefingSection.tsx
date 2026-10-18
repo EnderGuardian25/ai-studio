@@ -11,7 +11,7 @@ import { fieldClasses, fieldEdge } from '@/components/ui/Input'
 import { apiFetch } from '@/lib/apiFetch'
 import { cn } from '@/lib/utils'
 import { SectionHead } from '@/components/ui/SectionHead'
-import { ICON, SCROLL_FOCUS, SMALL_CAPS } from '@/components/ui/folio'
+import { ICON, SCROLL_FOCUS, SMALL_CAPS } from '@/components/ui/atoms'
 import { BriefingAssistantPanel } from '@/components/campaigns/BriefingAssistantPanel'
 import type { CampaignBriefing } from '@/lib/api-types'
 
