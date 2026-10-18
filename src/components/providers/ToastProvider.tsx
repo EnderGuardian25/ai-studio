@@ -28,10 +28,10 @@ export function ToastProvider() {
         classNames: {
           // Opaque overlay surface at radius-md (DESIGN_SYSTEM.md §4.1).
           toast:
-            'surface-overlay rounded-ui-md w-full flex items-start gap-3 py-3.5 pl-4 pr-10 font-text text-ui-sm text-fg',
+            'surface-overlay rounded-ui-md w-full flex items-start gap-3 py-3.5 pl-4 pr-10 text-ui-sm text-fg',
           icon: 'flex-shrink-0 mt-0.5',
           content: 'flex flex-col gap-0.5 min-w-0',
-          title: 'font-display text-ui-lg font-medium leading-snug text-fg',
+          title: 'text-ui-lg font-medium leading-snug text-fg',
           description: 'text-ui-sm text-fg-muted',
           closeButton: [
             'absolute top-2.5 right-2.5 p-1 rounded-ui-sm text-fg-muted hover:text-fg',

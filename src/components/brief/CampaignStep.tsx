@@ -43,7 +43,7 @@ function BriefingPreview({ campaignId }: { campaignId: string }) {
         type="button"
         onClick={() => setOpen(o => !o)}
         aria-expanded={open}
-        className={`w-full flex items-center gap-2 py-3 text-left font-text text-ui-sm font-semibold text-fg rounded-ui-sm ${FOCUS}`}
+        className={`w-full flex items-center gap-2 py-3 text-left text-ui-sm font-semibold text-fg rounded-ui-sm ${FOCUS}`}
       >
         {open ? <ChevronDown size={15} strokeWidth={1.4} /> : <ChevronRight size={15} strokeWidth={1.4} />}
         Campaign briefing (applies to every post)
@@ -85,7 +85,7 @@ export function CampaignStep({
             </span>
           ) : resolvedKit ? (
             <>
-              <span className="font-display text-ui-base font-medium text-fg">{resolvedKit.name}</span>
+              <span className="text-ui-base font-medium text-fg">{resolvedKit.name}</span>
               <span className={EYEBROW}>
                 {SOURCE_LABEL[resolvedKit.source] ?? resolvedKit.source}
               </span>

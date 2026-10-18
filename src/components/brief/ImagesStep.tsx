@@ -29,7 +29,7 @@ export function ImagesStep({
     <div>
       <StepHead
         index={3}
-        title={<>Images <span className="font-text font-normal text-ui-sm tracking-normal text-fg-muted">(optional)</span></>}
+        title={<>Images <span className="font-normal text-ui-sm tracking-normal text-fg-muted">(optional)</span></>}
       >
         Attach images for Claude to use. Choose how each one is used: embed it directly in the design, or use it as style inspiration only.
       </StepHead>
@@ -58,7 +58,7 @@ export function ImagesStep({
                 <button
                   type="button"
                   onClick={() => toggleIntent(img.id)}
-                  className={`inline-flex h-control-sm items-center gap-1.5 whitespace-nowrap rounded-ui-md border border-line px-2.5 font-text text-ui-xs font-semibold text-fg hover:border-fg transition-[border-color] duration-fast ease-standard ${FOCUS}`}
+                  className={`inline-flex h-control-sm items-center gap-1.5 whitespace-nowrap rounded-ui-md border border-line px-2.5 text-ui-xs font-semibold text-fg hover:border-fg transition-[border-color] duration-fast ease-standard ${FOCUS}`}
                 >
                   {img.intent === 'embed'
                     ? <><ImageIcon size={15} strokeWidth={1.4} /> Embed</>
@@ -82,7 +82,7 @@ export function ImagesStep({
         type="button"
         onClick={() => fileInputRef.current?.click()}
         disabled={uploading}
-        className={`flex h-12 w-full items-center justify-center gap-2 rounded-ui-md border border-dashed border-line font-text text-ui-sm font-semibold text-fg-muted hover:border-fg hover:text-fg transition-colors duration-fast ease-standard disabled:opacity-50 disabled:cursor-not-allowed ${FOCUS}`}
+        className={`flex h-12 w-full items-center justify-center gap-2 rounded-ui-md border border-dashed border-line text-ui-sm font-semibold text-fg-muted hover:border-fg hover:text-fg transition-colors duration-fast ease-standard disabled:opacity-50 disabled:cursor-not-allowed ${FOCUS}`}
       >
         {uploading
           ? <><Loader2 size={15} strokeWidth={1.4} className="animate-spin" /> Uploading…</>

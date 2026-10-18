@@ -26,7 +26,7 @@ export function CreatePostButton() {
       className="
         fixed bottom-7 right-7 z-30
         inline-flex items-center justify-center gap-2.5 h-12 w-12 md:w-auto md:px-[22px] rounded-ui-md
-        bg-accent text-accent-fg font-text text-ui-base font-semibold
+        bg-accent text-accent-fg text-ui-base font-semibold
         shadow-overlay
         transition-[transform,box-shadow] duration-fast ease-standard
         hover:-translate-x-px hover:-translate-y-px

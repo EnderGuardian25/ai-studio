@@ -34,15 +34,14 @@ export default function LoginPage() {
     router.refresh()
   }
 
-  // Folio (DESIGN_SYSTEM.md §2, §6): no box, structure from type and rules.
-  // The "Studio" wordmark at display size, a muted line, then a 2 px --fg rule
-  // opening the form.
+  // The Bistec Studio logo (021 A6), a muted line, then a 2 px --fg rule
+  // opening the form (restyled as a bezel card in 021 T3).
   return (
-    <main className="min-h-screen flex items-center justify-center bg-canvas text-fg font-text px-4 py-12">
+    <main className="min-h-screen flex items-center justify-center bg-canvas text-fg px-4 py-12">
       <div className="w-full max-w-sm">
-        {/* The page's one h1, for screen readers (014 FR-14): the wordmark is an img. */}
+        {/* The page's one h1, for screen readers (014 FR-14): the logo is an img. */}
         <h1 className="sr-only">Sign in to Studio</h1>
-        <Logo size="2xl" />
+        <Logo height={48} />
         <p className="mt-3 text-ui-sm text-fg-muted">Sign in to continue</p>
         <form onSubmit={handleSubmit} className="mt-8 pt-6 border-t-2 border-fg space-y-4">
           <Input

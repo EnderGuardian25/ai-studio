@@ -10,7 +10,7 @@ import { FOCUS } from '@/components/ui/folio'
 // 2 px ink frame (the --fg border plus an inset 1 px --fg ring).
 export function cardCls(selected: boolean, extra = '') {
   return [
-    'rounded-ui-md border text-left font-text',
+    'rounded-ui-md border text-left',
     'transition-[background-color,border-color,box-shadow] duration-fast ease-standard',
     FOCUS,
     selected
@@ -25,7 +25,7 @@ export function cardCls(selected: boolean, extra = '') {
 // as the sidebar marks the current page (§8.6).
 export function rowCls(selected: boolean, extra = '') {
   return [
-    'relative w-full text-left font-text border-b border-line-subtle',
+    'relative w-full text-left border-b border-line-subtle',
     'transition-colors duration-fast ease-standard',
     FOCUS,
     'before:absolute before:left-0 before:top-2 before:bottom-2 before:w-0.5',

@@ -80,7 +80,7 @@ export function Modal({
             // Never taller than the viewport: header/footer stay pinned and the
             // body scrolls, so tall forms remain fully usable on short screens.
             'max-h-[calc(100dvh-2rem)] flex flex-col',
-            'surface-overlay p-6 font-text text-ui-base text-fg',
+            'surface-overlay p-6 text-ui-base text-fg',
             // animate-modal-in, not the old scale-in keyframe: the keyframes must carry
             // the centering translate or the animation wipes it (see globals.css).
             'animate-modal-in',
@@ -90,7 +90,7 @@ export function Modal({
         >
           {!hideHeader && (
             <div className="flex items-start justify-between gap-4 mb-4 flex-shrink-0">
-              <Dialog.Title className="font-display text-ui-xl font-medium leading-tight text-fg">
+              <Dialog.Title className="text-ui-xl font-medium leading-tight text-fg">
                 {title}
               </Dialog.Title>
               <Dialog.Close asChild>
@@ -134,7 +134,7 @@ export function Drawer({
         <Dialog.Content
           className={cn(
             'fixed right-0 top-0 z-50 h-full w-full max-w-md',
-            'surface-overlay rounded-none font-text text-ui-base text-fg',
+            'surface-overlay rounded-none text-ui-base text-fg',
             'flex flex-col',
             'data-[state=open]:animate-slide-in',
             'focus:outline-none',
@@ -143,7 +143,7 @@ export function Drawer({
         >
           {!hideHeader && (
             <div className="flex items-center justify-between px-5 py-4 border-b border-line-subtle flex-shrink-0">
-              <Dialog.Title className="font-display text-ui-lg font-medium text-fg">
+              <Dialog.Title className="text-ui-lg font-medium text-fg">
                 {title}
               </Dialog.Title>
               <Dialog.Close asChild>

@@ -13,7 +13,9 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const variantClasses: Record<ButtonVariant, string> = {
-  primary: 'bg-accent text-accent-fg border border-accent enabled:hover:shadow-raised',
+  // Graphite's --accent equals --fg, so fill alone no longer tells Primary
+  // from Ink: Primary carries the raised shadow at rest, Ink is flat (021 A13).
+  primary: 'bg-accent text-accent-fg border border-accent shadow-raised',
   secondary: [
     'bg-transparent text-fg border border-line enabled:hover:border-fg',
     // an open menu button
@@ -21,7 +23,7 @@ const variantClasses: Record<ButtonVariant, string> = {
   ].join(' '),
   ghost: 'bg-transparent text-fg border border-transparent underline decoration-line underline-offset-4',
   danger: 'bg-transparent text-status-failed border border-status-failed',
-  ink: 'bg-fg text-canvas border border-fg',
+  ink: 'bg-fg text-canvas border border-fg shadow-none',
 }
 
 // One class per property and size: `cn` is a plain join (no tailwind-merge),
@@ -53,7 +55,7 @@ export function Button({
     <button
       className={cn(
         'inline-flex items-center justify-center gap-2 whitespace-nowrap',
-        'font-text font-semibold rounded-ui-md',
+        'font-semibold rounded-ui-md',
         'transition-[background-color,border-color,color,box-shadow] duration-fast ease-standard',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-canvas',
         'disabled:opacity-50 disabled:cursor-not-allowed',

@@ -269,7 +269,7 @@ export function RefinementPanel({
                 key={m.id}
                 className="grid grid-cols-[40px_minmax(0,1fr)] gap-3 border-b border-line-subtle py-2.5"
               >
-                <span aria-hidden className="font-display text-ui-base italic text-fg-muted">
+                <span aria-hidden className="text-ui-base italic text-fg-muted">
                   № {i + 1}
                 </span>
                 <div className="min-w-0">
@@ -370,12 +370,12 @@ export function RefinementPanel({
           onChange={(e) => setInput(e.target.value)}
           disabled={busy}
           placeholder="e.g. Make the logo larger…"
-          className="min-w-0 flex-1 bg-transparent px-3.5 py-2.5 font-display text-ui-base italic text-fg [font-variation-settings:'opsz'_24] placeholder:text-fg-muted focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+          className="min-w-0 flex-1 bg-transparent px-3.5 py-2.5 text-ui-base italic text-fg placeholder:text-fg-muted focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
         />
         <button
           type="submit"
           disabled={busy || !input.trim()}
-          className="inline-flex flex-shrink-0 items-center gap-2 whitespace-nowrap border-l border-line bg-fg px-4 font-text text-ui-sm font-semibold text-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex flex-shrink-0 items-center gap-2 whitespace-nowrap border-l border-line bg-fg px-4 text-ui-sm font-semibold text-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus disabled:cursor-not-allowed disabled:opacity-50"
         >
           Send
           {running || pendingAction === 'REFINE' ? (

@@ -19,6 +19,10 @@ import { join, relative, resolve } from 'node:path'
 // names, or spells out the small-caps tracking literally, is a new copy and
 // fails here (014 design.md §5). A copy has no legitimate exception, so
 // `ui-exception:` does not apply to this guard.
+//
+// 021 FR-13: a deny-list of Folio leftovers (021 design.md §6), switched on
+// pattern by pattern in the task that removes each one's last hit. There is
+// no legitimate Folio leftover, so `ui-exception:` does not apply to it either.
 
 const ROOT = process.cwd()
 const SRC = resolve(ROOT, 'src')
@@ -55,6 +59,19 @@ const PATTERNS: Array<[string, RegExp]> = [
       `${START}(?:bg|text|border|ring|from|to|via|fill|stroke|divide|outline|placeholder|decoration|shadow)-primary(?:-[a-z0-9]+)*${END}`
     ),
   ],
+]
+
+// 021 design.md §6, numbered as there. Each entry: the label, the pattern, and
+// the repo-relative files it does not apply to (data, not UI).
+const FOLIO_PATTERNS: Array<[string, RegExp, string[]]> = [
+  // 1 (T1). The brand-kit font picker lists Instrument Sans as one of the 100
+  // Google Fonts a kit may use for its posts: data for generated posts, not
+  // the app's face (021 NFR-10), so that one file is excluded.
+  ['Folio font family', /fraunces|instrument[ _]sans/i, ['src/components/admin/brandkits/googleFonts.ts']],
+  // 2 (T1)
+  ['removed font utility', new RegExp(`${START}font-(?:display|text)${END}`), []],
+  // 3 (T1)
+  ['opsz font-variation setting', /opsz|font-variation-settings/, []],
 ]
 
 const SHARED_NAME =
@@ -158,6 +175,69 @@ describe('UI token guard (AC-14)', () => {
     '<div className="text-primary" /> // ui-exception: self-test',
   ])('passes %s', (line) => {
     expect(findViolations('sample.tsx', line)).toEqual([])
+  })
+})
+
+// 021 FR-13. `file` is the repo-relative path with forward slashes.
+function findFolioLeftovers(file: string, text: string): string[] {
+  const hits: string[] = []
+  text.split(/\r?\n/).forEach((line, i) => {
+    for (const [label, re, excluded] of FOLIO_PATTERNS) {
+      if (excluded.includes(file)) continue
+      const m = line.match(re)
+      if (m) hits.push(`${file}:${i + 1}: ${m[0]} (${label})`)
+    }
+  })
+  return hits
+}
+
+describe('Folio deny-list (021 FR-13, AC-05)', () => {
+  const files = sourceFiles(SRC)
+
+  it('finds no Folio leftover in src/ for the patterns switched on so far', () => {
+    const hits = files.flatMap((f) =>
+      findFolioLeftovers(relative(ROOT, f).split('\\').join('/'), readFileSync(f, 'utf8'))
+    )
+    expect(hits, hits.join('\n')).toEqual([])
+  })
+
+  it.each([
+    // 1
+    ["import { Fraunces, JetBrains_Mono } from 'next/font/google'", 'Fraunces'],
+    ['const face = Instrument_Sans({ subsets })', 'Instrument_Sans'],
+    ['// the text face is Instrument Sans', 'Instrument Sans'],
+    // 2
+    ['<h2 className="font-display text-ui-lg">', 'font-display'],
+    ["cn('font-text', SMALL_CAPS)", 'font-text'],
+    ['<p className="md:font-display">', 'font-display'],
+    ["'w-full text-left font-text',", 'font-text'],
+    // 3
+    ['<h1 className="[font-variation-settings:\'opsz\'_144]">', 'font-variation-settings'],
+    ["  axes: ['opsz'],", 'opsz'],
+  ])('flags %s', (line, token) => {
+    const hits = findFolioLeftovers('src/components/x.tsx', line)
+    expect(hits).toHaveLength(1)
+    expect(hits[0]).toContain(`: ${token} (`)
+  })
+
+  it.each([
+    '<p className="font-sans font-mono font-semibold">',
+    '<p className="font-textual xfont-display font-display-x">',
+    "const jakarta = Plus_Jakarta_Sans({ variable: '--font-sans' })",
+    '<span className="font-mono">token</span>',
+  ])('passes %s', (line) => {
+    expect(findFolioLeftovers('src/components/x.tsx', line)).toEqual([])
+  })
+
+  it('does not honour ui-exception, and excludes only the brand-kit font list from pattern 1', () => {
+    expect(findFolioLeftovers('src/components/x.tsx', '<p className="font-text" /> // ui-exception: x')).toHaveLength(1)
+    const fontList = "  'Lexend','Instrument Sans','Kanit',"
+    expect(findFolioLeftovers('src/components/admin/brandkits/googleFonts.ts', fontList)).toEqual([])
+    expect(findFolioLeftovers('src/components/admin/brandkits/FontEditor.tsx', fontList)).toHaveLength(1)
+    // The exclusion is pattern 1's only: the same file still fails pattern 2.
+    expect(
+      findFolioLeftovers('src/components/admin/brandkits/googleFonts.ts', '<p className="font-text" />')
+    ).toHaveLength(1)
   })
 })
 

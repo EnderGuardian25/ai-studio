@@ -33,7 +33,7 @@ export function Stepper({ step, onJump }: StepperProps) {
               aria-current={active ? 'step' : undefined}
               aria-disabled={(!done && !active) || undefined}
               className={[
-                'w-full text-left border-t-2 pt-2.5 pb-1 font-text',
+                'w-full text-left border-t-2 pt-2.5 pb-1',
                 'transition-colors duration-fast ease-standard',
                 FOCUS,
                 active
@@ -45,7 +45,7 @@ export function Stepper({ step, onJump }: StepperProps) {
             >
               <span
                 className={[
-                  'flex h-5 items-center font-display italic text-ui-base leading-none',
+                  'flex h-5 items-center italic text-ui-base leading-none',
                   active ? 'text-accent' : '',
                 ].join(' ')}
               >

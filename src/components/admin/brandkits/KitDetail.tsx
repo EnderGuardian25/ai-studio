@@ -245,7 +245,7 @@ export function KitDetail({ kit, onRefresh }: KitDetailProps) {
             <h2 className={`flex flex-wrap items-baseline gap-x-3 gap-y-1 ${SECTION_HEAD}`}>
               <span className="min-w-0 max-w-full break-words">{kit.name}</span>
               {kit.isDefault && (
-                <span className="font-text text-ui-xs font-semibold tracking-normal text-accent">
+                <span className="text-ui-xs font-semibold tracking-normal text-accent">
                   System default
                 </span>
               )}

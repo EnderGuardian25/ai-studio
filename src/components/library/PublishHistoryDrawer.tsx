@@ -86,7 +86,7 @@ export function PublishHistoryDrawer({
                 <div key={post.id} className="py-4 flex flex-col gap-2">
                   {/* Top row: channel + status */}
                   <div className="flex items-center justify-between gap-2">
-                    <span className="font-display text-ui-lg font-medium text-fg">
+                    <span className="text-ui-lg font-medium text-fg">
                       {channelLabel(post.channel)}
                     </span>
                     <StatusChip status={chipStatus} />

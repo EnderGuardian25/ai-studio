@@ -19,7 +19,7 @@ import { GeneratedWith } from './GeneratedWith'
 // every 26 px, scrolling with the text. Only captions are ruled.
 const RULED_TEXTAREA = [
   'block w-full resize-y rounded-ui-sm border border-line bg-surface-raised px-4 py-1',
-  'font-text text-ui-sm leading-[26px] text-fg placeholder:text-fg-muted',
+  'text-ui-sm leading-[26px] text-fg placeholder:text-fg-muted',
   '[background-image:repeating-linear-gradient(to_bottom,transparent_0,transparent_25px,rgb(var(--line-subtle))_25px,rgb(var(--line-subtle))_26px)]',
   '[background-attachment:local] [background-position:0_4px]',
   'transition-[border-color,box-shadow] duration-fast ease-standard',

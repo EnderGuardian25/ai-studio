@@ -354,7 +354,7 @@ export function BriefingAssistantPanel({ campaignId, open, onClose, onApply }: B
                   <p
                     className={
                       m.role === 'user'
-                        ? "whitespace-pre-wrap break-words font-display text-ui-base italic leading-snug text-fg [font-variation-settings:'opsz'_24]"
+                        ? "whitespace-pre-wrap break-words text-ui-base italic leading-snug text-fg"
                         : 'whitespace-pre-wrap break-words text-ui-sm leading-relaxed text-fg'
                     }
                   >
@@ -473,13 +473,13 @@ export function BriefingAssistantPanel({ campaignId, open, onClose, onApply }: B
               value={input}
               onChange={e => setInput(e.target.value)}
               placeholder="Tell the assistant about this campaign…"
-              className="min-w-0 flex-1 bg-transparent px-3.5 py-2.5 font-display text-ui-base italic text-fg [font-variation-settings:'opsz'_24] placeholder:text-fg-muted focus:outline-none"
+              className="min-w-0 flex-1 bg-transparent px-3.5 py-2.5 text-ui-base italic text-fg placeholder:text-fg-muted focus:outline-none"
             />
             <button
               type="submit"
               disabled={!input.trim() || pending}
               aria-label="Send"
-              className="inline-flex flex-shrink-0 items-center gap-2 whitespace-nowrap border-l border-line bg-fg px-4 font-text text-ui-sm font-semibold text-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex flex-shrink-0 items-center gap-2 whitespace-nowrap border-l border-line bg-fg px-4 text-ui-sm font-semibold text-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus disabled:cursor-not-allowed disabled:opacity-50"
             >
               Send
               {pending ? <Loader2 {...ICON} className="animate-spin" aria-hidden /> : <Send {...ICON} aria-hidden />}

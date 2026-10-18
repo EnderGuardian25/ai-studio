@@ -389,7 +389,7 @@ export default function DraftDetailPage() {
           {/* The caption line beneath the plate (§8.12). */}
           <div className="mt-3.5 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 text-ui-xs text-fg-muted">
             <span className="min-w-0 break-words">
-              <i className="font-display text-ui-sm text-fg">Preview</i>
+              <i className="text-ui-sm text-fg">Preview</i>
               {currentRevision && (
                 <span>
                   , v{currentRevision.revisionNumber} of {revisions.length} — {currentRevision.instruction}
@@ -456,9 +456,9 @@ export default function DraftDetailPage() {
                         <img src={r.exportUrl} alt="" className="block h-full w-full object-contain" />
                       )}
                     </span>
-                    <span className="mt-2.5 flex flex-wrap items-baseline gap-x-1.5 font-display text-ui-base font-medium text-fg">
+                    <span className="mt-2.5 flex flex-wrap items-baseline gap-x-1.5 text-ui-base font-medium text-fg">
                       v{r.revisionNumber}
-                      {isCurrent && <span className={`${SMALL_CAPS} font-text text-accent`}>Current</span>}
+                      {isCurrent && <span className={`${SMALL_CAPS} text-accent`}>Current</span>}
                       {restoringRev === r.revisionNumber && (
                         <Loader2 {...ICON} className="animate-spin self-center text-fg-muted" />
                       )}

@@ -173,7 +173,7 @@ export function CampaignBriefingSection({ campaignId, isTeamAdmin }: CampaignBri
                     <li key={b.id} className="flex items-start justify-between gap-3 border-b border-line-subtle py-2.5">
                       <div className="min-w-0">
                         <div className="flex items-baseline gap-2">
-                          <span className="font-display text-ui-base font-medium text-fg">v{b.version}</span>
+                          <span className="text-ui-base font-medium text-fg">v{b.version}</span>
                           {b.isActive && <span className={`${SMALL_CAPS} text-accent`}>active</span>}
                         </div>
                         <p className="mt-0.5 line-clamp-2 break-words text-ui-xs text-fg-muted" title={b.content}>

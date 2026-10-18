@@ -5,7 +5,7 @@
 
 // A row's title link: --fg in the display face, --accent on hover.
 export const ROW_TITLE =
-  'font-display text-ui-lg font-medium leading-snug text-fg break-words transition-colors duration-fast ease-standard hover:text-accent'
+  'text-ui-lg font-medium leading-snug text-fg break-words transition-colors duration-fast ease-standard hover:text-accent'
 
 // Breadcrumbs (§8.6): --text-sm in --fg-muted, links underlined in --line,
 // the current page in --fg 500.

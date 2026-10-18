@@ -69,7 +69,7 @@ export function StatusChip(props: StatusChipProps) {
     <span
       className={cn(
         'inline-flex items-center h-[22px] px-2 rounded-ui-sm flex-shrink-0 whitespace-nowrap',
-        `font-text ${SMALL_CAPS}`,
+        SMALL_CAPS,
         'shadow-[inset_0_0_0_1px_currentColor]',
         config.classes,
         props.className,

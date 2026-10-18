@@ -46,7 +46,7 @@ export function SegmentedToggle({
             aria-selected={isActive}
             onClick={() => onChange(opt.value)}
             className={cn(
-              'px-2.5 py-1.5 font-text text-ui-xs font-semibold',
+              'px-2.5 py-1.5 text-ui-xs font-semibold',
               'transition-colors duration-fast ease-standard',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus',
               isActive ? 'bg-fg text-canvas' : 'text-fg-muted hover:text-fg',

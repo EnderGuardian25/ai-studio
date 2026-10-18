@@ -129,7 +129,7 @@ export function FontEditor({ fonts, onChange }: FontEditorProps) {
                     tabIndex={-1}
                     onMouseDown={e => { e.preventDefault(); add(name) }}
                     onMouseEnter={() => setHighlighted(i)}
-                    className={`w-full px-3.5 py-[7px] text-left font-text text-ui-sm text-fg transition-colors duration-fast ease-standard ${
+                    className={`w-full px-3.5 py-[7px] text-left text-ui-sm text-fg transition-colors duration-fast ease-standard ${
                       i === highlighted ? 'bg-canvas' : ''
                     }`}
                   >

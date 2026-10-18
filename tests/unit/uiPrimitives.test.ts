@@ -26,7 +26,8 @@ import {
 // .test.ts file with no JSX.
 
 const count = (html: string, re: RegExp) => (html.match(re) ?? []).length
-// renderToStaticMarkup escapes the quotes inside class values (the opsz settings).
+// renderToStaticMarkup escapes the quotes inside class values (none since the
+// Fraunces opsz settings went, 021 T1; kept for any future quoted value).
 const attr = (s: string) => s.replace(/'/g, '&#x27;')
 
 describe('PageHead', () => {
@@ -167,7 +168,7 @@ describe('FieldLabel', () => {
 
 describe('StatusChip', () => {
   const BASE =
-    'inline-flex items-center h-[22px] px-2 rounded-ui-sm flex-shrink-0 whitespace-nowrap font-text text-ui-2xs font-semibold uppercase tracking-[0.14em] shadow-[inset_0_0_0_1px_currentColor]'
+    'inline-flex items-center h-[22px] px-2 rounded-ui-sm flex-shrink-0 whitespace-nowrap text-ui-2xs font-semibold uppercase tracking-[0.14em] shadow-[inset_0_0_0_1px_currentColor]'
 
   // createElement reads only the last overload (the status one); JSX resolves
   // both. So the tone case names its own signature, which tsc checks against
@@ -233,7 +234,7 @@ describe('ModelPicker', () => {
     )
     expect(html).toMatch(/<select id="li-model" [^>]*aria-describedby="li-model-hint"/)
     expect(html).toContain(
-      '<div id="li-model-hint" class="font-text text-ui-xs text-fg-muted"><p>Default</p></div>',
+      '<div id="li-model-hint" class="text-ui-xs text-fg-muted"><p>Default</p></div>',
     )
     expect(count(html, /<option /g)).toBe(3)
     expect(html).toContain('<option value="HAIKU" selected="">Haiku 4.5 · $ (fast)</option>')
@@ -260,7 +261,7 @@ describe('ModelPicker', () => {
   it('shows one model as plain text, with no select', () => {
     const html = render({ id: 'm' }, view({ allowed: ['HAIKU'] }))
     expect(html).not.toContain('<select')
-    expect(html).toContain('<p class="font-text text-ui-sm text-fg">Model: Haiku 4.5</p>')
+    expect(html).toContain('<p class="text-ui-sm text-fg">Model: Haiku 4.5</p>')
   })
 
   it('renders nothing for CAPTION when the caption provider is not Claude, or before the view loads', () => {
@@ -298,7 +299,7 @@ describe('ModelPicker', () => {
       /<select id="m" [^>]*aria-describedby="m-hint m-error" aria-invalid="true"/,
     )
     expect(html).toContain(
-      '<p id="m-error" class="font-text text-ui-xs text-status-failed">Opus 5.5 isn&#x27;t allowed on this team</p>',
+      '<p id="m-error" class="text-ui-xs text-status-failed">Opus 5.5 isn&#x27;t allowed on this team</p>',
     )
   })
 
@@ -326,7 +327,7 @@ describe('Select', () => {
     )
     expect(html).toMatch(/<select id="s" [^>]*aria-describedby="help s-error" aria-invalid="true"/)
     expect(html).toContain(
-      '<p id="s-error" class="font-text text-ui-xs text-status-failed">Bad</p>',
+      '<p id="s-error" class="text-ui-xs text-status-failed">Bad</p>',
     )
   })
 

@@ -238,9 +238,10 @@ test.describe('Field labels (T9)', () => {
 
 // ── T10: one control height per size, from the --control-* tokens (AC-06) ────
 
-const CONTROL_PX = { sm: 30, md: 36 } as const
+// 021 A1: Graphite's heights (--control-sm|md = 32 | 38 px).
+const CONTROL_PX = { sm: 32, md: 38 } as const
 // Values no literal utility produces, for the override check below.
-const OVERRIDE_PX = { sm: 44, md: 52 } as const
+const OVERRIDE_PX = { sm: 46, md: 54 } as const
 
 async function heightOf(control: Locator) {
   await expect(control).toBeVisible()
@@ -349,16 +350,31 @@ async function tokenColours(page: Page) {
   })
 }
 
-// The names of the buttons in main whose computed fill is the accent (AC-07).
+// A computed box-shadow with at least one visible layer: `none`, and Tailwind's
+// `shadow-none` (layers of rgba(0, 0, 0, 0)), have none.
+const VISIBLE_SHADOW = /rgba?\((?!0, 0, 0, 0\))/
+
+// The names of the primary buttons in main (AC-07). In Graphite --accent
+// equals --fg (021 A13), so fill alone no longer tells Primary from Ink:
+// Primary is the accent fill WITH a resting shadow, Ink the same fill, flat.
 async function accentFilledInMain(page: Page): Promise<string[]> {
   const { accent } = await tokenColours(page)
   return page.locator('main button').evaluateAll(
-    (buttons, colour) =>
+    (buttons, [colour, visible]) =>
       buttons
-        .filter((b) => getComputedStyle(b).backgroundColor === colour)
+        .filter((b) => {
+          const cs = getComputedStyle(b)
+          return cs.backgroundColor === colour && new RegExp(visible).test(cs.boxShadow)
+        })
         .map((b) => (b.getAttribute('aria-label') ?? b.textContent ?? '').trim()),
-    accent,
+    [accent, VISIBLE_SHADOW.source] as const,
   )
+}
+
+// An Ink button: the --fg fill and no visible resting shadow (021 A13).
+async function expectInk(button: Locator, fg: string) {
+  await expect(button).toHaveCSS('background-color', fg)
+  expect(await button.evaluate((b) => getComputedStyle(b).boxShadow)).not.toMatch(VISIBLE_SHADOW)
 }
 
 test.describe('Brand kits (T11)', () => {
@@ -392,9 +408,9 @@ test.describe('Brand kits (T11)', () => {
 
     const { fg } = await tokenColours(page)
     expect(await accentFilledInMain(page), 'the accent-filled buttons in main').toEqual(['Save'])
-    // The inline-form submits are Ink.
-    await expect(saveTemplate).toHaveCSS('background-color', fg)
-    await expect(saveVersion).toHaveCSS('background-color', fg)
+    // The inline-form submits are Ink: the same fill, flat.
+    await expectInk(saveTemplate, fg)
+    await expectInk(saveVersion, fg)
   })
 
   test('AC-08: the kit list is a capped, focusable "Brand kits" region with a visible focus indicator', async ({ page }) => {

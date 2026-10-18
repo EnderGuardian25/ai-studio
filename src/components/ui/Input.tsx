@@ -7,7 +7,7 @@ import { FieldLabel } from './FieldLabel'
 // background-COLOR only (bg-*), so a background-image set beside it survives.
 const fieldBase = (box: string) => [
   'w-full rounded-ui-sm border bg-surface-raised',
-  `${box} font-text text-ui-base text-fg`,
+  `${box} text-ui-base text-fg`,
   'placeholder:text-fg-muted',
   'transition-[border-color,box-shadow] duration-fast ease-standard',
   'focus:outline-none focus:border-focus focus:ring-1 focus:ring-focus',
@@ -26,7 +26,7 @@ export const inputClasses = fieldBase('h-control-md px-3.5')
 // competing border colours would be settled by CSS source order.
 export const fieldEdge = (error?: string) => (error ? 'border-status-failed' : 'border-line')
 
-export const fieldErrorClasses = 'font-text text-ui-xs text-status-failed'
+export const fieldErrorClasses = 'text-ui-xs text-status-failed'
 
 interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label?: string

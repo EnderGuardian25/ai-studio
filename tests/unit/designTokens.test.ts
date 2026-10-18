@@ -9,20 +9,25 @@ import { Input, fieldClasses, inputClasses } from '@/components/ui/Input'
 import { Select } from '@/components/ui/Select'
 import { COMPACT_FIELD, COMPACT_TEXTAREA, ICON_BUTTON } from '@/components/ui/folio'
 
-// AC-07 (011 FR-06/FR-07): the Folio semantic tokens live in globals.css, per
+// AC-07 (011 FR-06/FR-07): the semantic tokens live in globals.css, per
 // theme where they vary, and tailwind.config.ts exposes every semantic colour
 // as rgb(var(--…) / <alpha-value>). The Frozen Light tokens are gone since the
 // cleanup (T13, FR-13), and Tailwind's default type and radius steps are not
 // redefined.
+//
+// 021 AC-01/AC-02 (FR-01, FR-02, FR-14): the values are Graphite's, checked
+// against the study file itself, so a hand-typed digit fails here.
 
 const css = readFileSync(resolve(process.cwd(), 'src/app/globals.css'), 'utf8')
+const STUDY_PATH = 'docs/ui-reference/direction-studies/study-a-graphite.html'
+const study = readFileSync(resolve(process.cwd(), STUDY_PATH), 'utf8')
 
 // Custom properties of the top-level `:root { … }` or `.dark { … }` blocks
 // (not `.dark ::selection` and the like), across every such block.
-function blockVars(selector: ':root' | '.dark'): Record<string, string> {
+function blockVars(source: string, selector: ':root' | '.dark'): Record<string, string> {
   const vars: Record<string, string> = {}
   const sel = selector === ':root' ? ':root' : '\\.dark'
-  for (const [, body] of css.matchAll(new RegExp(`(?:^|\\n)${sel}\\s*\\{([^}]*)\\}`, 'g'))) {
+  for (const [, body] of source.matchAll(new RegExp(`(?:^|\\n)${sel}\\s*\\{([^}]*)\\}`, 'g'))) {
     for (const [, name, value] of body.matchAll(/--([\w-]+)\s*:\s*([^;]+);/g)) {
       vars[name] = value.trim()
     }
@@ -30,8 +35,20 @@ function blockVars(selector: ':root' | '.dark'): Record<string, string> {
   return vars
 }
 
-const ROOT = blockVars(':root')
-const DARK = blockVars('.dark')
+const ROOT = blockVars(css, ':root')
+const DARK = blockVars(css, '.dark')
+const STUDY_ROOT = blockVars(study, ':root')
+const STUDY_DARK = blockVars(study, '.dark')
+
+// A value that differs from the study, allowed only for contrast (021 R10,
+// FR-01). Each entry names its contrast pair and is listed in
+// DESIGN_SYSTEM.md §3. Empty: every study value passes (design.md §9).
+const DEVIATIONS: Record<string, { root?: string; dark?: string; pair: string }> = {}
+
+// The study's --font-* lines are not copied: next/font supplies them.
+const isFont = (name: string) => name.startsWith('font-')
+// The control heights are 014's keys, which the study does not declare (A1).
+const CONTROL_KEYS = ['control-sm', 'control-md', 'control-lg']
 
 // Theme-dependent: declared in both blocks (DESIGN_SYSTEM.md §3).
 const COLOR_TOKENS = [
@@ -59,6 +76,7 @@ const ROOT_ONLY_TOKENS = [
   'radius-sm',
   'radius-md',
   'radius-lg',
+  'radius-xl',
   'radius-pill',
   'control-sm',
   'control-md',
@@ -79,9 +97,10 @@ const ROOT_ONLY_TOKENS = [
   'space-2',
   'space-3',
   'space-4',
+  'space-5',
   'space-6',
   'space-8',
-  'space-12',
+  'space-10',
 ]
 
 const TRIPLET = /^\d{1,3} \d{1,3} \d{1,3}$/
@@ -114,8 +133,8 @@ describe('semantic tokens in globals.css (AC-07)', () => {
   })
 
   it('leaves the font variables to next/font (not literal in :root)', () => {
-    // A literal "Fraunces" would miss next/font's generated family name and
-    // fall through to Georgia (DESIGN_SYSTEM.md §3.1 note).
+    // A literal "Plus Jakarta Sans" would miss next/font's generated family
+    // name and fall through to the system sans (DESIGN_SYSTEM.md §3.1 note).
     for (const name of ['font-display', 'font-sans', 'font-mono']) {
       expect(ROOT[name]).toBeUndefined()
     }
@@ -154,6 +173,51 @@ describe('semantic tokens in globals.css (AC-07)', () => {
     const bodies = [...css.matchAll(/(?:^|\n)\s*body\s*\{([^}]*)\}/g)].map((m) => m[1])
     expect(bodies).toHaveLength(1)
     expect(bodies[0]).toMatch(/(?:^|[;{\s])font-variant-numeric:\s*tabular-nums\s*;/)
+  })
+})
+
+describe('Graphite token values equal the study (021 AC-01, AC-02)', () => {
+  it('parses both study blocks', () => {
+    // A parse that found nothing would pass vacuously.
+    expect(Object.keys(STUDY_ROOT).length).toBeGreaterThan(40)
+    expect(Object.keys(STUDY_DARK).length).toBeGreaterThan(15)
+  })
+
+  it.each([
+    [':root', ROOT, STUDY_ROOT, 'root'],
+    ['.dark', DARK, STUDY_DARK, 'dark'],
+  ] as const)(
+    'every non-font study token in %s is in globals.css with an equal value',
+    (_selector, ours, theirs, theme) => {
+      const diffs = Object.entries(theirs)
+        .filter(([name]) => !isFont(name))
+        .filter(([name, value]) => ours[name] !== (DEVIATIONS[name]?.[theme] ?? value))
+        .map(([name, value]) => `--${name}: globals.css "${ours[name]}" vs study "${value}"`)
+      expect(diffs, diffs.join('\n')).toEqual([])
+    },
+  )
+
+  it('declares exactly the study key set, minus the fonts, plus the control heights', () => {
+    const expectedRoot = [...Object.keys(STUDY_ROOT).filter((n) => !isFont(n)), ...CONTROL_KEYS].sort()
+    expect(Object.keys(ROOT).sort()).toEqual(expectedRoot)
+    expect(Object.keys(DARK).sort()).toEqual(Object.keys(STUDY_DARK).sort())
+    expect(Object.keys(ROOT)).toHaveLength(47)
+    expect(Object.keys(DARK)).toHaveLength(19)
+  })
+
+  it('adds --radius-xl, --space-5 and --space-10, and drops --space-12', () => {
+    expect(ROOT['radius-xl']).toBe('26px')
+    expect(ROOT['space-5']).toBe('20px')
+    expect(ROOT['space-10']).toBe('40px')
+    expect(ROOT['space-12']).toBeUndefined()
+  })
+
+  it('has an empty deviation map, each entry naming its contrast pair', () => {
+    for (const [name, entry] of Object.entries(DEVIATIONS)) {
+      expect(entry.pair, `DEVIATIONS.${name}`).toBeTruthy()
+      expect(STUDY_ROOT[name] ?? STUDY_DARK[name], `DEVIATIONS.${name} is a study token`).toBeTruthy()
+    }
+    expect(Object.keys(DEVIATIONS)).toEqual([])
   })
 })
 
@@ -198,6 +262,7 @@ describe('tailwind.config.ts semantic mapping (AC-07)', () => {
         'ui-sm': 'radius-sm',
         'ui-md': 'radius-md',
         'ui-lg': 'radius-lg',
+        'ui-xl': 'radius-xl',
         'ui-pill': 'radius-pill',
       },
       fontSize: {
@@ -218,13 +283,18 @@ describe('tailwind.config.ts semantic mapping (AC-07)', () => {
     }
   })
 
-  it('wires the next/font families', () => {
+  // 021 AC-02 (FR-02): exactly two families, both from next/font.
+  it('wires exactly the two next/font families, sans and mono', () => {
     const fonts = extend.fontFamily as Record<string, string[]>
-    expect(fonts.display[0]).toBe('var(--font-display)')
-    expect(fonts.text[0]).toBe('var(--font-sans)')
-    expect(fonts.mono[0]).toBe('var(--font-mono)')
-    // Since the cleanup (T13) the default sans is Instrument Sans too.
-    expect(fonts.sans[0]).toBe('var(--font-sans)')
+    expect(Object.keys(fonts)).toEqual(['sans', 'mono'])
+    expect(fonts.sans).toEqual(['var(--font-sans)', 'ui-sans-serif', 'system-ui', 'sans-serif'])
+    expect(fonts.mono).toEqual(['var(--font-mono)', 'ui-monospace', 'SFMono-Regular', 'monospace'])
+  })
+
+  // 021 AC-02 (FR-02, A2, FR-07).
+  it('maps the status tint opacity and the small-caps tracking', () => {
+    expect(extend.opacity?.['12']).toBe('0.12')
+    expect(extend.letterSpacing?.label).toBe('0.14em')
   })
 
   it('does not redefine Tailwind default type and radius steps', () => {
@@ -243,10 +313,10 @@ describe('tailwind.config.ts semantic mapping (AC-07)', () => {
 })
 
 // AC-06 (014 FR-07): one control height per size, from one source. The three
-// --control-* tokens on :root are the only place 30 / 36 / 40 px are written;
-// Tailwind exposes them as spacing keys, and every control reads them.
-describe('control heights (014 AC-06)', () => {
-  const CONTROL = { 'control-sm': '30px', 'control-md': '36px', 'control-lg': '40px' }
+// --control-* tokens on :root are the only place 32 / 38 / 44 px are written
+// (021 A1); Tailwind exposes them as spacing keys, and every control reads them.
+describe('control heights (014 AC-06, 021 A1)', () => {
+  const CONTROL = { 'control-sm': '32px', 'control-md': '38px', 'control-lg': '44px' }
 
   it.each(Object.entries(CONTROL))(':root declares --%s as %s', (token, value) => {
     expect(ROOT[token]).toBe(value)

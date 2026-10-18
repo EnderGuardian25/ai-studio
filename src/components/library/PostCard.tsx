@@ -105,7 +105,7 @@ export function PostCard({ draft, isTeamAdmin, onPublish, onViewHistory, onDelet
       {/* Title, then a muted meta line with the status on the right */}
       <div className="flex flex-col gap-1.5 pt-4">
         <p
-          className="font-display text-ui-lg font-medium leading-snug text-fg line-clamp-2"
+          className="text-ui-lg font-medium leading-snug text-fg line-clamp-2"
           title={draft.brief.topic}
         >
           {draft.brief.topic}

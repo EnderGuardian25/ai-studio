@@ -125,7 +125,7 @@ function KpiCard({ label, value }: { label: string; value: number }) {
   return (
     <div className="border-b border-line-subtle py-4">
       <div className={EYEBROW}>{label}</div>
-      <div className="mt-2 font-display text-ui-2xl font-normal leading-none tabular-nums [font-variation-settings:'opsz'_144]">
+      <div className="mt-2 text-ui-2xl font-normal leading-none tabular-nums">
         {value}
       </div>
     </div>

@@ -77,7 +77,7 @@ export function SizeDesignStep({
               >
                 <Icon size={20} strokeWidth={1.4} className={selected ? 'text-fg' : 'text-fg-muted'} />
                 <span className="min-w-0">
-                  <span className="block font-display text-ui-lg font-medium leading-tight text-fg">
+                  <span className="block text-ui-lg font-medium leading-tight text-fg">
                     {ASPECT_LABELS[value]}
                   </span>
                   <span className="block text-ui-xs text-fg-muted">{sub} px</span>
@@ -120,7 +120,7 @@ export function SizeDesignStep({
             aria-pressed={designMode === 'TEMPLATE'}
             className={cardCls(designMode === 'TEMPLATE', 'p-4')}
           >
-            <div className="font-display text-ui-lg font-medium leading-tight text-fg mb-1.5">
+            <div className="text-ui-lg font-medium leading-tight text-fg mb-1.5">
               Path A — Template
             </div>
             <div className="text-ui-xs text-fg-muted">
@@ -136,7 +136,7 @@ export function SizeDesignStep({
             aria-pressed={designMode === 'GENERATE'}
             className={cardCls(designMode === 'GENERATE', 'p-4')}
           >
-            <div className="font-display text-ui-lg font-medium leading-tight text-fg mb-1.5">
+            <div className="text-ui-lg font-medium leading-tight text-fg mb-1.5">
               Path B — Freeform
             </div>
             <div className="text-ui-xs text-fg-muted">

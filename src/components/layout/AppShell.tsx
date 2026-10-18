@@ -60,7 +60,7 @@ const SETTINGS_ITEM: NavItem = { label: 'Settings', href: '/settings' }
 // Folio nav item (DESIGN_SYSTEM.md §8.6): --fg-muted text, --fg on hover.
 // Shared by the links and the Sign out button.
 const NAV_ITEM =
-  'relative block py-[5px] pl-3 text-left font-text text-ui-base rounded-ui-sm ' +
+  'relative block py-[5px] pl-3 text-left text-ui-base rounded-ui-sm ' +
   'transition-colors duration-fast ease-standard ' +
   'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus'
 
@@ -124,7 +124,7 @@ function Sidebar({ onClose }: { onClose?: () => void }) {
   // the mobile panel floats, so it takes the --fg border and overlay shadow.
   return (
     <aside
-      className={`flex flex-col h-full w-[220px] pt-[22px] pb-[18px] overflow-y-auto bg-canvas font-text text-fg border-r ${
+      className={`flex flex-col h-full w-[220px] pt-[22px] pb-[18px] overflow-y-auto bg-canvas text-fg border-r ${
         onClose ? 'border-fg shadow-overlay' : 'border-line-subtle'
       }`}
     >
@@ -183,9 +183,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <ConfirmProvider>
-      {/* font-text: the shell sets Folio's text face (Instrument Sans) for
-          every screen inside it. */}
-      <div className="min-h-screen flex flex-col bg-canvas text-fg font-text">
+      <div className="min-h-screen flex flex-col bg-canvas text-fg">
         {/* Top app bar: opaque --surface-1 with a --line-subtle bottom rule
             (DESIGN_SYSTEM.md §4.2, §6). The logo sits 28 px in on desktop. */}
         <header className="fixed top-0 inset-x-0 z-40 h-[60px] flex items-center justify-between pl-4 pr-4 md:pl-7 md:pr-6 bg-surface border-b border-line-subtle">
@@ -198,7 +196,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             >
               <Menu size={20} strokeWidth={1.4} />
             </button>
-            <Logo />
+            <Logo height={32} />
           </div>
 
           <ThemeToggle />

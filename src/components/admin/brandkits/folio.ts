@@ -10,7 +10,7 @@ import { FOCUS } from '@/components/ui/folio'
 // as the sidebar marks the current page (§8.6).
 export function rowCls(selected: boolean, extra = '') {
   return [
-    'relative font-text border-b border-line-subtle',
+    'relative border-b border-line-subtle',
     'transition-colors duration-fast ease-standard',
     'before:absolute before:left-0 before:top-2 before:bottom-2 before:w-0.5',
     selected ? 'bg-surface-raised before:bg-accent' : 'hover:bg-surface before:bg-transparent',
@@ -22,7 +22,7 @@ export function rowCls(selected: boolean, extra = '') {
 // on hover. Selected: paper fill and a 2 px ink frame (§8.4's ink, as a card).
 export function optionCls(selected: boolean, extra = '') {
   return [
-    'rounded-ui-md border text-left font-text',
+    'rounded-ui-md border text-left',
     'transition-[background-color,border-color,box-shadow] duration-fast ease-standard',
     FOCUS,
     selected
@@ -39,4 +39,4 @@ export const CODE_FIELD =
 
 // The kit name while editing: the §8.3 field set in the kit title's face.
 export const TITLE_FIELD =
-  'w-full max-w-md rounded-ui-sm border border-line bg-surface-raised px-3.5 py-1.5 font-display text-ui-xl font-medium text-fg transition-[border-color,box-shadow] duration-fast ease-standard focus:outline-none focus:border-focus focus:ring-1 focus:ring-focus'
+  'w-full max-w-md rounded-ui-sm border border-line bg-surface-raised px-3.5 py-1.5 text-ui-xl font-medium text-fg transition-[border-color,box-shadow] duration-fast ease-standard focus:outline-none focus:border-focus focus:ring-1 focus:ring-focus'

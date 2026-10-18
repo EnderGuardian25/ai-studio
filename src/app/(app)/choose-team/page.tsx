@@ -49,7 +49,7 @@ export default function ChooseTeamPage() {
   // teams as ruled rows under a 2 px --fg rule, not cards. Each row is a
   // button named by its team (plus "Switching…" while it is picked).
   return (
-    <div className="mx-auto w-full max-w-md py-6 md:py-12 font-text text-fg">
+    <div className="mx-auto w-full max-w-md py-6 md:py-12 text-fg">
       <PageTitle>Choose a team</PageTitle>
       <p className="mt-3 text-ui-base text-fg-muted">
         Pick which team you want to work in. You can switch again later from the sidebar.
@@ -74,7 +74,7 @@ export default function ChooseTeamPage() {
                   'disabled:opacity-50 disabled:cursor-not-allowed',
                 )}
               >
-                <span className="truncate flex-1 font-display text-ui-lg font-medium">{team.name}</span>
+                <span className="truncate flex-1 text-ui-lg font-medium">{team.name}</span>
                 {pickingId === team.id ? (
                   <span className="text-ui-xs text-fg-muted">Switching…</span>
                 ) : (

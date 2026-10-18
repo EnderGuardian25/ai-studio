@@ -33,7 +33,7 @@ There are 8 tasks in 3 waves. All the work lands on `v2`, after 018 and 022 (R12
 
 ### Wave 1 — Foundation: tokens, fonts, primitives, shell (the shippable cut)
 
-- [ ] `T1` — Graphite tokens, fonts and Tailwind mapping; the PNG logo back; token, contrast and guard tests
+- [x] `T1` — Graphite tokens, fonts and Tailwind mapping; the PNG logo back; token, contrast and guard tests
   - Files: `src/app/globals.css`, `tailwind.config.ts`, `src/app/layout.tsx`, `src/components/Logo.tsx` (restore from `7fdbe38^`), `public/BistecStudioLogo.png` (restore from `7fdbe38^`), `src/app/(auth)/login/page.tsx` and `src/components/layout/AppShell.tsx` (the `<Logo>` call only), `src/components/ui/Button.tsx` (the resting shadows only), every `src/**` file with a `font-display` / `font-text` / `opsz` token (mechanical; about 40 files), `tests/unit/designTokens.test.ts`, `tests/unit/contrast.test.ts`, `tests/unit/uiTokenGuard.test.ts`, `tests/unit/noTeamNotice.test.ts`, `tests/e2e/surfaces.test.ts` (the wordmark case → logo case; the new body-font case), `tests/e2e/a11y.test.ts` (the AC-07 helper)
   - Estimate: large
   - Kind: impl

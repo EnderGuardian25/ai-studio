@@ -24,8 +24,10 @@ import {
 //   T6, the shell group: AC-11 (the 375 px sidebar opens, traps focus,
 //          reaches every link and closes; no horizontal scroll), AC-12
 //          (login, choose-team and the shell at 375 px), AC-17 (visible focus
-//          on the first three stops of login and the shell), the "Studio"
-//          wordmark, the theme toggle, and the Create post button's motion.
+//          on the first three stops of login and the shell), the logo, the
+//          theme toggle, and the Create post button's motion.
+//   021 T1: the Bistec Studio PNG logo is back (AC-10), and the body font is
+//          Plus Jakarta Sans (AC-04).
 //   T7–T12, the screen groups: AC-12 (375 px, no horizontal scroll), AC-17
 //          (visible focus on a screen's first three stops) and FR-12 (each
 //          screen's controls, by role and name).
@@ -295,20 +297,43 @@ test.describe('Shell, login and choose-team (T6)', () => {
     expect(stops).toEqual(['Light', 'Dark', 'Switch team'])
   })
 
-  test('the "Studio" wordmark is the logo, typeset in the display face', async ({ page }) => {
+  // 021 AC-10 (FR-08, A6): the PNG logo, inverted to white on the dark theme.
+  for (const theme of THEMES) {
+    test(`AC-10: the logo is the Bistec Studio PNG on login and in the banner (${theme})`, async ({ page }) => {
+      await storeTheme(page, theme)
+      await page.setViewportSize({ width: 1440, height: 900 })
+      const filter = theme === 'dark' ? 'invert(1)' : 'none'
+      await page.goto('/login')
+      await expectTheme(page, theme)
+      const loginLogo = page.getByRole('img', { name: 'Bistec Studio', exact: true })
+      await expect(loginLogo).toBeVisible()
+      await expect(loginLogo).toHaveCSS('background-image', /BistecStudioLogo\.png/)
+      await expect(loginLogo).toHaveCSS('filter', filter)
+      await pageLogin(page)
+      const logo = page.getByRole('banner').getByRole('img', { name: 'Bistec Studio', exact: true })
+      await expect(logo).toBeVisible()
+      await expect(logo).toHaveCSS('background-image', /BistecStudioLogo\.png/)
+      await expect(logo).toHaveCSS('filter', filter)
+      // The asset itself is served (a 404 would leave the box empty).
+      const res = await page.request.get('/BistecStudioLogo.png')
+      expect(res.status()).toBe(200)
+      expect(res.headers()['content-type']).toMatch(/image\/png/)
+    })
+  }
+
+  // 021 AC-04 (FR-03, NFR-05): next/font serves Plus Jakarta Sans under a
+  // generated family name that keeps the font's name (e.g. __Plus_Jakarta_Sans_…).
+  // The suite's afterEach keeps the AC-19 no-CDN check on these loads.
+  test('AC-04: the body font is Plus Jakarta Sans on login and in the shell', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 })
     await page.goto('/login')
-    await expect(page.getByRole('img', { name: 'Studio' })).toHaveText('Studio')
+    const bodyFont = () => page.evaluate(() => getComputedStyle(document.body).fontFamily)
+    expect(await bodyFont()).toMatch(/Plus.Jakarta.Sans/)
     await pageLogin(page)
-    const logo = page.getByRole('banner').getByRole('img', { name: 'Studio' })
-    await expect(logo).toHaveText('Studio')
-    const style = await logo.evaluate((el) => {
-      const cs = getComputedStyle(el)
-      return { family: cs.fontFamily, style: cs.fontStyle, image: cs.backgroundImage }
-    })
-    expect(style.family).toMatch(/Fraunces/i)
-    expect(style.style).toBe('italic')
-    expect(style.image).toBe('none')
+    expect(await bodyFont()).toMatch(/Plus.Jakarta.Sans/)
+    // A heading inherits it: no other family is left to override it.
+    const h1 = page.getByRole('heading', { level: 1 }).first()
+    await expect(h1).toHaveCSS('font-family', /Plus.Jakarta.Sans/)
   })
 
   test('the theme toggle switches the theme and its pressed state follows', async ({ page }) => {

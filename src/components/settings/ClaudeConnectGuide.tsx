@@ -130,7 +130,7 @@ export function ClaudeConnectGuide({ variant }: { variant: 'personal' | 'team' }
               // §8.4: segments in --fg-muted, the selected one in ink. The
               // focus ring is inset: the outline's overflow-hidden clips an
               // outer one.
-              className={`px-2.5 py-1.5 font-text text-ui-xs font-semibold transition-colors duration-fast ease-standard focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus ${
+              className={`px-2.5 py-1.5 text-ui-xs font-semibold transition-colors duration-fast ease-standard focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus ${
                 selected ? 'bg-fg text-canvas' : 'text-fg-muted hover:text-fg'
               }`}
             >

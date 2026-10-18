@@ -71,10 +71,10 @@ export function TeamSwitcher() {
         : teamRole === 'EDITOR'
           ? 'Editor'
           : null
-  const block = 'mx-5 mb-[22px] pb-4 border-b border-line-subtle font-text text-fg'
+  const block = 'mx-5 mb-[22px] pb-4 border-b border-line-subtle text-fg'
   const name = (
     <span className="min-w-0">
-      <span className="block truncate font-display text-ui-base font-medium leading-tight [font-variation-settings:'opsz'_24]">
+      <span className="block truncate text-ui-base font-medium leading-tight">
         {label}
       </span>
       {roleLabel && <span className="block text-ui-xs text-fg-muted">{roleLabel}</span>}
@@ -117,7 +117,7 @@ export function TeamSwitcher() {
               onSelect={() => selectTeam(team.id)}
               className={cn(
                 'flex items-center gap-2.5 px-3.5 py-[7px] cursor-pointer outline-none',
-                'font-text text-ui-sm text-fg',
+                'text-ui-sm text-fg',
                 'data-[highlighted]:bg-canvas',
               )}
             >

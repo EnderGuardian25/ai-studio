@@ -12,21 +12,21 @@ export function NoTeamNotice({ isSuperAdmin }: { isSuperAdmin: boolean }) {
       <Users size={28} strokeWidth={1.4} className="mx-auto mb-3 text-fg-muted" />
       {isSuperAdmin ? (
         <>
-          <h2 className="font-display text-ui-lg font-medium text-fg">No teams yet</h2>
+          <h2 className="text-ui-lg font-medium text-fg">No teams yet</h2>
           <p className="mt-2 text-ui-sm text-fg-muted">
             Create the first team, then add yourself and others to it to start creating posts.
           </p>
           {/* Folio's primary button (§8.2), drawn on a link. */}
           <Link
             href="/admin/teams"
-            className="mt-5 inline-flex h-control-md items-center justify-center gap-2 whitespace-nowrap rounded-ui-md border border-accent bg-accent px-5 font-text text-ui-sm font-semibold text-accent-fg transition-[box-shadow] duration-fast ease-standard hover:shadow-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
+            className="mt-5 inline-flex h-control-md items-center justify-center gap-2 whitespace-nowrap rounded-ui-md border border-accent bg-accent px-5 text-ui-sm font-semibold text-accent-fg transition-[box-shadow] duration-fast ease-standard hover:shadow-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
           >
             Create a team
           </Link>
         </>
       ) : (
         <>
-          <h2 className="font-display text-ui-lg font-medium text-fg">
+          <h2 className="text-ui-lg font-medium text-fg">
             You&rsquo;re not in a team yet
           </h2>
           <p className="mt-2 text-ui-sm text-fg-muted">

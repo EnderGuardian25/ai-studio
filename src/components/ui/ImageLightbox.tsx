@@ -83,7 +83,7 @@ export function ImageLightbox({ open, onClose, src, topic, aspectRatio }: ImageL
           />
 
           {/* Caption bar */}
-          <div className="surface-overlay mt-4 flex items-center gap-3 px-4 py-2 max-w-full font-text">
+          <div className="surface-overlay mt-4 flex items-center gap-3 px-4 py-2 max-w-full">
             <p className="text-ui-sm text-fg truncate">
               {topic}
               <span className="ml-2 text-ui-xs tabular-nums text-fg-muted">

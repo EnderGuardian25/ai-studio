@@ -64,8 +64,10 @@ function over(fg: RGB, alpha: number, bg: RGB): RGB {
 
 const TEXT = 4.5 // body text
 const UI = 3 // non-text boundaries: control edges, focus
-// Status-chip tint alpha, the same in both themes (DESIGN_SYSTEM.md §3).
-const CHIP_ALPHA = 0.1
+// Status tint alpha, the same in both themes and for chips, notices and
+// status discs (021 A2): the Graphite study's chip tint. 0.12 is stricter than
+// the 0.10 it replaces (design.md §9).
+const CHIP_ALPHA = 0.12
 
 const SURFACES = ['canvas', 'surface-1', 'surface-2'] as const
 const STATUSES = ['draft', 'exported', 'scheduled', 'published', 'failed'] as const

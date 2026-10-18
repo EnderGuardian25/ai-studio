@@ -21,7 +21,7 @@ export function ThemeToggle() {
     <div
       role="group"
       aria-label="Theme"
-      className="inline-flex overflow-hidden rounded-ui-md border border-line font-text text-ui-xs font-semibold"
+      className="inline-flex overflow-hidden rounded-ui-md border border-line text-ui-xs font-semibold"
     >
       <button
         type="button"

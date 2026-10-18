@@ -99,7 +99,7 @@ export default function ProjectDetailPage() {
                     href={`/campaigns/${campaign.id}`}
                     className={`group flex items-center justify-between gap-3 py-3.5 ${FOCUS}`}
                   >
-                    <span className="min-w-0 break-words font-display text-ui-lg font-medium leading-snug text-fg transition-colors duration-fast ease-standard group-hover:text-accent">
+                    <span className="min-w-0 break-words text-ui-lg font-medium leading-snug text-fg transition-colors duration-fast ease-standard group-hover:text-accent">
                       {campaign.name}
                     </span>
                     <ArrowRight {...ICON} aria-hidden className="flex-shrink-0 text-fg-muted transition-colors duration-fast ease-standard group-hover:text-fg" />

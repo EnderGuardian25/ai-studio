@@ -10,7 +10,7 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // ─── Folio semantic colours (change 011, DESIGN_SYSTEM.md §3.4) ───
+        // ─── Semantic colours (change 011, DESIGN_SYSTEM.md §3.4) ───
         // Each is an R G B triplet var from globals.css, switched by .dark, so
         // one class serves both themes and opacity modifiers work (bg-scrim/50).
         canvas: tok('canvas'),
@@ -35,19 +35,18 @@ const config: Config = {
         raised: 'var(--shadow-raised)',
         overlay: 'var(--shadow-overlay)',
       },
+      // Exactly two families (021 FR-02): Plus Jakarta Sans and JetBrains Mono,
+      // both from next/font (src/app/layout.tsx). The body sets `font-sans`,
+      // so nothing else needs a font utility.
       fontFamily: {
-        // `sans` and `text` are both Instrument Sans (DESIGN_SYSTEM.md §5.1);
-        // `text` stays as the name the restyled screens already use.
         sans: ['var(--font-sans)', 'ui-sans-serif', 'system-ui', 'sans-serif'],
-        mono: ['var(--font-mono)', 'monospace'],
-        display: ['var(--font-display)'],
-        text: ['var(--font-sans)'],
+        mono: ['var(--font-mono)', 'ui-monospace', 'SFMono-Regular', 'monospace'],
       },
-      // Folio sizes and radii under ui-* keys: Tailwind's own sm/base/xl/2xl
-      // (type) and md/lg (radius) differ from Folio's, and the app still uses
-      // a few of the defaults. Spacing needs only the control heights (Folio's
-      // steps equal Tailwind's): h-control-md, w-control-sm and so on (014
-      // FR-07), under their own keys so no default step changes.
+      // The design system's sizes and radii under ui-* keys: Tailwind's own
+      // sm/base/xl/2xl (type) and md/lg (radius) differ from ours, and the app
+      // still uses a few of the defaults. Spacing needs only the control
+      // heights (the design steps equal Tailwind's): h-control-md, w-control-sm
+      // and so on (014 FR-07), under their own keys so no default step changes.
       spacing: {
         'control-sm': 'var(--control-sm)',
         'control-md': 'var(--control-md)',
@@ -69,7 +68,16 @@ const config: Config = {
         'ui-sm': 'var(--radius-sm)',
         'ui-md': 'var(--radius-md)',
         'ui-lg': 'var(--radius-lg)',
+        'ui-xl': 'var(--radius-xl)',
         'ui-pill': 'var(--radius-pill)',
+      },
+      // The one status-tint alpha, for bg-status-x/12 (021 A2).
+      opacity: {
+        '12': '0.12',
+      },
+      // The one small-caps tracking, used only by SMALL_CAPS (021 FR-07).
+      letterSpacing: {
+        label: '0.14em',
       },
       transitionDuration: {
         fast: 'var(--dur-fast)',

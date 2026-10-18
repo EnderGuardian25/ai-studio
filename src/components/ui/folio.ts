@@ -21,16 +21,16 @@ export const EYEBROW = `${SMALL_CAPS} text-fg-muted`
 // Page title (§5.2): 42 px display, stepping down to 24 px below md. No top
 // margin: PageHead adds `mt-2` under an eyebrow.
 export const PAGE_TITLE =
-  "font-display font-normal text-ui-xl md:text-ui-2xl leading-[1.04] tracking-[-0.025em] [font-variation-settings:'opsz'_144]"
+  "font-normal text-ui-xl md:text-ui-2xl leading-[1.04] tracking-[-0.025em]"
 export const PAGE_LEAD = 'mt-3 text-ui-sm text-fg-muted'
 
 // A section head (§8.14): an italic --accent numeral, then the h2.
-export const SECTION_NUMERAL = 'font-display italic text-ui-base text-accent'
+export const SECTION_NUMERAL = 'italic text-ui-base text-accent'
 export const SECTION_HEAD =
-  "font-display text-ui-xl font-medium leading-tight tracking-[-0.01em] [font-variation-settings:'opsz'_48]"
+  "text-ui-xl font-medium leading-tight tracking-[-0.01em]"
 
 // A sub-head (§5.2 h3).
-export const SUB_HEAD = 'font-display text-ui-lg font-medium leading-snug text-fg'
+export const SUB_HEAD = 'text-ui-lg font-medium leading-snug text-fg'
 
 // A notice on its status tint (§3.2): the text in the status colour on its
 // 10 % fill (the pair §3.3 checks), ringed in currentColor like a chip (§8.5).
@@ -64,7 +64,7 @@ export const TABLE_HEAD_ROW =
 // `cn` is a plain join: overriding fieldClasses' padding would leave two
 // competing utilities.
 const COMPACT_BOX =
-  'rounded-ui-sm border border-line bg-surface-raised px-2.5 font-text text-ui-sm text-fg placeholder:text-fg-muted transition-[border-color,box-shadow] duration-fast ease-standard focus:outline-none focus:border-focus focus:ring-1 focus:ring-focus disabled:cursor-not-allowed disabled:opacity-50'
+  'rounded-ui-sm border border-line bg-surface-raised px-2.5 text-ui-sm text-fg placeholder:text-fg-muted transition-[border-color,box-shadow] duration-fast ease-standard focus:outline-none focus:border-focus focus:ring-1 focus:ring-focus disabled:cursor-not-allowed disabled:opacity-50'
 // Single-line: the sm control height (--control-sm, 014 FR-07), so it lines up
 // with the sm Button beside it.
 export const COMPACT_FIELD = `${COMPACT_BOX} h-control-sm`
