@@ -48,7 +48,7 @@ No real model calls. Never run two implementers in this checkout. Use `export MS
 
 ### Wave 2 — Docs
 
-- [ ] `T3` — The repo rules, the fork history and the pre-merge prod checklist
+- [x] `T3` — The repo rules, the fork history and the pre-merge prod checklist
   - Files: `CLAUDE.md`, `docs/handoff.md`, `docs/fork-history.md` (new)
   - Estimate: medium
   - Kind: docs

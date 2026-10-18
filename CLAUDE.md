@@ -2,196 +2,51 @@
 
 This repo contains planning documents for **bistec-studio**, an internal marketing post generation tool for the Bistec marketing team.
 
-## ✅ Outstanding work — START HERE (updated 2026-10-14)
+## ✅ Outstanding work — START HERE (updated 2026-10-19)
 
-- **⏸️ 2026-10-14 — PICK UP HERE: 016 and 017 are VERIFIED PASS (CI green). 018 is building: T1 is a committed WIP (`8546451b`), interrupted by a usage limit. Resume at 018 T1 FR-04, using [`reports/T1-wip.md`](.specclaw/changes/018-post-008-small-fixes/reports/T1-wip.md).** Full detail: [`docs/handoff.md`](docs/handoff.md) top section.
-  - **Resume order:**
-    1. Finish 018 T1: FR-04 (the draft-GET provider lookup), the AC-01 mutation proof, the targeted E2E, a `specclaw:code-reviewer` pass, then mark T1 complete.
-    2. 018 T2 (Undo settle-on-state, revision-list retry), T3 (test hygiene) and T4 (gate and CI), then verify.
-    3. 019 (claim token) and 020 (Create post button off the draft page). Both are approved (bounded) but **not yet planned**: run `/specclaw:plan` first.
-  - **Gates at the last verified point (017, `e539395d`):** E2E 387/3/0/0; unit 2546; CI run 38436823300 green. At the 018 WIP: tsc clean, lint 0 errors, unit 2551.
-  - **Process (unchanged):** one task at a time. An implementer subagent does the work, `specclaw:code-reviewer` reviews it, and the orchestrator re-runs tsc, lint and unit and commits. A full clean mock E2E and a CI check close each change. No real model calls.
-- **(superseded) 2026-10-13 (latest) — 016 fresh-start cleanup VERIFIED PASS (E2E 386/3/0/0; CI green). 017 publish fixes VERIFIED PASS (E2E 387/3/0/0; CI green). The new system starts FRESH (no data import, user decision). 004 re-verified PASS at `e88b55b6` (CI green). Changes 016–020 are approved (bounded) and build one at a time: 016 fresh-start cleanup → 017 publish fixes → 018 small fixes → 019 claim token → 020 Create post button off the draft page.** Full detail: [`docs/handoff.md`](docs/handoff.md) top section.
-  - **Decisions:**
-    - no import or carry-over; `import-posts` is won't-fix and both scripts are deleted in 016;
-    - no pre-made "Bistec" team on fresh systems;
-    - the 012 and 008 rollbacks go;
-    - the `copyText` alias goes;
-    - the Create post button is hidden on `/drafts/[id]` (this amends 011 AC-01).
-  - **⚠️ Remote `upstream` → `bistec-oss/studio` has push enabled. Never push to it; removing it waits on the user.**
-  - **After 016–020:** 006, 007, 009 and 010 (proposals), plus the 005 AC-16 operator run.
-- **(superseded) 2026-10-13 (later) — 008 model selection is BUILT 19/19 and VERIFIED PASS (32/32 gating ACs; [`verify-report.md`](.specclaw/changes/008-model-selection/verify-report.md)). CI green at `c78ce50c`. Next: the post-012/008 follow-ups (handoff "Still open after 008"); AC-32 (real Opus timings) stays optional.** Full detail: [`docs/handoff.md`](docs/handoff.md) top section; deploy, rollback and procedures in its **008 runbook** section.
-  - **Gates:** wave 1 **383/3/0/0** (CI run 38304451112 green); wave 2 **391/3/0/0**, a full clean mock E2E at `b36be415`. Unit **2604/2604**, tsc clean, lint 0 errors. Every task was reviewed: no BLOCK; T1's one WARN (a refused `CLAUDE_CLI_MODEL` must still try the table default) was fixed before commit and is unit-tested.
-  - **Check first:** the CI run for `b36be415` (run 38354472914, in progress when the docs were written) and for the T19 docs commit (L21).
-  - **T2 passed (2026-10-13):** the pinned CLI 2.1.287 accepts all three full IDs, so `cliArg = apiId`.
-  - **What 008 is now:**
-    - one catalogue, `src/lib/models/catalogue.ts`: Haiku 4.5, Sonnet 5.5 and Opus 5.5, the only file in `src/` allowed a model literal;
-    - one resolver, `resolveModel`: explicit pick → draft stamp → team default → system default → fallback, with the team allow-list checked at every tier;
-    - `/team` → Models: allowed models, per-surface defaults, and the "Opus requires a personal token" switch;
-    - stamps: `DraftCaption.model`, `Draft.headlineModel`, `Draft.designModel`, `DraftRevision.model`;
-    - pickers on the wizard Review step, refine, every regenerate control and both assistant chat headers.
-  - **⚠️ Deploy:** one additive migration, `20261012120000_model_selection`, applied on boot. **`CLAUDE_CLI_MODEL` is now the system default, not a global override. `default` or any value that isn't a catalogue key or a current ID fails the boot.**
-  - **Optional, not a gate:** AC-32, one real Opus 5.5 Path B generation and refine in CLI mode, to measure the placeholder timeouts.
-- **(superseded) 2026-10-13 — 008 wave 1 is BUILT, REVIEWED and GREEN.** Full detail: [`docs/handoff.md`](docs/handoff.md) top section.
-  - **Done:** T1 and T3–T12 are committed, each reviewed NOTE. The local full clean E2E gave **383/3/0/0** and unit 2394. **CI run 38304451112 at `d3c5685a` is green.**
-  - **Open:** **T2, the operator CLI full-ID check** (the user runs it; the command is in `tasks.md` T2). T12 stays `in_progress` until `reports/T2.md` exists.
-  - **Next:** wave 2, T13–T19 (the pickers), with the same one-task-at-a-time process.
-- **(superseded) 2026-10-12 (evening) — 008 BUILD in progress.** Full detail: [`docs/handoff.md`](docs/handoff.md) top section.
-  - **Committed:** T1, T3–T6 (each reviewed) and **T7, which is UNREVIEWED.** The review was stopped to save usage; the gates were verified (unit 2285/2285).
-  - **Next:**
-    1. review T7, then mark it complete;
-    2. T8 → T12 (the wave-1 gate);
-    3. wave 2, T13–T19.
-  - **T2 (operator CLI full-ID check) is waiting on the user.** The command is in `tasks.md` T2.
-  - **Process:** one task at a time: an implementer subagent → `specclaw:code-reviewer` → the orchestrator re-runs tsc/lint/unit and commits. No real model calls.
-- **(superseded) 2026-10-12 (latest) — 008 is PLANNED and waiting for the user to approve the plan; then `/specclaw:build 008-model-selection`.** The earlier planner subagent died on a usage limit after writing `spec.md`; the orchestrator reviewed it and wrote `design.md` and `tasks.md`. **19 tasks in 2 waves:** wave 1 = T1–T12, shippable alone, one full E2E gate; wave 2 = T13–T19, the pickers.
-  - **T2 is an operator step:** the pinned CLI 2.1.287 must accept the full model IDs. It gates the wave-1 gate (T12), not T3–T11.
-  - **Read first:** `spec.md` Assumptions A1–A14 and open questions 1–4; `design.md` §5 (timeouts are placeholders; the budget unit test is the gate) and §13 (every panel finding → where it is addressed).
-  - **Build order:** subagent-driven, one task at a time: an implementer, then a `specclaw:code-reviewer`, then the orchestrator commits. No real model calls.
-
-- **⏸️ 2026-10-12 (later) — PICK UP HERE: 008 model selection is APPROVED (architectural) and was being PLANNED by a subagent when the chat was cleared. Finish the plan first.** Full detail: [`docs/handoff.md`](docs/handoff.md) top section.
-  - **State at the clear:**
-    - 015 verified PASS and fork CI is green.
-    - 008's proposal is approved (`a1272922`), with a deep party panel (CHANGES_REQUESTED: 5 BLOCK / 23 WARN / 6 NOTE, see `party-report.md`) and all rulings recorded.
-    - A planner subagent was writing `.specclaw/changes/008-model-selection/{spec,design,tasks}.md`. **These are uncommitted.**
-    - **The plan lock on 008 has been held since 2026-10-12T02:53Z.**
-  - **Resume:**
-    1. **Check the plan files.** Run `ls .specclaw/changes/008-model-selection/`. If `spec.md`, `design.md` and `tasks.md` are all there and complete, review them against the proposal's **"Panel rulings (user, 2026-10-12)"** and **"Panel resolutions (orchestrator, 2026-10-12)"** sections, and against design.md's "Panel findings → where addressed" table.
-    2. **Record the phases.** Run `specclaw-parse-tasks .specclaw/changes/008-model-selection/tasks.md`, then `specclaw-set-phase .specclaw 008-model-selection spec done`, then `design done`, then `tasks done`.
-    3. **Release and commit.** Run `specclaw-change-lock .specclaw release 008-model-selection`, then commit and push to `v2`.
-    4. **Get approval.** Present the plan summary, the A1… assumptions and the open questions to the user, then `/specclaw:build 008-model-selection`.
-    5. **If any plan file is missing or half-written:** release the lock and re-run `/specclaw:plan 008-model-selection`. The proposal holds everything the plan needs.
-  - **008 binding decisions (all in `proposal.md`):**
-    - **Catalogue:** Haiku 4.5, Sonnet 5.5 and Opus 5.5, with no Fable. They are stored as **closed catalogue keys**; full API IDs appear only in stamps.
-    - **Two waves.** Wave 1, independently shippable: catalogue, `resolveModel` (replacing `modelFor`/`modelForBackground`), current IDs everywhere, `TeamModelPolicy` with defaults, allow-list and the "Opus requires a personal token" switch at `/team`, and the stamps (`DraftCaption.model`, `Draft.headlineModel`, `Draft.designModel`, `DraftRevision.model`). It also covers the per-action time budget under both 15-minute sweeps, the boundary seam, the model-literal guard and `CLAUDE_CLI_MODEL` as a validated system default. Wave 2: the pickers (wizard Review, refine, every regenerate control, chat headers), the `model` body fields and the team-token notice.
-    - **No per-user remembered choice.** New posts and chats pre-select the team default. Regenerate pre-selects the draft's stamp; mixed or null stamps fall to the team default.
-    - **No `ScheduledGeneration` pin.**
-    - **The allow-list is checked at every tier at call time.** A stored value that is no longer allowed falls to the team default, recorded as a substitution. Only an explicit request returns 400.
-    - **Cost tiers** `$`/`$$`/`$$$` are computed from numeric per-MTok prices.
-    - **Path A** gets Haiku and Sonnet only.
-  - **Never run real model calls while planning or testing.** The pinned CLI 2.1.287's full-ID check and the Opus 5.5 timings are operator-gated tasks.
-
-- **✅ 2026-10-12 — superseded by 2026-10-12 (later) above: fork CI on `v2` is GREEN again. Change 015 (draft-page settle race) is built and VERIFIED PASS (8/8).** CI run 38195143494 passed on every job (E2E 371 passed / 3 skipped, unit, build), the first green since 013. Local full gate: 371/3/0/0.
-  - **Root cause** (`/specclaw:debug`, deterministic repro): `RefinementPanel` settled a refine row, and the draft page refreshed its version list, only on an _observed_ `pendingAction` transition. A refine that finished before the post-202 refetch was served went from `null` to `null` as far as the client could see, so the row hung on "Applying…" with the input disabled and History stuck at v1. The slower runner always lost that race. This was also the old 011 "Applying…" follow-up.
-  - **The fix:** settle on state, not on an edge. The panel awaits the refetch, then resolves once `pendingAction` is null, with unchanged outcome logic. The page refetches revisions whenever the current revision is missing from the list. New `tests/e2e/settle-race.test.ts` (§X) forces the race by holding the post-202 GET for 3 s, for refine and for Regenerate design. A mutation check showed each half of the fix guards its own case. `surfaces.test.ts` is untouched.
-  - **User rule (2026-10-12):** all work lands directly on `v2`; no per-change PRs. The whole of `v2` goes to `main` as one PR later, on request.
-  - **New small follow-up:** the `CaptionPanel`/`HeadlinePanel` undo-clear uses the same observed-edge pattern. Its only effect is a leftover Undo that restores identical text after a regenerate that fails faster than the refetch.
-  - **Next after 015 verify:** the remaining post-012 follow-ups below (starting with the `import-posts` `teamId` gap; won't-fix, the script was removed by 016), then the roadmap's next planning item, **008 model selection**.
-
-- **⏸️ 2026-10-11 (later) — superseded by 2026-10-12 above: 012 (per-channel captions) is BUILT 16/16 and VERIFIED PASS (28/28 gating ACs, 2026-10-12), all pushed. Next: the follow-ups below, starting with the red-CI refine race (`/specclaw:debug`).** Verify: [`verify-report.md`](.specclaw/changes/012-per-channel-captions/verify-report.md) — fresh E2E at HEAD 369/3/0/0, unit 2025, `test:render` 15/15. Full detail: [`docs/handoff.md`](docs/handoff.md) top section; deploy/backfill/rollback steps in its **012 runbook** section.
-  - **Commits this session:** T8 `1f00261d`, T9 `9cf986eb`, T10 `05e8b021`, T11 `932104ec`, T12 `44b28c83`, T13 `29ed3c8e`, T14 `b522046e`, T15 `c9386ae0`, T16 `1b7186f7`.
-  - **Gates** (each a full clean mock E2E after a dropped and recreated test DB): wave 1 **363/3/0/0**, wave 2 **369/3/0/0**, wave 3 **369/3/0/0** (passed/skipped/failed/flaky). Unit **2025**.
-  - **User decisions this session:**
-    - **(a)** MCP/ACP `publish_post` keeps FR-17: a refused caption leaves a **FAILED Post row** with the resolver's reason. The T7 review's "no row" suggestion was rejected.
-    - **(b)** The red fork CI is debugged as its own change after 012.
-  - **~~🔴 Fork CI on `v2` has been RED since 014 wave 1~~ — FIXED 2026-10-12 by change 015 (green at `df27ff49`).** It had been red since run 37974533639, 2026-10-09; "v2 CI is green" was true only at 013.
-    - One runner-only failure: `tests/e2e/surfaces.test.ts` "Draft review (T9) at 375px" times out waiting for the refine log row "Applied", on the first attempt and the retry; it passes locally every time. Likely the already-logged refine "Applying…" race.
-    - All 14 wave-1 012 cases pass in CI, including the backfill and down.sql cases.
-    - **Lesson (L21):** after each push, check `gh run list --branch v2`, not just the local gate.
-  - **Follow-ups after 012, each its own change:**
-    1. ~~the red-CI refine race, together with the refine "Applying…" follow-up;~~ **done: change 015, CI green 2026-10-12;**
-    2. ~~`import-posts.mjs` never sets `teamId`~~ (won't-fix; removed by 016), so a real import has been broken since team tenancy; `--dry-run` hides it (L22);
-    3. the ACP manifest's advertised `generate_post` output schema (`src/acp/agent.ts`) lacks `headline` and `captions`;
-    4. ~~`POST /api/posts` returns 201 for an immediate publish that ends FAILED;~~ fixed by 017;
-    5. a per-claim token for draft actions;
-    6. the floating Create post button overlapping content;
-    7. small items: the trailing `---` in split sections (T3); the caption check runs before the duplicate 409 (T7/T8); per-post caption loads in the posts list GET (T7); the axe rule list copied into `captions.test.ts` should become a shared helper (T13); the 014 verify gaps 5–8;
-    8. **the 005 AC-16 operator run** stays open. 🔴 Revoke the OAuth token pasted into chat on 2026-10-06 first.
+- **⏸️ 2026-10-19 — PICK UP HERE. This repo is `bistec-oss/studio`, and since 2026-10-18 it carries the fork's `v2`. 018 is VERIFIED PASS. 022 (prod data and deploy restore) is building: T1 and T2 are done, T3 (these docs) is in review, and T4 (the full gate and CI) is next. After 022: 021 Graphite, then 019 and 020.** Full detail: [`docs/handoff.md`](docs/handoff.md) top section and its **pre-merge prod checklist**.
+  - **The fork era (2026-10-07 to 2026-10-14) is in [`docs/fork-history.md`](docs/fork-history.md).** It is superseded context, not instructions. That file also holds the procedure for importing code from the fork.
+  - **Repo rules. This entry is authoritative; `docs/handoff.md` links here.**
+    - This repo is **`bistec-oss/studio`**, and **`origin` points to it**.
+    - Work continues on **`v2`**. Pushes to `origin v2` are allowed.
+    - **Never commit or push to `main`.** `main` deploys to company prod. `v2` → `main` is one PR, merged only on the user's go-ahead, and only after the pre-merge prod checklist in `docs/handoff.md` is done.
+    - **`fork`** = `EnderGuardian25/ai-studio`. It is fetch-only: its push URL is `DISABLED`. Fork code arrives only as a reviewed PR into `v2`, never by fast-forward.
+    - **The 2026-10-18 fast-forward was the one-time adoption** (`c82fdb0` → `1c38dbb`, 119 commits), done on the user's explicit instruction.
+    - There is no `upstream` remote.
+    - **Draft PR #43 (`v2` → `main`) stays a draft and is never merged.**
+  - **User decisions (2026-10-18):**
+    - adopt the fork's `v2` (above), and keep the `fork` remote with push disabled;
+    - **keep company prod data working** (change 022);
+    - **the Graphite theme** (change 021), with the old `BistecStudioLogo.png`;
+    - restore `docker-publish.yml` (022 T2, done);
+    - **build order: 018 → 022 → 021 → 019 → 020;**
+    - prod's `CLAUDE_CLI_MODEL` is a catalogue key;
+    - no prod dump, so 022's dry run is synthetic. This is the named waiver in the handoff checklist.
+  - **Where things stand:**
+    - **018 VERIFIED PASS,** 8/8 ACs. E2E 390/3/0/0; CI green at `432a036f`.
+    - **022:**
+      - T1 (`8b5c551`): the carry-over migration `20261012130000_legacy_caption_carryover`, the `LegacyCaptionArchive` table and `npm run test:upgrade`;
+      - T2 (`6d02d6b`): the env preflight before migrate, the catalogue comment and the restored `docker-publish.yml`;
+      - T3: these docs; T4: the full gate and CI, then verify.
+      - 022 does not merge or deploy. After verify, the merge waits on the checklist's operator steps and the user's go-ahead.
+    - **021 Graphite re-theme:** planned, 8 tasks in 3 waves. It builds after 022.
+    - **019 (claim token) and 020 (Create post button off the draft page):** approved (bounded), not planned yet. Run `/specclaw:plan` first.
+  - **Gates now:** unit 2556/2556, lint 0 errors / 7 warnings. The last full clean mock E2E was 390/3/0/0 (018 verify).
+  - **The company prod items are live to-dos again.** The fork era called them "company history"; they are not.
+    - **B4:** the prod scheduler resource isn't running. Read [`docs/scheduler-b4-diagnosis-2026-08-03.md`](docs/scheduler-b4-diagnosis-2026-08-03.md) first.
+    - **Team Claude tokens:** neither prod team has one, so scheduled and MCP runs fail on credentials.
+    - **The Coolify token:** `COOLIFY_API_TOKEN` has been dead since 2026-09-15, so a merge to `main` builds but does not deploy. The Coolify administrator rotates it with [`docs/coolify-token-rotation.md`](docs/coolify-token-rotation.md) (`deploy` + `read`).
+    - **MinIO → silo on prod:** [`docs/minio-silo-migration.md`](docs/minio-silo-migration.md) (CVE-2026-40344).
+    - 🔴 **Revoke the OAuth token pasted into chat on 2026-10-06** and make a new one with `claude setup-token`.
+  - **Process:** one task at a time. An implementer subagent does the work, `specclaw:code-reviewer` reviews it, and the orchestrator re-runs tsc, lint and unit and commits. A full clean mock E2E and a CI check close each change. No real model calls.
   - **Gotchas:**
-    - **`npm run test:e2e:db` does NOT drop the test DB** (it creates if missing, migrates, seeds). A clean gate first needs `docker exec designer-postgres-1 psql -U bistec -d postgres -c "DROP DATABASE IF EXISTS bistec_studio_test WITH (FORCE);"`.
-    - **`specclaw-build setup` refuses on a stale lock** from a previous session: `specclaw-change-lock .specclaw release <change>` (`setup --force` doesn't parse).
-    - **The `review-package` diff came out repo-wide (~437 KB) for T8;** point reviewers at `git diff -- <task files>`.
-    - **(removed by 016)** ~~**The `captions:*` scripts use `--env-file-if-exists=.env`**~~ (so they work in CI). Locally run them only with `dotenv -e .env.test --` or an explicit `DATABASE_URL`.
-    - **A dev DB without the three 012 migrations can't create drafts** with the current Prisma client: `npx prisma migrate deploy` on the dev DB before running the dev app.
-    - **(removed by 016: the 012 rollback no longer exists)** ~~**Rolling back:**~~ run `prisma/rollback/012-per-channel-captions.down.sql` **before** the old image boots. It also un-records migration 3, so a later 012 redeploy re-applies it by itself and no manual roll-forward step is needed (runbook; proven by TC-CAP-13).
+    - **Shared Docker databases.** `D:\studio` and `D:\Bistec\designer` (the fork checkout) share one Postgres and one MinIO (the `designer-*` containers). The root `.env` `DATABASE_URL` is the shared `bistec_studio`. **Never run a prisma or DB command without an explicit `DATABASE_URL`** that points at `bistec_studio_test` or a scratch database.
+    - **Incident, 2026-10-18:** a subagent migrated `bistec_studio` to `v2` head by mistake. No data was lost: every legacy caption is in `LegacyCaptionArchive` (022 [`reports/T1.md`](.specclaw/changes/022-prod-data-and-deploy-restore/reports/T1.md)). It doubles as a real-data dry run of the prod upgrade.
+    - `npm run test:e2e:db` does not drop the test DB. A clean gate first runs `docker exec designer-postgres-1 psql -U bistec -d postgres -c "DROP DATABASE IF EXISTS bistec_studio_test WITH (FORCE);"`.
+    - `export MSYS_NO_PATHCONV=1` before any docker command with a container path.
+    - After each push, check `gh run list --branch v2`, not just the local gate.
 
-- **⏸️ 2026-10-11 (superseded by 2026-10-11 (later) above) — 013 and 014 are verified PASS; 012 (per-channel captions) is building, with T1–T7 of 16 committed. Resume at T8.** Full detail: [`docs/handoff.md`](docs/handoff.md) top section.
-  - Everything is pushed to `origin/v2`.
-  - **Then** resume `/specclaw:build 012-per-channel-captions` at **T8**, subagent-driven: one task at a time, an implementer then a `specclaw:code-reviewer`, and the orchestrator commits.
-    - **T8:** MCP/ACP outputs. It carries two items from the T7 review: MCP `getDraft` still returns `copyText`, and MCP/ACP `publish_post` needs the up-front resolver check.
-    - **T9:** the `legacyCaptionText @map("copyText")` rename.
-    - **T10:** the wave-1 E2E and gate. T6 listed the E2E cases it expects to break.
-    - **T11–T16:** the panels, then the wording and docs.
-    - ~~Then `/specclaw:verify 012`.~~ **Done 2026-10-12: PASS.**
-  - **Done since 2026-10-09:**
-    - **013** fork CI is checks only: `docker-publish.yml` is deleted, Actions are ON, and `v2` CI is green.
-    - **004** is PASS.
-    - **014** UI a11y, shared `PageHead`/`SectionHead`/`Notice`/`FieldLabel` primitives and consistency: 18 tasks, verify PASS 21/21. The final E2E was **349/3/0/0**, with unit 1769 and `test:render` 15/15.
-  - **012 binding decisions** (proposal Decisions, the panel rulings, A1–A10):
-    - `DraftCaption` is keyed on `Channel`, with WHATSAPP added. A publish to a channel with no publisher fails closed.
-    - A required, fenced `Draft.headline`, with a Topic fallback for migrated drafts.
-    - Contracts keep their names.
-    - `copyText` is preserved as `legacyCaptionText @map`, alongside the boot backfill and the lazy loader (all removed by 016).
-  - **Follow-ups to propose after 012:**
-    - ~~`POST /api/posts` returns 201 for a FAILED immediate publish;~~ fixed by 017;
-    - a per-claim token for draft actions;
-    - the floating Create post button overlapping content at some widths.
-  - **Gotchas:**
-    - Exactly one :3001 listener before an E2E run.
-    - Never `npm run build` while `next dev` is serving.
-    - Never run the caption backfill script without an explicit test-DB `DATABASE_URL` (the script was removed by 016).
-    - Resume usage-limited subagents with `SendMessage`.
-
-- **🧭 2026-10-09 (superseded by 2026-10-11 above) — 011 verified PASS; fork `main` merged into `v2`; 013 (fork CI, checks only) is building.** Full detail: [`docs/handoff.md`](docs/handoff.md) top section.
-  - **The user's decisions:**
-    - **The fork runs checks only:** no GHCR push and no redeploy. `docker-publish.yml` is deleted (013 T1); the user will write their own deploy workflow later. `e2e.yml` (typecheck, lint, E2E, unit, build, `docker build .` with no push) runs on PRs and on pushes to `v2` and `main`.
-    - **The 011 theme-toggle exception to FR-12 is approved.**
-    - **Order: 013 → 014 → 012.**
-      - **013 fork CI** (bounded) is building.
-      - **014 UI accessibility / shared primitives / consistency** is approved: one change, a full E2E per wave, the shared primitive first, a static scroll-region rule.
-      - **012 per-channel captions** is approved: a `DraftCaption` table, a separate on-image headline, design-only revisions, and a brief step named "Brief & Caption Direction".
-  - **011 verify: PASS, 20/20.** A fresh E2E at HEAD gave 311 passed / 3 skipped / 1 flaky / 0 failed. The flake was a one-off Chromium page crash at `tests/e2e/surfaces.test.ts:521`.
-  - **The merge `2506de0b`** was clean and brought 004 Phase 0. Gates on the merged tree: tsc clean, lint 0 errors, unit 1722/1722, build, full clean mock E2E **313/3/0/0**, and `auth.test.ts` 8/8 with the new `/api/health` case.
-    - `/api/health` without a session returns 200 `{"ok":true,"commit":"unknown"}`; the commit is unknown because `GIT_SHA` is unset locally.
-    - The `node:22-alpine` image builds, with `claude` 2.1.287, node v22.23.3 and no `EBADENGINE` warnings. **005 AC-17 re-check: PASS.**
-    - **004 Phase 0:** AC-P0-3 and AC-P0-5 pass; AC-P0-1 and AC-P0-2 are superseded by 013, because the fork has no deploy target; AC-P0-4 waits on the first `v2` CI run.
-  - **Local MinIO now runs silo** (`pgsty/silo:RELEASE.2026-09-16T00-00-00Z`, same volume; buckets, object counts and policies unchanged). The rollback image is `local/minio-rollback:pre-silo`.
-  - **Next, in order:**
-    1. **Finish 013 with T3:** push `v2` to `origin`, re-enable Actions, watch the first `v2` E2E run and record AC-P0-4. Report any runner-only failure to the user before fixing it.
-    2. **Plan and build 014.**
-    3. **Plan and build 012.**
-    4. **The operator run of 005 AC-16:** `scripts/cli-sandbox-check.mjs` in the rebuilt image, with a real OAuth token. 🔴 Revoke the token pasted into chat on 2026-10-06 first.
-    5. **Watch the `surfaces.test.ts:521` page-crash flake.**
-
-- **🎨 2026-10-08 — 011 (app visual redesign) is BUILT: 13/13 tasks on `v2` in the fork.** Every screen is **Folio**. Full detail: [`docs/handoff.md`](docs/handoff.md) top section.
-  - **The user's decisions:**
-    - **Direction:** B Folio (2026-10-07).
-    - **Logo:** the typeset **"Studio"** wordmark; the Bistec Studio PNG is deleted.
-    - **Draft page:** no "More" menu. Export, Edit inline and the other actions stay visible buttons.
-  - **Commits:** T3 `9be31d58` → T13 `c37357a3`, each implemented by a subagent, reviewed by `specclaw:code-reviewer` and committed by the orchestrator.
-  - **What changed:**
-    - **The legacy Frozen Light layer is gone.** `tests/unit/uiTokenGuard.test.ts` fails on any legacy class, glass utility or raw palette colour, with a `// ui-exception:` opt-out.
-    - **The default font is Instrument Sans,** with Fraunces for display and JetBrains Mono for code.
-  - **Gates at `c37357a3`:** unit 1722/1722, lint 0 errors, build, `test:render` 15/15, full clean mock E2E **312/3/0/0**. The suite grew by 47 (`tests/e2e/surfaces.test.ts`).
-  - **Next, in order:**
-    1. ~~**`/specclaw:verify 011-app-visual-redesign`.**~~ **Done 2026-10-09:** PASS, 20/20.
-    2. ~~**The fork CI-fix proposal.** The user approves it; they asked for it after 011. It means guarding or removing the `docker-publish.yml` deploy job, adding `v2` to `e2e.yml`, then re-enabling Actions.~~ **Superseded 2026-10-09 by change 013:** `docker-publish.yml` is deleted, and CI is checks only.
-    3. **The 011 follow-up proposal, for the user to approve.** **Approved 2026-10-09 as change 014.** Its contents are listed in the handoff:
-       - an accessibility naming pass;
-       - one shared page-head / section primitive replacing 8 `folio.ts` copies;
-       - smaller consistency items.
-    4. ~~**Merge fork `main` into `v2`.** This brings 004 Phase 0: Node 22, `/api/health`, CI hardening and MinIO → silo. Then recheck 005 AC-17 and AC-16.~~ **Done 2026-10-09 at `2506de0b`.** AC-17 passes; AC-16 still needs an operator run.
-  - **~~Pre-existing bug, logged as a follow-up:~~ FIXED 2026-10-12 (change 015):** a refine row can stay on "Applying…" if the mock refine finishes before the post-202 refetch sees `pendingAction`. It was seen once.
-  - **The capture tool:** `node scripts/capture-ui.mjs --out ui-captures/<name>`, against `npm run test:e2e:serve`, captures every screen. `ui-captures/` is gitignored.
-
-- **🍴 2026-10-07 — THIS REPO IS NOW THE FORK `EnderGuardian25/ai-studio` (public). Read this before any git, `gh`, CI or deploy step.** Full detail: [`docs/handoff.md`](docs/handoff.md) → "moved to the fork".
-  - **The user's decision:** company development stops. All `v2` work (004, 005, 011 and the 006–010/012 proposals) continues here. **The company repo `bistec-oss/studio` is left exactly as it is.** Never push, open PRs, close PRs (draft #43 included) or delete branches there.
-  - **Remotes:**
-    - `origin` = the fork. Push here; `main` and `v2` track it, and **`v2` is the fork's default branch**.
-    - `company` = `bistec-oss/studio`, **fetch-only**. Its push URL is deliberately `DISABLED-company-repo-is-read-only`; never "repair" it.
-    - `gh repo set-default` = `EnderGuardian25/ai-studio`. In a fork, `gh pr create` and `/specclaw:pr` otherwise default the PR base to the **company** repo. If `gh` ever proposes `bistec-oss/studio`, stop.
-  - **CI on the fork is checks only** (user decision 2026-10-09, change 013). `docker-publish.yml` is **deleted**, so there is no GHCR push, no Coolify redeploy and no company health poll. `e2e.yml` is the only workflow; it runs on PRs and on pushes to `v2` and `main`.
-    - **Actions are re-enabled by 013 T3** (`gh api -X PUT repos/EnderGuardian25/ai-studio/actions/permissions -F enabled=true`), once 013 is pushed to `v2`. Until 013 T3 lands, Actions are off (since 2026-10-07) and the gates run locally.
-    - **Never** give the fork a `COOLIFY_API_TOKEN`. A deploy workflow for the user's own target will be written fresh later.
-  - **The repo is public.**
-    - The 2026-10-07 audit found no real credential in the tree or in `v2` history, and everything was already public on the company repo.
-    - **Never commit** secrets, `.env*` (except `.env.example`), prod IDs, customer data or tokens. Test fixtures use obvious fakes (`FAKE`, `AAAA…`).
-    - `BistecStudio2026!` is the test-only seed password; it is never used outside a `*_test` DB.
-  - **Company prod (`studio.bistecglobal.com`) is not ours.** The Coolify, MinIO → silo prod swap, B4, team-token and prod-test items further down are **company history and reference**, not to-dos. The fork has no deploy target yet.
-  - **PR #42 was merged into company `main` on 2026-09-28** (`671ad6e9` = fork `main`). Every "merge #42 only on go-ahead" note below is stale. ~~**To do in the fork:** merge `main` into `v2`, recheck 005 AC-17 under node:22, re-run AC-16 against a rebuilt image, and close 004's Phase 0 ACs.~~ **Done 2026-10-09** (`2506de0b`), except the AC-16 operator run and AC-P0-4.
-  - **Branch rule (kept):** `v2` is the integration branch. Fork `main` moves only on the user's go-ahead.
-
-- **⏸️ 2026-10-07 — PICK UP HERE. 005 is done and verified PASS. 011 (app visual redesign) is planned, and wave 1 is built. The build is paused at its operator gate: the user picks a design direction.** Full detail: [`docs/handoff.md`](docs/handoff.md) top section.
+- **⏸️ 2026-10-07 (superseded by 2026-10-19 above; kept for history). 005 is done and verified PASS. 011 (app visual redesign) is planned, and wave 1 is built. The build is paused at its operator gate: the user picks a design direction.** Full detail: [`docs/handoff.md`](docs/handoff.md) top section.
   - **Next, in order:**
     1. **Get the user's pick: A Graphite, B Folio or C Instrument,** plus any changes they want.
        - Comparison page: https://claude.ai/artifact/XijAC8pAQRkmGErC5QYmB5 (private). The local copy is [`docs/ui-reference/direction-studies/pick.html`](docs/ui-reference/direction-studies/pick.html). The full studies sit beside it, each with its token block and contrast tables.
@@ -200,7 +55,7 @@ This repo contains planning documents for **bistec-studio**, an internal marketi
        - Then T4 (tokens), T5 (primitives, opaque surfaces), T6 (shell), T7–T12 (screens), T13 (cleanup).
        - Every task that touches `src/` ends with a full clean mock E2E run.
        - The T2 report's carry-over notes (`--line-subtle`, reduced-motion timing, amber `scheduled`, regrouped controls) are in the handoff.
-    3. ~~PR #42 merges only on the user's go-ahead.~~ **Superseded by the fork entry above:** #42 was merged on 2026-09-28. Merge fork `main` into `v2`, then recheck AC-17 and AC-16 and close Phase 0.
+    3. ~~PR #42 merges only on the user's go-ahead.~~ **Superseded:** #42 was merged on 2026-09-28, and `main` was merged into `v2` on 2026-10-09 (`2506de0b`; see [`docs/fork-history.md`](docs/fork-history.md)).
     4. **🔴 The user should revoke the OAuth token pasted into chat on 2026-10-06** and make a new one with `claude setup-token`.
   - **005 verify: PASS, 25/25** ([`verify-report.md`](.specclaw/changes/005-provider-flexibility-onboarding/verify-report.md)).
     - AC-16 passed 3/3 in the operator run.
@@ -220,8 +75,8 @@ This repo contains planning documents for **bistec-studio**, an internal marketi
     - **Gemini:** mock-only by user decision.
     - **Onboarding:** `docs/claude-account-setup.md` (native installer primary) and an in-app guide.
     - **Item 2 (COPY route) stays deferred to 008.**
-  - **Open PRs (company repo, not ours since the fork):** #42 is **merged** (2026-09-28). Draft #43 `v2` → `main` is left open on the company repo and is never touched or merged.
-  - **Company ops, handed to the company's Coolify administrator and not fork to-dos:** swap prod MinIO to `pgsty/silo` (`docs/minio-silo-migration.md`; CVE-2026-40344), and rotate `COOLIFY_API_TOKEN`.
+  - **Open PRs:** #42 is **merged** (2026-09-28). Draft #43 `v2` → `main` stays a draft and is never merged.
+  - **Company ops for the Coolify administrator (live to-dos again since 2026-10-18; see the top entry):** swap prod MinIO to `pgsty/silo` (`docs/minio-silo-migration.md`; CVE-2026-40344), and rotate `COOLIFY_API_TOKEN`.
   - **Gates at `v2` head:**
     - unit 1593/1593, lint 0 errors, build passes;
     - last full clean mock E2E 265/3/0/0, at 011 T1 (2026-10-06);
@@ -557,6 +412,7 @@ Before writing any backend code, API routes, Prisma models, or provider logic, r
 ### Specification & planning
 
 - **[`.specclaw/ROADMAP.md`](.specclaw/ROADMAP.md)** — changes 004–012 (004 built and verified PARTIAL, Phase 0 only; 005 built and verified PASS; 011 planned, wave 1 built, waiting on the direction pick; 006–010 and 012 proposals): recommended order, hard/soft dependencies, and which change owns what where they overlap. **Read before planning or building any of them.** Each change's `proposal.md` is the source of truth for its own scope.
+- **[`docs/fork-history.md`](docs/fork-history.md)** — the fork era (2026-10-07 to 2026-10-14), superseded context only, and the **"Importing from the fork"** procedure (the checks by class before any fork code reaches `v2`).
 - **[`docs/coolify-token-rotation.md`](docs/coolify-token-rotation.md)** — ops handoff for the dead Coolify deploy token (merges don't deploy until it's rotated).
 - **[`docs/handoff.md`](docs/handoff.md)** — session handoff with current decisions, Path A/B design descriptions, AGUI spec, provider registration flow, v2 interoperability target, and the latest code-review remediation summary
 - **[`.specclaw/changes/001-marketing-post-studio-v1/spec.md`](.specclaw/changes/001-marketing-post-studio-v1/spec.md)** — full functional requirements (FR-01 through FR-33) and non-functional requirements
