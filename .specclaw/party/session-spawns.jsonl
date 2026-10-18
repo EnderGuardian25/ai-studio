@@ -2,3 +2,5 @@
 {"date":"2026-10-10","change":"012-per-channel-captions","spawns":10,"at":"2026-10-10T17:42:53Z"}
 {"date":"2026-10-12","change":"008-model-selection","spawns":10,"at":"2026-10-12T02:42:55Z"}
 {"date":"2026-10-13","change":"016-import-posts-team-tenancy","spawns":6,"at":"2026-10-13T10:41:08Z"}
+{"date":"2026-10-18","change":"021-graphite-retheme","spawns":6,"at":"2026-10-18T16:43:30Z"}
+{"date":"2026-10-18","change":"022-prod-data-and-deploy-restore","spawns":10,"at":"2026-10-18T16:43:31Z"}

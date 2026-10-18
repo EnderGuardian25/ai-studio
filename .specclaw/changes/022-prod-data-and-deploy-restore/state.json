@@ -1,0 +1,9 @@
+{
+  "change": "022-prod-data-and-deploy-restore",
+  "phase": "proposal",
+  "branch": "",
+  "size": "bounded",
+  "phases": {
+    "proposal": { "status": "approved", "at": "2026-10-18T16:45:19Z" }
+  }
+}
