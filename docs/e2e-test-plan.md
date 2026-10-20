@@ -772,6 +772,8 @@ Each case mints an EXPORTED draft (`mintExportedDraft`) and acts on it in the br
 | 018 AC-05 the caption/headline Undo settles on state     | TC-RACE-03, TC-RACE-04 |
 | 018 AC-06 the revision list retries after a failed fetch | TC-RACE-05             |
 
+> **Update (2026-10-20, change 020):** `create-post-button.test.ts` (011 FR-01 to FR-03) now asserts the floating Create post button is absent on `/drafts/[id]` at 1440 and 375, and runs a check that the refine Send button is not covered at 1440. Its AC-01 case is narrowed to `/`, `/library` and `/campaigns`.
+
 ---
 
 ## 7. Fixes required to the existing specs (before/while implementing)
@@ -808,35 +810,36 @@ CI gate: **`.github/workflows/e2e.yml`** runs the whole suite (§A–§Y, includ
 
 ## 9. Coverage traceability
 
-| Finding(s)                                                  | Guarded by                                                                             |
-| ----------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| H1 ACP/MCP auth                                             | TC-ACP-01/02/03                                                                        |
-| H2 IDOR                                                     | TC-AGUI-06, TC-LIB-01, ownership asserts across D/E/F                                  |
-| H3 library leak                                             | TC-LIB-01                                                                              |
-| H4 admin gating                                             | TC-AUTH-05, TC-PUB-09, TC-BK-08, TC-RES-05                                             |
-| H5 publish button                                           | TC-UI-03                                                                               |
-| H7 atomicity                                                | TC-PUB-02/03, TC-REG-H7a/b/c                                                           |
-| H8 upload validation                                        | TC-BK-07                                                                               |
-| H9 indexes                                                  | TC-REG-H9                                                                              |
-| H10 storage                                                 | TC-BK-04, TC-GEN-05, TC-PUB-08, TC-LIB-05, TC-ACP-05, TC-REG-H10a/b/c, TC-UI-04        |
-| H11 puppeteer                                               | TC-REG-H11a/b/c                                                                        |
-| H12 scheduler                                               | TC-PUB-04, TC-REG-H12a/b/c                                                             |
-| H13 /api/me                                                 | TC-AUTH-04                                                                             |
-| M1 atomic default                                           | TC-BK-02, TC-PROV-06                                                                   |
-| M4 soft-delete resolve                                      | TC-RES-04                                                                              |
-| M5 artifact sync                                            | TC-BK-06                                                                               |
-| M6 ACP validation                                           | TC-ACP-03                                                                              |
-| M9 middleware prefix                                        | TC-AUTH-07                                                                             |
-| M10 key prefix mask                                         | TC-PROV-04                                                                             |
-| M11 bounded lists                                           | TC-RES-06                                                                              |
-| M12 brief validation                                        | TC-GEN-03/04                                                                           |
-| L1 IG header / system user                                  | TC-ACP-04                                                                              |
-| L2 shared helpers                                           | TC-REG-L2                                                                              |
-| Known Issue (oversized template)                            | TC-GEN-06                                                                              |
-| Change 004 refine fidelity (AC-08 → AC-20b)                 | §U TC-REJ-01…04, §V TC-FID-01…17, T18/T19 in `refine-not-applied.test.ts` (see §V map) |
-| Change 005 skipped-background notice (AC-01, AC-08 → AC-11) | §BG TC-BG-01…10, TC-GEN-05 (see §BG map)                                               |
-| Change 012 per-channel captions (AC-12 → AC-24)             | §W TC-CAP-01…20, TC-ASYNC-10 (see §W map)                                              |
-| Change 008 model selection, wave 1 (AC-15 → AC-23)          | §Y TC-MODEL-01…12, `a11y` /team axe (see §Y map)                                       |
-| Change 008 model selection, wave 2 (AC-27 → AC-31, AC-33)   | §Y TC-MODEL-13…20, `a11y` /drafts/[id] axe (see §Y wave-2 map)                         |
+| Finding(s)                                                      | Guarded by                                                                             |
+| --------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| H1 ACP/MCP auth                                                 | TC-ACP-01/02/03                                                                        |
+| H2 IDOR                                                         | TC-AGUI-06, TC-LIB-01, ownership asserts across D/E/F                                  |
+| H3 library leak                                                 | TC-LIB-01                                                                              |
+| H4 admin gating                                                 | TC-AUTH-05, TC-PUB-09, TC-BK-08, TC-RES-05                                             |
+| H5 publish button                                               | TC-UI-03                                                                               |
+| H7 atomicity                                                    | TC-PUB-02/03, TC-REG-H7a/b/c                                                           |
+| H8 upload validation                                            | TC-BK-07                                                                               |
+| H9 indexes                                                      | TC-REG-H9                                                                              |
+| H10 storage                                                     | TC-BK-04, TC-GEN-05, TC-PUB-08, TC-LIB-05, TC-ACP-05, TC-REG-H10a/b/c, TC-UI-04        |
+| H11 puppeteer                                                   | TC-REG-H11a/b/c                                                                        |
+| H12 scheduler                                                   | TC-PUB-04, TC-REG-H12a/b/c                                                             |
+| H13 /api/me                                                     | TC-AUTH-04                                                                             |
+| M1 atomic default                                               | TC-BK-02, TC-PROV-06                                                                   |
+| M4 soft-delete resolve                                          | TC-RES-04                                                                              |
+| M5 artifact sync                                                | TC-BK-06                                                                               |
+| M6 ACP validation                                               | TC-ACP-03                                                                              |
+| M9 middleware prefix                                            | TC-AUTH-07                                                                             |
+| M10 key prefix mask                                             | TC-PROV-04                                                                             |
+| M11 bounded lists                                               | TC-RES-06                                                                              |
+| M12 brief validation                                            | TC-GEN-03/04                                                                           |
+| L1 IG header / system user                                      | TC-ACP-04                                                                              |
+| L2 shared helpers                                               | TC-REG-L2                                                                              |
+| Known Issue (oversized template)                                | TC-GEN-06                                                                              |
+| Change 004 refine fidelity (AC-08 → AC-20b)                     | §U TC-REJ-01…04, §V TC-FID-01…17, T18/T19 in `refine-not-applied.test.ts` (see §V map) |
+| Change 005 skipped-background notice (AC-01, AC-08 → AC-11)     | §BG TC-BG-01…10, TC-GEN-05 (see §BG map)                                               |
+| Change 012 per-channel captions (AC-12 → AC-24)                 | §W TC-CAP-01…20, TC-ASYNC-10 (see §W map)                                              |
+| Change 008 model selection, wave 1 (AC-15 → AC-23)              | §Y TC-MODEL-01…12, `a11y` /team axe (see §Y map)                                       |
+| Change 008 model selection, wave 2 (AC-27 → AC-31, AC-33)       | §Y TC-MODEL-13…20, `a11y` /drafts/[id] axe (see §Y wave-2 map)                         |
+| Change 020 Create post button off the draft page (AC-01, AC-02) | `create-post-button.test.ts` AC-01, AC-01b, AC-02b (see the 020 update note after §X)  |
 
 > Items with no behavioral surface (M2 init race, M3 stdin, M7 polling, M8 crypto guards, M13 dead code) are best covered by unit tests; M7 polling can optionally be a UI test (draft auto-refresh while `IN_PROGRESS`).

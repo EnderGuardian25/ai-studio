@@ -4,6 +4,8 @@
 **Created:** 2026-10-06
 **Status:** 🟡 Draft
 
+> **Update (2026-10-20, change 020):** the floating Create post button is no longer on the draft page. 020 amends FR-01 and AC-01: `AppShell` renders it on every `(app)` page except `/brief` and `/drafts/[id]`, because the draft page's own actions (the refine Send button) sit in that corner. The original text below is kept; the binding-decisions line "on every `(app)` page, is hidden on `/brief`" reads the same way.
+
 ## Overview
 
 011 replaces the inherited "Frozen Light" look with a designed visual system, and fixes its main legibility defect: translucent fixed and floating surfaces that let text show through. It also adds one small behaviour, a floating **Create post** button.
@@ -41,7 +43,7 @@ The work runs in this order, and each step is shippable on its own:
 
 #### Create post button
 
-**FR-01: A floating Create post button in the app shell.** It is rendered by `AppShell` on every `(app)` page **except `/brief`**, fixed bottom-right, and it links to `/brief`.
+**FR-01: A floating Create post button in the app shell.** It is rendered by `AppShell` on every `(app)` page **except `/brief`** (amended by 020: also except `/drafts/[id]`), fixed bottom-right, and it links to `/brief`.
 
 - Its accessible name is "Create post" at every width.
 - Its form follows A2.
@@ -152,7 +154,7 @@ A guard test fails if any of them reappear in `src/`.
 
 ## Acceptance Criteria
 
-- **AC-01 (FR-01):** E2E: on `/`, `/library`, `/campaigns` and `/drafts/[id]`, a link with accessible name "Create post" is visible bottom-right and navigates to `/brief`. On `/brief` it is absent.
+- **AC-01 (FR-01) (amended by 020: `/drafts/[id]` is dropped from this list, and the button is asserted absent there):** E2E: on `/`, `/library`, `/campaigns` and `/drafts/[id]`, a link with accessible name "Create post" is visible bottom-right and navigates to `/brief`. On `/brief` it is absent.
 - **AC-02 (FR-01, A2):** E2E: at 1440 px the button shows the text "Create post". At 375 px it shows the icon only and still has the accessible name "Create post". At both widths it is reachable with Tab and shows a visible focus indicator (non-`none` outline or box-shadow on `:focus-visible`).
 - **AC-03 (FR-02):** E2E: with the button visible, fire three toasts. No toast's bounding box intersects the button's bounding box.
 - **AC-04 (FR-03):** The dashboard Create Post quick action still links to `/brief` (existing coverage stays green).

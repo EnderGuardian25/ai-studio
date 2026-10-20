@@ -33,7 +33,7 @@ This change has **2 tasks in 2 waves**:
 
 ### Wave 1 — The change
 
-- [ ] `T1` — Hide the button on the draft page, with its tests and docs
+- [x] `T1` — Hide the button on the draft page, with its tests and docs
   - Files: `src/components/layout/AppShell.tsx`, `src/components/layout/CreatePostButton.tsx` (comment only), `src/components/providers/ToastProvider.tsx` (comment only, if its text needs it), `tests/e2e/create-post-button.test.ts`, `docs/ui-reference/DESIGN_SYSTEM.md`, `.specclaw/changes/011-app-visual-redesign/spec.md`, `docs/e2e-test-plan.md`
   - Estimate: small
   - Kind: impl

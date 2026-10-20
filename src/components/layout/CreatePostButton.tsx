@@ -3,8 +3,9 @@ import { Plus } from 'lucide-react'
 import { FOCUS } from '@/components/ui/atoms'
 
 // Floating "Create post" shortcut, fixed bottom-right on every (app) page
-// except /brief (AppShell decides). A plain link, so it always starts a fresh
-// brief — resuming an unfinished one stays on the dashboard's Recent Drafts.
+// except /brief and the draft page (AppShell decides). A plain link, so it
+// always starts a fresh brief — resuming an unfinished one stays on the
+// dashboard's Recent Drafts.
 //
 // The study's .fab (021 design.md §5): a 52 px ink pill (--accent, which is
 // ink, with --accent-fg text), 24 px from the right and bottom, on the soft

@@ -100,15 +100,14 @@ test.describe('Create post button (011 FR-01 – FR-03)', () => {
     await api.dispose()
   })
 
-  // AC-01 — visible bottom-right on /, /library, /campaigns and /drafts/[id],
-  // each navigating to /brief; absent on /brief itself.
+  // AC-01 — visible bottom-right on /, /library and /campaigns, each
+  // navigating to /brief; absent on /brief itself. (Amended by 020: the draft
+  // page is excluded, see AC-01b.)
   test('AC-01: shown bottom-right on app pages, links to /brief, absent on /brief', async ({ page }) => {
-    test.skip(!MOCKED(), 'needs MOCK_AI + MOCK_PUPPETEER to mint a draft')
-    const draftId = await createExportedDraft(api, `fab-ac01-${Date.now()}`)
     await page.setViewportSize({ width: 1440, height: 900 })
     await pageLogin(page)
 
-    for (const path of ['/', '/library', '/campaigns', `/drafts/${draftId}`]) {
+    for (const path of ['/', '/library', '/campaigns']) {
       await page.goto(path)
       const link = page.getByRole('link', { name: 'Create post', exact: true })
       await expect(link).toBeVisible()
@@ -123,6 +122,52 @@ test.describe('Create post button (011 FR-01 – FR-03)', () => {
     await page.goto('/brief?resume=does-not-exist')
     await expect(page.getByRole('button', { name: /continue/i })).toBeVisible()
     await expect(fab(page)).toHaveCount(0)
+  })
+
+  // AC-01b (020) — the draft page has no Create post button, at desktop and
+  // mobile: the element is absent, not hidden.
+  test('AC-01b: absent on the draft page at 1440px and 375px', async ({ page }) => {
+    test.skip(!MOCKED(), 'needs MOCK_AI + MOCK_PUPPETEER to mint a draft')
+    const draftId = await createExportedDraft(api, `fab-ac01b-${Date.now()}`)
+    await pageLogin(page)
+
+    for (const viewport of [{ width: 1440, height: 900 }, { width: 375, height: 812 }]) {
+      await page.setViewportSize(viewport)
+      await page.goto(`/drafts/${draftId}`)
+      await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
+      await expect(fab(page)).toHaveCount(0)
+      await expect(page.getByRole('link', { name: 'Create post', exact: true })).toHaveCount(0)
+    }
+  })
+
+  // AC-02b (020) — at 1440px nothing fixed covers the refine Send button when
+  // it sits where the floating button would: its bottom edge 24px above the
+  // viewport bottom, inside the button's right-hand band. It is disabled while
+  // the input is empty, but elementFromPoint still sees it.
+  test('AC-02b: the refine Send button is not covered at 1440px', async ({ page }) => {
+    test.skip(!MOCKED(), 'needs MOCK_AI + MOCK_PUPPETEER to mint a draft')
+    const draftId = await createExportedDraft(api, `fab-ac02b-${Date.now()}`)
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await pageLogin(page)
+    await page.goto(`/drafts/${draftId}`)
+
+    const send = page.getByRole('button', { name: 'Send', exact: true })
+    await expect(send).toBeVisible()
+    await send.scrollIntoViewIfNeeded()
+    const result = await send.evaluate((el) => {
+      // Scroll the page so Send's bottom edge is 24px above the viewport
+      // bottom, where the floating button's own bottom edge sits.
+      const before = el.getBoundingClientRect()
+      window.scrollBy(0, before.bottom - (window.innerHeight - 24))
+      const r = el.getBoundingClientRect()
+      const inside =
+        r.left >= 0 && r.top >= 0 && r.right <= window.innerWidth && r.bottom <= window.innerHeight
+      // The button is 24px from the right edge and at most ~190px wide.
+      const inBand = r.right > window.innerWidth - 24 - 190 && r.bottom >= window.innerHeight - 24 - 52
+      const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)
+      return { inside, inBand, covered: !(hit && el.contains(hit)) }
+    })
+    expect(result).toMatchObject({ inside: true, inBand: true, covered: false })
   })
 
   // AC-02 — icon + label at 1440px; icon only (same accessible name, tooltip)

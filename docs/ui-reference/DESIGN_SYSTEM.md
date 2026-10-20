@@ -509,8 +509,8 @@ It takes one of two props (014 FR-03):
 - **The nub:** a 38 px circle on `--accent-fg` at 0.14, holding the Plus icon. It turns 90° on hover over `--dur-base`.
 - **Press:** 0.98. **Reduced motion:** neither the button nor the nub moves.
 - **Below `md`** it is a 52 × 52 circle showing the nub alone, with the same accessible name, "Create post", a `title` tooltip and its `data-testid`.
-- **Layering:** above page content, below the header, the mobile sidebar overlay, modals and the lightbox. It is hidden on `/brief`.
-- **Known:** being fixed bottom-right, it covers the right end of the last visible row on some screens at rest; the 140 px bottom padding of `main` lets every row scroll clear of it.
+- **Layering:** above page content, below the header, the mobile sidebar overlay, modals and the lightbox. It is hidden on `/brief` and on the draft page (020), where the page's own actions, the refine Send button among them, sit in that corner.
+- **Known:** being fixed bottom-right, it covers the right end of the last visible row on some screens at rest; the 140 px bottom padding of `main` lets every row scroll clear of it. The padding still serves the pages that show the button; on the draft page it clears nothing and is left alone.
 
 ### 8.10 Modals, drawers and confirm dialogs
 

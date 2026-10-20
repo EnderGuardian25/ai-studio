@@ -187,6 +187,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const { teamChoiceRequired } = useCurrentUser()
   const pathname = usePathname()
   const router = useRouter()
+  // Hidden on the wizard (/brief) and on the draft page, whose own actions sit
+  // in the bottom-right corner (020).
+  const hideCreatePost = pathname === '/brief' || pathname.startsWith('/drafts/')
 
   // Bounce to the chooser when /api/me reports no resolved active team —
   // but never from the chooser itself, or picking a team there would
@@ -258,9 +261,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </main>
         </div>
 
-        {/* Floating Create post shortcut, hidden on the wizard it opens.
+        {/* Floating Create post shortcut, hidden on the wizard it opens and on
+            the draft page, whose own actions (refine Send) sit in that corner.
             usePathname() carries no query string, so /brief?resume=… matches too. */}
-        {pathname !== '/brief' && <CreatePostButton />}
+        {!hideCreatePost && <CreatePostButton />}
       </div>
     </ConfirmProvider>
   )
