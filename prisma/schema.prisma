@@ -536,7 +536,12 @@ model Draft {
   // In-flight draft action marker for the async action pattern (regenerate
   // copy/design, refine): set on atomic claim, cleared when the run settles.
   pendingAction   DraftAction?
-  // Error from the last action run; cleared when the next action starts.
+  // Token minted by the claim (change 019). Set with the claim, nulled by every
+  // settle and by the stale sweep; every write the run makes is guarded on it.
+  // Null alongside a non-null pendingAction means an older image took the claim.
+  pendingActionClaimId String?
+  // Error from the last action run. The claim keeps it (since 004 T17 fix
+  // round 1); the next settle replaces or clears it.
   pendingActionError String?
   // "Couldn't apply" outcome of the last refine (change 004 FR-14): the refine
   // ran to completion but failed verification twice, so nothing was committed.

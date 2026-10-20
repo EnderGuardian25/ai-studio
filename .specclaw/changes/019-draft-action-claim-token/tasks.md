@@ -37,7 +37,7 @@ This change has **4 tasks in 3 waves**:
 
 ### Wave 1 — Migration
 
-- [ ] `T1` — The claim-token column, its migration, the down script and the schema comment
+- [x] `T1` — The claim-token column, its migration, the down script and the schema comment
   - Files: `prisma/schema.prisma`, `prisma/migrations/20261020120000_draft_action_claim_id/migration.sql` (new), `prisma/rollback/019-draft-action-claim-token.down.sql` (new)
   - Estimate: small
   - Kind: migration
