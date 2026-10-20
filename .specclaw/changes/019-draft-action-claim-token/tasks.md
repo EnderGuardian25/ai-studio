@@ -88,7 +88,7 @@ This change has **4 tasks in 3 waves**:
 
 ### Wave 3 — Gate
 
-- [ ] `T4` — The checklist line, the full gate and CI
+- [x] `T4` — The checklist line, the full gate and CI
   - Files: `docs/handoff.md`, `CLAUDE.md`
   - Estimate: small
   - Kind: test

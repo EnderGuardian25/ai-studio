@@ -4,7 +4,7 @@ This repo contains planning documents for **bistec-studio**, an internal marketi
 
 ## ✅ Outstanding work — START HERE (updated 2026-10-20)
 
-- **⏸️ 2026-10-20 — PICK UP HERE. This repo is `bistec-oss/studio`, and since 2026-10-18 it carries the fork's `v2`. 018, 022 and 021 (Graphite) are VERIFIED PASS. Next: 019, then 020 (`/specclaw:plan` each first).** Full detail: [`docs/handoff.md`](docs/handoff.md) top section and its **pre-merge prod checklist**.
+- **⏸️ 2026-10-20 — PICK UP HERE. This repo is `bistec-oss/studio`, and since 2026-10-18 it carries the fork's `v2`. 018, 022 and 021 (Graphite) are VERIFIED PASS. 019 (claim token) is built; verify it next. Then 020 (`/specclaw:plan` first).** Full detail: [`docs/handoff.md`](docs/handoff.md) top section and its **pre-merge prod checklist**.
   - **The fork era (2026-10-07 to 2026-10-14) is in [`docs/fork-history.md`](docs/fork-history.md).** It is superseded context, not instructions. That file also holds the procedure for importing code from the fork.
   - **Repo rules. This entry is authoritative; `docs/handoff.md` links here.**
     - This repo is **`bistec-oss/studio`**, and **`origin` points to it**.
@@ -32,8 +32,14 @@ This repo contains planning documents for **bistec-studio**, an internal marketi
       - 022 does not merge or deploy. The merge waits on the checklist's operator steps and the user's go-ahead.
     - **021 Graphite re-theme: VERIFIED PASS,** 19/19 ACs ([`verify-report.md`](.specclaw/changes/021-graphite-retheme/verify-report.md)). T1–T8 `6c42ff8`…`b8d041a`; final full clean mock E2E 397/3/0/0; render 15/15; CI green at `aa5f7a8`.
       - AC-05 carve-out: "Instrument Sans" stays in `src/components/admin/brandkits/googleFonts.ts` (post font data, FR-12/NFR-10); `DESIGN_SYSTEM.md` §11 documents it.
-    - **019 (claim token) and 020 (Create post button off the draft page):** approved (bounded), not planned yet. Run `/specclaw:plan` first.
-  - **Gates now:** unit 2652/2652, lint 0 errors / 7 warnings. The last full clean mock E2E was 397/3/0/0 (021 T8, 2026-10-20).
+    - **019 (claim token): BUILT,** T1–T4 (`d521e11`, `1b549b6`, `7e86b96`, then the T4 docs commit); verify next. CI: green at `7e86b96` (runs 39445592883, 39445602043).
+      - T1: the nullable `Draft.pendingActionClaimId` column, the additive migration `20261020120000_draft_action_claim_id` and its manual down script;
+      - T2: the claim mints a token, and the heartbeat, release, complete, caption settles and sweep are guarded on it;
+      - T3: content writes from a claimed run are guarded on the claim (`DraftClaimLostError` rolls back and removes the uploaded export);
+      - T4: the checklist line in `docs/handoff.md` (a check, no blocking step) and the full gate: unit 2681/2681; E2E 397/3/0/0; `test:upgrade` 3/3.
+      - Known leftover: when Regenerate design loses its claim, the PNG it already uploaded is orphaned. Out of scope per the spec.
+    - **020 (Create post button off the draft page):** approved (bounded), not planned yet. Run `/specclaw:plan` first.
+  - **Gates now:** unit 2681/2681, lint 0 errors / 7 warnings. The last full clean mock E2E was 397/3/0/0 (019 T4, 2026-10-20).
   - **The company prod items are live to-dos again.** The fork era called them "company history"; they are not.
     - **B4:** the prod scheduler resource isn't running. Read [`docs/scheduler-b4-diagnosis-2026-08-03.md`](docs/scheduler-b4-diagnosis-2026-08-03.md) first.
     - **Team Claude tokens:** neither prod team has one, so scheduled and MCP runs fail on credentials.
