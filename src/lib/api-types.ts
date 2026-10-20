@@ -153,6 +153,18 @@ export interface ScheduledGeneration {
   updatedAt: string
 }
 
+// GET /api/scheduler/status
+export interface SchedulerLoopStatus {
+  loop: 'scheduler' | 'generation'
+  state: 'online' | 'offline' | 'never'
+  lastSeenAt: string | null
+}
+
+export interface SchedulerStatus {
+  loops: SchedulerLoopStatus[]
+  offline: boolean
+}
+
 // GET /api/campaigns/[id]/brandkit
 export type BrandKitSource = 'explicit' | 'campaign' | 'project' | 'system'
 

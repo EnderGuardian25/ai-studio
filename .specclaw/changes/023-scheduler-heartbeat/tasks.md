@@ -56,7 +56,7 @@ This change has **3 tasks in 3 waves**:
 
 ### Wave 2 — The heartbeat, end to end
 
-- [ ] `T2` — The worker writes, the pure health function, the route, the banner, the retry reason, the test seam and the tests
+- [x] `T2` — The worker writes, the pure health function, the route, the banner, the retry reason, the test seam and the tests
   - Files: `src/lib/scheduler/heartbeatStatus.ts` (new), `src/lib/scheduler/heartbeat.ts` (new), `src/scheduler/worker.ts`, `src/app/api/scheduler/status/route.ts` (new), `src/app/api/test/worker-heartbeat/route.ts` (new), `src/lib/api-types.ts`, `src/components/campaigns/ScheduledQueueSection.tsx`, `tests/unit/heartbeatStatus.test.ts` (new), `tests/unit/heartbeat.test.ts` (new), `tests/unit/schedulerStatusRoute.test.ts` (new), `tests/e2e/scheduler-heartbeat.test.ts` (new)
   - Estimate: medium
   - Kind: impl

@@ -4,17 +4,19 @@ import React, { useState } from 'react'
 import Link from 'next/link'
 import { toast } from 'sonner'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Plus, Pencil, XCircle, RotateCcw } from 'lucide-react'
+import { Plus, Pencil, XCircle, RotateCcw, AlertTriangle } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { StatusChip } from '@/components/ui/StatusChip'
+import { Notice } from '@/components/ui/Notice'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { apiFetch } from '@/lib/apiFetch'
 import { ASPECT_LABELS } from '@/lib/aspectRatio'
 import { channelLabel } from '@/lib/channels'
+import { relativeTime } from '@/lib/format'
 import { QueueEntryModal } from './QueueEntryModal'
 import { SectionHead } from '@/components/ui/SectionHead'
-import { FOCUS, ICON, ICON_BUTTON, SCROLL_FOCUS, TABLE_HEAD_ROW, TEXT_LINK } from '@/components/ui/atoms'
-import type { ScheduledGeneration, GenerationStatus } from '@/lib/api-types'
+import { FOCUS, ICON, ICON_SM, ICON_BUTTON, SCROLL_FOCUS, TABLE_HEAD_ROW, TEXT_LINK } from '@/components/ui/atoms'
+import type { ScheduledGeneration, GenerationStatus, SchedulerStatus } from '@/lib/api-types'
 
 // Planned-posts queue under a campaign: table of scheduled generations with
 // status chips and per-row actions (edit/cancel while PENDING, re-run after
@@ -32,6 +34,20 @@ const ACTION_LABEL: Record<string, string> = {
   HOLD: 'Hold for review',
   SCHEDULE_PUBLISH: 'Schedule publish',
   PUBLISH_NOW: 'Publish now',
+}
+
+// The line the offline banner shows for one down loop (023 FR-05): what stops,
+// and when the loop was last seen. A loop that never reported says so.
+function offlineLine(loop: SchedulerStatus['loops'][number]): string {
+  const publishing = loop.loop === 'scheduler'
+  const name = publishing ? 'publishing' : 'generation'
+  if (loop.state === 'never' || !loop.lastSeenAt) {
+    return `The ${name} loop has not reported in. It is not running, or it has only just restarted.`
+  }
+  const seen = relativeTime(new Date(loop.lastSeenAt))
+  return publishing
+    ? `The publishing loop was last seen ${seen}. Scheduled posts will not publish until it is running.`
+    : `The generation loop was last seen ${seen}. Planned posts will not generate until it is running.`
 }
 
 function formatDateTime(iso: string | null): string {
@@ -58,6 +74,17 @@ export function ScheduledQueueSection({ campaignId, resolvedKitId, isTeamAdmin }
     // RUNNING → COMPLETED transitions happen in the worker; poll to reflect them.
     refetchInterval: 30_000,
   })
+
+  // While loading, or if the status route fails, there is no banner: an
+  // unreachable route must not read as "scheduler offline".
+  const { data: schedulerStatus } = useQuery({
+    queryKey: ['scheduler', 'status'],
+    queryFn: () => apiFetch<SchedulerStatus>('/api/scheduler/status'),
+    refetchInterval: 60_000,
+  })
+  const downLoops = schedulerStatus?.offline
+    ? schedulerStatus.loops.filter(l => l.state !== 'online')
+    : []
 
   function invalidate() {
     return queryClient.invalidateQueries({ queryKey: ['campaigns', campaignId, 'queue'] })
@@ -97,6 +124,21 @@ export function ScheduledQueueSection({ campaignId, resolvedKitId, isTeamAdmin }
           <Plus {...ICON} /> Plan a post
         </Button>
       </SectionHead>
+
+      {downLoops.length > 0 && (
+        <Notice
+          tone="warning"
+          role="status"
+          data-testid="scheduler-offline-banner"
+          icon={<AlertTriangle {...ICON_SM} aria-hidden />}
+          className="mb-3"
+        >
+          <p className="font-semibold">Scheduler offline</p>
+          {downLoops.map(l => (
+            <p key={l.loop}>{offlineLine(l)}</p>
+          ))}
+        </Notice>
+      )}
 
       {entries.length === 0 ? (
         <p className="text-ui-sm text-fg-muted">
@@ -139,8 +181,10 @@ export function ScheduledQueueSection({ campaignId, resolvedKitId, isTeamAdmin }
                       {' · '}
                       {ASPECT_LABELS[entry.aspectRatio].split(' ')[0]}
                     </p>
-                    {entry.status === 'FAILED' && entry.errorReason && (
-                      <p className="mt-0.5 text-ui-xs text-status-failed" title={entry.errorReason}>
+                    {entry.errorReason && (entry.status === 'FAILED' || (entry.status === 'PENDING' && entry.retryCount > 0)) && (
+                      <p
+                        className={`mt-0.5 text-ui-xs ${entry.status === 'FAILED' ? 'text-status-failed' : 'text-status-scheduled'}`}
+                        title={entry.errorReason}>
                         {entry.errorReason.length > 80 ? `${entry.errorReason.slice(0, 80)}…` : entry.errorReason}
                       </p>
                     )}
