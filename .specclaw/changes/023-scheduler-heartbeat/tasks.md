@@ -36,7 +36,7 @@ This change has **3 tasks in 3 waves**:
 
 ### Wave 1 — Migration
 
-- [ ] `T1` — The `WorkerHeartbeat` table, its migration and the down script
+- [x] `T1` — The `WorkerHeartbeat` table, its migration and the down script
   - Files: `prisma/schema.prisma`, `prisma/migrations/20261021120000_worker_heartbeat/migration.sql` (new), `prisma/rollback/023-scheduler-heartbeat.down.sql` (new)
   - Estimate: small
   - Kind: migration

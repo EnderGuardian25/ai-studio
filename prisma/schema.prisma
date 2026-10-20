@@ -838,3 +838,15 @@ model LegacyCaptionArchive {
   copyText   String   @db.Text
   archivedAt DateTime @default(now())
 }
+
+// 023: one row per scheduler-worker loop ('scheduler' | 'generation'). The
+// table is global, not per team: the worker serves every team. The tick's
+// start and end are kept apart so a long generation tick is not read as
+// offline: lastTickEndedAt null, or before lastTickStartedAt, means "inside a
+// tick". Written best-effort by the worker; read by GET /api/scheduler/status.
+model WorkerHeartbeat {
+  loop              String    @id
+  lastTickStartedAt DateTime
+  lastTickEndedAt   DateTime?
+  updatedAt         DateTime  @updatedAt
+}
