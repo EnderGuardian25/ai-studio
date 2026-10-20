@@ -1,7 +1,7 @@
 # 🦞 SpecClaw Dashboard
 
 **Project:** bistec-studio
-**Last Updated:** 2026-10-20 18:12 UTC
+**Last Updated:** 2026-10-20 18:15 UTC
 
 _1 unnumbered change · run `/specclaw:renumber` to order them_
 
@@ -22,7 +22,7 @@ _1 unnumbered change · run `/specclaw:renumber` to order them_
 - 🔍 **017-publish-api-fixes** ▫ — verify PASS | 3/3 tasks (100%) | 0 failed | PR #43 open
 - 🔍 **018-post-008-small-fixes** ▫ — verify PASS | 4/4 tasks (100%) | 0 failed | PR #43 open | 1h2m
 - 🔍 **019-draft-action-claim-token** ▫ — verify PASS | 4/4 tasks (100%) | 0 failed | PR #43 open | 4h14m
-- 🔨 **020-create-post-button-draft-page** ▫ — build in-progress | 2/2 tasks (100%) | 0 failed | PR #43 open | 1h11m
+- 🔍 **020-create-post-button-draft-page** ▫ — verify PASS | 2/2 tasks (100%) | 0 failed | PR #43 open | 1h12m
 - 🔍 **021-graphite-retheme** ▣ — verify PASS | 8/8 tasks (100%) | 0 failed | 42h47m
 - 🔍 **022-prod-data-and-deploy-restore** ▫ — verify PASS | 4/4 tasks (100%) | 0 failed | 5h22m
 

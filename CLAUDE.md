@@ -4,7 +4,7 @@ This repo contains planning documents for **bistec-studio**, an internal marketi
 
 ## ✅ Outstanding work — START HERE (updated 2026-10-20)
 
-- **⏸️ 2026-10-20 — PICK UP HERE. This repo is `bistec-oss/studio`, and since 2026-10-18 it carries the fork's `v2`. 018, 022, 021 (Graphite) and 019 (claim token) are VERIFIED PASS. 020 (Create post button off the draft page) is built; verify next.** Full detail: [`docs/handoff.md`](docs/handoff.md) top section and its **pre-merge prod checklist**.
+- **⏸️ 2026-10-20 — PICK UP HERE. This repo is `bistec-oss/studio`, and since 2026-10-18 it carries the fork's `v2`. 018, 022, 021 (Graphite), 019 (claim token) and 020 (Create post button off the draft page) are VERIFIED PASS, so the build order is complete. Next: the company prod to-dos below, then the `v2` → `main` merge, which waits on the user's go-ahead and the pre-merge prod checklist.** Full detail: [`docs/handoff.md`](docs/handoff.md) top section and its **pre-merge prod checklist**.
   - **The fork era (2026-10-07 to 2026-10-14) is in [`docs/fork-history.md`](docs/fork-history.md).** It is superseded context, not instructions. That file also holds the procedure for importing code from the fork.
   - **Repo rules. This entry is authoritative; `docs/handoff.md` links here.**
     - This repo is **`bistec-oss/studio`**, and **`origin` points to it**.
@@ -38,7 +38,7 @@ This repo contains planning documents for **bistec-studio**, an internal marketi
       - T3: content writes from a claimed run are guarded on the claim (`DraftClaimLostError` rolls back and removes the uploaded export);
       - T4: the checklist line in `docs/handoff.md` (a check, no blocking step) and the full gate: unit 2681/2681; E2E 397/3/0/0; `test:upgrade` 3/3.
       - Known leftover: when Regenerate design loses its claim, the PNG it already uploaded is orphaned. Out of scope per the spec.
-    - **020 (Create post button off the draft page): BUILT,** T1 `8d0d633` and T2 (the gate); verify next. CI: green at `8d0d633` (runs 39466314229, 39466320752).
+    - **020 (Create post button off the draft page): VERIFIED PASS,** 7/7 ACs ([`verify-report.md`](.specclaw/changes/020-create-post-button-draft-page/verify-report.md)). T1 `8d0d633`, T2 `bd0e0fb`. CI: green at `8d0d633` (runs 39466314229, 39466320752).
       - T1: `AppShell` hides the button on `/brief` and on `/drafts/`; E2E AC-01b (absent on the draft page) and AC-02b (refine Send not covered, mutation-checked); `DESIGN_SYSTEM.md` §8.9, the 011 FR-01/AC-01 amendment and `e2e-test-plan.md`.
       - T2: the full gate. Unit 2681/2681; lint 0 errors / 7 warnings; tsc clean; build passes; E2E 399/3/0/0.
       - Known gap: `docs/ui-reference/screen-light.png` and `screen-dark.png` still show the button (not recaptured, spec A3).

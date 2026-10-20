@@ -1,13 +1,13 @@
 # bistec-studio — Session Handoff
 
-**Date:** 2026-10-20 (latest: **020 built, verify next; 019 claim token, 021 Graphite re-theme, 018 and 022 VERIFIED PASS**). 2026-10-19: this repo adopted the fork's `v2` on 2026-10-18. The fork-era sections, 2026-10-07 to 2026-10-14, moved to [`fork-history.md`](fork-history.md). Previous: 2026-10-07 (005 verified PASS; 011 planned, wave 1 built). Previous: 2026-10-03 (004 finished and verified PARTIAL, Phase 0 only; 005 built 9/10, waiting on one operator check). Before that: 2026-09-28 (build session — 004 Waves 1–3 built, MinIO → silo, PR #42 + draft PR #43). Before that: 2026-09-23 (later, later the same day: proposal **012** per-channel captions + copy→caption rename, a floating **Create post** button folded into 011, and a launch-video legibility pass. Before that: planning session — proposals 008–011 + roadmap, 004 re-planned to 24 tasks incl. Phase 0, and the deploy pipeline found broken: Coolify 401 since 2026-09-15). Previous: 2026-07-28 (copy-edit status clobber fix).
+**Date:** 2026-10-20 (latest: **020 Create post button, 019 claim token, 021 Graphite re-theme, 018 and 022 VERIFIED PASS; the build order is complete**). 2026-10-19: this repo adopted the fork's `v2` on 2026-10-18. The fork-era sections, 2026-10-07 to 2026-10-14, moved to [`fork-history.md`](fork-history.md). Previous: 2026-10-07 (005 verified PASS; 011 planned, wave 1 built). Previous: 2026-10-03 (004 finished and verified PARTIAL, Phase 0 only; 005 built 9/10, waiting on one operator check). Before that: 2026-09-28 (build session — 004 Waves 1–3 built, MinIO → silo, PR #42 + draft PR #43). Before that: 2026-09-23 (later, later the same day: proposal **012** per-channel captions + copy→caption rename, a floating **Create post** button folded into 011, and a launch-video legibility pass. Before that: planning session — proposals 008–011 + roadmap, 004 re-planned to 24 tasks incl. Phase 0, and the deploy pipeline found broken: Coolify 401 since 2026-09-15). Previous: 2026-07-28 (copy-edit status clobber fix).
 **Repo:** https://github.com/bistec-oss/studio, which `origin` points to. **The repo rules (branches, remotes, the `fork` remote, PR #43) are in [`CLAUDE.md`](../CLAUDE.md)'s top entry, which is authoritative.** This file does not repeat them.
 **Branch:** work continues on **`v2`**, pushed to `origin v2`. `main` is `671ad6e9` (PR #42) and deploys to company prod. `v2` → `main` is one PR, merged only on the user's go-ahead and after the pre-merge prod checklist below.
 **Production:** `https://studio.bistecglobal.com` serves company `main`. Its migration head is `20260728120000_heal_copy_edit_clobbered_drafts`. Merges to `main` build but do not deploy until the Coolify token is rotated (see CLAUDE.md).
 
 ---
 
-## ⏸️ 2026-10-20 — PICK UP HERE: 018, 022, 021 and 019 VERIFIED PASS; 020 built (verify next)
+## ⏸️ 2026-10-20 — PICK UP HERE: 018, 022, 021, 019 and 020 VERIFIED PASS; the build order is complete
 
 ### Where things stand
 
@@ -17,7 +17,7 @@
 | 022 prod data and deploy restore          | ✅ **VERIFIED PASS** (11/11 ACs)                            | E2E 390/3/0/0; CI green at `12ef7e6c`; [verify-report](../.specclaw/changes/022-prod-data-and-deploy-restore/verify-report.md)                                                     |
 | 021 Graphite re-theme                     | ✅ **VERIFIED PASS** (19/19 ACs; AC-05 font-data carve-out) | E2E 397/3/0/0; render 15/15; CI green at `aa5f7a8`; [verify-report](../.specclaw/changes/021-graphite-retheme/verify-report.md)                                                    |
 | 019 draft-action claim token              | **VERIFIED PASS** 9/9 ACs                                   | E2E 397/3/0/0; unit 2681/2681; test:upgrade 3/3; CI green at `7e86b96` (runs 39445592883, 39445602043); [reports](../.specclaw/changes/019-draft-action-claim-token/reports/T4.md) |
-| 020 Create post button off the draft page | **BUILT** (T1–T2), verify next                              | E2E 399/3/0/0; unit 2681/2681; CI green at `8d0d633` (runs 39466314229, 39466320752); [reports](../.specclaw/changes/020-create-post-button-draft-page/reports/T2.md)              |
+| 020 Create post button off the draft page | **VERIFIED PASS** 7/7 ACs                                   | E2E 399/3/0/0; unit 2681/2681; CI green at `8d0d633` (runs 39466314229, 39466320752); [reports](../.specclaw/changes/020-create-post-button-draft-page/reports/T2.md)              |
 
 - **019 (VERIFIED PASS, 9/9 ACs; [verify-report](../.specclaw/changes/019-draft-action-claim-token/verify-report.md)):**
   - **T1 (`d521e11`):** the nullable `Draft.pendingActionClaimId` column, the migration `20261020120000_draft_action_claim_id` and its manual down script `prisma/rollback/019-draft-action-claim-token.down.sql`.
@@ -48,7 +48,7 @@
 ### Resume, in order
 
 1. ~~022~~ and ~~021~~ are done: both VERIFIED PASS (2026-10-19 and 2026-10-20).
-2. **020 is built:** run `/specclaw:verify` on it. (019 is VERIFIED PASS.)
+2. ~~019~~ and ~~020~~ are done: both VERIFIED PASS (2026-10-20). The build order 018 → 022 → 021 → 019 → 020 is complete.
 3. **The `v2` → `main` merge** waits on the user's go-ahead and the checklist below.
 4. **Company prod to-dos, live again:** B4, the team Claude tokens, the Coolify token rotation and MinIO → silo on prod. They are listed in CLAUDE.md.
 
