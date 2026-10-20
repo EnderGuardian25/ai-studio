@@ -182,6 +182,8 @@ File map:
 
 ## Open Questions
 
+**Resolved 2026-10-20 by the user: both defaults stand.** OQ-1 is included (FR-05, last item) and OQ-2 is included (FR-06).
+
 - **OQ-1 — Guard Regenerate design's own revision write?** The proposal's list of content writes names `commitDraftRevision`, the refine conflict write and `recordRejectedRender`. It omits `regenerate-design/route.ts:127-155`, which is the same class of unguarded write from a claimed run (problem step 3, for Regenerate design). **Default: include it (FR-05, last item).** If the user says no, drop that item, its AC-04 line and the `renderStamps` test edit.
 - **OQ-2 — Guard the sweep's clear on the observed token?** The proposal says only that the sweep nulls the token. Guarding it closes the "sweep reads, the run settles, R2 claims, the sweep clears R2" interleaving, and it is how FR-07's null-token match is expressed. **Default: include it (FR-06).** If the user says no, the sweep keeps `{ id, pendingAction }` and only adds the null write.
 
