@@ -11,7 +11,8 @@ import type { Channel } from '@prisma/client'
 
 // Shared publish dialog: pick one or more channels and an optional schedule, then
 // fire a POST /api/posts per channel. Used from both the Library grid and the
-// draft review page so the publish UX (and validation) stays identical.
+// draft review page so the publish UX (and validation) stays identical. It sits
+// on Modal's overlay surface (021 design.md §4.3); its props stay stable (010).
 
 const CHANNELS = CHANNEL_VALUES
 
@@ -118,7 +119,7 @@ export function PublishDialog({ draftId, onClose, onSuccess }: PublishDialogProp
             const reasonId = `${channelsId}-${ch}-reason`
             return (
               <div key={ch} className="flex flex-col gap-1">
-                <label className="flex items-center gap-2 cursor-pointer text-ui-base text-fg">
+                <label className="flex items-center gap-2 cursor-pointer text-ui-sm font-medium text-fg">
                   <input
                     type="checkbox"
                     checked={checkedChannels.includes(ch)}

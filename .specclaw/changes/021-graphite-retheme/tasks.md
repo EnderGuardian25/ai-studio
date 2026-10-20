@@ -115,7 +115,7 @@ There are 8 tasks in 3 waves. All the work lands on `v2`, after 018 and 022 (R12
 
 ### Wave 2 — Screens
 
-- [ ] `T4` — Restyle the dashboard, library and brief wizard
+- [x] `T4` — Restyle the dashboard, library and brief wizard
   - Files: `src/app/(app)/page.tsx`, `src/components/dashboard/*`, `src/app/(app)/library/page.tsx`, `src/components/library/*`, `src/app/(app)/brief/page.tsx`, `src/components/brief/*`, `tests/unit/noTeamNotice.test.ts` (if its string changes), `tests/e2e/surfaces.test.ts` (only if an 011 T7/T8 case reads a removed class)
   - Estimate: medium
   - Kind: impl

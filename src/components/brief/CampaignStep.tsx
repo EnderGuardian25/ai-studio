@@ -7,7 +7,7 @@ import { apiFetch } from '@/lib/apiFetch'
 import type { Campaign, CampaignBriefing } from '@/lib/api-types'
 import { SOURCE_LABEL } from './constants'
 import type { ResolvedKit } from './types'
-import { EYEBROW, FOCUS } from '@/components/ui/atoms'
+import { EYEBROW, FOCUS, ICON, TAG } from '@/components/ui/atoms'
 import { rowCls } from './cardCls'
 import { StepHead } from './StepHead'
 import { CampaignRow } from './CampaignRow'
@@ -45,7 +45,7 @@ function BriefingPreview({ campaignId }: { campaignId: string }) {
         aria-expanded={open}
         className={`w-full flex items-center gap-2 py-3 text-left text-ui-sm font-semibold text-fg rounded-ui-sm ${FOCUS}`}
       >
-        {open ? <ChevronDown size={15} strokeWidth={1.4} /> : <ChevronRight size={15} strokeWidth={1.4} />}
+        {open ? <ChevronDown {...ICON} aria-hidden /> : <ChevronRight {...ICON} aria-hidden />}
         Campaign briefing (applies to every post)
         <span className="ml-auto text-ui-xs font-normal text-fg-muted">
           v{active.version}
@@ -71,22 +71,22 @@ export function CampaignStep({
 }: CampaignStepProps) {
   return (
     <div>
-      <StepHead index={0} title="Select Campaign">
+      <StepHead title="Select Campaign">
         Group this post under a campaign. Its brand kit (or the parent project&apos;s) becomes the
         default on the next step — you can still change it.
       </StepHead>
 
       {/* Resolved brand-kit line */}
       {campaignId && (
-        <div className="surface flex flex-wrap items-baseline gap-x-3 gap-y-1 mb-4 px-4 py-3">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mb-4 rounded-ui-md bg-canvas px-4 py-3 ring-1 ring-inset ring-line-subtle">
           {kitLoading ? (
             <span className="text-ui-sm text-fg-muted flex items-center gap-2">
-              <Loader2 size={15} strokeWidth={1.4} className="animate-spin" /> Resolving brand kit…
+              <Loader2 {...ICON} aria-hidden className="animate-spin" /> Resolving brand kit…
             </span>
           ) : resolvedKit ? (
             <>
-              <span className="text-ui-base font-medium text-fg">{resolvedKit.name}</span>
-              <span className={EYEBROW}>
+              <span className="text-ui-sm font-semibold text-fg">{resolvedKit.name}</span>
+              <span className={TAG}>
                 {SOURCE_LABEL[resolvedKit.source] ?? resolvedKit.source}
               </span>
               <span className="text-ui-xs text-fg-muted sm:ml-auto">Default for this post</span>
@@ -100,8 +100,8 @@ export function CampaignStep({
       {/* Active campaign briefing preview */}
       {campaignId && <BriefingPreview campaignId={campaignId} />}
 
-      {/* Ruled list, opened by the 2 px --fg rule */}
-      <div className="border-t-2 border-fg">
+      {/* Ruled list on --line-subtle; the selected row is raised (021 design.md §8) */}
+      <div>
         {/* Uncategorized */}
         <button
           type="button"
@@ -110,14 +110,14 @@ export function CampaignStep({
           className={rowCls(campaignId === '', 'flex items-center gap-3 py-3.5 pl-4 pr-3')}
         >
           <span className="flex-1 min-w-0">
-            <span className={['block text-ui-base text-fg', campaignId === '' ? 'font-semibold' : ''].join(' ')}>
+            <span className={['block text-ui-sm text-fg', campaignId === '' ? 'font-semibold' : 'font-medium'].join(' ')}>
               No campaign (Uncategorized)
             </span>
             <span className="block text-ui-xs text-fg-muted">
               Pick a brand kit yourself on the next step.
             </span>
           </span>
-          {campaignId === '' && <Check size={15} strokeWidth={1.4} className="text-accent flex-shrink-0" />}
+          {campaignId === '' && <Check {...ICON} aria-hidden className="text-accent flex-shrink-0" />}
         </button>
 
         {/* Grouped by project */}

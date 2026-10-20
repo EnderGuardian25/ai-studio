@@ -6,10 +6,14 @@ import { useRouter } from 'next/navigation'
 import { ChevronDown, ChevronUp, Trash2 } from 'lucide-react'
 import { StatusChip } from '@/components/ui/StatusChip'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
+import { Button } from '@/components/ui/Button'
+import { Panel } from '@/components/ui/Panel'
+import { SectionHead } from '@/components/ui/SectionHead'
 import {
   FOCUS,
+  ICON_SM,
+  PILL_BADGE,
   SCROLL_FOCUS,
-  SECTION_HEAD,
   TABLE_HEAD_ROW,
   TEXT_LINK,
 } from '@/components/ui/atoms'
@@ -20,17 +24,20 @@ import { channelLabel as sharedChannelLabel } from '@/lib/channels'
 // ─── Recent Drafts card (dashboard) ─────────────────────────────────────────
 // Collapsed it shows the first COLLAPSED_COUNT rows; Expand grows the same
 // block in place and scrolls the full server-provided list internally — no
-// overlay, no extra fetch. Folio draws it as a ruled table, not a card box.
+// overlay, no extra fetch. A bezel card holding a ruled table (021 design.md
+// §8, the study's .ct).
 
 const COLLAPSED_COUNT = 8
 
-// Folio's visible focus (DESIGN_SYSTEM.md §9), on a rounded-ui-sm box: the
-// links and buttons in this card draw their outline with the corner.
+// The visible focus (DESIGN_SYSTEM.md §9), on a rounded-ui-sm box: the links
+// and buttons in this card draw their outline with the corner.
 const FOCUS_ROUNDED = `${FOCUS} rounded-ui-sm`
-// A row's title link: --fg, --accent on hover.
-const TOPIC_LINK = 'font-medium text-fg transition-colors duration-fast ease-standard hover:text-accent'
-// The small-caps header cell (§8.15).
-const HEAD_CELL = 'py-2 font-semibold'
+// A row's title link: --fg, underlined on hover (--accent is ink in Graphite,
+// so a colour change would not show).
+const TOPIC_LINK =
+  'font-medium text-fg decoration-line underline-offset-4 hover:underline'
+// A header cell; the sentence-case style is on the row (TABLE_HEAD_ROW).
+const HEAD_CELL = 'py-2'
 
 const DRAFT_CHIP: Record<DraftStatus, 'draft' | 'exported' | 'published' | 'failed'> = {
   IN_PROGRESS: 'draft',
@@ -107,31 +114,26 @@ export function RecentDraftsCard({
   }
 
   return (
-    <div className={className}>
-      {/* Section head over a 2 px --fg rule (DESIGN_SYSTEM.md §6, §8.13) */}
-      <div className="flex items-baseline gap-4 pb-2.5">
-        <h2 className={SECTION_HEAD}>Recent Drafts</h2>
+    <Panel bezel className={`p-5 ${className ?? ''}`}>
+      {/* The card head (the study's .card-hd), with Expand in its tail */}
+      <SectionHead title="Recent Drafts" className="mb-3">
         {hasMore && (
-          <button
-            type="button"
-            onClick={() => setExpanded(v => !v)}
-            className={`ml-auto inline-flex items-center gap-1 px-1.5 text-ui-xs font-semibold text-fg underline decoration-line underline-offset-4 ${FOCUS_ROUNDED}`}
-          >
+          <Button variant="ghost" size="sm" onClick={() => setExpanded(v => !v)}>
             {expanded ? (
               <>
-                Collapse <ChevronUp size={14} strokeWidth={1.4} />
+                Collapse <ChevronUp {...ICON_SM} aria-hidden />
               </>
             ) : (
               <>
-                Expand <ChevronDown size={14} strokeWidth={1.4} />
+                Expand <ChevronDown {...ICON_SM} aria-hidden />
               </>
             )}
-          </button>
+          </Button>
         )}
-      </div>
+      </SectionHead>
 
       {drafts.length === 0 && unfinished.length === 0 ? (
-        <p className="border-t-2 border-fg py-8 text-center text-ui-sm text-fg-muted">
+        <p className="py-8 text-center text-ui-sm text-fg-muted">
           No drafts yet.{' '}
           <Link href="/brief" className={`${TEXT_LINK} ${FOCUS_ROUNDED}`}>
             Create your first brief
@@ -146,9 +148,9 @@ export function RecentDraftsCard({
           tabIndex={0}
           role="region"
           aria-label="Recent drafts"
-          className={`border-t-2 border-fg ${SCROLL_FOCUS} ${expanded ? 'max-h-96 overflow-y-auto overflow-x-auto' : 'overflow-x-auto'}`}
+          className={`rounded-ui-sm ${SCROLL_FOCUS} ${expanded ? 'max-h-96 overflow-y-auto overflow-x-auto' : 'overflow-x-auto'}`}
         >
-          {/* Folio data table (§8.15): ruled rows, a small-caps header row */}
+          {/* A data table (§8.15, the study's .ct): ruled rows, a sentence-case header row */}
           <table className="w-full min-w-[600px] text-ui-sm">
             <thead>
               <tr className={TABLE_HEAD_ROW}>
@@ -162,7 +164,7 @@ export function RecentDraftsCard({
             </thead>
             <tbody>
               {unfinishedRows.map(u => (
-                <tr key={`unfinished-${u.id}`} className="group border-b border-line-subtle">
+                <tr key={`unfinished-${u.id}`} className="group border-b border-line-subtle last:border-b-0">
                   <td className="py-2.5 pr-3">
                     <Link href={`/brief?resume=${u.id}`} className={`${TOPIC_LINK} ${FOCUS_ROUNDED}`}>
                       {u.topic || 'Untitled brief'}
@@ -172,7 +174,7 @@ export function RecentDraftsCard({
                   <td className="py-2.5 pr-3 text-fg-muted">—</td>
                   <td className="py-2.5 pr-3 text-fg-muted">—</td>
                   <td className="py-2.5 pr-3">
-                    <StatusChip status="unfinished" />
+                    <span className={PILL_BADGE}>Unfinished</span>
                   </td>
                   <td className="whitespace-nowrap py-2.5 text-ui-xs text-fg-muted">
                     <span className="inline-flex items-center gap-3">
@@ -185,16 +187,16 @@ export function RecentDraftsCard({
                         aria-label="Discard unfinished brief"
                         disabled={discarding === u.id}
                         onClick={() => void discardUnfinished(u)}
-                        className={`inline-flex h-6 w-6 items-center justify-center text-fg-muted transition-colors duration-fast ease-standard hover:text-status-failed disabled:opacity-50 ${FOCUS_ROUNDED}`}
+                        className={`inline-flex h-6 w-6 items-center justify-center rounded-ui-pill text-fg-muted transition-colors duration-fast ease-standard hover:bg-surface-raised hover:text-status-failed disabled:opacity-50 ${FOCUS}`}
                       >
-                        <Trash2 size={15} strokeWidth={1.4} />
+                        <Trash2 {...ICON_SM} aria-hidden />
                       </button>
                     </span>
                   </td>
                 </tr>
               ))}
               {rows.map(d => (
-                <tr key={d.id} className="group border-b border-line-subtle">
+                <tr key={d.id} className="group border-b border-line-subtle last:border-b-0">
                   <td className="py-2.5 pr-3">
                     <Link href={`/drafts/${d.id}`} className={`${TOPIC_LINK} ${FOCUS_ROUNDED}`}>
                       {d.brief?.topic ?? 'Untitled'}
@@ -215,6 +217,6 @@ export function RecentDraftsCard({
           </table>
         </div>
       )}
-    </div>
+    </Panel>
   )
 }

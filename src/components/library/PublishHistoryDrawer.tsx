@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button'
 import { StatusChip } from '@/components/ui/StatusChip'
 import { channelLabel } from '@/lib/channels'
 import { formatDateTime } from '@/lib/format'
+import { FOCUS, ICON_SM, TEXT_LINK } from '@/components/ui/atoms'
 
 interface PostHistory {
   id: string
@@ -64,8 +65,8 @@ export function PublishHistoryDrawer({
 
   return (
     <Drawer open onClose={onClose} title="Publish History">
-        {/* Body */}
-        {/* Ruled rows, not boxes (DESIGN_SYSTEM.md §6) */}
+        {/* Body: ruled rows on --line-subtle, not boxes (DESIGN_SYSTEM.md §6),
+            inside the Drawer's overlay surface */}
         <div className="px-5 py-2 divide-y divide-line-subtle">
           {posts.length === 0 ? (
             <p className="text-ui-sm text-fg-muted text-center py-8">
@@ -86,7 +87,7 @@ export function PublishHistoryDrawer({
                 <div key={post.id} className="py-4 flex flex-col gap-2">
                   {/* Top row: channel + status */}
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-ui-lg font-medium text-fg">
+                    <span className="text-ui-sm font-semibold text-fg">
                       {channelLabel(post.channel)}
                     </span>
                     <StatusChip status={chipStatus} />
@@ -103,16 +104,16 @@ export function PublishHistoryDrawer({
                       href={platformUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="self-start inline-flex items-center gap-1 rounded-ui-sm text-ui-xs text-accent underline decoration-line underline-offset-4 hover:decoration-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
+                      className={`self-start inline-flex items-center gap-1 rounded-ui-sm text-ui-xs ${TEXT_LINK} ${FOCUS}`}
                     >
                       View on {channelLabel(post.channel)}
-                      <ExternalLink size={12} strokeWidth={1.4} />
+                      <ExternalLink {...ICON_SM} aria-hidden />
                     </a>
                   )}
 
-                  {/* Error reason, on the failed tint the chips use (0.10) */}
+                  {/* Error reason, on the failed tint the chips use (0.12, 021 A2) */}
                   {isFailed && post.errorReason && (
-                    <p className="text-ui-xs text-status-failed bg-status-failed/10 rounded-ui-sm px-2 py-1">
+                    <p className="text-ui-xs text-status-failed bg-status-failed/12 rounded-ui-sm px-2.5 py-1.5">
                       {post.errorReason}
                     </p>
                   )}
@@ -126,7 +127,7 @@ export function PublishHistoryDrawer({
                       disabled={retrying === post.id}
                       className="self-start"
                     >
-                      <RotateCcw size={13} strokeWidth={1.4} />
+                      <RotateCcw {...ICON_SM} aria-hidden />
                       {retrying === post.id ? 'Retrying…' : 'Retry'}
                     </Button>
                   )}

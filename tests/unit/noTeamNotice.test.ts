@@ -19,7 +19,7 @@ describe('NoTeamNotice', () => {
   it('keeps the unchanged message, with no link, for everyone else', () => {
     const html = renderToStaticMarkup(h(NoTeamNotice, { isSuperAdmin: false }))
     expect(html).toContain(
-      '<h2 class="text-ui-lg font-medium text-fg">You’re not in a team yet</h2>',
+      '<h2 class="text-ui-lg font-semibold leading-snug tracking-[-0.01em] text-fg">You’re not in a team yet</h2>',
     )
     expect(html).toContain(
       '<p class="mt-2 text-ui-sm text-fg-muted">Ask a super admin to add you to a team before you can create or view posts.</p>',

@@ -9,7 +9,7 @@ import { apiFetch } from '@/lib/apiFetch'
 import { fieldClasses, fieldEdge, inputClasses } from '@/components/ui/Input'
 import { cn } from '@/lib/utils'
 import { FieldLabel } from '@/components/ui/FieldLabel'
-import { EYEBROW, SCROLL_FOCUS, SMALL_CAPS } from '@/components/ui/atoms'
+import { EYEBROW, ICON, SCROLL_FOCUS, SMALL_CAPS } from '@/components/ui/atoms'
 import { StepHead } from './StepHead'
 import { GOAL_OPTIONS, TONE_OPTIONS } from './constants'
 
@@ -62,7 +62,7 @@ export function ContentStep({ topic, setTopic, prompt, setPrompt, goal, setGoal,
 
   return (
     <div>
-      <StepHead index={2} title={<>Brief &amp; Caption Direction</>}>
+      <StepHead title={<>Brief &amp; Caption Direction</>}>
         Give the post a short topic, tell Claude what it&apos;s about, then pick a goal and tone.
       </StepHead>
 
@@ -85,6 +85,7 @@ export function ContentStep({ topic, setTopic, prompt, setPrompt, goal, setGoal,
       <FieldLabel htmlFor={enhanceResult ? undefined : briefId} className="mb-2.5">Brief</FieldLabel>
       {enhanceResult ? (
         <div className="space-y-4 mb-6">
+          {/* "Before" and "AI suggestion" stay micro-labels: panel captions (021 FR-07). */}
           {enhanceResult.original.trim() && (
             <div>
               <p className={`${EYEBROW} mb-1.5`}>Before</p>
@@ -93,7 +94,7 @@ export function ContentStep({ topic, setTopic, prompt, setPrompt, goal, setGoal,
                 tabIndex={0}
                 role="region"
                 aria-label="Before"
-                className={`surface px-4 py-3 text-ui-sm text-fg-muted whitespace-pre-wrap leading-relaxed max-h-40 overflow-y-auto ${SCROLL_FOCUS}`}
+                className={`rounded-ui-md bg-canvas px-4 py-3 ring-1 ring-inset ring-line-subtle text-ui-sm text-fg-muted whitespace-pre-wrap leading-relaxed max-h-40 overflow-y-auto ${SCROLL_FOCUS}`}
               >
                 {enhanceResult.original}
               </div>
@@ -105,7 +106,7 @@ export function ContentStep({ topic, setTopic, prompt, setPrompt, goal, setGoal,
               tabIndex={0}
               role="region"
               aria-label="AI suggestion"
-              className={`rounded-ui-sm border border-fg bg-surface-raised px-4 py-3 text-ui-sm text-fg whitespace-pre-wrap leading-relaxed max-h-64 overflow-y-auto ${SCROLL_FOCUS}`}
+              className={`rounded-ui-md bg-surface-raised px-4 py-3 shadow-panel ring-[1.5px] ring-inset ring-fg text-ui-sm text-fg whitespace-pre-wrap leading-relaxed max-h-64 overflow-y-auto ${SCROLL_FOCUS}`}
             >
               {enhanceResult.draft}
             </div>
@@ -136,9 +137,9 @@ export function ContentStep({ topic, setTopic, prompt, setPrompt, goal, setGoal,
               onClick={enhance}
               disabled={enhancing || (!topic.trim() && !prompt.trim())}
             >
-              <Sparkles size={15} strokeWidth={1.4} /> {enhancing ? 'Enhancing…' : 'Enhance with AI'}
+              <Sparkles {...ICON} aria-hidden /> {enhancing ? 'Enhancing…' : 'Enhance with AI'}
             </Button>
-            <div className="text-right text-ui-xs text-fg-muted pt-1.5">
+            <div className="text-right font-mono text-ui-2xs text-fg-muted pt-2">
               {prompt.length} chars{prompt.trim().length > 0 && prompt.trim().length <= 10 ? ' — add a little more detail' : ''}
             </div>
           </div>
@@ -150,7 +151,7 @@ export function ContentStep({ topic, setTopic, prompt, setPrompt, goal, setGoal,
         </>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-6 border-t border-line-subtle">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-5 border-t border-line-subtle">
         <Select label="Goal" options={GOAL_OPTIONS} value={goal} onChange={e => setGoal(e.target.value)} />
         <Select label="Tone" options={TONE_OPTIONS} value={tone} onChange={e => setTone(e.target.value)} />
       </div>

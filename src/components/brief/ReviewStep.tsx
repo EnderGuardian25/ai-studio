@@ -18,6 +18,7 @@ import { ReviewRow, type ReviewRowProps } from './ReviewRow'
 import { Notice } from '@/components/ui/Notice'
 import { ModelPicker } from '@/components/ui/ModelPicker'
 import { StepHead } from './StepHead'
+import { ICON } from '@/components/ui/atoms'
 
 // ─── Step 4 — Review ─────────────────────────────────────────────────────────
 
@@ -111,12 +112,12 @@ export function ReviewStep({
 
   return (
     <div>
-      <StepHead index={4} title={<>Review &amp; Generate</>}>
+      <StepHead title={<>Review &amp; Generate</>}>
         Check your brief before sending it to Claude.
       </StepHead>
 
-      {/* Ruled rows, opened by the 2 px --fg rule (DESIGN_SYSTEM.md §8.15) */}
-      <dl className="border-t-2 border-fg">
+      {/* Ruled rows on --line-subtle (DESIGN_SYSTEM.md §8.15) */}
+      <dl className="border-t border-line-subtle">
         {rows.map(row => (
           <ReviewRow key={row.label} {...row} />
         ))}
@@ -162,7 +163,7 @@ export function ReviewStep({
 
       {submitting && (
         <Notice tone="info" className="mt-6 flex items-center gap-2">
-          <Loader2 size={15} strokeWidth={1.4} className="animate-spin" /> Generating your post — this can take up to a minute…
+          <Loader2 {...ICON} aria-hidden className="animate-spin" /> Generating your post — this can take up to a minute…
         </Notice>
       )}
     </div>
