@@ -19,3 +19,8 @@
 {"ev":"stop","span":"T7","at":"2026-10-20T10:24:14Z","ts":1792491854,"status":"ok"}
 {"ev":"start","span":"T8","kind":"task","label":"T8","parent":"W3","model":"opus","attempt":"1","at":"2026-10-20T10:24:51Z","ts":1792491891}
 {"ev":"stop","span":"T8","at":"2026-10-20T10:55:45Z","ts":1792493745,"status":"ok"}
+{"ev":"stop","span":"W1","at":"2026-10-20T06:34:57Z","ts":1792478097,"status":"ok"}
+{"ev":"start","span":"W2","kind":"wave","label":"wave 2","at":"2026-10-20T06:35:24Z","ts":1792478124}
+{"ev":"stop","span":"W2","at":"2026-10-20T10:24:14Z","ts":1792491854,"status":"ok"}
+{"ev":"start","span":"W3","kind":"wave","label":"wave 3","at":"2026-10-20T10:24:51Z","ts":1792491891}
+{"ev":"stop","span":"W3","at":"2026-10-20T10:55:45Z","ts":1792493745,"status":"ok"}
