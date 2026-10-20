@@ -152,7 +152,7 @@ vi.mock('@/lib/drafts/draftActions', () => ({
     _d: string,
     _u: string,
     _t: string,
-    _a: string,
+    _a: unknown,
     work: () => Promise<unknown>,
   ) => {
     await work().catch(() => {})
@@ -368,8 +368,8 @@ beforeEach(() => {
   }
   h.draftFindUnique.mockImplementation(async () => draft())
   h.briefCreate.mockImplementation(async ({ data }: { data: object }) => ({ id: 'b-new', ...data }))
-  h.claimDraft.mockResolvedValue(true)
-  h.claimCaption.mockResolvedValue(true)
+  h.claimDraft.mockResolvedValue({ action: 'REFINE', claimId: 'c1' })
+  h.claimCaption.mockResolvedValue({ action: 'REGENERATE_COPY', claimId: 'c1' })
   const stop = async () => {
     throw new Error('boundary reached')
   }

@@ -86,8 +86,8 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
   }
   const model = resolvedModel.resolved
 
-  const claimed = await claimDraftAction(draft.id, 'REGENERATE_DESIGN')
-  if (!claimed) {
+  const claim = await claimDraftAction(draft.id, 'REGENERATE_DESIGN')
+  if (!claim) {
     return NextResponse.json({ error: 'Another action is already running on this draft' }, { status: 409 })
   }
 
@@ -95,7 +95,7 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
   // (the team token otherwise) — startDraftAction resolves it before the
   // request unwinds and pins it onto the background run. A throw below is
   // recorded on Draft.pendingActionError; the draft itself is left untouched.
-  await startDraftAction(draft.id, user.userId, user.teamId, 'REGENERATE_DESIGN', async () => {
+  await startDraftAction(draft.id, user.userId, user.teamId, claim, async () => {
     if (headline.fallback) console.info(headlineFallbackMessage(draft.id))
     // Run the new design first — if it fails, the draft is left untouched.
     // actor is the acting teammate (NOT the brief owner) — the image-provider
@@ -109,7 +109,7 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
       model,
       // 008 FR-12: the stale-sweep heartbeat between the background step and
       // the design, so neither segment carries the other (budget.ts).
-      { onBeforeDesign: () => touchDraftAction(draft.id, 'REGENERATE_DESIGN') },
+      { onBeforeDesign: () => touchDraftAction(draft.id, claim) },
     )
     // F3 (AC-04): this render's stamp, resolved once and written to both the
     // new revision row and the draft (008: with the model that made it).

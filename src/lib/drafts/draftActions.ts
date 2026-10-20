@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { resolveClaudeAuth } from '@/lib/agent/userToken'
 import { runWithClaudeAuth } from '@/lib/agent/claudeAuth'
 import { NOT_APPLIED_CLEARED, discardNotAppliedRender } from '@/lib/drafts/revisions'
+import { CLAIM_RELEASED, claimData, claimWhere, logLostClaim, newClaimId, type DraftClaim } from '@/lib/drafts/claim'
 
 // Lifecycle of an async draft action (regenerate copy/design, refine) — the
 // F1 background pattern applied to actions on an existing draft. A route
@@ -11,8 +12,9 @@ import { NOT_APPLIED_CLEARED, discardNotAppliedRender } from '@/lib/drafts/revis
 
 // Atomically claim the action slot: a conditional update where pendingAction
 // IS NULL, so there is no read-then-write race — exactly one concurrent
-// request wins. Returns false when an action is already in flight (or the
-// draft doesn't exist); the caller responds 409.
+// request wins. Returns the claim (the action and a fresh token, 019) or null
+// when an action is already in flight (or the draft doesn't exist); the caller
+// responds 409. The WHERE ignores whatever token an earlier run left behind.
 //
 // Claiming does NOT clear the previous run's pendingActionError (T17 fix round
 // 1). It used to, and that let a crash vanish: when two requests raced, the
@@ -26,15 +28,17 @@ import { NOT_APPLIED_CLEARED, discardNotAppliedRender } from '@/lib/drafts/revis
 // also logged by startDraftAction, so it is recorded even after a later
 // success clears the field.
 //
-// Settling is guarded on the action THIS run claimed (release/complete below):
-// a run the stale sweep already cleared settles late as a no-op instead of
-// clearing, or overwriting the outcome of, a newer action's claim.
-export async function claimDraftAction(draftId: string, action: DraftAction): Promise<boolean> {
+// Settling is guarded on the claim THIS run took (action and token; release/
+// complete below): a run the stale sweep already cleared settles late as a
+// no-op instead of clearing, or overwriting the outcome of, a newer claim, even
+// a newer claim of the same action.
+export async function claimDraftAction(draftId: string, action: DraftAction): Promise<DraftClaim | null> {
+  const claim: DraftClaim = { action, claimId: newClaimId() }
   const { count } = await prisma.draft.updateMany({
     where: { id: draftId, pendingAction: null },
-    data: { pendingAction: action },
+    data: claimData(claim),
   })
-  return count === 1
+  return count === 1 ? claim : null
 }
 
 // Heartbeat for a long-running claimed action: bumps Draft.updatedAt (which
@@ -42,9 +46,9 @@ export async function claimDraftAction(draftId: string, action: DraftAction): Pr
 // 15-min window) while the claim is still held. Guarded on the claim, so it
 // never revives an action the sweep already cleared. See the refine route for
 // the arithmetic that makes the sweep unable to fire on a live refine.
-export async function touchDraftAction(draftId: string, action: DraftAction): Promise<void> {
+export async function touchDraftAction(draftId: string, claim: DraftClaim): Promise<void> {
   await prisma.draft.updateMany({
-    where: { id: draftId, pendingAction: action },
+    where: { id: draftId, ...claimWhere(claim) },
     data: { updatedAt: new Date() },
   })
 }
@@ -63,24 +67,19 @@ export async function touchGeneration(draftId: string): Promise<void> {
 
 // Release the action slot, optionally recording why the run failed.
 // updateMany (not update) so a draft deleted mid-action is a silent no-op.
-// Guarded on `action` (the one this run claimed): when the claim is no longer
-// ours (swept, then re-claimed) 0 rows match. That is logged, never thrown.
+// Guarded on the claim this run took: when it is no longer ours (swept, then
+// re-claimed) 0 rows match. That is logged, never thrown. The token is nulled
+// with the action.
 export async function releaseDraftAction(
   draftId: string,
-  action: DraftAction,
+  claim: DraftClaim,
   error?: string,
 ): Promise<void> {
   const { count } = await prisma.draft.updateMany({
-    where: { id: draftId, pendingAction: action },
-    data: { pendingAction: null, pendingActionError: error ?? null },
+    where: { id: draftId, ...claimWhere(claim) },
+    data: { ...CLAIM_RELEASED, pendingActionError: error ?? null },
   })
-  if (count === 0) logLostClaim(draftId, action)
-}
-
-function logLostClaim(draftId: string, action: DraftAction) {
-  console.warn(
-    `[draft-action] draft ${draftId}: ${action} no longer holds the claim (swept or superseded); settle ignored`,
-  )
+  if (count === 0) logLostClaim(draftId, claim)
 }
 
 // Release the action slot after a SUCCESSFUL run. A success also clears the
@@ -90,17 +89,17 @@ function logLostClaim(draftId: string, action: DraftAction) {
 // render it referenced as discarded, so a late "Use anyway" on it 409s.
 // A batch (not interactive) transaction: two statements in order, no read and
 // no held connection, since this runs on every action completion.
-// Both statements are guarded on the claimed `action`, so a late settle from a
+// Both statements are guarded on the claim, so a late settle from a
 // swept run neither stamps nor clears a newer action's not-applied outcome.
-export async function completeDraftAction(draftId: string, action: DraftAction): Promise<void> {
+export async function completeDraftAction(draftId: string, claim: DraftClaim): Promise<void> {
   const [, draft] = await prisma.$transaction([
-    discardNotAppliedRender(prisma, draftId, action),
+    discardNotAppliedRender(prisma, draftId, claim),
     prisma.draft.updateMany({
-      where: { id: draftId, pendingAction: action },
-      data: { pendingAction: null, pendingActionError: null, ...NOT_APPLIED_CLEARED },
+      where: { id: draftId, ...claimWhere(claim) },
+      data: { ...CLAIM_RELEASED, pendingActionError: null, ...NOT_APPLIED_CLEARED },
     }),
   ])
-  if (draft.count === 0) logLostClaim(draftId, action)
+  if (draft.count === 0) logLostClaim(draftId, claim)
 }
 
 // What a work closure may return. 'not-applied' = the refine completed
@@ -129,13 +128,13 @@ export async function startDraftAction(
   draftId: string,
   userId: string,
   teamId: string,
-  action: DraftAction,
+  claim: DraftClaim,
   work: () => Promise<void | DraftActionCompletion>,
   onError?: (err: unknown) => Promise<void>,
 ): Promise<void> {
   const auth = await resolveClaudeAuth(userId, teamId)
   void runWithClaudeAuth(auth, work)
-    .then((completion) => (completion === 'not-applied' ? releaseDraftAction(draftId, action) : completeDraftAction(draftId, action)))
+    .then((completion) => (completion === 'not-applied' ? releaseDraftAction(draftId, claim) : completeDraftAction(draftId, claim)))
     .catch(async (err) => {
       // Logged as well as recorded: the next run to settle overwrites
       // pendingActionError, so without this a crashed run can vanish without
@@ -144,7 +143,7 @@ export async function startDraftAction(
       if (onError) {
         await onError(err).catch((e) => console.error(`[draft-action] onError for draft ${draftId} failed:`, e))
       }
-      return releaseDraftAction(draftId, action, err instanceof Error ? err.message : String(err))
+      return releaseDraftAction(draftId, claim, err instanceof Error ? err.message : String(err))
     })
     // Belt-and-braces: a release failure (e.g. DB down) must not become an
     // unhandled rejection.

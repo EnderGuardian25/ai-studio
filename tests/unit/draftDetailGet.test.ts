@@ -8,13 +8,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 const h = vi.hoisted(() => ({
   draftFindUnique: vi.fn(),
+  draftUpdateMany: vi.fn(),
   providerFindFirst: vi.fn(),
   copyProviderIsClaude: vi.fn(),
   resolveBrandKit: vi.fn(),
 }))
 
 vi.mock('@/lib/prisma', () => ({
-  prisma: { draft: { findUnique: h.draftFindUnique }, availableProvider: { findFirst: h.providerFindFirst } },
+  prisma: { draft: { findUnique: h.draftFindUnique, updateMany: h.draftUpdateMany }, availableProvider: { findFirst: h.providerFindFirst } },
 }))
 vi.mock('@/lib/api/handler', () => {
   const wrap =
@@ -55,6 +56,7 @@ function exportedDraft(copyProviderKey: string | null) {
     status: 'EXPORTED',
     failureReason: null,
     pendingAction: null,
+    pendingActionClaimId: null,
     pendingActionError: null,
     pendingConflict: null,
     updatedAt: now,
@@ -96,6 +98,7 @@ async function get() {
 
 beforeEach(() => {
   h.draftFindUnique.mockReset()
+  h.draftUpdateMany.mockReset().mockResolvedValue({ count: 1 })
   h.providerFindFirst.mockReset()
   h.copyProviderIsClaude.mockReset()
   h.copyProviderIsClaude.mockImplementation(realCopyProviderIsClaude)
@@ -159,5 +162,61 @@ describe('GET /api/drafts/[id] — the provider lookup per poll (018 FR-04)', ()
     const { body } = await pending
     expect(body.brandKitName).toBe('Kit')
     expect(body.captionProviderIsClaude).toBe(true)
+  })
+})
+
+// 019 FR-06 / FR-07 / AC-05: the sweep's clear is guarded on the claim it
+// OBSERVED, and a null token (an older image's claim) is swept all the same.
+describe('GET /api/drafts/[id] — the stale-action sweep is guarded on the observed claim (019)', () => {
+  const STALE_AT = new Date(Date.now() - 20 * 60_000)
+  const stale = (claimId: string | null) => ({
+    ...exportedDraft(null),
+    pendingAction: 'REFINE',
+    pendingActionClaimId: claimId,
+    updatedAt: STALE_AT,
+  })
+
+  it('clears with a WHERE carrying the observed action and token, and nulls the token', async () => {
+    h.draftFindUnique.mockResolvedValue(stale('tok-1'))
+    const { body } = await get()
+    expect(h.draftUpdateMany).toHaveBeenCalledWith({
+      where: { id: 'd1', pendingAction: 'REFINE', pendingActionClaimId: 'tok-1' },
+      data: {
+        pendingAction: null,
+        pendingActionClaimId: null,
+        pendingActionError: 'The action was interrupted. Please try again.',
+      },
+    })
+    expect(body.pendingAction).toBeNull()
+  })
+
+  it('sweeps a stale row whose token is null (claimed by an older image): the WHERE matches IS NULL', async () => {
+    h.draftFindUnique.mockResolvedValue(stale(null))
+    await get()
+    expect(h.draftUpdateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: 'd1', pendingAction: 'REFINE', pendingActionClaimId: null } }),
+    )
+  })
+
+  it('a sweep whose observed token no longer matches writes nothing to the row', async () => {
+    // A stateful fake: R2 claimed (tok-2) between the sweep's read (tok-1) and its clear.
+    const row = { pendingAction: 'REFINE', pendingActionClaimId: 'tok-2', pendingActionError: null as string | null }
+    h.draftUpdateMany.mockImplementation(async ({ where, data }: { where: Record<string, unknown>; data: Record<string, unknown> }) => {
+      if (where.pendingAction !== row.pendingAction || where.pendingActionClaimId !== row.pendingActionClaimId) {
+        return { count: 0 }
+      }
+      Object.assign(row, data)
+      return { count: 1 }
+    })
+    h.draftFindUnique.mockResolvedValue(stale('tok-1'))
+    await get()
+    expect(row).toEqual({ pendingAction: 'REFINE', pendingActionClaimId: 'tok-2', pendingActionError: null })
+  })
+
+  it('never puts the token in the response', async () => {
+    h.draftFindUnique.mockResolvedValue({ ...exportedDraft(null), pendingAction: 'REFINE', pendingActionClaimId: 'tok-secret' })
+    const { body } = await get()
+    expect(JSON.stringify(body)).not.toContain('tok-secret')
+    expect(body).not.toHaveProperty('pendingActionClaimId')
   })
 })

@@ -57,7 +57,7 @@ vi.mock('@/lib/drafts/draftActions', () => ({
   claimDraftAction: h.claim,
   touchDraftAction: async () => {},
   // Run the claimed action's work inline so its writes are observable.
-  startDraftAction: async (_d: string, _u: string, _t: string, _a: string, work: () => Promise<unknown>) => {
+  startDraftAction: async (_d: string, _u: string, _t: string, _a: unknown, work: () => Promise<unknown>) => {
     await work()
   },
 }))
@@ -118,7 +118,7 @@ beforeEach(() => {
   h.policy = null
   h.result = { kind: 'accepted', html: '<html>refined</html>', refineCalls: 1, verifierCalls: 0 }
   for (const fn of [h.draftUpdate, h.claim, h.commit, h.reject, h.runRefineAttempts, h.refineApi]) fn.mockReset()
-  h.claim.mockResolvedValue(true)
+  h.claim.mockResolvedValue({ action: 'REFINE', claimId: 'c1' })
   h.commit.mockResolvedValue({ revisionId: 'rev-2', exportKey: 'exports/r.png', revisionNumber: 2 })
   h.reject.mockResolvedValue({ revisionId: 'rej-1', exportKey: null })
   h.refineApi.mockResolvedValue('<html>reply</html>')

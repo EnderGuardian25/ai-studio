@@ -101,8 +101,8 @@ vi.mock('@/lib/api/handler', () => ({
 vi.mock('@/lib/authz/visibility', () => ({ canAccessContent: () => true }))
 vi.mock('@/lib/agent/backgroundGeneration', () => ({ startBackgroundGeneration: h.startBackgroundGeneration }))
 vi.mock('@/lib/drafts/draftActions', () => ({
-  claimDraftAction: async () => true,
-  startDraftAction: async (_d: string, _u: string, _t: string, _a: string, work: () => Promise<unknown>) => {
+  claimDraftAction: async () => ({ action: 'REGENERATE_COPY', claimId: 'c1' }),
+  startDraftAction: async (_d: string, _u: string, _t: string, _a: unknown, work: () => Promise<unknown>) => {
     await work()
   },
 }))

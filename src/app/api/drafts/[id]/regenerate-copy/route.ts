@@ -105,8 +105,8 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
 
   // One draft-level claim for every caption action (A2), with the target rows
   // marked PENDING in the same transaction.
-  const claimed = await claimCaptionAction(draft.id, targets)
-  if (!claimed) {
+  const claim = await claimCaptionAction(draft.id, targets)
+  if (!claim) {
     return NextResponse.json({ error: 'Another action is already running on this draft' }, { status: 409 })
   }
 
@@ -122,7 +122,7 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
       draft.id,
       user.userId,
       user.teamId,
-      'REGENERATE_COPY',
+      claim,
       async () => {
         const { fields, stamp } = await writeCaptions(
           provider,
@@ -130,7 +130,7 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
           targets,
           model,
         )
-        await settleCaptionAction(draft.id, targets, fields, stamp)
+        await settleCaptionAction(draft.id, claim, targets, fields, stamp)
         // A headline has no row to carry a failure, so it is reported on
         // pendingActionError; the stored headline is unchanged.
         const headline = fields.HEADLINE
@@ -138,7 +138,7 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
           throw new Error(`Regenerate headline failed: ${headline?.reason ?? 'missing'}`)
         }
       },
-      (err) => settleCaptionAction(draft.id, targets, failedCaptionFields(targets, errorMessage(err))),
+      (err) => settleCaptionAction(draft.id, claim, targets, failedCaptionFields(targets, errorMessage(err))),
     )
   } catch (err) {
     // The run never started (e.g. the credential lookup threw): settle the rows
@@ -147,8 +147,8 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
     // Best-effort: if this fails too, the stale sweep still recovers the draft.
     const message = errorMessage(err)
     try {
-      await settleCaptionAction(draft.id, targets, failedCaptionFields(targets, message))
-      await releaseDraftAction(draft.id, 'REGENERATE_COPY', message)
+      await settleCaptionAction(draft.id, claim, targets, failedCaptionFields(targets, message))
+      await releaseDraftAction(draft.id, claim, message)
     } catch (e) {
       console.error(`[draft-action] draft ${draft.id}: releasing the unstarted caption action failed:`, e)
     }

@@ -162,8 +162,8 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
   }
   const model = resolvedModel.resolved
 
-  const claimed = await claimDraftAction(draft.id, 'REFINE')
-  if (!claimed) {
+  const claim = await claimDraftAction(draft.id, 'REFINE')
+  if (!claim) {
     return NextResponse.json({ error: 'Another action is already running on this draft' }, { status: 409 })
   }
 
@@ -175,7 +175,7 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
   // actor is the acting teammate (NOT the brief owner) — image-provider
   // resolution must follow whoever is running this refine.
   const actor = { userId: user.userId, teamId: user.teamId }
-  await startDraftAction(draft.id, user.userId, user.teamId, 'REFINE', async () => {
+  await startDraftAction(draft.id, user.userId, user.teamId, claim, async () => {
     // Background pre-step: generates a new background ONLY when the instruction
     // asks for one (e.g. "change the background to a city skyline"); a skip
     // with its reason otherwise. See agent/background.ts: it resolves the
@@ -217,7 +217,7 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
         // team-token retry, not a second timeout; the margin absorbs renderer
         // queueing under PUPPETEER_MAX_CONCURRENCY.)
         runRefine: async ({ attempt, model, retryReasons }) => {
-          await touchDraftAction(draft.id, 'REFINE')
+          await touchDraftAction(draft.id, claim)
           return mode === 'cli'
             ? runDesignAgentCliRefine({ systemPrompt, userMessage: userMessage(retryReasons), model })
             : runDesignAgentRefine({
@@ -266,7 +266,7 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
       commit: async (html) => {
         // The pre-commit heartbeat (008 FR-12): the final render + commit is
         // its own budget segment, not the tail of the last attempt's.
-        await touchDraftAction(draft.id, 'REFINE')
+        await touchDraftAction(draft.id, claim)
         // No export key: commitDraftRevision renders + uploads this document —
         // the one that was verified (Ruling D).
         await commitDraftRevision({
@@ -306,7 +306,7 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
           `[refine] draft ${draft.id}: not applied after ${notApplied.diagnostics.refineCalls} attempts — ${notApplied.reason}`,
         )
         // The same heartbeat as commit's: the rejected render is rendered too.
-        await touchDraftAction(draft.id, 'REFINE')
+        await touchDraftAction(draft.id, claim)
         await recordRejectedRender({
           draftId: draft.id,
           instruction,

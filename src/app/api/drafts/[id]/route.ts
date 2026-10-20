@@ -23,6 +23,7 @@ interface DraftRecoveryRow {
   status: DraftStatus
   failureReason: string | null
   pendingAction: DraftAction | null
+  pendingActionClaimId: string | null
   pendingActionError: string | null
   updatedAt: Date
 }
@@ -38,7 +39,7 @@ async function recoverIfStuck(draft: DraftRecoveryRow): Promise<{
   pendingAction: DraftAction | null
   pendingActionError: string | null
 }> {
-  const { id, status, pendingAction } = draft
+  const { id, status, pendingAction, pendingActionClaimId } = draft
   const plan = planDraftRecovery(draft)
   const effective = {
     status,
@@ -76,8 +77,11 @@ async function recoverIfStuck(draft: DraftRecoveryRow): Promise<{
   if (plan.clearStuckAction) {
     await prisma.draft
       .updateMany({
-        where: { id, pendingAction },
-        data: { pendingAction: null, pendingActionError: STUCK_ACTION_REASON },
+        // Guarded on the claim OBSERVED (action and token; a null token matches
+        // IS NULL, the older-image shape), so a run that settled, or a newer
+        // claim taken since the read, is never cleared (019 FR-06).
+        where: { id, pendingAction, pendingActionClaimId },
+        data: { pendingAction: null, pendingActionClaimId: null, pendingActionError: STUCK_ACTION_REASON },
       })
       .catch(() => {
         /* best-effort recovery */

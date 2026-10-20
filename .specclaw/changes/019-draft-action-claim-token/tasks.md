@@ -57,7 +57,7 @@ This change has **4 tasks in 3 waves**:
 
 ### Wave 2 — The token and its guards
 
-- [ ] `T2` — The claim mints a token; heartbeat, release, complete, the caption settles and the sweep are guarded on it
+- [x] `T2` — The claim mints a token; heartbeat, release, complete, the caption settles and the sweep are guarded on it
   - Files: `src/lib/drafts/claim.ts` (new), `src/lib/drafts/draftActions.ts`, `src/lib/drafts/revisions.ts` (only `discardNotAppliedRender`'s claim filter), `src/lib/captions/store.ts`, `src/app/api/drafts/[id]/route.ts`, `src/app/api/drafts/[id]/refine/route.ts`, `src/app/api/drafts/[id]/regenerate-design/route.ts`, `src/app/api/drafts/[id]/regenerate-copy/route.ts`, `tests/unit/draftActions.test.ts`, `tests/unit/captionStore.test.ts`, `tests/unit/captionRoutes.test.ts`, `tests/unit/draftDetailGet.test.ts`, `tests/unit/modelRequests.test.ts`, `tests/unit/draftActionModels.test.ts`, `tests/unit/captionWriters.test.ts`, `tests/unit/renderStamps.test.ts`, `tests/unit/actionHeartbeats.test.ts` (only if its fake needs it)
   - Estimate: large
   - Kind: impl

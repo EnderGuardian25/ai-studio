@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { PROMPT_VERSION } from '@/lib/agent/prompts/shared'
 import { INSTRUCTION_CLASS_KEYS } from '@/lib/agent/instructionClasses'
 import { getFontSetId } from '@/lib/renderer/fontSet'
-import type { DraftAction } from '@prisma/client'
+import { claimWhere, type DraftClaim } from '@/lib/drafts/claim'
 import type { DraftNotApplied } from '@/lib/api-types'
 import type { BackgroundSkipFields } from '@/lib/drafts/backgroundNotice'
 import type { ResolvedModel } from '@/lib/models/resolve'
@@ -597,13 +597,13 @@ export const NOT_APPLIED_CLEARED = { notAppliedReason: null, notAppliedRevisionI
 // says so too. One statement, no read, so it also fits a batch transaction —
 // it runs on every draft-action completion (draftActions.completeDraftAction).
 //
-// `claimedAction` (draft-action completion only): the stamp applies only while
-// the draft STILL carries that claim, so a late settle from a swept run cannot
+// `claim` (draft-action completion only): the stamp applies only while the
+// draft STILL carries that claim (action and token), so a late settle from a swept run cannot
 // discard a newer action's outcome.
 export function discardNotAppliedRender(
   client: Prisma.TransactionClient,
   draftId: string,
-  claimedAction?: DraftAction,
+  claim?: DraftClaim,
 ) {
   return client.draftRevision.updateMany({
     where: {
@@ -611,7 +611,7 @@ export function discardNotAppliedRender(
       rejectedAt: { not: null },
       adoptedAt: null,
       discardedAt: null,
-      notAppliedOn: { some: { id: draftId, ...(claimedAction ? { pendingAction: claimedAction } : {}) } },
+      notAppliedOn: { some: { id: draftId, ...(claim ? claimWhere(claim) : {}) } },
     },
     data: { discardedAt: new Date() },
   })

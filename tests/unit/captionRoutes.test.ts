@@ -63,6 +63,7 @@ const { PATCH: patch } = await import('@/app/api/drafts/[id]/route')
 
 const ctx = { params: { id: 'd1' } }
 const ALL = ['INSTAGRAM', 'LINKEDIN', 'WHATSAPP']
+const CLAIM = { action: 'REGENERATE_COPY', claimId: 'claim-1' }
 
 function post(body?: string) {
   return regenerate(new Request('http://test/x', { method: 'POST', body }) as never, ctx as never)
@@ -88,7 +89,7 @@ beforeEach(() => {
   h.draftFindUnique.mockResolvedValue(exportedDraft())
   h.resolveCopyProvider.mockResolvedValue({})
   h.loadDraftCaptions.mockResolvedValue({ captions: [] })
-  h.claimCaptionAction.mockResolvedValue(true)
+  h.claimCaptionAction.mockResolvedValue(CLAIM)
   h.settleCaptionAction.mockResolvedValue(undefined)
   h.releaseDraftAction.mockResolvedValue(undefined)
   h.startDraftAction.mockResolvedValue(undefined)
@@ -129,10 +130,10 @@ describe('regenerate-copy — a failure never strands the claim', () => {
 
     expect(res.status).toBe(422)
     expect(await res.json()).toEqual({ code: 'COPY_ERROR', message: 'No Claude credential' })
-    expect(h.settleCaptionAction).toHaveBeenCalledWith('d1', ['LINKEDIN'], {
+    expect(h.settleCaptionAction).toHaveBeenCalledWith('d1', CLAIM, ['LINKEDIN'], {
       LINKEDIN: { ok: false, reason: 'No Claude credential' },
     })
-    expect(h.releaseDraftAction).toHaveBeenCalledWith('d1', 'REGENERATE_COPY', 'No Claude credential')
+    expect(h.releaseDraftAction).toHaveBeenCalledWith('d1', CLAIM, 'No Claude credential')
     // Settled while the claim still holds, so no newer run's rows are touched.
     expect(order).toEqual(['settle', 'release'])
   })
@@ -153,8 +154,20 @@ describe('regenerate-copy — a failure never strands the claim', () => {
     )
   })
 
+  it('carries the claim from claimCaptionAction to startDraftAction and the unstarted settle (019)', async () => {
+    const res = await post(JSON.stringify({ channel: 'LINKEDIN' }))
+    expect(res.status).toBe(202)
+    expect(h.startDraftAction.mock.calls[0][3]).toBe(CLAIM)
+    h.startDraftAction.mockRejectedValue(new Error('x'))
+    h.settleCaptionAction.mockClear()
+    h.releaseDraftAction.mockClear()
+    await post(JSON.stringify({ channel: 'LINKEDIN' }))
+    expect(h.settleCaptionAction.mock.calls[0][1]).toBe(CLAIM)
+    expect(h.releaseDraftAction.mock.calls[0][1]).toBe(CLAIM)
+  })
+
   it('a lost claim is 409 and releases nothing it does not hold', async () => {
-    h.claimCaptionAction.mockResolvedValue(false)
+    h.claimCaptionAction.mockResolvedValue(null)
     const res = await post('{}')
     expect(res.status).toBe(409)
     expect(h.startDraftAction).not.toHaveBeenCalled()
@@ -204,7 +217,7 @@ describe('regenerate-copy — 008 FR-09 stamp tier, resolved before the claim', 
 
   beforeEach(() => {
     // Run the background work inline so the closure's writes are observable.
-    h.startDraftAction.mockImplementation(async (_d: string, _u: string, _t: string, _a: string, work: () => Promise<unknown>) => {
+    h.startDraftAction.mockImplementation(async (_d: string, _u: string, _t: string, _a: unknown, work: () => Promise<unknown>) => {
       await work()
     })
     h.writeCaptions.mockImplementation(async (_p: unknown, _b: unknown, targets: string[], model: { arg: string; substitutedFrom: string | null }) => ({
@@ -260,6 +273,7 @@ describe('regenerate-copy — 008 FR-09 stamp tier, resolved before the claim', 
     // The settle receives the reply's stamp, substitution included.
     expect(h.settleCaptionAction).toHaveBeenCalledWith(
       'd1',
+      CLAIM,
       ['LINKEDIN'],
       { LINKEDIN: { ok: true, text: 'new LINKEDIN' } },
       { model: HAIKU, substitutedFrom: OPUS },
@@ -288,7 +302,7 @@ describe('regenerate-copy — 008 FR-09 stamp tier, resolved before the claim', 
     const onError = h.startDraftAction.mock.calls[0][5] as (e: unknown) => Promise<void>
     h.settleCaptionAction.mockClear()
     await onError(new Error('boom'))
-    expect(h.settleCaptionAction).toHaveBeenCalledWith('d1', ['LINKEDIN'], { LINKEDIN: { ok: false, reason: 'boom' } })
-    expect(h.settleCaptionAction.mock.calls[0]).toHaveLength(3)
+    expect(h.settleCaptionAction).toHaveBeenCalledWith('d1', CLAIM, ['LINKEDIN'], { LINKEDIN: { ok: false, reason: 'boom' } })
+    expect(h.settleCaptionAction.mock.calls[0]).toHaveLength(4)
   })
 })

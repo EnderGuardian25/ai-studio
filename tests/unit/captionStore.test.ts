@@ -38,6 +38,11 @@ const {
 } = await import('@/lib/captions/store')
 
 const T = new Date('2026-10-11T00:00:00Z')
+// The claim a caption action holds (019): the settle's draft-row guard carries it.
+const CLAIM = { action: 'REGENERATE_COPY', claimId: 'tok-1' } as const
+const GUARD = { id: 'd1', pendingAction: 'REGENERATE_COPY', pendingActionClaimId: 'tok-1' }
+// The settle's own first write is the claim guard; the headline write is the one carrying `headline`.
+const headlineWrites = () => h.draftUpdateMany.mock.calls.filter(([a]) => 'headline' in a.data)
 const row = (channel: string, text = '', status = 'READY') => ({
   channel,
   text,
@@ -227,10 +232,12 @@ describe('saveGenerationCaptions', () => {
 
 describe('claimCaptionAction', () => {
   it('claims REGENERATE_COPY guarded on null and marks only the target channels PENDING', async () => {
-    expect(await claimCaptionAction('d1', ['WHATSAPP', 'HEADLINE'])).toBe(true)
+    const claim = await claimCaptionAction('d1', ['WHATSAPP', 'HEADLINE'])
+    expect(claim).toEqual({ action: 'REGENERATE_COPY', claimId: expect.any(String) })
+    // The WHERE is still the empty slot; the data carries the fresh token (019).
     expect(h.draftUpdateMany).toHaveBeenCalledWith({
       where: { id: 'd1', pendingAction: null },
-      data: { pendingAction: 'REGENERATE_COPY' },
+      data: { pendingAction: 'REGENERATE_COPY', pendingActionClaimId: claim!.claimId },
     })
     expect(h.captionUpdateMany).toHaveBeenCalledWith({
       where: { draftId: 'd1', channel: { in: ['WHATSAPP'] } },
@@ -240,13 +247,19 @@ describe('claimCaptionAction', () => {
 
   it('touches no row when another action holds the draft', async () => {
     h.draftUpdateMany.mockResolvedValue({ count: 0 })
-    expect(await claimCaptionAction('d1', ['INSTAGRAM'])).toBe(false)
+    expect(await claimCaptionAction('d1', ['INSTAGRAM'])).toBeNull()
     expect(h.captionUpdateMany).not.toHaveBeenCalled()
   })
 
   it('a headline-only claim marks no row', async () => {
-    expect(await claimCaptionAction('d1', ['HEADLINE'])).toBe(true)
+    expect(await claimCaptionAction('d1', ['HEADLINE'])).not.toBeNull()
     expect(h.captionUpdateMany).not.toHaveBeenCalled()
+  })
+
+  it('two claims carry different tokens', async () => {
+    const a = await claimCaptionAction('d1', ['HEADLINE'])
+    const b = await claimCaptionAction('d1', ['HEADLINE'])
+    expect(a!.claimId).not.toBe(b!.claimId)
   })
 })
 
@@ -256,7 +269,7 @@ describe('claimCaptionAction — db injection', () => {
   it('runs on the injected client, not the global one', async () => {
     const updateMany = vi.fn().mockResolvedValue({ count: 1 })
     const db = { $transaction: (fn: (tx: unknown) => unknown) => fn({ draft: { updateMany }, draftCaption: { updateMany } }) }
-    expect(await claimCaptionAction('d1', ['INSTAGRAM'], db as never)).toBe(true)
+    expect(await claimCaptionAction('d1', ['INSTAGRAM'], db as never)).not.toBeNull()
     expect(updateMany).toHaveBeenCalledTimes(2)
     expect(h.transaction).not.toHaveBeenCalled()
   })
@@ -269,7 +282,7 @@ describe('settleCaptionAction (FR-11, design §5)', () => {
       { channel: 'LINKEDIN', text: '' },
       { channel: 'WHATSAPP', text: 'old wa' },
     ])
-    await settleCaptionAction('d1', ['INSTAGRAM', 'LINKEDIN', 'WHATSAPP'], {
+    await settleCaptionAction('d1', CLAIM, ['INSTAGRAM', 'LINKEDIN', 'WHATSAPP'], {
       INSTAGRAM: { ok: true, text: 'new ig' },
       LINKEDIN: { ok: false, reason: 'missing' },
       WHATSAPP: { ok: false, reason: 'empty' },
@@ -294,27 +307,104 @@ describe('settleCaptionAction (FR-11, design §5)', () => {
         data: { status: 'READY', text: 'old wa', failureReason: 'Regenerate failed: empty' },
       },
     ])
-    // No headline was requested.
-    expect(h.draftUpdateMany).not.toHaveBeenCalled()
+    // The draft-row guard comes first (NFR-04), then no headline was requested.
+    expect(h.draftUpdateMany).toHaveBeenCalledTimes(1)
+    expect(h.draftUpdateMany).toHaveBeenCalledWith({ where: GUARD, data: { updatedAt: expect.any(Date) } })
+    expect(h.draftUpdateMany.mock.invocationCallOrder[0]).toBeLessThan(h.captionFindMany.mock.invocationCallOrder[0])
+    expect(headlineWrites()).toHaveLength(0)
   })
 
   it('writes a validated headline, guarded on the caption claim; a failed one changes nothing', async () => {
     h.captionFindMany.mockResolvedValue([])
-    await settleCaptionAction('d1', ['HEADLINE'], { HEADLINE: { ok: true, text: 'New line' } })
+    await settleCaptionAction('d1', CLAIM, ['HEADLINE'], { HEADLINE: { ok: true, text: 'New line' } })
     expect(h.draftUpdateMany).toHaveBeenCalledWith({
-      where: { id: 'd1', pendingAction: 'REGENERATE_COPY' },
+      where: GUARD,
       data: { headline: 'New line' },
     })
 
     h.draftUpdateMany.mockClear()
-    await settleCaptionAction('d1', ['HEADLINE'], { HEADLINE: { ok: false, reason: 'empty' } })
-    expect(h.draftUpdateMany).not.toHaveBeenCalled()
+    await settleCaptionAction('d1', CLAIM, ['HEADLINE'], { HEADLINE: { ok: false, reason: 'empty' } })
+    expect(headlineWrites()).toHaveLength(0)
   })
 
   it('never writes a headline that was not requested, even if the reply carried one', async () => {
     h.captionFindMany.mockResolvedValue([])
-    await settleCaptionAction('d1', ['INSTAGRAM'], { HEADLINE: { ok: true, text: 'Sneaky' } })
-    expect(h.draftUpdateMany).not.toHaveBeenCalled()
+    await settleCaptionAction('d1', CLAIM, ['INSTAGRAM'], { HEADLINE: { ok: true, text: 'Sneaky' } })
+    expect(headlineWrites()).toHaveLength(0)
+  })
+})
+
+// 019 FR-04 / AC-03: a settle whose claim was swept and superseded writes
+// nothing, even when the superseding claim is for the same action. A stateful
+// fake: R2's claim re-marks the rows PENDING under its own token.
+describe('settleCaptionAction: a late settle is a no-op (019 AC-03)', () => {
+  const STALE = { action: 'REGENERATE_COPY', claimId: 'tok-1' } as const
+  const LIVE = { action: 'REGENERATE_COPY', claimId: 'tok-2' } as const
+
+  function install(heldToken: string) {
+    const draft = { pendingAction: 'REGENERATE_COPY', pendingActionClaimId: heldToken, headline: 'old headline' }
+    const rows = [
+      { channel: 'INSTAGRAM', text: 'r2 ig', status: 'PENDING', failureReason: null as string | null },
+      { channel: 'LINKEDIN', text: 'r2 li', status: 'PENDING', failureReason: null as string | null },
+    ]
+    h.draftUpdateMany.mockImplementation(async ({ where, data }: { where: Record<string, unknown>; data: Record<string, unknown> }) => {
+      if (where.pendingAction !== draft.pendingAction || where.pendingActionClaimId !== draft.pendingActionClaimId) {
+        return { count: 0 }
+      }
+      if ('headline' in data) draft.headline = data.headline as string
+      return { count: 1 }
+    })
+    h.captionFindMany.mockImplementation(async () => rows.filter((r) => r.status === 'PENDING').map(({ channel, text }) => ({ channel, text })))
+    h.captionUpdateMany.mockImplementation(async ({ where, data }: { where: { channel: string }; data: Record<string, unknown> }) => {
+      const row = rows.find((r) => r.channel === where.channel && r.status === 'PENDING')
+      if (!row) return { count: 0 }
+      Object.assign(row, data)
+      return { count: 1 }
+    })
+    return { draft, rows }
+  }
+
+  it('success fields from the superseded run leave the rows PENDING with the new run text, and the headline', async () => {
+    const { draft, rows } = install('tok-2')
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    await settleCaptionAction(
+      'd1',
+      STALE,
+      ['INSTAGRAM', 'LINKEDIN', 'HEADLINE'],
+      { INSTAGRAM: { ok: true, text: 'stale ig' }, LINKEDIN: { ok: true, text: 'stale li' }, HEADLINE: { ok: true, text: 'stale h' } },
+      { model: 'm', substitutedFrom: null },
+    )
+    expect(rows.map((r) => [r.status, r.text])).toEqual([['PENDING', 'r2 ig'], ['PENDING', 'r2 li']])
+    expect(draft.headline).toBe('old headline')
+    expect(h.captionUpdateMany).not.toHaveBeenCalled()
+    expect(warn).toHaveBeenCalledTimes(1)
+    expect(warn.mock.calls[0][0]).not.toContain('tok-')
+    warn.mockRestore()
+  })
+
+  it('failure fields from the superseded run leave the rows PENDING too', async () => {
+    const { rows } = install('tok-2')
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    await settleCaptionAction('d1', STALE, ['INSTAGRAM', 'LINKEDIN'], {
+      INSTAGRAM: { ok: false, reason: 'boom' },
+      LINKEDIN: { ok: false, reason: 'boom' },
+    })
+    expect(rows.map((r) => [r.status, r.text, r.failureReason])).toEqual([
+      ['PENDING', 'r2 ig', null],
+      ['PENDING', 'r2 li', null],
+    ])
+    warn.mockRestore()
+  })
+
+  it('the live claim settles the rows and the headline', async () => {
+    const { draft, rows } = install('tok-2')
+    await settleCaptionAction('d1', LIVE, ['INSTAGRAM', 'LINKEDIN', 'HEADLINE'], {
+      INSTAGRAM: { ok: true, text: 'new ig' },
+      LINKEDIN: { ok: true, text: 'new li' },
+      HEADLINE: { ok: true, text: 'new h' },
+    })
+    expect(rows.map((r) => [r.status, r.text])).toEqual([['READY', 'new ig'], ['READY', 'new li']])
+    expect(draft.headline).toBe('new h')
   })
 })
 
@@ -376,6 +466,7 @@ describe('008 FR-08: settleCaptionAction stamps validated fields only', () => {
     ])
     await settleCaptionAction(
       'd1',
+      CLAIM,
       ['INSTAGRAM', 'LINKEDIN', 'WHATSAPP'],
       {
         INSTAGRAM: { ok: true, text: 'new ig' },
@@ -399,9 +490,9 @@ describe('008 FR-08: settleCaptionAction stamps validated fields only', () => {
 
   it('a validated headline writes headlineModel in the same claim-guarded update; a failed one writes nothing', async () => {
     h.captionFindMany.mockResolvedValue([])
-    await settleCaptionAction('d1', ['HEADLINE'], { HEADLINE: { ok: true, text: 'New line' } }, STAMP)
+    await settleCaptionAction('d1', CLAIM, ['HEADLINE'], { HEADLINE: { ok: true, text: 'New line' } }, STAMP)
     expect(h.draftUpdateMany).toHaveBeenCalledWith({
-      where: { id: 'd1', pendingAction: 'REGENERATE_COPY' },
+      where: GUARD,
       data: {
         headline: 'New line',
         headlineModel: 'claude-sonnet-5-5',
@@ -409,8 +500,8 @@ describe('008 FR-08: settleCaptionAction stamps validated fields only', () => {
       },
     })
     h.draftUpdateMany.mockClear()
-    await settleCaptionAction('d1', ['HEADLINE'], { HEADLINE: { ok: false, reason: 'empty' } }, STAMP)
-    expect(h.draftUpdateMany).not.toHaveBeenCalled()
+    await settleCaptionAction('d1', CLAIM, ['HEADLINE'], { HEADLINE: { ok: false, reason: 'empty' } }, STAMP)
+    expect(headlineWrites()).toHaveLength(0)
   })
 
   it('the failure settles (no stamp: onError, an unstarted run) and the stale sweep never write a stamp field', async () => {
@@ -418,7 +509,7 @@ describe('008 FR-08: settleCaptionAction stamps validated fields only', () => {
       { channel: 'INSTAGRAM', text: 'kept' },
       { channel: 'LINKEDIN', text: '' },
     ])
-    await settleCaptionAction('d1', ['INSTAGRAM', 'LINKEDIN'], {
+    await settleCaptionAction('d1', CLAIM, ['INSTAGRAM', 'LINKEDIN'], {
       INSTAGRAM: { ok: false, reason: 'boom' },
       LINKEDIN: { ok: false, reason: 'boom' },
     })
@@ -431,7 +522,7 @@ describe('008 FR-08: settleCaptionAction stamps validated fields only', () => {
 
   it('without a stamp, even an ok field writes no stamp field (the pre-008 shape)', async () => {
     h.captionFindMany.mockResolvedValue([{ channel: 'INSTAGRAM', text: 'x' }])
-    await settleCaptionAction('d1', ['INSTAGRAM'], { INSTAGRAM: { ok: true, text: 'y' } })
+    await settleCaptionAction('d1', CLAIM, ['INSTAGRAM'], { INSTAGRAM: { ok: true, text: 'y' } })
     expect(h.captionUpdateMany.mock.calls[0][0].data).not.toHaveProperty('model')
   })
 })

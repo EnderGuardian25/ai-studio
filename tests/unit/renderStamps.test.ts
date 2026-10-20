@@ -87,10 +87,10 @@ vi.mock('@/lib/api/handler', () => ({
 vi.mock('@/lib/authz/visibility', () => ({ canAccessContent: () => true }))
 // Run the claimed action's work inline so the test can observe its writes.
 vi.mock('@/lib/drafts/draftActions', () => ({
-  claimDraftAction: async () => true,
+  claimDraftAction: async () => ({ action: 'REGENERATE_DESIGN', claimId: 'c1' }),
   // 008 T9: the generation's pre-design heartbeat (a Path A design calls it).
   touchGeneration: async () => {},
-  startDraftAction: async (_d: string, _u: string, _t: string, _a: string, work: () => Promise<unknown>) => {
+  startDraftAction: async (_d: string, _u: string, _t: string, _a: unknown, work: () => Promise<unknown>) => {
     await work()
   },
 }))

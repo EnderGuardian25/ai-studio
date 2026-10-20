@@ -11,6 +11,7 @@ import { CAPTION_CHANNELS, type CaptionTarget } from '@/lib/channels'
 import type { FieldResult } from '@/lib/captions/extract'
 import { settleCaptionRow, type CaptionStamp } from '@/lib/captions/actionTargets'
 import { resolveCaptionForPublish, type CaptionResolution } from '@/lib/captions/resolve'
+import { claimData, claimWhere, logLostClaim, newClaimId, type DraftClaim } from '@/lib/drafts/claim'
 
 export interface CaptionRow {
   channel: Channel
@@ -203,8 +204,9 @@ export async function saveGenerationCaptions(
 
 // Claim the draft-level caption action (A2, design §5): REGENERATE_COPY,
 // guarded on no action in flight, and the target rows marked PENDING in the
-// same transaction. False when another action holds the draft (the caller
-// answers 409). Released by startDraftAction as today.
+// same transaction. Returns the claim (action and fresh token, 019) or null when
+// another action holds the draft (the caller answers 409). Released by
+// startDraftAction as today.
 //
 // The rows must exist: call loadDraftCaptions first, so a channel the draft
 // lacks gets its row before it is claimed. Otherwise the PENDING update finds
@@ -213,21 +215,22 @@ export async function claimCaptionAction(
   draftId: string,
   targets: readonly CaptionTarget[],
   db: PrismaClient = prisma,
-): Promise<boolean> {
+): Promise<DraftClaim | null> {
   const channels = targetChannels(targets)
+  const claim: DraftClaim = { action: 'REGENERATE_COPY', claimId: newClaimId() }
   return db.$transaction(async (tx) => {
     const { count } = await tx.draft.updateMany({
       where: { id: draftId, pendingAction: null },
-      data: { pendingAction: 'REGENERATE_COPY' },
+      data: claimData(claim),
     })
-    if (count !== 1) return false
+    if (count !== 1) return null
     if (channels.length > 0) {
       await tx.draftCaption.updateMany({
         where: { draftId, channel: { in: channels } },
         data: { status: 'PENDING' },
       })
     }
-    return true
+    return claim
   })
 }
 
@@ -262,9 +265,11 @@ async function settlePendingRows(
 
 // A caption action's write (FR-11, design §5): each target row per its field
 // result, and the headline when it was requested and validated, in one
-// transaction. The headline write is guarded on the caption claim, so a run the
-// stale sweep already cleared cannot overwrite it late. A failed headline
-// leaves the column unchanged; the caller reports it.
+// transaction. It opens with a write to the draft row guarded on the claim (the
+// lock order claimCaptionAction takes: draft row, then caption rows), so a run
+// the stale sweep already cleared, or a newer claim superseded, writes nothing
+// and logs once (019). The headline write carries the same guard. A failed
+// headline leaves the column unchanged; the caller reports it.
 //
 // 008 FR-08: `stamp` is the reply's model (writeCaptions). It goes on each
 // target whose field validated — the row's model, or headlineModel in the
@@ -272,6 +277,7 @@ async function settlePendingRows(
 // with its text (A7). The failure settles (onError, an unstarted run) pass none.
 export async function settleCaptionAction(
   draftId: string,
+  claim: DraftClaim,
   targets: readonly CaptionTarget[],
   fields: Partial<Record<CaptionTarget, FieldResult>>,
   stamp: CaptionStamp | null = null,
@@ -279,6 +285,14 @@ export async function settleCaptionAction(
 ): Promise<void> {
   const headline = targets.includes('HEADLINE') ? fields.HEADLINE : undefined
   await db.$transaction(async (tx) => {
+    const { count } = await tx.draft.updateMany({
+      where: { id: draftId, ...claimWhere(claim) },
+      data: { updatedAt: new Date() },
+    })
+    if (count === 0) {
+      logLostClaim(draftId, claim)
+      return
+    }
     await settlePendingRows(
       tx,
       draftId,
@@ -288,7 +302,7 @@ export async function settleCaptionAction(
     )
     if (headline?.ok) {
       await tx.draft.updateMany({
-        where: { id: draftId, pendingAction: 'REGENERATE_COPY' },
+        where: { id: draftId, ...claimWhere(claim) },
         data: { headline: headline.text, ...(stamp ? headlineStampFields(stamp) : {}) },
       })
     }
