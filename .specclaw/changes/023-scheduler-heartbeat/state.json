@@ -1,0 +1,9 @@
+{
+  "change": "023-scheduler-heartbeat",
+  "phase": "proposal",
+  "branch": "",
+  "size": "bounded",
+  "phases": {
+    "proposal": { "status": "approved", "at": "2026-10-20T20:17:30Z" }
+  }
+}
