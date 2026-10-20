@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { PROMPT_VERSION } from '@/lib/agent/prompts/shared'
 import { INSTRUCTION_CLASS_KEYS } from '@/lib/agent/instructionClasses'
 import { getFontSetId } from '@/lib/renderer/fontSet'
-import { claimWhere, type DraftClaim } from '@/lib/drafts/claim'
+import { claimWhere, DraftClaimLostError, type DraftClaim } from '@/lib/drafts/claim'
 import type { DraftNotApplied } from '@/lib/api-types'
 import type { BackgroundSkipFields } from '@/lib/drafts/backgroundNotice'
 import type { ResolvedModel } from '@/lib/models/resolve'
@@ -288,6 +288,13 @@ export interface CommitRevisionArgs {
   // commit landing in that window would otherwise be silently overwritten —
   // with element mode's many small edits per session, a real lost update.
   expectedRevisionNumber?: number | null
+  // 019: the claim of the draft action making this commit (the refine's
+  // verified commit). The final draft write is guarded on it, so a run the
+  // sweep cleared cannot land a revision over a newer claim: a miss throws
+  // DraftClaimLostError and the transaction rolls back. Valid on the plain
+  // commit only — it cannot be combined with expectedRevisionNumber or
+  // adoptRejectedRevisionId, which have their own guards (a programming error).
+  claim?: DraftClaim
   // 008 FR-08 / A6: the model whose output `html` is — the refine's
   // ResolvedModel, or a stored stamp carried forward (an inline edit carries
   // the draft's designModel; an Override, pendingConflict's model). Omitted
@@ -325,6 +332,17 @@ export class AdoptConflictError extends Error {
   }
 }
 
+// Removes an export this call uploaded and knows no row references. Best-effort:
+// a failed removal is logged and never masks the failure that led here.
+async function removeUnusedExport(key: string, why: string) {
+  try {
+    const { deleteObject, BUCKET_EXPORTS } = await import('@/lib/storage/minio')
+    await deleteObject(BUCKET_EXPORTS, key)
+  } catch (cleanupErr) {
+    console.error(`[revisions] could not remove the unused export ${key} after ${why}:`, cleanupErr)
+  }
+}
+
 // Shared commit path for refine + inline-edit. Renders the HTML to a PNG when
 // no export key is supplied (the override / inline-edit / verified-refine
 // case), then allocates a revision number and writes the DraftRevision +
@@ -340,6 +358,10 @@ export async function commitDraftRevision(
   const { draftId, instruction, html, width, height, backgroundImageUrl, backgroundSkip, adoptRejectedRevisionId } = args
   const casExpected = args.expectedRevisionNumber
   const cas = casExpected !== undefined
+  const claim = args.claim
+  if (claim && (cas || adoptRejectedRevisionId)) {
+    throw new Error('commitDraftRevision: claim cannot be combined with expectedRevisionNumber or adoptRejectedRevisionId')
+  }
 
   // F3: the stamp of the render this commit makes current, resolved once and
   // written to both the new row and the draft. An adopt reinstates the
@@ -373,20 +395,15 @@ export async function commitDraftRevision(
       writeRevision(tx, revisionNumber),
     )
   } catch (err) {
-    // A CAS miss is the one failure after the upload that is KNOWN to have
-    // written nothing (the throw rolled the transaction back), so the export
-    // it rendered can be removed without risking a committed row that points
-    // at it. Every other failure keeps the pre-existing behaviour (the object
-    // is left in place): after e.g. a dropped connection the commit may in
-    // fact have landed. Best-effort — a failed removal is logged and never
-    // masks the conflict.
-    if (err instanceof RevisionConflictError && uploadedKey) {
-      try {
-        const { deleteObject, BUCKET_EXPORTS } = await import('@/lib/storage/minio')
-        await deleteObject(BUCKET_EXPORTS, uploadedKey)
-      } catch (cleanupErr) {
-        console.error(`[revisions] could not remove the unused export ${uploadedKey} after a revision conflict:`, cleanupErr)
-      }
+    // A CAS miss or a lost claim is the one failure after the upload that is
+    // KNOWN to have written nothing (the throw rolled the transaction back),
+    // so the export it rendered can be removed without risking a committed row
+    // that points at it. Every other failure keeps the pre-existing behaviour
+    // (the object is left in place): after e.g. a dropped connection the commit
+    // may in fact have landed. Best-effort — a failed removal is logged and
+    // never masks the conflict.
+    if ((err instanceof RevisionConflictError || err instanceof DraftClaimLostError) && uploadedKey) {
+      await removeUnusedExport(uploadedKey, err instanceof DraftClaimLostError ? 'a lost claim' : 'a revision conflict')
     }
     throw err
   }
@@ -455,9 +472,9 @@ export async function commitDraftRevision(
       ...backgroundSkip,
     }
 
-    if (!cas && !adoptRejectedRevisionId) {
-      // The plain commit (whole-document inline edit, refine, override):
-      // unchanged — no guard.
+    if (!cas && !adoptRejectedRevisionId && !claim) {
+      // The plain commit (whole-document inline edit, override): unchanged —
+      // no guard.
       await tx.draft.update({ where: { id: draftId }, data })
       return { id: created.id, revisionNumber }
     }
@@ -474,16 +491,20 @@ export async function commitDraftRevision(
     //     base AND pendingAction is null — an element edit must not commit
     //     while a refine/regenerate claimed the draft during its render
     //     (fix round 2, Minor 3; the same condition adopt has).
+    //   - claimed run (019, the refine's commit): the draft STILL carries this
+    //     run's claim (action and token), instead of pendingAction null — the
+    //     run holds its own claim. A swept or superseded run misses.
     const written = await tx.draft.updateMany({
       where: {
         id: draftId,
-        pendingAction: null,
+        ...(claim ? claimWhere(claim) : { pendingAction: null }),
         ...(adoptRejectedRevisionId ? { notAppliedRevisionId: adoptRejectedRevisionId } : {}),
         ...(cas ? { currentRevisionNumber: casExpected } : {}),
       },
       data,
     })
     if (written.count !== 1) {
+      if (claim) throw new DraftClaimLostError()
       if (adoptRejectedRevisionId) throw new AdoptConflictError()
       // Which condition missed? One read in the same transaction, after the
       // UPDATE's own evaluation. Under READ COMMITTED it sees the same OR
@@ -678,6 +699,9 @@ export interface RecordRejectedRenderArgs {
   // so a later "Use anyway" reinstates the render with its model. Omitted
   // reads as unknown (null).
   model?: ResolvedModel | null
+  // 019: the refine's claim. The discard and the final draft write are guarded
+  // on it; a miss throws DraftClaimLostError and nothing is recorded.
+  claim: DraftClaim
 }
 
 // Writes the not-applied outcome. A render/upload failure must not mask the
@@ -691,7 +715,7 @@ export interface RecordRejectedRenderArgs {
 export async function recordRejectedRender(
   args: RecordRejectedRenderArgs,
 ): Promise<{ revisionId: string; exportKey: string | null }> {
-  const { draftId, instruction, html, width, height } = args
+  const { draftId, instruction, html, width, height, claim } = args
   const diagnostics = rejectionDiagnosticsSchema.omit({ export: true }).parse(args.diagnostics)
   // F3: the rejected row carries the stamp of ITS render, so a later "Use
   // anyway" can reinstate it. The draft's stamp is untouched: its current
@@ -719,27 +743,37 @@ export async function recordRejectedRender(
   const reason =
     args.reason.length > MAX_NOT_APPLIED_REASON ? `${args.reason.slice(0, MAX_NOT_APPLIED_REASON - 1)}…` : args.reason
 
-  const row = await prisma.$transaction(async (tx) => {
-    await discardNotAppliedRender(tx, draftId)
-    const created = await tx.draftRevision.create({
-      data: {
-        draftId,
-        revisionNumber: null,
-        rejectedAt: new Date(),
-        instruction,
-        htmlSnapshot: html ?? args.unusableHtml ?? '',
-        exportUrl: exportKey,
-        rejection: rejection as Prisma.InputJsonValue,
-        ...stamp,
-      },
-      select: { id: true },
-    })
-    await tx.draft.update({
-      where: { id: draftId },
-      data: { notAppliedReason: reason, notAppliedRevisionId: created.id },
-    })
-    return created
-  }, TX_OPTIONS)
+  let row: { id: string }
+  try {
+    row = await prisma.$transaction(async (tx) => {
+      await discardNotAppliedRender(tx, draftId, claim)
+      const created = await tx.draftRevision.create({
+        data: {
+          draftId,
+          revisionNumber: null,
+          rejectedAt: new Date(),
+          instruction,
+          htmlSnapshot: html ?? args.unusableHtml ?? '',
+          exportUrl: exportKey,
+          rejection: rejection as Prisma.InputJsonValue,
+          ...stamp,
+        },
+        select: { id: true },
+      })
+      // The guarded final write, last as everywhere (see LOCK ORDER above): a
+      // run whose claim was swept or superseded records nothing.
+      const { count } = await tx.draft.updateMany({
+        where: { id: draftId, ...claimWhere(claim) },
+        data: { notAppliedReason: reason, notAppliedRevisionId: created.id },
+      })
+      if (count !== 1) throw new DraftClaimLostError()
+      return created
+    }, TX_OPTIONS)
+  } catch (err) {
+    // The throw rolled the row back, so the export uploaded above is unused.
+    if (err instanceof DraftClaimLostError && exportKey) await removeUnusedExport(exportKey, 'a lost claim')
+    throw err
+  }
 
   return { revisionId: row.id, exportKey }
 }

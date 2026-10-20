@@ -42,6 +42,8 @@ const fake = vi.hoisted(() => {
     // The draft's in-flight action marker — T19's adoptRejectedRevisionId
     // guard re-checks this (fix round 1, Minor 1).
     pendingAction: null as string | null,
+    // 019: the token the draft's claim carries (pendingActionClaimId).
+    claimId: null as string | null,
     // The draft's revision pointer — the element-edit CAS (expectedRevisionNumber,
     // change 004 T23 fix round 1) guards on it.
     currentRevisionNumber: null as number | null,
@@ -68,8 +70,11 @@ const fake = vi.hoisted(() => {
       if (key === 'draftId' || key === 'id') {
         if (value !== cond) return false
       } else if (key === 'notAppliedOn') {
-        // The single fake draft's back-reference: { some: { id } }.
+        // The single fake draft's back-reference: { some: { id, ...claim } }.
         if (row.id !== db.notAppliedRevisionId) return false
+        const some = (cond as { some: Record<string, unknown> }).some
+        if ('pendingAction' in some && some.pendingAction !== db.pendingAction) return false
+        if ('pendingActionClaimId' in some && some.pendingActionClaimId !== db.claimId) return false
       } else if (key === 'adoptedAt' || key === 'discardedAt') {
         if (cond !== null) throw new Error(`fake prisma: unsupported condition on ${key}`)
         if (value != null) return false
@@ -194,6 +199,7 @@ const fake = vi.hoisted(() => {
         where: {
           id?: string
           pendingAction?: string | null
+          pendingActionClaimId?: string | null
           notAppliedRevisionId?: string | null
           currentRevisionNumber?: number | null
         }
@@ -202,6 +208,7 @@ const fake = vi.hoisted(() => {
         db.ops.push('draft.updateMany')
         const { where } = args
         if ('pendingAction' in where && where.pendingAction !== db.pendingAction) return { count: 0 }
+        if ('pendingActionClaimId' in where && where.pendingActionClaimId !== db.claimId) return { count: 0 }
         if ('notAppliedRevisionId' in where && where.notAppliedRevisionId !== db.notAppliedRevisionId) {
           return { count: 0 }
         }
@@ -231,6 +238,7 @@ const fake = vi.hoisted(() => {
         draftUpdates: [...db.draftUpdates],
         notAppliedRevisionId: db.notAppliedRevisionId,
         pendingAction: db.pendingAction,
+        claimId: db.claimId,
         currentRevisionNumber: db.currentRevisionNumber,
       }
       try {
@@ -298,6 +306,7 @@ import {
   draftModelStamp,
   type RejectionDiagnostics,
 } from '@/lib/drafts/revisions'
+import { DraftClaimLostError, type DraftClaim } from '@/lib/drafts/claim'
 import { internalModel, decideModel } from '@/lib/models/resolve'
 import { DEFAULT_POLICY } from '@/lib/models/policyRules'
 import { PROMPT_VERSION } from '@/lib/agent/prompts/shared'
@@ -337,6 +346,7 @@ beforeEach(() => {
   db.draftUpdates = []
   db.notAppliedRevisionId = null
   db.pendingAction = null
+  db.claimId = null
   db.render = { calls: 0, fail: false }
   db.uploads = []
   db.deletes = []
@@ -603,7 +613,7 @@ describe('commitDraftRevision lock order: the revision insert precedes every dra
 
   it('adopt path: insert, then the rejected-row stamp, then ONE guarded draft write', async () => {
     db.rows = [committed('d1', 1)]
-    const { revisionId: rejectedId, exportKey } = await recordRejectedRender(rejectArgs())
+    const { revisionId: rejectedId, exportKey } = await recordHeld(rejectArgs())
     db.ops = []
     db.draftUpdates = []
     await commitDraftRevision({
@@ -734,7 +744,11 @@ function diagnostics(over: Partial<Omit<RejectionDiagnostics, 'export'>> = {}): 
   }
 }
 
+// 019: the claim a refine run holds while it records a rejected render.
+const CLAIM: DraftClaim = { action: 'REFINE', claimId: 'claim-1' }
+
 const rejectArgs = (over: Partial<Parameters<typeof recordRejectedRender>[0]> = {}) => ({
+  claim: CLAIM,
   draftId: 'd1',
   instruction: 'reduce the text',
   html: '<!DOCTYPE html><html><body>still long</body></html>',
@@ -745,10 +759,25 @@ const rejectArgs = (over: Partial<Parameters<typeof recordRejectedRender>[0]> = 
   ...over,
 })
 
+// recordRejectedRender while the draft holds CLAIM (the refine's own claim),
+// then back to the state the test had: the guarded final write needs the claim,
+// and the adopt / CAS tests that follow need the draft unclaimed.
+async function recordHeld(args: Parameters<typeof recordRejectedRender>[0]) {
+  const before = { action: db.pendingAction, claimId: db.claimId }
+  db.pendingAction = CLAIM.action
+  db.claimId = CLAIM.claimId
+  try {
+    return await recordRejectedRender(args)
+  } finally {
+    db.pendingAction = before.action
+    db.claimId = before.claimId
+  }
+}
+
 describe('recordRejectedRender (FR-12/13, Ruling D/E)', () => {
   it('writes ONE unnumbered rejected row with the render, diagnostics and export; the chain and pointer are untouched', async () => {
     db.rows = [committed('d1', 1), committed('d1', 2)]
-    const { revisionId, exportKey } = await recordRejectedRender(rejectArgs())
+    const { revisionId, exportKey } = await recordHeld(rejectArgs())
     const row = db.rows.find((r) => r.id === revisionId)!
     expect(row).toMatchObject({
       revisionNumber: null,
@@ -772,7 +801,7 @@ describe('recordRejectedRender (FR-12/13, Ruling D/E)', () => {
   })
 
   it('with no usable document: records the row for diagnosis, no render, no export', async () => {
-    const { revisionId, exportKey } = await recordRejectedRender(
+    const { revisionId, exportKey } = await recordHeld(
       rejectArgs({ html: null, unusableHtml: '<!DOCTYPE html><html><body>cut off' }),
     )
     expect(exportKey).toBeNull()
@@ -786,7 +815,7 @@ describe('recordRejectedRender (FR-12/13, Ruling D/E)', () => {
   it('a render failure does not mask the outcome: the row is recorded without an export', async () => {
     db.render.fail = true
     const errors = vi.spyOn(console, 'error').mockImplementation(() => {})
-    const { revisionId, exportKey } = await recordRejectedRender(rejectArgs())
+    const { revisionId, exportKey } = await recordHeld(rejectArgs())
     expect(exportKey).toBeNull()
     expect(errors).toHaveBeenCalled()
     errors.mockRestore()
@@ -796,28 +825,28 @@ describe('recordRejectedRender (FR-12/13, Ruling D/E)', () => {
   })
 
   it('REPLACING an outcome stamps the previous rejected row discarded', async () => {
-    const first = await recordRejectedRender(rejectArgs())
-    const second = await recordRejectedRender(rejectArgs({ instruction: 'reduce it again' }))
+    const first = await recordHeld(rejectArgs())
+    const second = await recordHeld(rejectArgs({ instruction: 'reduce it again' }))
     expect(db.rows.find((r) => r.id === first.revisionId)!.discardedAt).toBeInstanceOf(Date)
     expect(db.rows.find((r) => r.id === second.revisionId)!.discardedAt ?? null).toBeNull()
     expect(db.notAppliedRevisionId).toBe(second.revisionId)
   })
 
   it('caps the human-readable reason', async () => {
-    await recordRejectedRender(rejectArgs({ reason: 'x'.repeat(5000) }))
+    await recordHeld(rejectArgs({ reason: 'x'.repeat(5000) }))
     expect((db.draftUpdates[0].data.notAppliedReason as string).length).toBe(MAX_NOT_APPLIED_REASON)
   })
 
   it('refuses diagnostics beyond the hard caps (AC-15 is part of the schema)', async () => {
-    await expect(recordRejectedRender(rejectArgs({ diagnostics: diagnostics({ refineCalls: 3 }) }))).rejects.toThrow()
-    await expect(recordRejectedRender(rejectArgs({ diagnostics: diagnostics({ verifierCalls: 3 }) }))).rejects.toThrow()
+    await expect(recordHeld(rejectArgs({ diagnostics: diagnostics({ refineCalls: 3 }) }))).rejects.toThrow()
+    await expect(recordHeld(rejectArgs({ diagnostics: diagnostics({ verifierCalls: 3 }) }))).rejects.toThrow()
   })
 
   // Fix round 1, Minor 2: validation happens BEFORE the render/upload, so an
   // invalid record never orphans an export object.
   it('validates the diagnostics before rendering or uploading anything', async () => {
     const bad = diagnostics({ attempts: [{ ...diagnostics().attempts[0], verifierCalls: 2 }] })
-    await expect(recordRejectedRender(rejectArgs({ diagnostics: bad }))).rejects.toThrow()
+    await expect(recordHeld(rejectArgs({ diagnostics: bad }))).rejects.toThrow()
     expect(db.render.calls).toBe(0)
     expect(db.uploads).toEqual([])
     expect(db.rows).toEqual([])
@@ -831,7 +860,7 @@ describe('interactive transactions wait long enough for a pool connection', () =
   it('commitDraftRevision and recordRejectedRender both pass maxWait = TX_MAX_WAIT_MS (10 s)', async () => {
     expect(TX_MAX_WAIT_MS).toBeGreaterThanOrEqual(10_000)
     await commitDraftRevision({ draftId: 'd1', instruction: 'x', html: '<html/>', width: 1080, height: 1080, exportKey: 'k' })
-    await recordRejectedRender(rejectArgs())
+    await recordHeld(rejectArgs())
     expect(db.txOptions).toEqual([{ maxWait: TX_MAX_WAIT_MS }, { maxWait: TX_MAX_WAIT_MS }])
   })
 })
@@ -839,7 +868,7 @@ describe('interactive transactions wait long enough for a pool connection', () =
 describe('commitDraftRevision clears the not-applied outcome', () => {
   it('nulls notApplied* and stamps the referenced rejected row discarded', async () => {
     db.rows = [committed('d1', 1)]
-    const { revisionId: rejectedId } = await recordRejectedRender(rejectArgs())
+    const { revisionId: rejectedId } = await recordHeld(rejectArgs())
     db.draftUpdates = []
     await commitDraftRevision({ draftId: 'd1', instruction: 'x', html: '<html/>', width: 1080, height: 1080, exportKey: 'k' })
     expect(db.draftUpdates[0].data).toMatchObject({ notAppliedReason: null, notAppliedRevisionId: null, currentRevisionNumber: 2 })
@@ -847,7 +876,7 @@ describe('commitDraftRevision clears the not-applied outcome', () => {
   })
 
   it('never stamps an adopted rejected row', async () => {
-    const { revisionId: rejectedId } = await recordRejectedRender(rejectArgs())
+    const { revisionId: rejectedId } = await recordHeld(rejectArgs())
     const row = db.rows.find((r) => r.id === rejectedId)!
     row.adoptedAt = new Date()
     await commitDraftRevision({ draftId: 'd1', instruction: 'x', html: '<html/>', width: 1080, height: 1080, exportKey: 'k' })
@@ -860,7 +889,7 @@ describe('commitDraftRevision clears the not-applied outcome', () => {
 describe('commitDraftRevision adoptRejectedRevisionId (T19 "Use anyway")', () => {
   it('adopts the rejected row: stamps adoptedAt/adoptedRevisionNumber, creates exactly one chain row with its snapshot+export, clears notApplied', async () => {
     db.rows = [committed('d1', 1)]
-    const { revisionId: rejectedId, exportKey: rejectedExport } = await recordRejectedRender(
+    const { revisionId: rejectedId, exportKey: rejectedExport } = await recordHeld(
       rejectArgs({ instruction: 'make the logo bigger' }),
     )
     db.draftUpdates = []
@@ -912,8 +941,8 @@ describe('commitDraftRevision adoptRejectedRevisionId (T19 "Use anyway")', () =>
     // adopt reached the transaction. The fresh re-read of
     // Draft.notAppliedRevisionId inside the transaction must see that
     // mismatch and refuse, never touching the newer (live) row.
-    const first = await recordRejectedRender(rejectArgs({ instruction: 'first' }))
-    const second = await recordRejectedRender(rejectArgs({ instruction: 'second' }))
+    const first = await recordHeld(rejectArgs({ instruction: 'first' }))
+    const second = await recordHeld(rejectArgs({ instruction: 'second' }))
     // `second` is now the live outcome; `first` was already discarded by the
     // replace. Adopting the (already-discarded) `first` row must 409, and
     // the live `second` row must be untouched.
@@ -933,7 +962,7 @@ describe('commitDraftRevision adoptRejectedRevisionId (T19 "Use anyway")', () =>
   })
 
   it('a second adopt of the same row is refused (single-flight) and creates no second chain row', async () => {
-    const { revisionId: rejectedId, exportKey: rejectedExport } = await recordRejectedRender(rejectArgs())
+    const { revisionId: rejectedId, exportKey: rejectedExport } = await recordHeld(rejectArgs())
     const rowsBeforeFirstAdopt = db.rows.length
 
     await commitDraftRevision({
@@ -964,7 +993,7 @@ describe('commitDraftRevision adoptRejectedRevisionId (T19 "Use anyway")', () =>
   })
 
   it('a row without an export is refused (Ruling D)', async () => {
-    const { revisionId } = await recordRejectedRender(
+    const { revisionId } = await recordHeld(
       rejectArgs({ html: null, unusableHtml: '<!DOCTYPE html><html><body>cut off' }),
     )
     expect(db.rows.find((r) => r.id === revisionId)!.exportUrl).toBeNull()
@@ -1008,7 +1037,7 @@ describe('commitDraftRevision adoptRejectedRevisionId (T19 "Use anyway")', () =>
   // make the in-transaction guard refuse — proof the guard re-checks
   // pendingAction itself, not just the not-applied pointer.
   it('a draft with a pendingAction already claimed (a refine/regenerate in flight) refuses the adopt, touching nothing', async () => {
-    const { revisionId: rejectedId, exportKey: rejectedExport } = await recordRejectedRender(rejectArgs())
+    const { revisionId: rejectedId, exportKey: rejectedExport } = await recordHeld(rejectArgs())
     db.pendingAction = 'REFINE'
 
     await expect(
@@ -1210,7 +1239,7 @@ describe('F3 render stamps: every revision write records the render it holds', (
 
   it('recordRejectedRender stamps the rejected row with the values of ITS OWN render, and leaves the draft stamp alone', async () => {
     db.rows = [committed('d1', 1)]
-    const { revisionId } = await recordRejectedRender(rejectArgs())
+    const { revisionId } = await recordHeld(rejectArgs())
     const row = db.rows.find((r) => r.id === revisionId)!
     expect(row).toMatchObject({ fontSet: 'fonts-test', promptVersion: PROMPT_VERSION })
     // The draft's current render did not change, so neither does its stamp.
@@ -1220,7 +1249,7 @@ describe('F3 render stamps: every revision write records the render it holds', (
   })
 
   it('a rejected row with no usable document still carries the stamp of the attempt', async () => {
-    const { revisionId } = await recordRejectedRender(rejectArgs({ html: null, unusableHtml: '<html>cut' }))
+    const { revisionId } = await recordHeld(rejectArgs({ html: null, unusableHtml: '<html>cut' }))
     expect(db.rows.find((r) => r.id === revisionId)).toMatchObject({ fontSet: 'fonts-test', promptVersion: PROMPT_VERSION })
   })
 })
@@ -1417,7 +1446,7 @@ describe('008 FR-08: commitDraftRevision / recordRejectedRender record the model
 
   it("recordRejectedRender stamps the rejected row with the attempt's model; the draft's design stamp is untouched", async () => {
     db.rows = [committed('d1', 1)]
-    const { revisionId } = await recordRejectedRender({ ...rejectArgs(), model: refineModel })
+    const { revisionId } = await recordHeld({ ...rejectArgs(), model: refineModel })
     expect(db.rows.find((r) => r.id === revisionId)).toMatchObject({
       model: 'claude-sonnet-5-5',
       modelSubstitutedFrom: 'OPUS',
@@ -1430,5 +1459,127 @@ describe('008 FR-08: commitDraftRevision / recordRejectedRender record the model
   it('currentRenderStamp takes the internal / resolved model as its arg, never the key', () => {
     const m = internalModel('INTERNAL_VERIFIER', 'api')
     expect(currentRenderStamp(m)).toMatchObject({ model: m.arg, modelSubstitutedFrom: null })
+  })
+})
+
+// ── 019: the content writes from a claimed run are guarded on the claim ──────
+describe('019 commitDraftRevision with a claim (the refine commit)', () => {
+  const claimArgs = (over: Partial<Parameters<typeof commitDraftRevision>[0]> = {}) => ({
+    draftId: 'd1', instruction: 'refine', html: '<html/>', width: 1080, height: 1080, claim: CLAIM, ...over,
+  })
+  const hold = () => {
+    db.pendingAction = CLAIM.action
+    db.claimId = CLAIM.claimId
+  }
+
+  it('commits while the draft still carries the claim: ONE guarded final write whose WHERE is the claim', async () => {
+    db.rows = [committed('d1', 1)]
+    hold()
+    const out = await commitDraftRevision(claimArgs())
+    expect(out.revisionNumber).toBe(2)
+    expect(db.ops.filter((o) => o.startsWith('draft.'))).toEqual(['draft.updateMany'])
+    expect(db.ops.indexOf('draft.updateMany')).toBeGreaterThan(db.ops.indexOf('revision.create'))
+    expect(db.draftUpdates[0].where).toEqual({ id: 'd1', pendingAction: 'REFINE', pendingActionClaimId: 'claim-1' })
+    expect(db.draftUpdates[0].where).not.toHaveProperty('currentRevisionNumber')
+    expect(db.draftUpdates[0].data).toMatchObject({ currentRevisionNumber: 2, htmlContent: '<html/>' })
+    expect(db.deletes).toEqual([])
+  })
+
+  it('a lost claim (swept, then a newer claim of the SAME action) throws, rolls back and removes the export it uploaded', async () => {
+    db.rows = [committed('d1', 1)]
+    db.currentRevisionNumber = 1
+    db.pendingAction = 'REFINE'
+    db.claimId = 'claim-2' // R2's token
+    const err = await commitDraftRevision(claimArgs()).catch((e: unknown) => e)
+    expect(err).toBeInstanceOf(DraftClaimLostError)
+    // Nothing landed: no revision row, no draft write, the pointer is where it was.
+    expect(db.rows).toHaveLength(1)
+    expect(db.draftUpdates).toEqual([])
+    expect(db.currentRevisionNumber).toBe(1)
+    expect(db.ops.at(-1)).toBe('rollback')
+    // THIS call rendered and uploaded the export, so it is removed (best-effort).
+    expect(db.uploads).toEqual(['exports/refine-d1-test.png'])
+    expect(db.deletes).toEqual(['exports/refine-d1-test.png'])
+  })
+
+  it('a swept claim with no newer one (pendingAction null) is lost too', async () => {
+    db.rows = [committed('d1', 1)]
+    await expect(commitDraftRevision(claimArgs())).rejects.toBeInstanceOf(DraftClaimLostError)
+    expect(db.rows).toHaveLength(1)
+  })
+
+  it('a caller-supplied export key is never removed by the lost-claim cleanup', async () => {
+    db.rows = [committed('d1', 1)]
+    await expect(commitDraftRevision(claimArgs({ exportKey: 'exports/theirs.png' }))).rejects.toBeInstanceOf(
+      DraftClaimLostError,
+    )
+    expect(db.deletes).toEqual([])
+  })
+
+  it('a failed removal never masks the lost claim', async () => {
+    db.rows = [committed('d1', 1)]
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const minio = await import('@/lib/storage/minio')
+    const del = vi.spyOn(minio, 'deleteObject').mockRejectedValueOnce(new Error('minio down'))
+    await expect(commitDraftRevision(claimArgs())).rejects.toBeInstanceOf(DraftClaimLostError)
+    expect(spy).toHaveBeenCalled()
+    del.mockRestore()
+    spy.mockRestore()
+  })
+
+  it('a claim cannot be combined with expectedRevisionNumber or adoptRejectedRevisionId', async () => {
+    db.rows = [committed('d1', 1)]
+    hold()
+    await expect(commitDraftRevision(claimArgs({ expectedRevisionNumber: 1 }))).rejects.toThrow(/claim cannot be combined/)
+    await expect(commitDraftRevision(claimArgs({ adoptRejectedRevisionId: 'x' }))).rejects.toThrow(/claim cannot be combined/)
+    expect(db.uploads).toEqual([])
+    expect(db.draftUpdates).toEqual([])
+  })
+
+  it('without a claim nothing changes: the plain commit is still the unguarded draft.update', async () => {
+    db.rows = [committed('d1', 1)]
+    await commitDraftRevision({ draftId: 'd1', instruction: 'x', html: '<html/>', width: 1080, height: 1080, exportKey: 'k' })
+    expect(db.ops.filter((o) => o.startsWith('draft.'))).toEqual(['draft.update'])
+  })
+})
+
+describe('019 recordRejectedRender with a lost claim', () => {
+  it('throws DraftClaimLostError, writes no row and no draft outcome, and removes the render it uploaded', async () => {
+    db.rows = [committed('d1', 1)]
+    db.pendingAction = 'REFINE'
+    db.claimId = 'claim-2'
+    const err = await recordRejectedRender(rejectArgs()).catch((e: unknown) => e)
+    expect(err).toBeInstanceOf(DraftClaimLostError)
+    expect(db.rows).toHaveLength(1)
+    expect(db.notAppliedRevisionId).toBeNull()
+    expect(db.ops.at(-1)).toBe('rollback')
+    expect(db.deletes).toEqual(['exports/refine-d1-test.png'])
+  })
+
+  it('its final draft write and its discard both carry the claim; the draft write is last', async () => {
+    db.rows = [committed('d1', 1)]
+    await recordHeld(rejectArgs())
+    expect(db.draftUpdates).toHaveLength(1)
+    expect(db.draftUpdates[0].where).toEqual({ id: 'd1', pendingAction: 'REFINE', pendingActionClaimId: 'claim-1' })
+    expect(db.ops.lastIndexOf('draft.updateMany')).toBeGreaterThan(db.ops.indexOf('revision.create'))
+  })
+
+  it('its discard only stamps the live rejected row while the claim holds (a late settle leaves a newer outcome alone)', async () => {
+    db.rows = [committed('d1', 1)]
+    const first = await recordHeld(rejectArgs({ instruction: 'first' }))
+    db.pendingAction = 'REFINE'
+    db.claimId = 'claim-2'
+    await expect(recordRejectedRender(rejectArgs({ instruction: 'late' }))).rejects.toBeInstanceOf(DraftClaimLostError)
+    const firstRow = db.rows.find((r) => r.id === first.revisionId)!
+    expect(firstRow.discardedAt ?? null).toBeNull()
+    expect(db.notAppliedRevisionId).toBe(first.revisionId)
+  })
+
+  it('no render, no cleanup: a lost claim with no upload deletes nothing', async () => {
+    db.rows = [committed('d1', 1)]
+    await expect(recordRejectedRender(rejectArgs({ html: null, unusableHtml: '<html>cut' }))).rejects.toBeInstanceOf(
+      DraftClaimLostError,
+    )
+    expect(db.deletes).toEqual([])
   })
 })

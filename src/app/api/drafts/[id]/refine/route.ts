@@ -17,6 +17,7 @@ import { buildRefineSystemPrompt, buildRefineUserMessage } from '@/lib/agent/pro
 import { generateBackgroundForRefine } from '@/lib/agent/background'
 import { refineSkipFields } from '@/lib/drafts/backgroundNotice'
 import { commitDraftRevision, recordRejectedRender, type ModelStamp } from '@/lib/drafts/revisions'
+import { claimWhere, logLostClaim } from '@/lib/drafts/claim'
 import { claimDraftAction, startDraftAction, touchDraftAction } from '@/lib/drafts/draftActions'
 import { runRefineAttempts, settleRefine } from '@/lib/drafts/refineAttempt'
 import { verifyRefine } from '@/lib/drafts/refineVerify'
@@ -279,11 +280,16 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
           backgroundSkip: refineSkipFields(background),
           // 008 FR-08: the revision and the draft record the refine's model.
           model,
+          // 019: the final draft write is guarded on this run's claim.
+          claim,
         })
       },
       conflict: async (conflict) => {
-        await prisma.draft.update({
-          where: { id: draft.id },
+        // 019: guarded on the claim. A run the sweep cleared (or a newer claim
+        // superseded) writes nothing, and startDraftAction's complete then
+        // misses too.
+        const { count } = await prisma.draft.updateMany({
+          where: { id: draft.id, ...claimWhere(claim) },
           data: {
             pendingConflict: {
               conflictId: randomUUID(),
@@ -297,6 +303,7 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
             },
           },
         })
+        if (count !== 1) logLostClaim(draft.id, claim)
         // The conflict is a clean completion of the action — startDraftAction
         // releases the claim; the client learns of the conflict from the draft
         // GET's pendingConflict-derived field, not from this route's response.
@@ -318,6 +325,7 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
           diagnostics: notApplied.diagnostics,
           // 008 FR-08: the rejected render records the attempt's model.
           model,
+          claim,
         })
       },
     })

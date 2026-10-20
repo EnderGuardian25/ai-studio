@@ -34,3 +34,14 @@ export function logLostClaim(draftId: string, claim: DraftClaim) {
     `[draft-action] draft ${draftId}: ${claim.action} no longer holds the claim (swept or superseded); settle ignored`,
   )
 }
+
+// Thrown by a content write inside a revision transaction when the draft no
+// longer carries the run's claim (the sweep cleared it, or a newer claim took
+// it). The throw rolls the transaction back, so the stale run lands nothing;
+// startDraftAction's catch then misses its own guarded release and logs.
+export class DraftClaimLostError extends Error {
+  constructor() {
+    super('The draft no longer carries this action claim')
+    this.name = 'DraftClaimLostError'
+  }
+}

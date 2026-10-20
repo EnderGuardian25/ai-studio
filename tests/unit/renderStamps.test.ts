@@ -11,7 +11,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 const fake = vi.hoisted(() => {
   const db = {
-    draftWrites: [] as Array<{ op: string; data: Record<string, unknown> }>,
+    draftWrites: [] as Array<{ op: string; data: Record<string, unknown>; where?: Record<string, unknown> }>,
+    // 019: how many rows Regenerate design's claim-guarded draft write matches
+    // (0 = the claim was lost).
+    guardedCount: 1,
     revisionCreates: [] as Array<Record<string, unknown>>,
     draft: null as null | Record<string, unknown>,
     policy: null as null | Record<string, unknown>,
@@ -31,7 +34,13 @@ const fake = vi.hoisted(() => {
         return { id: 'd1', ...data }
       },
       findUnique: async () => db.draft,
-      updateMany: async () => ({ count: 1 }),
+      // Regenerate design's final write is a claim-guarded updateMany (019).
+      updateMany: async ({ where, data }: { where: Record<string, unknown>; data: Record<string, unknown> }) => {
+        if (!('htmlContent' in data)) return { count: 1 }
+        if (db.guardedCount !== 1) return { count: 0 }
+        db.draftWrites.push({ op: 'updateMany', where, data })
+        return { count: 1 }
+      },
     },
     draftCaption: { updateMany: async () => ({ count: 1 }) },
     draftRevision: {
@@ -49,8 +58,18 @@ const fake = vi.hoisted(() => {
   // Both transaction forms: the interactive callback and the batch array.
   const client = {
     ...tx,
-    $transaction: async (arg: unknown) =>
-      Array.isArray(arg) ? Promise.all(arg) : (arg as (t: typeof tx) => Promise<unknown>)(tx),
+    // The interactive form rolls the revision inserts back on a throw, like
+    // Postgres (019: a lost claim must leave no revision row).
+    $transaction: async (arg: unknown) => {
+      if (Array.isArray(arg)) return Promise.all(arg)
+      const before = db.revisionCreates.length
+      try {
+        return await (arg as (t: typeof tx) => Promise<unknown>)(tx)
+      } catch (err) {
+        db.revisionCreates.length = before
+        throw err
+      }
+    },
   }
   return { db, client }
 })
@@ -120,6 +139,7 @@ const brief = {
 
 beforeEach(() => {
   db.draftWrites = []
+  db.guardedCount = 1
   db.revisionCreates = []
   db.draft = null
   db.policy = null
@@ -154,6 +174,25 @@ describe('regenerate-design', () => {
   // A real Request: the route reads its (optional) body (008 FR-17).
   const req = new Request('http://test/x', { method: 'POST' }) as never
   const ctx = { params: { id: 'd1' } } as never
+
+  // 019 AC-04: the final draft write carries the claim, last; a lost claim
+  // throws and rolls the revision insert back.
+  it('the final draft write is guarded on the claim, and a lost claim lands no revision', async () => {
+    db.draft = {
+      id: 'd1', teamId: 'team1', brief, headline: 'h', htmlContent: '<html>v1</html>', exportUrl: 'exports/v1.png',
+      currentRevisionNumber: 1,
+    }
+    await regenerateDesign(req, ctx)
+    expect(db.draftWrites.at(-1)!.where).toEqual({ id: 'd1', pendingAction: 'REGENERATE_DESIGN', pendingActionClaimId: 'c1' })
+    expect(db.revisionCreates).toHaveLength(1)
+
+    db.draftWrites = []
+    db.revisionCreates = []
+    db.guardedCount = 0
+    await expect(regenerateDesign(req, ctx)).rejects.toThrow(/no longer carries/)
+    expect(db.revisionCreates).toHaveLength(0)
+    expect(db.draftWrites).toEqual([])
+  })
 
   it('the regenerated revision and the draft carry the same (current) stamp', async () => {
     db.draft = {

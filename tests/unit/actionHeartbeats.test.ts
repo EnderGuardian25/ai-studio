@@ -37,6 +37,8 @@ const h = vi.hoisted(() => {
       updateMany: async ({ where, data }: { where: Record<string, unknown>; data: Record<string, unknown> }) => {
         if ('updatedAt' in data) log.push(`touch:${String(where.status ?? where.pendingAction)}`)
         else if ('headline' in data) log.push('captions saved')
+        // Regenerate design's final write is a claim-guarded updateMany (019).
+        else if (data.status === 'EXPORTED') log.push('draft.update:EXPORTED')
         else if (data.pendingAction === null) log.push('release')
         else if (data.pendingAction) log.push('claim')
         return { count: 1 }

@@ -25,7 +25,7 @@ const h = vi.hoisted(() => ({
 
 vi.mock('@/lib/prisma', () => ({
   prisma: {
-    draft: { findUnique: async () => h.draft, update: h.draftUpdate },
+    draft: { findUnique: async () => h.draft, update: h.draftUpdate, updateMany: h.draftUpdate },
     teamModelPolicy: { findUnique: async () => h.policy },
     userClaudeToken: { findFirst: async () => null },
   },
@@ -119,6 +119,7 @@ beforeEach(() => {
   h.result = { kind: 'accepted', html: '<html>refined</html>', refineCalls: 1, verifierCalls: 0 }
   for (const fn of [h.draftUpdate, h.claim, h.commit, h.reject, h.runRefineAttempts, h.refineApi]) fn.mockReset()
   h.claim.mockResolvedValue({ action: 'REFINE', claimId: 'c1' })
+  h.draftUpdate.mockResolvedValue({ count: 1 })
   h.commit.mockResolvedValue({ revisionId: 'rev-2', exportKey: 'exports/r.png', revisionNumber: 2 })
   h.reject.mockResolvedValue({ revisionId: 'rej-1', exportKey: null })
   h.refineApi.mockResolvedValue('<html>reply</html>')
@@ -177,6 +178,25 @@ describe('refine resolves REFINE before its claim (A8, no stamp tier)', () => {
     const stored = h.draftUpdate.mock.calls[0][0].data.pendingConflict
     expect(stored).toMatchObject({ explanation: 'off-brand', model: HAIKU, modelSubstitutedFrom: null })
     expect(h.commit).not.toHaveBeenCalled()
+  })
+
+  // 019 AC-04: every content write of the refine run carries its claim.
+  it('the verified commit, the rejected render and the conflict write all carry the claim (a lost conflict claim logs, never throws)', async () => {
+    await post({ instruction: 'darker' })
+    expect(h.commit.mock.calls[0][0].claim).toEqual({ action: 'REFINE', claimId: 'c1' })
+
+    h.result = NOT_APPLIED
+    await post({ instruction: 'darker' })
+    expect(h.reject.mock.calls[0][0].claim).toEqual({ action: 'REFINE', claimId: 'c1' })
+
+    h.result = { kind: 'conflict', conflict: { conflict: true, explanation: 'off-brand', pendingHtml: '<html>p</html>' }, refineCalls: 1, verifierCalls: 0 }
+    await post({ instruction: 'darker' })
+    expect(h.draftUpdate.mock.calls[0][0].where).toEqual({ id: 'd1', pendingAction: 'REFINE', pendingActionClaimId: 'c1' })
+
+    h.draftUpdate.mockResolvedValue({ count: 0 })
+    const warn = vi.spyOn(console, 'warn')
+    await expect(post({ instruction: 'darker' })).resolves.toBeDefined()
+    expect(warn.mock.calls.some((c) => String(c[0]).includes('no longer holds the claim'))).toBe(true)
   })
 })
 

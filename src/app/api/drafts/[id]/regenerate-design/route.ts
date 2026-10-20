@@ -9,6 +9,7 @@ import { runPathBDesign } from '@/lib/agent/pathB'
 import { currentRenderStamp, draftStampFields, withNextRevisionNumber } from '@/lib/drafts/revisions'
 import { resolveModel } from '@/lib/models/policy'
 import { modelError, parseRegenerateDesignBody } from '@/lib/models/requests'
+import { claimWhere, DraftClaimLostError } from '@/lib/drafts/claim'
 import { claimDraftAction, startDraftAction, touchDraftAction } from '@/lib/drafts/draftActions'
 import { generationSkipFields } from '@/lib/drafts/backgroundNotice'
 import { designHeadline, headlineFallbackMessage } from '@/lib/captions/headline'
@@ -135,8 +136,11 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
           ...stamp,
         },
       })
-      await tx.draft.update({
-        where: { id: draft.id },
+      // 019: the guarded final write (last, see revisions.ts LOCK ORDER). A run
+      // the sweep cleared, or a newer claim superseded, throws and rolls back
+      // the revision insert above.
+      const { count } = await tx.draft.updateMany({
+        where: { id: draft.id, ...claimWhere(claim) },
         data: {
           htmlContent: result.htmlContent,
           exportUrl: result.exportUrl,
@@ -151,6 +155,7 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
           ...draftStampFields(stamp),
         },
       })
+      if (count !== 1) throw new DraftClaimLostError()
       return revisionNumber
     })
   })

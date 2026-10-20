@@ -73,8 +73,8 @@ This change has **4 tasks in 3 waves**:
     - **Before you start,** run `grep -rlE "claimDraftAction|claimCaptionAction|touchDraftAction|releaseDraftAction|completeDraftAction|startDraftAction|settleCaptionAction" tests/unit` to confirm the file list. Report any file that is not listed above.
     - **Run the targeted E2E suites** against a fresh `:3001` server: `async-actions.test.ts` and `captions.test.ts`.
 
-- [ ] `T3` — The content writes from a claimed run are guarded on the claim
-  - Files: `src/lib/drafts/claim.ts` (`DraftClaimLostError`, if T2 did not add it), `src/lib/drafts/revisions.ts`, `src/app/api/drafts/[id]/refine/route.ts`, `src/app/api/drafts/[id]/regenerate-design/route.ts`, `tests/unit/draftRevisions.test.ts`, `tests/unit/draftActionModels.test.ts`, `tests/unit/renderStamps.test.ts`, `tests/unit/background.test.ts` (only if its fake needs it)
+- [x] `T3` — The content writes from a claimed run are guarded on the claim
+  - Files: `src/lib/drafts/claim.ts` (`DraftClaimLostError`, if T2 did not add it), `src/lib/drafts/revisions.ts`, `src/app/api/drafts/[id]/refine/route.ts`, `src/app/api/drafts/[id]/regenerate-design/route.ts`, `tests/unit/draftRevisions.test.ts`, `tests/unit/draftActionModels.test.ts`, `tests/unit/renderStamps.test.ts`, `tests/unit/actionHeartbeats.test.ts` (added in build: its fake needed the `updateMany`), `tests/unit/background.test.ts` (only if its fake needs it)
   - Estimate: medium
   - Kind: impl
   - Depends: T2
