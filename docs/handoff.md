@@ -1,23 +1,23 @@
 # bistec-studio — Session Handoff
 
-**Date:** 2026-10-19 (latest: **this repo adopted the fork's `v2` on 2026-10-18; 018 VERIFIED PASS; 022 building, with T1–T3 done; T4 gate passed locally; CI pending**). The fork-era sections, 2026-10-07 to 2026-10-14, moved to [`fork-history.md`](fork-history.md). Previous: 2026-10-07 (005 verified PASS; 011 planned, wave 1 built). Previous: 2026-10-03 (004 finished and verified PARTIAL, Phase 0 only; 005 built 9/10, waiting on one operator check). Before that: 2026-09-28 (build session — 004 Waves 1–3 built, MinIO → silo, PR #42 + draft PR #43). Before that: 2026-09-23 (later, later the same day: proposal **012** per-channel captions + copy→caption rename, a floating **Create post** button folded into 011, and a launch-video legibility pass. Before that: planning session — proposals 008–011 + roadmap, 004 re-planned to 24 tasks incl. Phase 0, and the deploy pipeline found broken: Coolify 401 since 2026-09-15). Previous: 2026-07-28 (copy-edit status clobber fix).
+**Date:** 2026-10-20 (latest: **021 Graphite re-theme VERIFIED PASS; 018 and 022 VERIFIED PASS; next 019, then 020**). 2026-10-19: this repo adopted the fork's `v2` on 2026-10-18. The fork-era sections, 2026-10-07 to 2026-10-14, moved to [`fork-history.md`](fork-history.md). Previous: 2026-10-07 (005 verified PASS; 011 planned, wave 1 built). Previous: 2026-10-03 (004 finished and verified PARTIAL, Phase 0 only; 005 built 9/10, waiting on one operator check). Before that: 2026-09-28 (build session — 004 Waves 1–3 built, MinIO → silo, PR #42 + draft PR #43). Before that: 2026-09-23 (later, later the same day: proposal **012** per-channel captions + copy→caption rename, a floating **Create post** button folded into 011, and a launch-video legibility pass. Before that: planning session — proposals 008–011 + roadmap, 004 re-planned to 24 tasks incl. Phase 0, and the deploy pipeline found broken: Coolify 401 since 2026-09-15). Previous: 2026-07-28 (copy-edit status clobber fix).
 **Repo:** https://github.com/bistec-oss/studio, which `origin` points to. **The repo rules (branches, remotes, the `fork` remote, PR #43) are in [`CLAUDE.md`](../CLAUDE.md)'s top entry, which is authoritative.** This file does not repeat them.
 **Branch:** work continues on **`v2`**, pushed to `origin v2`. `main` is `671ad6e9` (PR #42) and deploys to company prod. `v2` → `main` is one PR, merged only on the user's go-ahead and after the pre-merge prod checklist below.
 **Production:** `https://studio.bistecglobal.com` serves company `main`. Its migration head is `20260728120000_heal_copy_edit_clobbered_drafts`. Merges to `main` build but do not deploy until the Coolify token is rotated (see CLAUDE.md).
 
 ---
 
-## ⏸️ 2026-10-19 — PICK UP HERE: the fork's `v2` adopted; 018 VERIFIED PASS; 022 T1–T3 done, T4 gate passed locally
+## ⏸️ 2026-10-20 — PICK UP HERE: 018, 022 and 021 VERIFIED PASS; next 019, then 020
 
 ### Where things stand
 
-| Change                                    | State                                                                                                                                                    | Evidence                                                                                                               |
-| ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| 018 post-008 small fixes                  | ✅ **VERIFIED PASS** (8/8 ACs)                                                                                                                           | E2E 390/3/0/0; CI green at `432a036f`; [verify-report](../.specclaw/changes/018-post-008-small-fixes/verify-report.md) |
-| 022 prod data and deploy restore          | 🔨 **building**: T1 `8b5c551`, T2 `6d02d6b`, T3 `7982636` done; T4 gate passed locally (E2E 390/3/0/0); CI pending (the orchestrator records the run ID) | [`reports/`](../.specclaw/changes/022-prod-data-and-deploy-restore/reports/)                                           |
-| 021 Graphite re-theme                     | planned (8 tasks in 3 waves); builds after 022                                                                                                           | [`021-graphite-retheme/`](../.specclaw/changes/021-graphite-retheme/)                                                  |
-| 019 draft-action claim token              | approved (bounded), **not planned**                                                                                                                      | proposal only                                                                                                          |
-| 020 Create post button off the draft page | approved (bounded), **not planned**                                                                                                                      | proposal only                                                                                                          |
+| Change                                    | State                                                       | Evidence                                                                                                                        |
+| ----------------------------------------- | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| 018 post-008 small fixes                  | ✅ **VERIFIED PASS** (8/8 ACs)                              | E2E 390/3/0/0; CI green at `432a036f`; [verify-report](../.specclaw/changes/018-post-008-small-fixes/verify-report.md)          |
+| 022 prod data and deploy restore          | ✅ **VERIFIED PASS** (11/11 ACs)                            | E2E 390/3/0/0; CI green at `12ef7e6c`; [verify-report](../.specclaw/changes/022-prod-data-and-deploy-restore/verify-report.md)  |
+| 021 Graphite re-theme                     | ✅ **VERIFIED PASS** (19/19 ACs; AC-05 font-data carve-out) | E2E 397/3/0/0; render 15/15; CI green at `aa5f7a8`; [verify-report](../.specclaw/changes/021-graphite-retheme/verify-report.md) |
+| 019 draft-action claim token              | approved (bounded), **not planned**                         | proposal only                                                                                                                   |
+| 020 Create post button off the draft page | approved (bounded), **not planned**                         | proposal only                                                                                                                   |
 
 ### What happened on 2026-10-18
 
@@ -39,13 +39,12 @@
 
 ### Resume, in order
 
-1. **022 T4:** T4 gate passed locally (clean mock E2E 390/3/0/0, tsc, lint, unit 2556/2556, build, `npm run test:upgrade` 3/3); CI pending (the orchestrator records the run ID). Then `/specclaw:verify 022-prod-data-and-deploy-restore`.
-2. **021 Graphite re-theme:** `/specclaw:build 021-graphite-retheme`.
-3. **019, then 020:** `/specclaw:plan` each, then build.
-4. **The `v2` → `main` merge** waits on the user's go-ahead and the checklist below.
-5. **Company prod to-dos, live again:** B4, the team Claude tokens, the Coolify token rotation and MinIO → silo on prod. They are listed in CLAUDE.md.
+1. ~~022~~ and ~~021~~ are done: both VERIFIED PASS (2026-10-19 and 2026-10-20).
+2. **019, then 020:** `/specclaw:plan` each, then build.
+3. **The `v2` → `main` merge** waits on the user's go-ahead and the checklist below.
+4. **Company prod to-dos, live again:** B4, the team Claude tokens, the Coolify token rotation and MinIO → silo on prod. They are listed in CLAUDE.md.
 
-**Gates now:** unit 2556/2556, lint 0 errors / 7 warnings. The last full clean mock E2E was 390/3/0/0 (022 T4, 2026-10-19).
+**Gates now:** unit 2652/2652, lint 0 errors / 7 warnings. The last full clean mock E2E was 397/3/0/0 (021 T8, 2026-10-20).
 
 ---
 

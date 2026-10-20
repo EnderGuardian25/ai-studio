@@ -1,7 +1,7 @@
 # 🦞 SpecClaw Dashboard
 
 **Project:** bistec-studio
-**Last Updated:** 2026-10-18 16:45 UTC
+**Last Updated:** 2026-10-20 11:16 UTC
 
 _1 unnumbered change · run `/specclaw:renumber` to order them_
 
@@ -20,7 +20,9 @@ _1 unnumbered change · run `/specclaw:renumber` to order them_
 - 🔍 **015-draft-action-settle-race** ▫ — verify PASS | 3/3 tasks (100%) | 0 failed | PR #43 open | 25m
 - 🔍 **016-fresh-start-cleanup** ▫ — verify PASS | 5/5 tasks (100%) | 0 failed | PR #43 open | 2m
 - 🔍 **017-publish-api-fixes** ▫ — verify PASS | 3/3 tasks (100%) | 0 failed | PR #43 open
-- 🔨 **018-post-008-small-fixes** ▫ — build in-progress | 0/4 tasks (0%) | 0 failed | PR #43 open
+- 🔍 **018-post-008-small-fixes** ▫ — verify PASS | 4/4 tasks (100%) | 0 failed | PR #43 open | 1h2m
+- 🔍 **021-graphite-retheme** ▣ — verify PASS | 8/8 tasks (100%) | 0 failed | 42h43m
+- 🔍 **022-prod-data-and-deploy-restore** ▫ — verify PASS | 4/4 tasks (100%) | 0 failed | 5h22m
 
 ## Pending Proposals
 
@@ -30,8 +32,6 @@ _1 unnumbered change · run `/specclaw:renumber` to order them_
 - 📋 **010-whatsapp-channel-posting** — proposal ready, awaiting planning
 - 📋 **019-draft-action-claim-token** ▫ — proposal ready, awaiting planning
 - 📋 **020-create-post-button-draft-page** ▫ — proposal ready, awaiting planning
-- 📋 **021-graphite-retheme** ▣ — proposal ready, awaiting planning
-- 📋 **022-prod-data-and-deploy-restore** ▫ — proposal ready, awaiting planning
 
 ## Recently Completed
 
@@ -39,6 +39,6 @@ _None._
 
 ## Stats
 
-- **Total changes:** 14
-- **Active:** 14
+- **Total changes:** 16
+- **Active:** 16
 - **Completed:** 0
