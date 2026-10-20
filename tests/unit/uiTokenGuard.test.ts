@@ -14,11 +14,13 @@ import { join, relative, resolve } from 'node:path'
 // (text-primary, hover:bg-primary-light, text-primary/50, …). 018 FR-07 widens
 // the family to digit-suffixed shades (text-primary-500, bg-primary-600/20).
 //
-// 014 FR-05: the shared Folio atoms and page primitives are defined once, in
+// 014 FR-05: the shared atoms and page primitives are defined once, in
 // src/components/ui/. Any other file under src/ that declares one of their
-// names, or spells out the small-caps tracking literally, is a new copy and
-// fails here (014 design.md §5). A copy has no legitimate exception, so
-// `ui-exception:` does not apply to this guard.
+// names is a new copy and fails here (014 design.md §5). A copy has no
+// legitimate exception, so `ui-exception:` does not apply to this guard. 014's
+// small-caps-literal check (`tracking-[0.14em]` outside ui/) is superseded by
+// the deny-list's pattern 5, which bans every positive arbitrary tracking,
+// ui/ included (021 design.md §6).
 //
 // 021 FR-13: a deny-list of Folio leftovers (021 design.md §6), switched on
 // pattern by pattern in the task that removes each one's last hit. There is
@@ -61,9 +63,10 @@ const PATTERNS: Array<[string, RegExp]> = [
   ],
 ]
 
-// 021 design.md §6, numbered as there. Each entry: the label, the pattern, and
-// the repo-relative files it does not apply to (data, not UI).
-const FOLIO_PATTERNS: Array<[string, RegExp, string[]]> = [
+// 021 design.md §6, numbered as there. Each entry: the label, the pattern, the
+// repo-relative files it does not apply to (data, not UI), and optionally the
+// path prefixes it is limited to (every file under src/ when absent).
+const FOLIO_PATTERNS: Array<[string, RegExp, string[], string[]?]> = [
   // 1 (T1). The brand-kit font picker lists Instrument Sans as one of the 100
   // Google Fonts a kit may use for its posts: data for generated posts, not
   // the app's face (021 NFR-10), so that one file is excluded.
@@ -74,6 +77,19 @@ const FOLIO_PATTERNS: Array<[string, RegExp, string[]]> = [
   ['opsz font-variation setting', /opsz|font-variation-settings/, []],
   // 4a (T2), the import-path half. The file-name half is FOLIO_FILE_NAME.
   ['Folio module import', /from\s+['"][^'"]*folio[^'"]*['"]/i, []],
+  // 5 (T6). A literal positive letter-spacing: Folio's small-caps tracking and
+  // its 0.1em table head. The one small-caps tracking is the tracking-label
+  // key, used only by SMALL_CAPS; negative heading tracking passes.
+  ['positive tracking literal', /tracking-\[0?\.\d+em\]/, []],
+  // 6 (T6). Small caps outside the one atom (021 FR-07): the `uppercase` class,
+  // as a whole token, in the app's UI code. src/lib and src/mcp are not UI
+  // (their comments say "uppercase" of enum values).
+  [
+    'uppercase outside ui/atoms.ts',
+    new RegExp(`${START}uppercase${END}`),
+    ['src/components/ui/atoms.ts'],
+    ['src/app/', 'src/components/'],
+  ],
   // 7 (T5). The proof plate and its crop marks, by name in any case, and the
   // CROP class constant (case-sensitive, so "CSS-crop" and "cropped" pass).
   ['proof plate or crop mark', /proof[- ]plate|crop[- ]mark/i, []],
@@ -92,7 +108,6 @@ const FOLIO_FILE_NAME = /folio/i
 
 const SHARED_NAME =
   /^\s*(?:export\s+(?:default\s+)?)?(?:async\s+)?(?:const|let|function)\s+(FOCUS|SCROLL_FOCUS|SMALL_CAPS|EYEBROW|FIELD_LABEL|PAGE_TITLE|PAGE_LEAD|SECTION_HEAD|SECTION_NUMERAL|SUB_HEAD|KIT_TITLE|STEP_HEAD|STEP_NUMERAL|STEP_LEAD|GROUP_HEAD|ASIDE_HEAD|NOTICE|WARN_NOTICE|ICON|ICON_SM|ICON_BUTTON|TEXT_LINK|TAG|TABLE_HEAD_ROW|COMPACT_FIELD|COMPACT_TEXTAREA|PILL_BADGE|PageHead|PageTitle|SectionHead|SectionHeader|Notice|FieldLabel|StatusWord|GateNotice)\b/
-const SMALL_CAPS_LITERAL = /tracking-\[0\.14em\]/
 const UI_DIR = 'src/components/ui/'
 
 function sourceFiles(dir: string): string[] {
@@ -122,8 +137,6 @@ function findSharedCopies(file: string, text: string): string[] {
   text.split(/\r?\n/).forEach((line, i) => {
     const name = line.match(SHARED_NAME)
     if (name) hits.push(`${file}:${i + 1}: ${name[1]} (shared name outside ${UI_DIR})`)
-    const caps = line.match(SMALL_CAPS_LITERAL)
-    if (caps) hits.push(`${file}:${i + 1}: ${caps[0]} (small-caps literal outside ${UI_DIR})`)
   })
   return hits
 }
@@ -200,8 +213,9 @@ function findFolioLeftovers(file: string, text: string): string[] {
   const name = file.split('/').pop() ?? file
   if (FOLIO_FILE_NAME.test(name)) hits.push(`${file}: ${name} (Folio module name)`)
   text.split(/\r?\n/).forEach((line, i) => {
-    for (const [label, re, excluded] of FOLIO_PATTERNS) {
+    for (const [label, re, excluded, only] of FOLIO_PATTERNS) {
       if (excluded.includes(file)) continue
+      if (only && !only.some((prefix) => file.startsWith(prefix))) continue
       const m = line.match(re)
       if (m) hits.push(`${file}:${i + 1}: ${m[0]} (${label})`)
     }
@@ -236,6 +250,15 @@ describe('Folio deny-list (021 FR-13, AC-05)', () => {
     ["import { EYEBROW } from '@/components/ui/folio'", "from '@/components/ui/folio'"],
     ["import { BLOCK, ROW } from './folio'", "from './folio'"],
     ['export * from "./Folio"', 'from "./Folio"'],
+    // 5
+    ['<th className="py-2 tracking-[0.1em]">', 'tracking-[0.1em]'],
+    ["export const SMALL_CAPS = 'text-ui-2xs font-semibold tracking-[0.14em]'", 'tracking-[0.14em]'],
+    ['<p className="md:tracking-[.05em]">', 'tracking-[.05em]'],
+    // 6
+    ['<span className="ml-2 text-ui-2xs uppercase text-fg-muted">{a.type}</span>', 'uppercase'],
+    ["cn('uppercase', open && 'block')", 'uppercase'],
+    ['<p className="md:uppercase">', 'uppercase'],
+    ['// an uppercase micro-label', 'uppercase'],
     // 7
     ['// A proof-plate crop mark (DESIGN_SYSTEM.md §8.12)', 'proof-plate'],
     ['{/* The Proof Plate (§8.12): paper and a hairline edge. */}', 'Proof Plate'],
@@ -260,6 +283,11 @@ describe('Folio deny-list (021 FR-13, AC-05)', () => {
     '<p className="font-textual xfont-display font-display-x">',
     "const jakarta = Plus_Jakarta_Sans({ variable: '--font-sans' })",
     '<span className="font-mono">token</span>',
+    // 5: the label key, negative and named tracking
+    '<h2 className="tracking-[-0.01em] tracking-tight tracking-label">',
+    // 6: other tokens that contain the word
+    '<p className="normal-case">{name.toUpperCase()}</p>',
+    '<p className="uppercased-x xuppercase">',
     // 4a: a use of the word that is not an import path (4b, T8, covers words)
     "import { BLOCK, ROW } from '@/components/ui/atoms'",
     "import { ROW_TITLE } from '@/components/campaigns/classes'",
@@ -299,16 +327,25 @@ describe('Folio deny-list (021 FR-13, AC-05)', () => {
     }
   })
 
-  // 021 T2 (FR-07): SMALL_CAPS uses tracking-label, so the small-caps literal is
-  // gone from ui/ too. Pattern 5 (T6) generalises this to every positive
-  // arbitrary tracking.
-  it('finds the small-caps tracking literal nowhere in src/, ui/ included', () => {
-    const hits = files.flatMap((f) =>
-      readFileSync(f, 'utf8')
-        .split(/\r?\n/)
-        .flatMap((line, i) => (SMALL_CAPS_LITERAL.test(line) ? [`${relative(ROOT, f)}:${i + 1}`] : [])),
-    )
-    expect(hits, hits.join('\n')).toEqual([])
+  // 021 T6: pattern 5 replaces T2's small-caps-literal scan (it bans every
+  // positive arbitrary tracking) and applies everywhere, ui/ included. Pattern
+  // 6 applies only to the app's UI code, and not to the one atom module.
+  it('applies pattern 5 inside ui/, and pattern 6 to src/app and src/components except ui/atoms.ts', () => {
+    const tracking = "export const SMALL_CAPS = 'text-ui-2xs tracking-[0.14em]'"
+    expect(findFolioLeftovers('src/components/ui/atoms.ts', tracking)).toHaveLength(1)
+    expect(findFolioLeftovers('src/components/ui/SectionHead.tsx', tracking)).toHaveLength(1)
+    const caps = "export const SMALL_CAPS = 'text-ui-2xs font-semibold uppercase tracking-label'"
+    expect(findFolioLeftovers('src/components/ui/atoms.ts', caps)).toEqual([])
+    expect(findFolioLeftovers('src/lib/channels.ts', '// normalizing to uppercase before lookup')).toEqual([])
+    expect(findFolioLeftovers('src/mcp/tools/generate.ts', '// Channel enum values are uppercase;')).toEqual([])
+    for (const file of [
+      'src/components/ui/StatusChip.tsx',
+      'src/components/admin/brandkits/KitDetail.tsx',
+      'src/app/(app)/campaigns/page.tsx',
+      'src/app/globals.css',
+    ]) {
+      expect(findFolioLeftovers(file, caps), file).toHaveLength(1)
+    }
   })
 })
 
@@ -328,13 +365,13 @@ describe('Shared-name guard (014 FR-05, AC-02)', () => {
       'const FOCUS =', // 2
       'export function SectionHead({ title }: Props) {', // 3
       '  function StatusWord() {', // 4
-      '<span className="uppercase tracking-[0.14em]">', // 5
+      '<span className="uppercase tracking-[0.14em]">', // 5: not a copy (the deny-list's patterns 5 and 6 catch it)
       "export const EYEBROW = 'x' // ui-exception: not honoured by this guard", // 6
       "const SHELL_ICON_BUTTON = 'x'", // 7: a different name
       'const ICON_SIZE = 15', // 8: a longer name
       "import { EYEBROW, SectionHead } from '@/components/ui/atoms'", // 9: a use, not a copy
       '<span className={`${EYEBROW} mb-3`}>', // 10
-      '<th className="tracking-[0.1em]">', // 11: another tracking value
+      '<th className="tracking-[0.1em]">', // 11: the same (pattern 5)
       "export const PILL_BADGE = 'x'", // 12 (021 T2)
       'export function GateNotice({ title }: Props) {', // 13 (021 T2)
     ].join('\n')
@@ -344,7 +381,6 @@ describe('Shared-name guard (014 FR-05, AC-02)', () => {
       '2',
       '3',
       '4',
-      '5',
       '6',
       '12',
       '13',

@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/Input'
 import { FieldLabel } from '@/components/ui/FieldLabel'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { SectionHead } from '@/components/ui/SectionHead'
-import { COMPACT_FIELD, FOCUS, ICON, ICON_BUTTON, SECTION_HEAD, TAG } from '@/components/ui/atoms'
+import { COMPACT_FIELD, EYEBROW, FOCUS, ICON, ICON_BUTTON, PILL_BADGE, SECTION_HEAD, TAG } from '@/components/ui/atoms'
 import { apiFetch } from '@/lib/apiFetch'
 import type { AspectRatio } from '@prisma/client'
 import { ASPECT_LABELS, ASPECT_VALUES, dimensionsLabel } from '@/lib/aspectRatio'
@@ -20,14 +20,20 @@ import { ColorSwatch } from './shared'
 import { BrandKitAssistantPanel } from './BrandKitAssistantPanel'
 import { CODE_FIELD, TITLE_FIELD, optionCls } from './classes'
 
-// A kit section: ruled apart from its neighbours (§6), never boxed.
-const SECTION = 'pb-8 pt-[22px]'
+// A kit section: a bezel card (021 design.md §8), its head the study's .card-hd.
+const SECTION = 'surface-bezel min-w-0 p-5'
 
-// The feed-to-AI switch: ICON_BUTTON's shape (the --control-sm square, §6)
-// with its colour left to the caller (--accent when on), since `cn` would
+// A recessed well inside a card (the template form): canvas with a hairline.
+const WELL = 'rounded-ui-lg bg-canvas p-4 ring-1 ring-inset ring-line-subtle'
+
+// A list inside a card: rows ruled apart on --line-subtle.
+const RULED_LIST = 'divide-y divide-line-subtle'
+
+// The feed-to-AI switch: ICON_BUTTON's shape (the round --control-sm target,
+// §6) with its colour left to the caller (--accent when on), since `cn` would
 // not settle two text colours.
 const TOGGLE_BUTTON =
-  'inline-flex h-control-sm w-control-sm flex-shrink-0 items-center justify-center rounded-ui-sm transition-colors duration-fast ease-standard'
+  'inline-flex h-control-sm w-control-sm flex-shrink-0 items-center justify-center rounded-ui-pill transition-colors duration-fast ease-standard'
 
 // ─── Kit Detail Panel ─────────────────────────────────────────────────────────
 
@@ -227,12 +233,12 @@ export function KitDetail({ kit, onRefresh }: KitDetailProps) {
   }
 
   return (
-    // The open kit: a 2 px --fg rule opens it (§6); its sections are numbered
-    // (§8.14) and ruled apart, not boxed. A region named by the kit, so the
-    // open kit is a landmark (and stays one while its name is being edited).
-    <section aria-label={kit.name} className="min-w-0 animate-fade-in border-t-2 border-fg">
+    // The open kit: its head, then each section on its own bezel card (021
+    // design.md §8). A region named by the kit, so the open kit is a landmark
+    // (and stays one while its name is being edited).
+    <section aria-label={kit.name} className="min-w-0 animate-fade-in">
       {/* Header */}
-      <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3 pb-6 pt-[22px]">
+      <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 pb-4">
         <div className="min-w-0 flex-1 basis-60">
           {editing ? (
             <input
@@ -242,13 +248,9 @@ export function KitDetail({ kit, onRefresh }: KitDetailProps) {
               className={TITLE_FIELD}
             />
           ) : (
-            <h2 className={`flex flex-wrap items-baseline gap-x-3 gap-y-1 ${SECTION_HEAD}`}>
+            <h2 className={`flex flex-wrap items-center gap-x-2.5 gap-y-1 ${SECTION_HEAD}`}>
               <span className="min-w-0 max-w-full break-words">{kit.name}</span>
-              {kit.isDefault && (
-                <span className="text-ui-xs font-semibold tracking-normal text-accent">
-                  System default
-                </span>
-              )}
+              {kit.isDefault && <span className={`${PILL_BADGE} tracking-normal`}>System default</span>}
             </h2>
           )}
         </div>
@@ -274,10 +276,10 @@ export function KitDetail({ kit, onRefresh }: KitDetailProps) {
         </div>
       </div>
 
-      <div className="divide-y divide-line-subtle border-t border-line-subtle">
+      <div className="space-y-3.5">
         {/* Colors — each swatch shows the kit's own colour (data, not tokens). */}
         <section className={SECTION}>
-          <SectionHead level={3} numeral="i." title="Color Palette" className="mb-3" />
+          <SectionHead level={3} title="Color Palette" className="mb-3" />
           {editing ? (
             <ColorEditor colors={colors} onChange={setColors} />
           ) : (
@@ -285,7 +287,7 @@ export function KitDetail({ kit, onRefresh }: KitDetailProps) {
               {kit.colors.length === 0 ? (
                 <span className="text-ui-sm text-fg-muted">No colors defined</span>
               ) : kit.colors.map(c => (
-                <div key={c} className="flex items-center gap-1.5 rounded-ui-sm border border-line-subtle bg-surface py-1 pl-1.5 pr-2">
+                <div key={c} className="flex items-center gap-1.5 rounded-ui-pill bg-canvas py-1 pl-1 pr-2.5 ring-1 ring-inset ring-line-subtle">
                   <ColorSwatch color={c} />
                   <span className="font-mono text-ui-xs text-fg">{c}</span>
                 </div>
@@ -295,9 +297,10 @@ export function KitDetail({ kit, onRefresh }: KitDetailProps) {
         </section>
 
         {/* Logos — a contact sheet (§8.13's vocabulary): each logo is shown as
-            uploaded, in a hairline frame; the primary one is framed in ink. */}
+            uploaded, on raised paper in a hairline ring; the primary one takes
+            the 1.5 px ink ring of a selected version. */}
         <section className={SECTION}>
-          <SectionHead level={3} numeral="ii." title="Logos" className="mb-3">
+          <SectionHead level={3} title="Logos" className="mb-3">
             <input
               ref={fileRef}
               type="file"
@@ -320,8 +323,8 @@ export function KitDetail({ kit, onRefresh }: KitDetailProps) {
                   return (
                     <li key={logo.id} className="flex min-w-0 flex-col gap-2">
                       <div
-                        className={`relative flex h-20 items-center justify-center rounded-ui-sm border bg-surface-raised p-2 ${
-                          isPrimary ? 'border-fg ring-1 ring-inset ring-fg' : 'border-line-subtle'
+                        className={`relative flex h-20 items-center justify-center rounded-ui-md bg-surface-raised p-2 ${
+                          isPrimary ? 'shadow-panel ring-[1.5px] ring-inset ring-fg' : 'ring-1 ring-inset ring-line-subtle'
                         }`}
                       >
                         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -372,15 +375,15 @@ export function KitDetail({ kit, onRefresh }: KitDetailProps) {
 
         {/* Fonts */}
         <section className={SECTION}>
-          <SectionHead level={3} numeral="iii." title="Fonts" className="mb-3" />
+          <SectionHead level={3} title="Fonts" className="mb-3" />
           {editing ? (
             <FontEditor fonts={fonts} onChange={setFonts} />
           ) : fonts.length === 0 ? (
             <span className="text-ui-sm text-fg-muted">No fonts added</span>
           ) : (
-            <ul className="border-t border-line-subtle">
+            <ul className={RULED_LIST}>
               {fonts.map(f => (
-                <li key={f.name} className="break-words border-b border-line-subtle py-2 text-ui-sm text-fg">
+                <li key={f.name} className="break-words py-2 text-ui-sm text-fg">
                   {f.name}
                 </li>
               ))}
@@ -390,7 +393,7 @@ export function KitDetail({ kit, onRefresh }: KitDetailProps) {
 
         {/* Templates */}
         <section className={SECTION}>
-          <SectionHead level={3} numeral="iv." title="HTML Templates" className="mb-3">
+          <SectionHead level={3} title="HTML Templates" className="mb-3">
             <input
               ref={templateImageRef}
               type="file"
@@ -413,7 +416,7 @@ export function KitDetail({ kit, onRefresh }: KitDetailProps) {
             </Button>
           </SectionHead>
           {addingTemplate && (
-            <div className="surface mb-5 animate-fade-in space-y-4 p-4">
+            <div className={`${WELL} mb-4 animate-fade-in space-y-4`}>
               <Input
                 label="Template name"
                 value={templateName}
@@ -464,9 +467,9 @@ export function KitDetail({ kit, onRefresh }: KitDetailProps) {
           {kit.templates.length === 0 ? (
             <span className="text-ui-sm text-fg-muted">No templates linked</span>
           ) : (
-            <ul className="border-t border-line-subtle">
+            <ul className={RULED_LIST}>
               {kit.templates.map(t => (
-                <li key={t.id} className="flex items-center justify-between gap-3 border-b border-line-subtle py-1.5">
+                <li key={t.id} className="flex items-center justify-between gap-3 py-1.5">
                   <span className="flex min-w-0 items-center gap-2">
                     <span className="truncate text-ui-sm text-fg" title={t.name}>{t.name}</span>
                     <span className={`${TAG} flex-shrink-0`}>{ASPECT_LABELS[t.aspectRatio]}</span>
@@ -488,13 +491,13 @@ export function KitDetail({ kit, onRefresh }: KitDetailProps) {
 
         {/* Brand Voice Prompt */}
         <section className={SECTION}>
-          <SectionHead level={3} numeral="v." title="Brand Voice Prompt" className="mb-3" />
+          <SectionHead level={3} title="Brand Voice Prompt" className="mb-3" />
           <PromptSection kitId={kit.id} prompts={kit.prompts} onRefresh={onRefresh} />
         </section>
 
         {/* Artifacts */}
         <section className={SECTION}>
-          <SectionHead level={3} numeral="vi." title="Artifacts" className="mb-3">
+          <SectionHead level={3} title="Artifacts" className="mb-3">
             <input
               ref={artifactRef}
               type="file"
@@ -509,12 +512,13 @@ export function KitDetail({ kit, onRefresh }: KitDetailProps) {
           {kit.artifacts.length === 0 ? (
             <span className="text-ui-sm text-fg-muted">No artifacts uploaded</span>
           ) : (
-            <ul className="border-t border-line-subtle">
+            <ul className={RULED_LIST}>
               {kit.artifacts.map(a => (
-                <li key={a.id} className="flex items-center justify-between gap-3 border-b border-line-subtle py-1.5">
+                <li key={a.id} className="flex items-center justify-between gap-3 py-1.5">
                   <div className="min-w-0">
                     <span className="break-words text-ui-sm text-fg">{a.name}</span>
-                    <span className="ml-2 text-ui-2xs uppercase tracking-[0.1em] text-fg-muted">{a.type}</span>
+                    {/* The artifact type, a micro-label (021 FR-07). */}
+                    <span className={`ml-2 ${EYEBROW}`}>{a.type}</span>
                   </div>
                   <div className="flex flex-shrink-0 items-center gap-1">
                     <button
@@ -525,7 +529,7 @@ export function KitDetail({ kit, onRefresh }: KitDetailProps) {
                       title={a.feedToAI ? 'Fed to AI — click to disable' : 'Not fed to AI — click to enable'}
                       className={`${TOGGLE_BUTTON} ${FOCUS} ${a.feedToAI ? 'text-accent' : 'text-fg-muted hover:text-fg'}`}
                     >
-                      {a.feedToAI ? <ToggleRight size={18} strokeWidth={1.4} /> : <ToggleLeft size={18} strokeWidth={1.4} />}
+                      {a.feedToAI ? <ToggleRight size={18} strokeWidth={1.6} /> : <ToggleLeft size={18} strokeWidth={1.6} />}
                     </button>
                     <button
                       type="button"

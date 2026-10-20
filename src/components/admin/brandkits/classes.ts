@@ -1,43 +1,46 @@
 // The brand kits admin's own class helpers (DESIGN_SYSTEM.md §6, §8.3, §8.4,
-// §8.6; 021 design.md §7). The shared atoms (FOCUS, SMALL_CAPS, the heading
+// §8.6; 021 design.md §7, §8). The shared atoms (FOCUS, SMALL_CAPS, the heading
 // strings, ICON, TAG, COMPACT_FIELD…) come from @/components/ui/atoms; this
 // module keeps only what this screen group alone uses (014 FR-02's residue
-// rule). Restyled with the screen in 021 T6.
+// rule).
 
 import { FOCUS } from '@/components/ui/atoms'
 
 // A ruled list row (the kit list): no box, a --line-subtle rule beneath.
-// Selected: paper fill, --fg weight and a 2 px --accent bar at the left edge,
-// as the sidebar marks the current page (§8.6).
+// Selected: the nav "current" look (the study's .nav a[aria-current]): the
+// paper fill, the panel shadow and a hairline ring, with its rule hidden.
 export function rowCls(selected: boolean, extra = '') {
   return [
-    'relative border-b border-line-subtle',
-    'transition-colors duration-fast ease-standard',
-    'before:absolute before:left-0 before:top-2 before:bottom-2 before:w-0.5',
-    selected ? 'bg-surface-raised before:bg-accent' : 'hover:bg-surface before:bg-transparent',
+    'relative border-b last:border-b-0',
+    'transition-[background-color,box-shadow] duration-fast ease-standard',
+    selected
+      ? 'rounded-ui-sm border-transparent bg-surface-raised shadow-panel ring-1 ring-inset ring-line-subtle'
+      : 'border-line-subtle hover:bg-canvas',
     extra,
   ].join(' ')
 }
 
-// An option button (the template size). Idle: a 1 px --line control edge, --fg
-// on hover. Selected: paper fill and a 2 px ink frame (§8.4's ink, as a card).
+// An option button (the template size), a pill. Idle: raised paper with a
+// --line-subtle hairline ring, --line on hover. Selected: the 1.5 px ink ring
+// of a selected version or template (the study's .v[aria-current]).
 export function optionCls(selected: boolean, extra = '') {
   return [
-    'rounded-ui-md border text-left',
-    'transition-[background-color,border-color,box-shadow] duration-fast ease-standard',
+    'rounded-ui-pill bg-surface-raised text-left',
+    'transition-[box-shadow,color] duration-fast ease-standard',
     FOCUS,
     selected
-      ? 'bg-surface-raised border-fg ring-1 ring-inset ring-fg text-fg'
-      : 'bg-transparent border-line text-fg-muted hover:border-fg hover:text-fg',
+      ? 'text-fg shadow-panel ring-[1.5px] ring-inset ring-fg'
+      : 'text-fg-muted ring-1 ring-inset ring-line-subtle hover:text-fg hover:ring-line',
     extra,
   ].join(' ')
 }
 
-// A code field (the template's HTML/CSS): the §8.3 field in the mono face at
-// --text-sm, written out in full for the same reason as COMPACT_FIELD.
+// A code field (the template's HTML/CSS): the §8.3 textarea (radius-md, the
+// --line edge, the focus outline) in the mono face at --text-sm, written out
+// in full for the same reason as COMPACT_FIELD.
 export const CODE_FIELD =
-  'w-full rounded-ui-sm border border-line bg-surface-raised px-3.5 py-2.5 font-mono text-ui-sm text-fg placeholder:text-fg-muted transition-[border-color,box-shadow] duration-fast ease-standard focus:outline-none focus:border-focus focus:ring-1 focus:ring-focus'
+  'w-full rounded-ui-md border border-line bg-surface-raised px-4 py-3 font-mono text-ui-sm text-fg placeholder:text-fg-muted transition-[border-color,box-shadow] duration-fast ease-standard focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-focus'
 
-// The kit name while editing: the §8.3 field set in the kit title's face.
+// The kit name while editing: the §8.3 field set at the kit title's size.
 export const TITLE_FIELD =
-  'w-full max-w-md rounded-ui-sm border border-line bg-surface-raised px-3.5 py-1.5 text-ui-xl font-medium text-fg transition-[border-color,box-shadow] duration-fast ease-standard focus:outline-none focus:border-focus focus:ring-1 focus:ring-focus'
+  'w-full max-w-md rounded-ui-md border border-line bg-surface-raised px-4 py-1.5 text-ui-lg font-semibold text-fg transition-[border-color,box-shadow] duration-fast ease-standard focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-focus'

@@ -17,6 +17,11 @@ import { apiFetch } from '@/lib/apiFetch'
 import { ROW_TITLE } from '@/components/campaigns/classes'
 import type { Campaign, BrandKitSummary, ProjectSummary, ProjectRef } from '@/lib/api-types'
 
+// A campaign row in a group card: ruled above on --line-subtle, except the
+// first row of each column (one column below lg, two from lg).
+const LIST_ROW =
+  'flex min-w-0 items-start gap-3 border-t border-line-subtle py-3.5 first:border-t-0 lg:[&:nth-child(2)]:border-t-0'
+
 export default function CampaignsPage() {
   const queryClient = useQueryClient()
   const confirm = useConfirm()
@@ -122,9 +127,9 @@ export default function CampaignsPage() {
 
   return (
     <>
-      {/* Page head (DESIGN_SYSTEM.md §6): an eyebrow, the display title, a lead. */}
+      {/* Page head (DESIGN_SYSTEM.md §6): an eyebrow, the title, a lead. */}
       <PageHead
-        className="mb-8"
+        className="mb-6"
         eyebrow="Organize"
         title="Campaigns"
         lead="Group posts by campaign and assign a brand kit override."
@@ -147,7 +152,7 @@ export default function CampaignsPage() {
       />
 
       {creating && (
-        <Panel className="mb-8 animate-fade-in p-4">
+        <Panel className="mb-5 animate-fade-in p-5">
           <form onSubmit={create} className="flex flex-col gap-3 sm:flex-row sm:items-end">
             <div className="min-w-0 flex-1">
               <Input
@@ -191,25 +196,27 @@ export default function CampaignsPage() {
       )}
 
       {!loading && !isError && visible.length === 0 && (
-        <div className="border-t-2 border-fg py-12 text-center">
-          <Megaphone size={28} strokeWidth={1.4} aria-hidden className="mx-auto mb-3 text-fg-muted" />
+        <Panel bezel className="py-12 text-center">
+          <Megaphone size={28} strokeWidth={1.6} aria-hidden className="mx-auto mb-3 text-fg-muted" />
           <p className="text-ui-sm text-fg-muted">
             {showDeleted ? 'No deleted campaigns.' : 'No campaigns yet.'}
           </p>
-        </div>
+        </Panel>
       )}
 
       {!isError && (
-        <div className="space-y-12">
+        <div className="space-y-5">
           {groups.map(group => (
-            <section key={group.project?.id ?? 'standalone'}>
-              {/* The group head: the project's name as a section head, its count on the right. */}
-              <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 pb-2.5">
+            // Each project's campaigns: one bezel card (021 design.md §8).
+            <section key={group.project?.id ?? 'standalone'} className="surface-bezel min-w-0 p-5">
+              {/* The card head: the project's name as a section head linking to
+                  the project, its count on the right. */}
+              <div className="mb-1 flex flex-wrap items-baseline gap-x-4 gap-y-1">
                 <h2 className={`min-w-0 break-words ${SECTION_HEAD}`}>
                   {group.project ? (
                     <Link
                       href={`/projects/${group.project.id}`}
-                      className={`rounded-ui-sm text-fg transition-colors duration-fast ease-standard hover:text-accent ${FOCUS}`}
+                      className={`rounded-ui-sm text-fg decoration-line underline-offset-4 hover:underline ${FOCUS}`}
                     >
                       {group.project.name}
                     </Link>
@@ -222,10 +229,12 @@ export default function CampaignsPage() {
                 </span>
               </div>
 
-              {/* Campaigns as ruled rows, not cards (§6), two columns on wide screens. */}
-              <ul className="grid grid-cols-1 border-t-2 border-fg lg:grid-cols-2 lg:gap-x-12">
+              {/* Campaigns as ruled rows on --line-subtle (§6), two columns on
+                  wide screens. Each row is ruled above, except the first row of
+                  each column. */}
+              <ul className="grid grid-cols-1 lg:grid-cols-2 lg:gap-x-10">
                 {group.campaigns.map(campaign => (
-                  <li key={campaign.id} className="flex min-w-0 items-start gap-3 border-b border-line-subtle py-3.5">
+                  <li key={campaign.id} className={LIST_ROW}>
                     <div className="min-w-0 flex-1">
                       <Link href={`/campaigns/${campaign.id}`} className={`rounded-ui-sm ${ROW_TITLE} ${FOCUS}`}>
                         {campaign.name}

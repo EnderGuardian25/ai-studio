@@ -9,7 +9,7 @@ import { fieldClasses, fieldEdge } from '@/components/ui/Input'
 import { FieldLabel } from '@/components/ui/FieldLabel'
 import { apiFetch } from '@/lib/apiFetch'
 import { cn } from '@/lib/utils'
-import { COMPACT_FIELD, ICON, SCROLL_FOCUS, SMALL_CAPS } from '@/components/ui/atoms'
+import { COMPACT_FIELD, ICON, PILL_BADGE, SCROLL_FOCUS } from '@/components/ui/atoms'
 import type { BrandKitPrompt as Prompt } from '@/lib/api-types'
 
 // ─── Prompt Section ───────────────────────────────────────────────────────────
@@ -97,7 +97,8 @@ export function PromptSection({ kitId, prompts, onRefresh }: PromptSectionProps)
       {view === 'active' && (
         <div className="space-y-3">
           {active ? (
-            <div className="surface whitespace-pre-wrap break-words px-4 py-3 text-ui-sm leading-relaxed text-fg">
+            // The active prompt, read-only: a recessed canvas well in the card.
+            <div className="whitespace-pre-wrap break-words rounded-ui-md bg-canvas px-4 py-3 text-ui-sm leading-relaxed text-fg ring-1 ring-inset ring-line-subtle">
               {active.content}
             </div>
           ) : (
@@ -138,22 +139,22 @@ export function PromptSection({ kitId, prompts, onRefresh }: PromptSectionProps)
         prompts.length === 0 ? (
           <p className="text-ui-sm text-fg-muted">No versions yet.</p>
         ) : (
-          // Ruled version rows (§8.13's vocabulary). The list scrolls inside
-          // its own box once it is long, so the box is a focusable, labelled
-          // region (WCAG 2.1.1, the T7 rule).
+          // Ruled version rows on --line-subtle (§8.13's vocabulary). The list
+          // scrolls inside its own box once it is long, so the box is a
+          // focusable, labelled region (WCAG 2.1.1, the T7 rule).
           <div
             tabIndex={0}
             role="region"
             aria-label="Prompt history"
-            className={`max-h-64 overflow-y-auto border-t border-line-subtle ${SCROLL_FOCUS}`}
+            className={`max-h-64 overflow-y-auto ${SCROLL_FOCUS}`}
           >
-            <ul>
+            <ul className="divide-y divide-line-subtle">
               {prompts.map(p => (
-                <li key={p.id} className="flex items-start justify-between gap-3 border-b border-line-subtle py-2.5">
+                <li key={p.id} className="flex items-start justify-between gap-3 py-2.5">
                   <div className="min-w-0">
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-ui-base font-medium text-fg">v{p.version}</span>
-                      {p.isActive && <span className={`${SMALL_CAPS} text-accent`}>active</span>}
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono text-ui-sm font-semibold text-fg">v{p.version}</span>
+                      {p.isActive && <span className={PILL_BADGE}>active</span>}
                     </div>
                     <p className="mt-0.5 line-clamp-2 break-words text-ui-xs text-fg-muted" title={p.content}>
                       {p.content}

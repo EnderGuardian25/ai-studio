@@ -162,7 +162,7 @@ There are 8 tasks in 3 waves. All the work lands on `v2`, after 018 and 022 (R12
     - **Targeted E2E:** `agui-refinement.test.ts`, `async-actions.test.ts`, `captions.test.ts`, `background-notice.test.ts`, `refine-not-applied.test.ts`, `rejected-revisions.test.ts`, `draft-inline-edit.test.ts`, `export.test.ts`, `publish.test.ts`, `settle-race.test.ts`, `model-selection.test.ts`, `surfaces.test.ts`, `a11y.test.ts`.
     - **Visual:** capture the draft page in both themes at 1440 and 375, and compare it with `shots/a-light.png` and `a-dark.png`.
 
-- [ ] `T6` — Restyle campaigns, projects, the scheduled queue and the brand kits admin
+- [x] `T6` — Restyle campaigns, projects, the scheduled queue and the brand kits admin
   - Files: `src/app/(app)/campaigns/page.tsx`, `src/app/(app)/campaigns/[id]/page.tsx`, `src/app/(app)/projects/page.tsx`, `src/app/(app)/projects/[id]/page.tsx`, `src/components/campaigns/*` (incl. `classes.ts`), `src/app/(app)/admin/brandkits/page.tsx`, `src/components/admin/brandkits/*` (incl. `classes.ts`), `tests/unit/uiTokenGuard.test.ts`
   - Estimate: large
   - Kind: impl

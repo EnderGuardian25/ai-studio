@@ -9,7 +9,7 @@ import { ArrowLeft, ArrowRight, Megaphone, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Select } from '@/components/ui/Select'
 import { PageTitle } from '@/components/ui/PageHead'
-import { EYEBROW, FOCUS, ICON, ICON_SM, SECTION_HEAD, SECTION_NUMERAL } from '@/components/ui/atoms'
+import { EYEBROW, FOCUS, ICON, ICON_SM, SECTION_HEAD } from '@/components/ui/atoms'
 import { apiFetch } from '@/lib/apiFetch'
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser'
 import { ASIDE_BLOCK, CRUMB_CURRENT, CRUMB_LINK } from '@/components/campaigns/classes'
@@ -66,40 +66,38 @@ export default function ProjectDetailPage() {
 
   return (
     <>
-      {/* Breadcrumb (DESIGN_SYSTEM.md §8.6), then the page title. */}
-      <nav aria-label="Breadcrumb" className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-ui-sm text-fg-muted">
+      {/* Breadcrumb (DESIGN_SYSTEM.md §8.6, the study's .back), then the page title. */}
+      <nav aria-label="Breadcrumb" className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-ui-xs text-fg-muted">
         <button type="button" onClick={() => router.push('/projects')} className={`${CRUMB_LINK} ${FOCUS}`}>
-          <ArrowLeft {...ICON} /> Projects
+          <ArrowLeft {...ICON_SM} aria-hidden /> Projects
         </button>
         <span aria-hidden>/</span>
         <span aria-hidden className={CRUMB_CURRENT}>{project.name}</span>
       </nav>
-      <PageTitle className="mb-10 break-words">{project.name}</PageTitle>
+      <PageTitle className="mb-6 break-words">{project.name}</PageTitle>
 
-      <div className="grid grid-cols-1 gap-x-12 gap-y-10 lg:grid-cols-[minmax(0,1fr)_280px]">
-        {/* Campaigns list */}
-        <section className="min-w-0">
-          <div className="flex items-baseline gap-x-3.5 pb-2.5">
-            <span aria-hidden className={SECTION_NUMERAL}>i.</span>
-            <h2 className={SECTION_HEAD}>Campaigns ({activeCampaigns.length})</h2>
-          </div>
+      <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1fr)_280px]">
+        {/* Campaigns list: a bezel card of ruled rows (021 design.md §8). */}
+        <section className="surface-bezel min-w-0 p-5">
+          <h2 className={`mb-1 ${SECTION_HEAD}`}>Campaigns ({activeCampaigns.length})</h2>
           {activeCampaigns.length === 0 ? (
-            <div className="border-t-2 border-fg py-10 text-center">
-              <Megaphone size={28} strokeWidth={1.4} aria-hidden className="mx-auto mb-2 text-fg-muted" />
+            <div className="py-8 text-center">
+              <Megaphone size={28} strokeWidth={1.6} aria-hidden className="mx-auto mb-2 text-fg-muted" />
               <p className="text-ui-sm text-fg-muted">No campaigns in this project.</p>
               <Link href="/campaigns">
                 <Button variant="ghost" size="sm" className="mt-2">Go to Campaigns</Button>
               </Link>
             </div>
           ) : (
-            <ul className="border-t-2 border-fg">
+            <ul className="divide-y divide-line-subtle">
               {activeCampaigns.map(({ campaign }) => (
-                <li key={campaign.id} className="border-b border-line-subtle">
+                <li key={campaign.id}>
                   <Link
                     href={`/campaigns/${campaign.id}`}
-                    className={`group flex items-center justify-between gap-3 py-3.5 ${FOCUS}`}
+                    className={`group flex items-center justify-between gap-3 rounded-ui-sm py-3.5 ${FOCUS}`}
                   >
-                    <span className="min-w-0 break-words text-ui-lg font-medium leading-snug text-fg transition-colors duration-fast ease-standard group-hover:text-accent">
+                    {/* The row title (16 px / 600), underlined on hover: --accent is ink. */}
+                    <span className="min-w-0 break-words text-ui-lg font-semibold leading-snug text-fg decoration-line underline-offset-4 group-hover:underline">
                       {campaign.name}
                     </span>
                     <ArrowRight {...ICON} aria-hidden className="flex-shrink-0 text-fg-muted transition-colors duration-fast ease-standard group-hover:text-fg" />
@@ -110,8 +108,8 @@ export default function ProjectDetailPage() {
           )}
         </section>
 
-        {/* Project meta */}
-        <aside className="min-w-0 border-t-2 border-fg">
+        {/* Project meta: blocks under EYEBROW heads, in one card. */}
+        <aside className="surface min-w-0 divide-y divide-line-subtle p-5">
           <section className={ASIDE_BLOCK}>
             <h2 className={`${EYEBROW} mb-3`}>Details</h2>
             <dl className="space-y-3 text-ui-sm">

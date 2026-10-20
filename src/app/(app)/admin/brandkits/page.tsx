@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/Button'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { QueryError } from '@/components/ui/QueryError'
 import { PageHead } from '@/components/ui/PageHead'
-import { FOCUS, ICON, ICON_BUTTON, SCROLL_FOCUS } from '@/components/ui/atoms'
+import { FOCUS, ICON, ICON_BUTTON, PILL_BADGE, SCROLL_FOCUS } from '@/components/ui/atoms'
 import { apiFetch } from '@/lib/apiFetch'
 import type { AdminBrandKitSummary, AdminBrandKitDetail } from '@/lib/api-types'
 import { AddKitModal } from '@/components/admin/brandkits/AddKitModal'
@@ -65,11 +65,11 @@ export default function BrandKitsPage() {
     <>
       {adding && <AddKitModal onClose={() => setAdding(false)} onCreated={handleCreated} />}
 
-      {/* Page head (DESIGN_SYSTEM.md §6): an eyebrow, the display title, a lead. */}
+      {/* Page head (DESIGN_SYSTEM.md §6): an eyebrow, the title, a lead. */}
       {/* One accent primary per view: once a kit is open, its own Save is the
           contextual primary, and Add Kit shows as an Outline button. */}
       <PageHead
-        className="mb-8"
+        className="mb-6"
         eyebrow="Admin"
         title="Brand Kits"
         lead="Manage brand identities, templates, and voice prompts."
@@ -80,28 +80,28 @@ export default function BrandKitsPage() {
         }
       />
 
-      <div className="grid grid-cols-1 gap-x-12 gap-y-10 lg:grid-cols-[260px_minmax(0,1fr)]">
-        {/* The kit list: ruled rows under a 2 px --fg rule; the open kit is
-            marked by a 2 px --accent bar, as the sidebar marks the current page.
-            Capped at about eight rows (014 FR-09), so it scrolls inside its own
-            box: a focusable, labelled region whether or not it overflows now
+      <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[260px_minmax(0,1fr)]">
+        {/* The kit list: one card of ruled rows; the open kit takes the nav
+            "current" look, as the sidebar marks the current page (021 design.md
+            §8). Capped at about eight rows (014 FR-09), so it scrolls inside its
+            own box: a focusable, labelled region whether or not it overflows now
             (the static rule, FR-17). */}
         <div
           tabIndex={0}
           role="region"
           aria-label="Brand kits"
-          className={`max-h-[32rem] min-w-0 overflow-y-auto border-t-2 border-fg ${SCROLL_FOCUS}`}
+          className={`surface max-h-[32rem] min-w-0 overflow-y-auto p-1.5 ${SCROLL_FOCUS}`}
         >
           {loading && (
             <div className="px-2 py-4 text-ui-sm text-fg-muted">Loading…</div>
           )}
           {!loading && kitsQuery.isError && (
-            <div className="pt-4">
+            <div className="p-2">
               <QueryError error={kitsQuery.error} onRetry={() => kitsQuery.refetch()} />
             </div>
           )}
           {!loading && !kitsQuery.isError && kits.length === 0 && (
-            <div className="border-b border-line-subtle py-6 text-center">
+            <div className="py-6 text-center">
               <p className="text-ui-sm text-fg-muted">No brand kits yet.</p>
               <Button variant="ghost" size="sm" className="mt-2" onClick={() => setAdding(true)}>
                 <Plus {...ICON} /> Create one
@@ -123,7 +123,7 @@ export default function BrandKitsPage() {
                       type="button"
                       onClick={() => setSelectedId(kit.id)}
                       aria-current={selected ? 'true' : undefined}
-                      className={`min-w-0 flex-1 cursor-pointer rounded-ui-sm py-3 pl-3 text-left ${SCROLL_FOCUS}`}
+                      className={`min-w-0 flex-1 cursor-pointer rounded-ui-sm py-2.5 pl-2.5 text-left ${SCROLL_FOCUS}`}
                     >
                       <span
                         className={`block truncate text-ui-sm ${selected ? 'font-semibold text-fg' : 'font-medium text-fg'}`}
@@ -134,7 +134,7 @@ export default function BrandKitsPage() {
                       <span className="mt-1.5 flex items-center gap-1.5">
                         {kit.colors.slice(0, 5).map(c => <ColorSwatch key={c} color={c} decorative />)}
                         {kit.isDefault && (
-                          <span className="ml-1 text-ui-xs font-semibold text-accent">default</span>
+                          <span className={`ml-1 ${PILL_BADGE}`}>default</span>
                         )}
                       </span>
                     </button>
@@ -164,7 +164,7 @@ export default function BrandKitsPage() {
           {selectedKit ? (
             <KitDetail kit={selectedKit} onRefresh={handleRefresh} />
           ) : (
-            <div className="border-t-2 border-fg py-12 text-center text-ui-sm text-fg-muted">
+            <div className="surface-bezel py-12 text-center text-ui-sm text-fg-muted">
               Select a brand kit to view details
             </div>
           )}
