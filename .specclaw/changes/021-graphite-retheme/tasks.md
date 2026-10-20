@@ -84,7 +84,7 @@ There are 8 tasks in 3 waves. All the work lands on `v2`, after 018 and 022 (R12
     - **Targeted E2E:** `a11y.test.ts`, `surfaces.test.ts`, `ui.test.ts`, `create-post-button.test.ts`, `library.test.ts` (the publish modal), `publish.test.ts`.
     - **Visual:** capture the library, the publish modal, a toast, the team menu and `/team`, in both themes at 1440 and 375.
 
-- [ ] `T3` — App shell islands, team switcher, theme toggle, Create post button, login and choose-team; wave 1 full E2E and captures
+- [x] `T3` — App shell islands, team switcher, theme toggle, Create post button, login and choose-team; wave 1 full E2E and captures
   - Files: `src/components/layout/AppShell.tsx`, `src/components/layout/TeamSwitcher.tsx`, `src/components/layout/CreatePostButton.tsx`, `src/components/theme/ThemeToggle.tsx`, `src/components/providers/ToastProvider.tsx` (offset), `src/app/(auth)/login/page.tsx`, `src/app/(app)/choose-team/page.tsx`, `tests/e2e/surfaces.test.ts`, `tests/unit/uiTokenGuard.test.ts`
   - Estimate: medium
   - Kind: impl

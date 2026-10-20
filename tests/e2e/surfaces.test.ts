@@ -30,6 +30,9 @@ import {
 //          Plus Jakarta Sans (AC-04).
 //   021 T2: a pressed primary Button computes no scale under reduced motion
 //          (AC-18).
+//   021 T3: the header and sidebar islands' geometry and the Create post
+//          button's nub (AC-11), and the sidebar's small-caps section label
+//          (AC-09).
 //   T7–T12, the screen groups: AC-12 (375 px, no horizontal scroll), AC-17
 //          (visible focus on a screen's first three stops) and FR-12 (each
 //          screen's controls, by role and name).
@@ -82,6 +85,24 @@ async function expectOpaque(locator: Locator, what: string) {
   })
   expect(alphaOf(style.bg), `${what} background-color ${style.bg}`).toBe(1)
   expect(style.backdrop, `${what} backdrop-filter`).toBe('none')
+}
+
+// The Create post button's nub: the circle that holds its Plus icon.
+function fabNub(page: Page): Locator {
+  return page.getByTestId('create-post-fab').locator(':scope > span').first()
+}
+
+// The rotation of an element's computed transform, in degrees: `none` is 0,
+// `matrix(a, b, c, d, e, f)` is atan2(b, a).
+function rotationDeg(locator: Locator): Promise<number> {
+  return locator.evaluate((el) => {
+    const t = getComputedStyle(el).transform
+    if (t === 'none') return 0
+    const m = t.match(/^matrix\(([^)]+)\)$/)
+    if (!m) return Number.NaN
+    const [a, b] = m[1].split(',').map(Number)
+    return (Math.atan2(b, a) * 180) / Math.PI
+  })
 }
 
 // Mint an EXPORTED draft via the API (owned by the admin, so the browser
@@ -357,14 +378,55 @@ test.describe('Shell, login and choose-team (T6)', () => {
     await expect(light).toHaveAttribute('aria-pressed', 'false')
   })
 
-  test('the Create post button lifts 1px on hover', async ({ page }) => {
+  // 021 AC-11 (FR-09): the nub turns 90° on hover; the button itself does
+  // not move (no lift).
+  test('the Create post button turns its nub 90° on hover', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 })
     await pageLogin(page)
     const fab = page.getByTestId('create-post-fab')
     await fab.hover()
-    await expect
-      .poll(() => fab.evaluate((el) => getComputedStyle(el).transform))
-      .toBe('matrix(1, 0, 0, 1, -1, -1)')
+    await expect.poll(() => rotationDeg(fabNub(page))).toBeCloseTo(90, 1)
+    expect(await fab.evaluate((el) => getComputedStyle(el).transform)).toBe('none')
+  })
+
+  // 021 AC-11 (FR-09, design.md §5): at 1440 in light, the header is a 56 px
+  // island 12 px in from the top and left, at radius-lg (18 px) with a
+  // shadow; the desktop sidebar is a 244 px island 12 px in from the left.
+  test('AC-11: the header and sidebar are floating islands at 1440px', async ({ page }) => {
+    await storeTheme(page, 'light')
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await pageLogin(page)
+    await expectTheme(page, 'light')
+    const header = page.getByRole('banner')
+    await expect(header).toBeVisible()
+    const hbox = (await header.boundingBox())!
+    expect(hbox.x).toBe(12)
+    expect(hbox.y).toBe(12)
+    expect(hbox.height).toBe(56)
+    await expect(header).toHaveCSS('border-radius', '18px')
+    expect(await header.evaluate((el) => getComputedStyle(el).boxShadow)).not.toBe('none')
+
+    const sidebar = page.locator('aside').first()
+    await expect(sidebar).toBeVisible()
+    const sbox = (await sidebar.boundingBox())!
+    expect(sbox.x).toBe(12)
+    expect(sbox.width).toBe(244)
+    // Below the header band (80 px), 12 px off the bottom edge.
+    expect(sbox.y).toBe(80)
+    expect(sbox.y + sbox.height).toBe(900 - 12)
+    await expect(sidebar).toHaveCSS('border-radius', '18px')
+  })
+
+  // 021 AC-09 (FR-07): the sidebar's section labels are the one small-caps
+  // atom: uppercase, tracked 0.14em at 11 px.
+  test('AC-09: a sidebar section label is small caps, tracked 1.54px', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await pageLogin(page)
+    const label = page.locator('aside').first().getByText('Create', { exact: true })
+    await expect(label).toBeVisible()
+    await expect(label).toHaveCSS('text-transform', 'uppercase')
+    await expect(label).toHaveCSS('font-size', '11px')
+    await expect(label).toHaveCSS('letter-spacing', '1.54px')
   })
 })
 
@@ -1381,12 +1443,17 @@ test.describe('AC-18 reduced motion', () => {
     await release()
   })
 
-  test('the Create post button does not move on hover (shell)', async ({ page }) => {
+  // 021 AC-11: under reduced motion neither the button nor its nub moves on
+  // hover. Polled: the 1 ms reduced-motion transition (011 T2 note 2).
+  test('the Create post button and its nub do not move on hover (shell)', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 })
     await pageLogin(page)
     const fab = page.getByTestId('create-post-fab')
     await fab.hover()
     await expect.poll(() => fab.evaluate((el) => getComputedStyle(el).transform)).toBe('none')
+    await expect.poll(() => fabNub(page).evaluate((el) => getComputedStyle(el).transform)).toBe('none')
+    await page.waitForTimeout(200)
+    expect(await fabNub(page).evaluate((el) => getComputedStyle(el).transform)).toBe('none')
   })
 })
 

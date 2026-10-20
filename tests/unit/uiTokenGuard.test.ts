@@ -74,6 +74,10 @@ const FOLIO_PATTERNS: Array<[string, RegExp, string[]]> = [
   ['opsz font-variation setting', /opsz|font-variation-settings/, []],
   // 4a (T2), the import-path half. The file-name half is FOLIO_FILE_NAME.
   ['Folio module import', /from\s+['"][^'"]*folio[^'"]*['"]/i, []],
+  // 8 (T3). A hard offset shadow: non-zero x and y offsets and a zero blur,
+  // in CSS or an arbitrary class. Graphite's soft layers (`0 1px 2px …`,
+  // `0 6px 20px -10px …`) pass.
+  ['hard offset shadow', /(?<![\d.-])[1-9]\d*px[ _][1-9]\d*px[ _]0(?:px)?(?=[ _])/, []],
   // 10 (T2)
   ['drop entrance', new RegExp(`${START}animate-drop${END}`), []],
 ]
@@ -228,6 +232,10 @@ describe('Folio deny-list (021 FR-13, AC-05)', () => {
     ["import { EYEBROW } from '@/components/ui/folio'", "from '@/components/ui/folio'"],
     ["import { BLOCK, ROW } from './folio'", "from './folio'"],
     ['export * from "./Folio"', 'from "./Folio"'],
+    // 8
+    ['active:shadow-[2px_2px_0_0_rgb(0_0_0/0.2)]', '2px_2px_0'],
+    ['  --shadow-raised: 4px 4px 0 0 rgb(33 28 24);', '4px 4px 0'],
+    ['  box-shadow: 6px 6px 0px rgb(var(--fg));', '6px 6px 0px'],
     // 10
     ['<div className="surface-raised animate-drop">', 'animate-drop'],
     ["cn('menu', open && 'motion-safe:animate-drop')", 'animate-drop'],
@@ -246,6 +254,10 @@ describe('Folio deny-list (021 FR-13, AC-05)', () => {
     "import { BLOCK, ROW } from '@/components/ui/atoms'",
     "import { ROW_TITLE } from '@/components/campaigns/classes'",
     '// a portfolio of posts',
+    // 8: soft, blurred or single-offset shadows, and other px pairs
+    '  --shadow-panel: 0 1px 2px rgb(24 24 22 / 0.04), 0 6px 20px -10px rgb(24 24 22 / 0.10);',
+    '  --shadow-raised: inset 0 1px 0 rgb(255 255 255 / 0.06), 0 2px 4px rgb(0 0 0 / 0.30);',
+    "shadow-[10px_20px_0.5px_rgb(0_0_0)] h-[52px] w-[52px] pl-[7px]",
     // 10: other animations
     '<div className="surface-raised origin-top-left animate-pop">',
     '<div className="animate-dropdown xanimate-drop">',
