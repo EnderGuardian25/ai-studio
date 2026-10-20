@@ -42,8 +42,8 @@ export interface HeadlinePanelProps {
 }
 
 // The on-image headline (012 FR-18/FR-19): its h3 with the tail (save state,
-// Undo, Generate/Regenerate headline), a single-line field named by that
-// heading (not ruled — §8.3 rules captions only), saved on blur with the
+// Undo, Generate/Regenerate headline), a single-line pill field named by that
+// heading, saved on blur with the
 // server's 400 reason shown inline, the n / 100 counter and the helper text.
 // "Regenerate all" never writes it (A9).
 export function HeadlinePanel({
@@ -201,7 +201,7 @@ export function HeadlinePanel({
 
       {busy ? (
         <div className="animate-pulse" aria-label="Generating the headline" role="status">
-          <div className="h-control-md w-2/3 rounded-ui-sm bg-line-subtle" />
+          <div className="h-control-md w-2/3 rounded-ui-pill bg-line-subtle" />
         </div>
       ) : (
         <>
@@ -233,7 +233,7 @@ export function HeadlinePanel({
             </p>
             <span
               id={counterId}
-              className={`shrink-0 text-ui-xs ${over ? 'font-semibold text-status-failed' : 'text-fg-muted'}`}
+              className={`shrink-0 font-mono text-ui-2xs ${over ? 'font-semibold text-status-failed' : 'text-fg-muted'}`}
             >
               {count(value.length)} / {count(HEADLINE_MAX)}
             </span>

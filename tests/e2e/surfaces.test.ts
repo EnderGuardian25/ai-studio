@@ -33,6 +33,8 @@ import {
 //   021 T3: the header and sidebar islands' geometry and the Create post
 //          button's nub (AC-11), and the sidebar's small-caps section label
 //          (AC-09).
+//   021 T5: the draft page's page head, then the stage beside the caption
+//          card from xl and above it below xl, with no crop marks (AC-12).
 //   T7–T12, the screen groups: AC-12 (375 px, no horizontal scroll), AC-17
 //          (visible focus on a screen's first three stops) and FR-12 (each
 //          screen's controls, by role and name).
@@ -686,9 +688,9 @@ test.describe('Draft review (T9)', () => {
     await pageLogin(page)
     await page.goto(`/drafts/${draft.id}`)
     await expect(page.getByRole('heading', { name: draft.topic, level: 1 })).toBeVisible({ timeout: 20_000 })
-    // The back link, the post (opens the lightbox), then the action bar. The
-    // one version is the current one, so it is not a button.
-    expect(await tabThreeFromMain(page)).toEqual(['Library', 'View full screen', 'Regenerate design'])
+    // The page head comes first (021 FR-11): the back link, then the action
+    // bar's first two. The post (it opens the lightbox) follows, in the stage.
+    expect(await tabThreeFromMain(page)).toEqual(['Library', 'Regenerate design', 'Edit inline'])
   })
 
   test('AC-12 + FR-12: at 375px every control is there, with refine, versions and the inline editor open', async ({ page }) => {
@@ -752,7 +754,7 @@ test.describe('Draft review (T9)', () => {
     await expect(dialog).toBeHidden()
   })
 
-  test('the post on the proof plate is shown as rendered: no filter, transform, rounding or crop', async ({ page }) => {
+  test('the post on the post stage is shown as rendered: no filter, transform, rounding or crop', async ({ page }) => {
     test.skip(!MOCKED(), 'needs MOCK_AI + MOCK_PUPPETEER to mint a draft')
     const draft = await exportedDraft(api)
     await page.setViewportSize({ width: 1440, height: 900 })
@@ -786,6 +788,61 @@ test.describe('Draft review (T9)', () => {
       frameRadius: '0px',
       frameFilter: 'none',
     })
+  })
+
+  // 021 AC-12 (FR-11): the stage beside the caption card from xl, above it
+  // below xl, and no proof-plate crop marks left on the page.
+  const stageOf = (page: Page) => page.getByRole('region', { name: 'Preview', exact: true })
+  const captionCardOf = (page: Page) =>
+    page
+      .locator('section')
+      .filter({ has: page.getByRole('heading', { name: 'Captions', level: 2, exact: true }) })
+      .last()
+
+  test('021 AC-12: at 1440 the stage sits left of the caption card, tops level; at 375 it sits above', async ({ page }) => {
+    test.skip(!MOCKED(), 'needs MOCK_AI + MOCK_PUPPETEER to mint a draft')
+    const draft = await exportedDraft(api)
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await pageLogin(page)
+    await page.goto(`/drafts/${draft.id}`)
+    await expect(page.getByRole('heading', { name: draft.topic, level: 1 })).toBeVisible({ timeout: 20_000 })
+    const box = async (l: Locator) => {
+      await expect(l).toBeVisible()
+      const b = await l.boundingBox()
+      expect(b, 'a bounding box').toBeTruthy()
+      return b!
+    }
+    // The page head is above both.
+    const title = await box(page.getByRole('heading', { name: draft.topic, level: 1 }))
+    let [stage, card] = [await box(stageOf(page)), await box(captionCardOf(page))]
+    expect(title.y + title.height).toBeLessThanOrEqual(stage.y)
+    expect(stage.x + stage.width, 'the stage is left of the caption card').toBeLessThanOrEqual(card.x)
+    expect(Math.abs(stage.y - card.y), 'their tops are within 24 px').toBeLessThanOrEqual(24)
+
+    await page.setViewportSize({ width: 375, height: 812 })
+    ;[stage, card] = [await box(stageOf(page)), await box(captionCardOf(page))]
+    expect(stage.y + stage.height, 'the stage is above the caption card').toBeLessThanOrEqual(card.y)
+    await expectNoHorizontalScroll(page, 'draft page (stage above the cards) at 375px')
+  })
+
+  test('021 AC-12: no element on the draft page names a crop mark or a proof plate', async ({ page }) => {
+    test.skip(!MOCKED(), 'needs MOCK_AI + MOCK_PUPPETEER to mint a draft')
+    const draft = await exportedDraft(api)
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await pageLogin(page)
+    await page.goto(`/drafts/${draft.id}`)
+    await expect(stageOf(page).getByRole('button', { name: 'View full screen', exact: true })).toBeVisible({
+      timeout: 20_000,
+    })
+    const named = await page.evaluate(() => {
+      const re = /crop[-_ ]?marks?|proof[-_ ]?plate|\bcrop\b/i
+      return [...document.querySelectorAll('*')].flatMap((el) => {
+        const attrs = [el.getAttribute('class') ?? '']
+        for (const a of el.getAttributeNames()) if (a.startsWith('data-')) attrs.push(a, el.getAttribute(a) ?? '')
+        return attrs.some((v) => re.test(v)) ? [`<${el.tagName.toLowerCase()} class="${el.getAttribute('class')}">`] : []
+      })
+    })
+    expect(named, named.join('\n')).toEqual([])
   })
 })
 

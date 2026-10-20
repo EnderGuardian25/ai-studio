@@ -74,6 +74,10 @@ const FOLIO_PATTERNS: Array<[string, RegExp, string[]]> = [
   ['opsz font-variation setting', /opsz|font-variation-settings/, []],
   // 4a (T2), the import-path half. The file-name half is FOLIO_FILE_NAME.
   ['Folio module import', /from\s+['"][^'"]*folio[^'"]*['"]/i, []],
+  // 7 (T5). The proof plate and its crop marks, by name in any case, and the
+  // CROP class constant (case-sensitive, so "CSS-crop" and "cropped" pass).
+  ['proof plate or crop mark', /proof[- ]plate|crop[- ]mark/i, []],
+  ['CROP constant', /\bCROP\b/, []],
   // 8 (T3). A hard offset shadow: non-zero x and y offsets and a zero blur,
   // in CSS or an arbitrary class. Graphite's soft layers (`0 1px 2px …`,
   // `0 6px 20px -10px …`) pass.
@@ -232,6 +236,12 @@ describe('Folio deny-list (021 FR-13, AC-05)', () => {
     ["import { EYEBROW } from '@/components/ui/folio'", "from '@/components/ui/folio'"],
     ["import { BLOCK, ROW } from './folio'", "from './folio'"],
     ['export * from "./Folio"', 'from "./Folio"'],
+    // 7
+    ['// A proof-plate crop mark (DESIGN_SYSTEM.md §8.12)', 'proof-plate'],
+    ['{/* The Proof Plate (§8.12): paper and a hairline edge. */}', 'Proof Plate'],
+    ['<span data-role="crop mark" />', 'crop mark'],
+    ["const CROP = 'pointer-events-none absolute h-[18px] w-[18px] border-line'", 'CROP'],
+    ['<span aria-hidden className={`${CROP} left-5 top-5 border-l border-t`} />', 'CROP'],
     // 8
     ['active:shadow-[2px_2px_0_0_rgb(0_0_0/0.2)]', '2px_2px_0'],
     ['  --shadow-raised: 4px 4px 0 0 rgb(33 28 24);', '4px 4px 0'],
@@ -254,6 +264,10 @@ describe('Folio deny-list (021 FR-13, AC-05)', () => {
     "import { BLOCK, ROW } from '@/components/ui/atoms'",
     "import { ROW_TITLE } from '@/components/campaigns/classes'",
     '// a portfolio of posts',
+    // 7: other uses of the words
+    '// We CSS-crop to that region; the post is never cropped.',
+    "const CROP_RATIO = 1 // a cropped image, a crop of the logo",
+    '{/* The post stage: a bezel card holding the post. */}',
     // 8: soft, blurred or single-offset shadows, and other px pairs
     '  --shadow-panel: 0 1px 2px rgb(24 24 22 / 0.04), 0 6px 20px -10px rgb(24 24 22 / 0.10);',
     '  --shadow-raised: inset 0 1px 0 rgb(255 255 255 / 0.06), 0 2px 4px rgb(0 0 0 / 0.30);',

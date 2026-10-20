@@ -136,7 +136,7 @@ There are 8 tasks in 3 waves. All the work lands on `v2`, after 018 and 022 (R12
     - **Targeted E2E:** `library.test.ts`, `brief-draft-recovery.test.ts`, `path-a.test.ts`, `path-b.test.ts`, `async-generation.test.ts`, `model-selection.test.ts`, `ui.test.ts`, `surfaces.test.ts`, `a11y.test.ts`, `create-post-button.test.ts`.
     - **Visual:** capture the dashboard, library and brief in both themes at 1440 and 375.
 
-- [ ] `T5` — Restyle the draft review and refine page: page head, the post stage instead of the proof plate, bezel cards
+- [x] `T5` — Restyle the draft review and refine page: page head, the post stage instead of the proof plate, bezel cards
   - Files: `src/app/(app)/drafts/[id]/page.tsx`, `src/components/drafts/*`, `tests/e2e/surfaces.test.ts`, `tests/unit/uiTokenGuard.test.ts`
   - Estimate: large
   - Kind: impl

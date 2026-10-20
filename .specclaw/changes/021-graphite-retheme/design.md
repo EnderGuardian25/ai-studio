@@ -280,7 +280,7 @@ Every screen task applies the same rules:
 - **The right column:** `HeadlinePanel`, `CaptionPanels` / `CaptionPanel` and `RefinementPanel` as bezel cards, each with a `.card-hd`.
   - **Fields:** `fieldClasses`. The counter is mono and right-aligned.
   - **Saved / Unsaved:** `text-ui-xs font-semibold` in `status-published` / `status-scheduled`.
-  - **Refine log rows:** a 22 px status disc (`bg-status-x/12 text-status-x`, with a check or alert icon), the instruction (`text-ui-sm font-medium`), a muted `text-ui-2xs` status line ("Applied · v2"; "Brand conflict" in `status-scheduled` 600), and a mono time, on `line-subtle` dividers.
+  - **Refine log rows:** a 22 px status disc (`bg-status-x/12 text-status-x`, with a check or alert icon), the instruction (`text-ui-sm font-medium`), a muted `text-ui-2xs` status line ("Applied"; "Brand conflict" in `status-scheduled` 600), and a mono time (the session-local time the request was sent), on `line-subtle` dividers. The status line carries no version number (T5 review: the row holds none in state, and adding one would change behaviour).
   - **Suggestions:** `TAG` pills.
   - **Prompt:** a pill `COMPACT_FIELD`-style form with the round `.send` Send. The "Refine requests" region, its focusability and every name are kept.
 - **`NotAppliedCard`** (red, `role="alert"`) and **`BackgroundNotice`** (amber, `role="status"`, `data-testid`, `data-reason`) move onto `Notice` at 0.12.

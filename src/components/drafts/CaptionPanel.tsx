@@ -6,6 +6,7 @@ import { Loader2, Check, AlertTriangle, Copy, Sparkles, Undo2 } from 'lucide-rea
 import { Button } from '@/components/ui/Button'
 import { SectionHead } from '@/components/ui/SectionHead'
 import { Notice } from '@/components/ui/Notice'
+import { fieldClasses, fieldEdge } from '@/components/ui/Input'
 import { ModelPicker } from '@/components/ui/ModelPicker'
 import { ICON } from '@/components/ui/atoms'
 import { apiFetch } from '@/lib/apiFetch'
@@ -15,17 +16,10 @@ import type { DraftCaptionDetail } from '@/lib/api-types'
 import type { ModelKey } from '@/lib/models/catalogue'
 import { GeneratedWith } from './GeneratedWith'
 
-// The ruled caption field (DESIGN_SYSTEM.md §8.3): a 1 px --line-subtle rule
-// every 26 px, scrolling with the text. Only captions are ruled.
-const RULED_TEXTAREA = [
-  'block w-full resize-y rounded-ui-sm border border-line bg-surface-raised px-4 py-1',
-  'text-ui-sm leading-[26px] text-fg placeholder:text-fg-muted',
-  '[background-image:repeating-linear-gradient(to_bottom,transparent_0,transparent_25px,rgb(var(--line-subtle))_25px,rgb(var(--line-subtle))_26px)]',
-  '[background-attachment:local] [background-position:0_4px]',
-  'transition-[border-color,box-shadow] duration-fast ease-standard',
-  'focus:outline-none focus:border-focus focus:ring-1 focus:ring-focus',
-  'disabled:cursor-not-allowed disabled:opacity-60',
-].join(' ')
+// The caption field (021 design.md §8, the study's .field): the shared
+// multi-line field at radius-md, relaxed leading, resizable, and no longer
+// ruled (021 FR-11).
+const CAPTION_FIELD = `${fieldClasses} ${fieldEdge()} block resize-y`
 
 export const count = (n: number) => n.toLocaleString('en-US')
 
@@ -83,7 +77,7 @@ export interface CaptionPanelProps {
 }
 
 // One channel's caption (012 FR-18/FR-19): its h3 with the tail (save state,
-// Undo, Copy, Generate/Regenerate), the ruled textarea named by that heading
+// Undo, Copy, Generate/Regenerate), the textarea named by that heading
 // and saved on blur, the per-registry counter with its limit or guide warning,
 // the review / FAILED / last-regenerate-failed notices, and a skeleton
 // only while the row is PENDING. Empty text on a row that is not PENDING always
@@ -330,7 +324,7 @@ export function CaptionPanel({
               inFlightSave.current = save()
             }}
             rows={8}
-            className={RULED_TEXTAREA}
+            className={CAPTION_FIELD}
             placeholder={`Write the ${spec.label} caption…`}
           />
           <div className="mt-2 flex items-baseline gap-4">
@@ -341,7 +335,7 @@ export function CaptionPanel({
             )}
             <span
               id={counterId}
-              className={`ml-auto shrink-0 text-ui-xs ${over ? 'font-semibold text-status-failed' : 'text-fg-muted'}`}
+              className={`ml-auto shrink-0 font-mono text-ui-2xs ${over ? 'font-semibold text-status-failed' : 'text-fg-muted'}`}
             >
               {counter}
             </span>

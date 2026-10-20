@@ -29,8 +29,8 @@ export function BackgroundNotice({ skipped }: BackgroundNoticeProps) {
         ? { href: '/team', label: 'Open Team settings' }
         : { href: '/settings', label: 'Open Settings' }
 
-  // Amber stays amber: Folio's warning colour is --status-scheduled (§3.2), as
-  // a notice on its own 10 % tint (the pair §3.3 checks).
+  // Amber stays amber: the warning colour is --status-scheduled (§3.2), as a
+  // notice on its own 0.12 tint (021 A2, the pair contrast.test.ts checks).
   return (
     <Notice
       tone="warning"
