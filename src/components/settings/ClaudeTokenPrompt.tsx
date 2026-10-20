@@ -46,7 +46,7 @@ export function ClaudeTokenPrompt() {
 
   const invalid = state === 'invalid'
 
-  // A notice (§3.2): ochre for an invalid token (a warning state), a neutral
+  // A notice (§3.2): amber for an invalid token (a warning state), a neutral
   // hairline nudge otherwise. Opaque and in-flow.
   return (
     <Notice tone={invalid ? 'warning' : 'neutral'} className="mb-6 flex items-center gap-3">

@@ -10,7 +10,7 @@ import { QueryError } from '@/components/ui/QueryError'
 import { SectionHead } from '@/components/ui/SectionHead'
 import { Select } from '@/components/ui/Select'
 import { StatusChip } from '@/components/ui/StatusChip'
-import { BLOCK, FOCUS, ROW } from '@/components/ui/atoms'
+import { FOCUS, ROW } from '@/components/ui/atoms'
 import { apiFetch } from '@/lib/apiFetch'
 import { SURFACE_LABELS, USER_SURFACES, isModelKey } from '@/lib/models/catalogue'
 import {
@@ -33,7 +33,7 @@ const MODELS_KEY = ['models'] as const
 
 const CHECKBOX = `h-4 w-4 accent-accent disabled:cursor-not-allowed ${FOCUS}`
 
-export function ModelsCard({ numeral }: { numeral?: string }) {
+export function ModelsCard() {
   const policyQuery = useQuery({
     queryKey: POLICY_KEY,
     queryFn: () => apiFetch<TeamModelPolicyInfo>('/api/team/model-policy'),
@@ -48,10 +48,11 @@ export function ModelsCard({ numeral }: { numeral?: string }) {
 
   return (
     // Named by its heading, so the section is a region the E2E can scope to (its Save is one of several).
-    <section aria-labelledby={headingId}>
-      <SectionHead numeral={numeral} title="Models" id={headingId} className="mb-3" />
+    // A bezel card (021 design.md §8), its head the study's .card-hd.
+    <section aria-labelledby={headingId} className="surface-bezel min-w-0 p-5">
+      <SectionHead title="Models" id={headingId} className="mb-3" />
 
-      <div className={BLOCK}>
+      <div>
         <p className="text-ui-sm text-fg-muted">
           The Claude models this team can run, and the model each part of the app uses by default.
         </p>
@@ -116,7 +117,7 @@ function ModelsForm({ policy, view }: { policy: TeamModelPolicyInfo; view: Model
             {view.catalogue.map((e) => {
               const id = idFor(e.key)
               return (
-                <li key={e.key} className={`${ROW} flex flex-wrap items-center gap-x-3 gap-y-1`}>
+                <li key={e.key} className={`${ROW} flex flex-wrap items-center gap-x-3 gap-y-1 last:border-b-0`}>
                   <input
                     id={id}
                     type="checkbox"

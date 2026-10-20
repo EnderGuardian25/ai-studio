@@ -7,7 +7,6 @@ import { Plus, Trash2, ToggleLeft, ToggleRight, Star, Eye, EyeOff } from 'lucide
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { FieldLabel } from '@/components/ui/FieldLabel'
-import { Panel } from '@/components/ui/Panel'
 import { SegmentedToggle } from '@/components/ui/SegmentedToggle'
 import { QueryError } from '@/components/ui/QueryError'
 import { PageHead } from '@/components/ui/PageHead'
@@ -15,14 +14,12 @@ import { SectionHead } from '@/components/ui/SectionHead'
 import { Notice } from '@/components/ui/Notice'
 import { StatusChip } from '@/components/ui/StatusChip'
 import {
-  BLOCK,
   EYEBROW,
   FOCUS,
   ICON,
   ICON_BUTTON,
-  ICON_SM,
+  PILL_BADGE,
   ROW,
-  SMALL_CAPS,
   SUB_HEAD,
   TAG,
 } from '@/components/ui/atoms'
@@ -43,9 +40,9 @@ import type { AdminProvider as Provider, ProviderSlot, ChannelStatus, ChannelMap
 
 // lucide-react 1.x removed brand icons — inline equivalents (stroke style
 // matches lucide so they sit naturally beside the other icons).
-function InstagramIcon({ size = 15 }: { size?: number }) {
+function InstagramIcon({ size = 16 }: { size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <rect width="20" height="20" x="2" y="2" rx="5" ry="5" />
       <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
       <line x1="17.5" x2="17.51" y1="6.5" y2="6.5" />
@@ -53,9 +50,9 @@ function InstagramIcon({ size = 15 }: { size?: number }) {
   )
 }
 
-function LinkedinIcon({ size = 15 }: { size?: number }) {
+function LinkedinIcon({ size = 16 }: { size?: number }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z" />
       <rect width="4" height="12" x="2" y="9" />
       <circle cx="4" cy="4" r="2" />
@@ -116,7 +113,9 @@ function RegisterForm({ onSuccess, allowCopySlot }: { onSuccess: () => void; all
   }
 
   return (
-    <Panel className="space-y-4 p-5">
+    // A recessed canvas well inside the providers card, as the brand kit
+    // template form (021 T6).
+    <div className="space-y-4 rounded-ui-lg bg-canvas p-5 ring-1 ring-inset ring-line-subtle">
       <h3 className={SUB_HEAD}>Register new provider</h3>
 
       <div className="space-y-3">
@@ -188,12 +187,12 @@ function RegisterForm({ onSuccess, allowCopySlot }: { onSuccess: () => void; all
 
         {error && <p className="text-ui-xs text-status-failed">{error}</p>}
 
-        {/* The view's one accent primary, shown only while this form is open. */}
+        {/* The view's one primary (021 A13), shown only while this form is open. */}
         <Button variant="primary" size="sm" onClick={register} disabled={loading || !apiKey}>
           {loading ? 'Validating…' : 'Register'}
         </Button>
       </div>
-    </Panel>
+    </div>
   )
 }
 
@@ -223,18 +222,14 @@ function ProviderCard({ provider, onRefresh }: { provider: Provider; onRefresh: 
   }
 
   return (
-    // A ruled row (§6): the label, its slot tag and the Default mark, the
+    // A ruled row (§6): the label, its slot tag and the Default badge, the
     // masked key beneath; quiet icon controls on the right (§8.16).
-    <li className={`${ROW} flex items-start gap-4`}>
+    <li className={`${ROW} flex items-start gap-4 last:border-b-0 last:pb-0`}>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           <span className="min-w-0 truncate text-ui-base font-medium text-fg" title={provider.label}>{provider.label}</span>
           <span className={TAG}>{provider.slot}</span>
-          {provider.isDefault && (
-            <span className={`flex items-center gap-1 ${SMALL_CAPS} text-accent`}>
-              <Star {...ICON_SM} fill="currentColor" aria-hidden /> Default
-            </span>
-          )}
+          {provider.isDefault && <span className={PILL_BADGE}>Default</span>}
         </div>
         <p className="mt-1 font-mono text-ui-xs text-fg-muted">
           {maskKey(provider.keyPrefix)}
@@ -244,10 +239,11 @@ function ProviderCard({ provider, onRefresh }: { provider: Provider; onRefresh: 
       <div className="flex flex-shrink-0 flex-wrap items-center justify-end gap-1">
         {/* The state in words (014 FR-19), outside the button and aria-hidden:
             the button keeps its "Enable <label>" name and aria-pressed, so a
-            visible "On" inside it can't break Label in Name. */}
+            visible "On" inside it can't break Label in Name. A status word, so
+            sentence case (021 FR-07). */}
         <span
           aria-hidden="true"
-          className={`${SMALL_CAPS} ${provider.isEnabled ? 'text-accent' : 'text-fg-muted'}`}
+          className={`text-ui-xs font-semibold ${provider.isEnabled ? 'text-accent' : 'text-fg-muted'}`}
         >
           {provider.isEnabled ? 'On' : 'Off'}
         </span>
@@ -260,8 +256,8 @@ function ProviderCard({ provider, onRefresh }: { provider: Provider; onRefresh: 
           title={provider.isEnabled ? 'Disable' : 'Enable'}
         >
           {provider.isEnabled
-            ? <ToggleRight size={20} strokeWidth={1.4} />
-            : <ToggleLeft size={20} strokeWidth={1.4} />}
+            ? <ToggleRight size={20} strokeWidth={1.6} />
+            : <ToggleLeft size={20} strokeWidth={1.6} />}
         </button>
         <button
           type="button"
@@ -344,7 +340,7 @@ function ChannelRow({
   }
 
   return (
-    <li className={`${ROW} space-y-3 py-4`}>
+    <li className={`${ROW} space-y-3 py-4 first:pt-0 last:border-b-0 last:pb-0`}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-2.5">
           <span className="text-fg-muted">{icon}</span>
@@ -512,13 +508,13 @@ function ProvidersSection() {
             {slot === 'COPY' ? 'Copy (text generation)' : 'Image generation'}
           </h3>
           {slot === 'COPY' && cliMode && (
-            <p className="text-ui-xs italic text-fg-muted">
+            <p className="text-ui-xs text-fg-muted">
               Not used in CLI mode — safe to delete.
             </p>
           )}
           {slot === 'IMAGE' && <ImageDefaultState rows={providersBySlot('IMAGE')} onRefresh={invalidateProviders} />}
           {providersBySlot(slot).length === 0 && (
-            <p className="text-ui-sm italic text-fg-muted">No providers registered for {slot}</p>
+            <p className="text-ui-sm text-fg-muted">No providers registered for {slot}</p>
           )}
           {providersBySlot(slot).length > 0 && (
             <ul className="border-t border-line-subtle">
@@ -567,14 +563,14 @@ function ChannelsSection() {
   }
 
   return (
-    <ul className="border-t border-line-subtle">
+    <ul>
       <ChannelRow
         channel="INSTAGRAM"
         status={channels.INSTAGRAM}
         label="Instagram"
         tokenPlaceholder="Access token"
         metadataPlaceholder="Business Account ID"
-        icon={<InstagramIcon size={15} />}
+        icon={<InstagramIcon size={16} />}
         onRefresh={invalidateChannels}
       />
       <ChannelRow
@@ -583,7 +579,7 @@ function ChannelsSection() {
         label="LinkedIn"
         tokenPlaceholder="Access token"
         metadataPlaceholder="Organization ID"
-        icon={<LinkedinIcon size={15} />}
+        icon={<LinkedinIcon size={16} />}
         onRefresh={invalidateChannels}
       />
     </ul>
@@ -611,29 +607,27 @@ export default function TeamSettingsPage() {
         eyebrow="Admin"
         title="Team settings"
         lead="Providers, channels, and credentials shared by everyone on this team."
-        className="mb-8"
+        className="mb-6"
       />
 
-      <div className="flex flex-col gap-12">
-        <section>
-          <SectionHead numeral="i." title="AI Providers" className="mb-3" />
-          <div className={BLOCK}>
-            <ProvidersSection />
-          </div>
+      {/* Each section is a bezel card (021 design.md §8), stacked on the
+          study's 20 px gap. */}
+      <div className="flex flex-col gap-5">
+        <section className="surface-bezel min-w-0 p-5">
+          <SectionHead title="AI Providers" className="mb-3" />
+          <ProvidersSection />
         </section>
 
-        <section>
-          <SectionHead numeral="ii." title="Social Channels" className="mb-3" />
-          <div className={BLOCK}>
-            <ChannelsSection />
-          </div>
+        <section className="surface-bezel min-w-0 p-5">
+          <SectionHead title="Social Channels" className="mb-3" />
+          <ChannelsSection />
         </section>
 
-        <TeamClaudeTokenCard numeral="iii." />
+        <TeamClaudeTokenCard />
 
-        <ApiKeysCard numeral="iv." />
+        <ApiKeysCard />
 
-        <ModelsCard numeral="v." />
+        <ModelsCard />
       </div>
     </div>
   )

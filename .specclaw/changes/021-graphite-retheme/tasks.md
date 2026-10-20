@@ -192,7 +192,7 @@ There are 8 tasks in 3 waves. All the work lands on `v2`, after 018 and 022 (R12
     - **Targeted E2E:** `campaign-scheduling.test.ts`, `briefing-assistant.test.ts`, `brand-kit.test.ts`, `brandkit-assistant.test.ts`, `image-to-template.test.ts`, `team-isolation.test.ts`, `surfaces.test.ts`, `a11y.test.ts`.
     - **Visual:** capture campaigns, campaign detail, projects, project detail and brand kits in both themes at 1440 and 375.
 
-- [ ] `T7` — Restyle team, settings and admin users and teams; wave 2 full E2E and captures
+- [x] `T7` — Restyle team, settings and admin users and teams; wave 2 full E2E and captures
   - Files: `src/app/(app)/team/layout.tsx`, `src/app/(app)/team/page.tsx`, `src/components/team/*`, `src/app/(app)/settings/page.tsx`, `src/components/settings/*`, `src/app/(app)/admin/layout.tsx`, `src/app/(app)/admin/users/page.tsx`, `src/app/(app)/admin/teams/page.tsx`
   - Estimate: medium
   - Kind: impl

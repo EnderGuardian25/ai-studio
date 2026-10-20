@@ -12,7 +12,7 @@ import { useCurrentUser } from '@/lib/hooks/useCurrentUser'
 import { SectionHead } from '@/components/ui/SectionHead'
 import { Notice } from '@/components/ui/Notice'
 import { StatusChip } from '@/components/ui/StatusChip'
-import { BLOCK, ICON, SUB_HEAD } from '@/components/ui/atoms'
+import { ICON, SUB_HEAD } from '@/components/ui/atoms'
 import { ClaudeConnectGuide } from './ClaudeConnectGuide'
 import type { ClaudeTokenInfo } from '@/lib/api-types'
 
@@ -29,7 +29,7 @@ function statusPill(info: ClaudeTokenInfo) {
   return <StatusChip tone="published">Connected</StatusChip>
 }
 
-export function ClaudeTokenCard({ numeral }: { numeral?: string }) {
+export function ClaudeTokenCard() {
   const { cliMode } = useCurrentUser()
   const confirm = useConfirm()
   const queryClient = useQueryClient()
@@ -82,12 +82,13 @@ export function ClaudeTokenCard({ numeral }: { numeral?: string }) {
   const info = data ?? ({ connected: false } as ClaudeTokenInfo)
 
   return (
-    <section>
-      <SectionHead numeral={numeral} title="Claude account" className="mb-3">
+    // A bezel card (021 design.md §8), its head the study's .card-hd.
+    <section className="surface-bezel min-w-0 p-5">
+      <SectionHead title="Claude account" className="mb-3">
         {!isLoading && statusPill(info)}
       </SectionHead>
 
-      <div className={`${BLOCK} flex flex-col gap-5`}>
+      <div className="flex flex-col gap-5">
         <p className="text-ui-sm text-fg-muted">
           Connect your personal Claude subscription for post generation.
         </p>

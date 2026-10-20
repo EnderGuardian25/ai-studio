@@ -5,7 +5,6 @@ import { toast } from 'sonner'
 import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
 import { SectionHead } from '@/components/ui/SectionHead'
-import { BLOCK } from '@/components/ui/atoms'
 import { authClient } from '@/lib/auth-client'
 
 // Self-service password change. better-auth's base client always exposes
@@ -16,7 +15,7 @@ import { authClient } from '@/lib/auth-client'
 // deactivation flow's "sessions revoked" precedent elsewhere in the app.
 const MIN_LENGTH = 8
 
-export function ChangePasswordCard({ numeral }: { numeral?: string }) {
+export function ChangePasswordCard() {
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -61,10 +60,11 @@ export function ChangePasswordCard({ numeral }: { numeral?: string }) {
   }
 
   return (
-    <section>
-      <SectionHead numeral={numeral} title="Password" className="mb-3" />
+    // A bezel card (021 design.md §8), its head the study's .card-hd.
+    <section className="surface-bezel min-w-0 p-5">
+      <SectionHead title="Password" className="mb-3" />
 
-      <div className={`${BLOCK} flex flex-col gap-5`}>
+      <div className="flex flex-col gap-5">
         <p className="text-ui-sm text-fg-muted">
           Change your sign-in password. Other devices are signed out immediately.
         </p>
@@ -99,7 +99,7 @@ export function ChangePasswordCard({ numeral }: { numeral?: string }) {
           />
           {error && <p className="text-ui-xs text-status-failed">{error}</p>}
           <div>
-            {/* The page's one accent primary (§8.2). */}
+            {/* The page's one primary (§8.2, 021 A13). */}
             <Button type="submit" disabled={saving || !currentPassword || !newPassword || !confirmPassword}>
               {saving ? 'Changing…' : 'Change password'}
             </Button>

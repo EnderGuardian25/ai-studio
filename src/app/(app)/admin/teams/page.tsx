@@ -12,9 +12,9 @@ import { Select } from '@/components/ui/Select'
 import { Modal } from '@/components/ui/Modal'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { PageHead } from '@/components/ui/PageHead'
+import { Panel } from '@/components/ui/Panel'
 import { SectionHead } from '@/components/ui/SectionHead'
 import {
-  BLOCK,
   FOCUS,
   ICON,
   ICON_BUTTON,
@@ -100,7 +100,7 @@ export default function AdminTeamsPage() {
         eyebrow="Admin"
         title="Teams"
         lead="Every team on the platform. Manage membership below a selected row."
-        className="mb-8"
+        className="mb-6"
         actions={
           <Button onClick={() => setAddOpen(true)}>
             <Plus {...ICON} /> Add team
@@ -108,63 +108,66 @@ export default function AdminTeamsPage() {
         }
       />
 
-      {/* A Folio data table (§8.15), in a focusable, labelled scroll region;
-          `relative` contains the sr-only Actions header at 375 px. */}
-      <div
-        tabIndex={0}
-        role="region"
-        aria-label="Teams"
-        className={`relative overflow-x-auto border-t-2 border-fg ${SCROLL_FOCUS}`}
-      >
-        <table className="w-full min-w-[600px] text-ui-sm">
-          <thead>
-            <tr className={TABLE_HEAD_ROW}>
-              <th scope="col" className="py-2 pr-3 font-semibold">Name</th>
-              <th scope="col" className="py-2 pr-6 text-right font-semibold">Members</th>
-              <th scope="col" className="py-2 pr-3 font-semibold">Created</th>
-              <th scope="col" className="py-2 font-semibold sr-only">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {teams.map((t) => (
-              <tr key={t.id} className="border-b border-line-subtle align-middle">
-                <td className="break-words py-2.5 pr-3 font-medium text-fg">{t.name}</td>
-                <td className="py-2.5 pr-6 text-right text-fg">{t.memberCount}</td>
-                <td className="whitespace-nowrap py-2.5 pr-3 text-ui-xs text-fg-muted">
-                  {new Date(t.createdAt).toLocaleDateString()}
-                </td>
-                <td className="whitespace-nowrap py-1.5">
-                  <div className="flex justify-end gap-1">
-                    {/* Outline, open while its panel shows: the page keeps one
-                        accent primary (§8.2). */}
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      aria-expanded={selectedTeamId === t.id}
-                      onClick={() => setSelectedTeamId(selectedTeamId === t.id ? null : t.id)}
-                    >
-                      <UsersIcon {...ICON_SM} /> Members
-                    </Button>
-                    <Button variant="ghost" size="sm" onClick={() => setRenameTarget(t)}>
-                      <Pencil {...ICON_SM} /> Rename
-                    </Button>
-                    <Button variant="danger" size="sm" onClick={() => deleteTeam(t)}>
-                      <Trash2 {...ICON_SM} /> Delete
-                    </Button>
-                  </div>
-                </td>
+      {/* A ruled data table (§8.15, the study's .ct) on a bezel card (021
+          design.md §8), in a focusable, labelled scroll region; `relative`
+          contains the sr-only Actions header at 375 px. */}
+      <Panel bezel className="min-w-0 p-5">
+        <div
+          tabIndex={0}
+          role="region"
+          aria-label="Teams"
+          className={`relative overflow-x-auto ${SCROLL_FOCUS}`}
+        >
+          <table className="w-full min-w-[600px] text-ui-sm">
+            <thead>
+              <tr className={TABLE_HEAD_ROW}>
+                <th scope="col" className="py-2 pr-3 font-semibold">Name</th>
+                <th scope="col" className="py-2 pr-6 text-right font-semibold">Members</th>
+                <th scope="col" className="py-2 pr-3 font-semibold">Created</th>
+                <th scope="col" className="py-2 font-semibold sr-only">Actions</th>
               </tr>
-            ))}
-            {teams.length === 0 && (
-              <tr>
-                <td colSpan={4} className="py-6 text-center text-ui-sm italic text-fg-muted">
-                  No teams yet
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {teams.map((t) => (
+                <tr key={t.id} className="border-b border-line-subtle align-middle last:border-b-0">
+                  <td className="break-words py-2.5 pr-3 font-medium text-fg">{t.name}</td>
+                  <td className="py-2.5 pr-6 text-right tabular-nums text-fg">{t.memberCount}</td>
+                  <td className="whitespace-nowrap py-2.5 pr-3 text-ui-xs text-fg-muted">
+                    {new Date(t.createdAt).toLocaleDateString()}
+                  </td>
+                  <td className="whitespace-nowrap py-1.5">
+                    <div className="flex justify-end gap-1">
+                      {/* Secondary, expanded while its panel shows: the page
+                          keeps one primary (§8.2, 021 A13). */}
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        aria-expanded={selectedTeamId === t.id}
+                        onClick={() => setSelectedTeamId(selectedTeamId === t.id ? null : t.id)}
+                      >
+                        <UsersIcon {...ICON_SM} /> Members
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={() => setRenameTarget(t)}>
+                        <Pencil {...ICON_SM} /> Rename
+                      </Button>
+                      <Button variant="danger" size="sm" onClick={() => deleteTeam(t)}>
+                        <Trash2 {...ICON_SM} /> Delete
+                      </Button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {teams.length === 0 && (
+                <tr>
+                  <td colSpan={4} className="py-6 text-center text-ui-sm text-fg-muted">
+                    No teams yet
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Panel>
 
       {selectedTeamId && (
         <TeamMembersPanel
@@ -390,21 +393,23 @@ function TeamMembersPanel({
   if (!team) return null
 
   return (
-    <section className="mt-12">
+    // A bezel card (021 design.md §8), its head the study's .card-hd; the
+    // members are ruled rows on --line-subtle.
+    <section className="surface-bezel mt-5 min-w-0 p-5">
       <SectionHead title={`Members of ${team.name}`} className="mb-3">
         <button
           type="button"
           onClick={onClose}
           aria-label="Close member panel"
-          className={`${ICON_BUTTON} hover:text-fg ${FOCUS}`}
+          className={`${ICON_BUTTON} hover:bg-surface-raised hover:text-fg ${FOCUS}`}
         >
           <X {...ICON} />
         </button>
       </SectionHead>
 
-      <div className={BLOCK}>
+      <div>
         {members.length === 0 && (
-          <p className="text-ui-sm italic text-fg-muted">No members yet</p>
+          <p className="text-ui-sm text-fg-muted">No members yet</p>
         )}
         {members.length > 0 && (
           <ul>

@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
 import { SectionHead } from '@/components/ui/SectionHead'
 import { StatusChip } from '@/components/ui/StatusChip'
-import { BLOCK, ICON_SM, ROW } from '@/components/ui/atoms'
+import { ICON_SM, ROW } from '@/components/ui/atoms'
 import { Modal } from '@/components/ui/Modal'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { QueryError } from '@/components/ui/QueryError'
@@ -23,7 +23,7 @@ import type { TeamApiKeySummary, TeamApiKeyCreated } from '@/lib/api-types'
 
 const QUERY_KEY = ['team', 'api-keys'] as const
 
-export function ApiKeysCard({ numeral }: { numeral?: string }) {
+export function ApiKeysCard() {
   const queryClient = useQueryClient()
   const confirm = useConfirm()
   const [createOpen, setCreateOpen] = useState(false)
@@ -56,14 +56,16 @@ export function ApiKeysCard({ numeral }: { numeral?: string }) {
   }
 
   return (
-    <section>
-      <SectionHead numeral={numeral} title="API keys" className="mb-3">
+    // A bezel card (021 design.md §8), its head the study's .card-hd; the keys
+    // are ruled rows on --line-subtle.
+    <section className="surface-bezel min-w-0 p-5">
+      <SectionHead title="API keys" className="mb-3">
         <Button size="sm" variant="secondary" onClick={() => setCreateOpen(true)}>
           <Plus {...ICON_SM} /> Create key
         </Button>
       </SectionHead>
 
-      <div className={BLOCK}>
+      <div>
         <p className="text-ui-sm text-fg-muted">
           Machine credentials for MCP/ACP integrations calling on this team&apos;s behalf.
         </p>
@@ -74,11 +76,11 @@ export function ApiKeysCard({ numeral }: { numeral?: string }) {
           ) : isError ? (
             <QueryError error={error} onRetry={() => refetch()} />
           ) : keys.length === 0 ? (
-            <p className="text-ui-sm italic text-fg-muted">No API keys yet</p>
+            <p className="text-ui-sm text-fg-muted">No API keys yet</p>
           ) : (
             <ul className="border-t border-line-subtle">
               {keys.map((k) => (
-                <li key={k.id} className={`${ROW} flex items-center justify-between gap-3`}>
+                <li key={k.id} className={`${ROW} flex items-center justify-between gap-3 last:border-b-0 last:pb-0`}>
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="min-w-0 break-words text-ui-base font-medium text-fg">{k.label}</span>
@@ -192,7 +194,7 @@ function RevealKeyModal({
           This is the only time the full key is shown. Copy it now — it can&apos;t be retrieved again later.
         </p>
         <div className="flex flex-wrap items-center gap-2">
-          <code className="min-w-0 flex-1 break-all rounded-ui-sm border border-line bg-surface-raised px-3 py-2.5 font-mono text-ui-xs text-fg">
+          <code className="min-w-0 flex-1 break-all rounded-ui-md bg-canvas px-3 py-2.5 font-mono text-ui-xs text-fg ring-1 ring-inset ring-line-subtle">
             {created?.plaintext}
           </code>
           <Button type="button" variant="secondary" size="sm" onClick={copy}>

@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/Button'
 import { SectionHead } from '@/components/ui/SectionHead'
 import { Notice } from '@/components/ui/Notice'
 import { StatusChip } from '@/components/ui/StatusChip'
-import { BLOCK, ICON } from '@/components/ui/atoms'
+import { ICON } from '@/components/ui/atoms'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { apiFetch } from '@/lib/apiFetch'
 import type { OpenAiKeyInfo } from '@/lib/api-types'
@@ -30,7 +30,7 @@ function statusPill(info: OpenAiKeyInfo) {
   return <StatusChip tone="published">Connected</StatusChip>
 }
 
-export function OpenAiKeyCard({ numeral }: { numeral?: string }) {
+export function OpenAiKeyCard() {
   const confirm = useConfirm()
   const queryClient = useQueryClient()
   const [key, setKey] = useState('')
@@ -78,12 +78,13 @@ export function OpenAiKeyCard({ numeral }: { numeral?: string }) {
   const info = data ?? ({ connected: false } as OpenAiKeyInfo)
 
   return (
-    <section>
-      <SectionHead numeral={numeral} title="OpenAI key" className="mb-3">
+    // A bezel card (021 design.md §8), its head the study's .card-hd.
+    <section className="surface-bezel min-w-0 p-5">
+      <SectionHead title="OpenAI key" className="mb-3">
         {!isLoading && statusPill(info)}
       </SectionHead>
 
-      <div className={`${BLOCK} flex flex-col gap-5`}>
+      <div className="flex flex-col gap-5">
         <p className="text-ui-sm text-fg-muted">
           Connect your personal OpenAI key for image generation.
         </p>
