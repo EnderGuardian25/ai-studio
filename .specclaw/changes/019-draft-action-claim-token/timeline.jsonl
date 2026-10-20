@@ -14,3 +14,5 @@
 {"ev":"start","span":"T4","kind":"task","label":"gate + docs","parent":"W3","model":"haiku","attempt":"1","at":"2026-10-20T15:08:04Z","ts":1792508884}
 {"ev":"stop","span":"T4","at":"2026-10-20T15:27:58Z","ts":1792510078,"status":"ok"}
 {"ev":"stop","span":"W3","at":"2026-10-20T15:27:58Z","ts":1792510079,"status":"ok"}
+{"ev":"start","span":"verify-1792510119","kind":"phase","label":"verify","at":"2026-10-20T15:28:39Z","ts":1792510119}
+{"ev":"stop","span":"verify-1792510119","at":"2026-10-20T15:32:27Z","ts":1792510347,"status":"ok"}

@@ -4,7 +4,7 @@ This repo contains planning documents for **bistec-studio**, an internal marketi
 
 ## ✅ Outstanding work — START HERE (updated 2026-10-20)
 
-- **⏸️ 2026-10-20 — PICK UP HERE. This repo is `bistec-oss/studio`, and since 2026-10-18 it carries the fork's `v2`. 018, 022 and 021 (Graphite) are VERIFIED PASS. 019 (claim token) is built; verify it next. Then 020 (`/specclaw:plan` first).** Full detail: [`docs/handoff.md`](docs/handoff.md) top section and its **pre-merge prod checklist**.
+- **⏸️ 2026-10-20 — PICK UP HERE. This repo is `bistec-oss/studio`, and since 2026-10-18 it carries the fork's `v2`. 018, 022, 021 (Graphite) and 019 (claim token) are VERIFIED PASS. Next: 020 (`/specclaw:plan` first).** Full detail: [`docs/handoff.md`](docs/handoff.md) top section and its **pre-merge prod checklist**.
   - **The fork era (2026-10-07 to 2026-10-14) is in [`docs/fork-history.md`](docs/fork-history.md).** It is superseded context, not instructions. That file also holds the procedure for importing code from the fork.
   - **Repo rules. This entry is authoritative; `docs/handoff.md` links here.**
     - This repo is **`bistec-oss/studio`**, and **`origin` points to it**.
@@ -32,7 +32,7 @@ This repo contains planning documents for **bistec-studio**, an internal marketi
       - 022 does not merge or deploy. The merge waits on the checklist's operator steps and the user's go-ahead.
     - **021 Graphite re-theme: VERIFIED PASS,** 19/19 ACs ([`verify-report.md`](.specclaw/changes/021-graphite-retheme/verify-report.md)). T1–T8 `6c42ff8`…`b8d041a`; final full clean mock E2E 397/3/0/0; render 15/15; CI green at `aa5f7a8`.
       - AC-05 carve-out: "Instrument Sans" stays in `src/components/admin/brandkits/googleFonts.ts` (post font data, FR-12/NFR-10); `DESIGN_SYSTEM.md` §11 documents it.
-    - **019 (claim token): BUILT,** T1–T4 (`d521e11`, `1b549b6`, `7e86b96`, then the T4 docs commit); verify next. CI: green at `7e86b96` (runs 39445592883, 39445602043).
+    - **019 (claim token): VERIFIED PASS,** 9/9 ACs ([`verify-report.md`](.specclaw/changes/019-draft-action-claim-token/verify-report.md)). T1–T4 `d521e11`, `1b549b6`, `7e86b96`, `0b7608a`. CI: green at `7e86b96` (runs 39445592883, 39445602043).
       - T1: the nullable `Draft.pendingActionClaimId` column, the additive migration `20261020120000_draft_action_claim_id` and its manual down script;
       - T2: the claim mints a token, and the heartbeat, release, complete, caption settles and sweep are guarded on it;
       - T3: content writes from a claimed run are guarded on the claim (`DraftClaimLostError` rolls back and removes the uploaded export);
