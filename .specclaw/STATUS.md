@@ -1,7 +1,7 @@
 # 🦞 SpecClaw Dashboard
 
 **Project:** bistec-studio
-**Last Updated:** 2026-10-20 15:32 UTC
+**Last Updated:** 2026-10-20 17:02 UTC
 
 _1 unnumbered change · run `/specclaw:renumber` to order them_
 
@@ -21,7 +21,8 @@ _1 unnumbered change · run `/specclaw:renumber` to order them_
 - 🔍 **016-fresh-start-cleanup** ▫ — verify PASS | 5/5 tasks (100%) | 0 failed | PR #43 open | 2m
 - 🔍 **017-publish-api-fixes** ▫ — verify PASS | 3/3 tasks (100%) | 0 failed | PR #43 open
 - 🔍 **018-post-008-small-fixes** ▫ — verify PASS | 4/4 tasks (100%) | 0 failed | PR #43 open | 1h2m
-- 🔍 **019-draft-action-claim-token** ▫ — verify PASS | 4/4 tasks (100%) | 0 failed | PR #43 open | 4h10m
+- 🔍 **019-draft-action-claim-token** ▫ — verify PASS | 4/4 tasks (100%) | 0 failed | PR #43 open | 4h14m
+- 📝 **020-create-post-button-draft-page** ▫ — tasks done | 0/2 tasks (0%) | 0 failed
 - 🔍 **021-graphite-retheme** ▣ — verify PASS | 8/8 tasks (100%) | 0 failed | 42h47m
 - 🔍 **022-prod-data-and-deploy-restore** ▫ — verify PASS | 4/4 tasks (100%) | 0 failed | 5h22m
 
@@ -31,7 +32,6 @@ _1 unnumbered change · run `/specclaw:renumber` to order them_
 - 📋 **007-brandkit-design-system** — proposal ready, awaiting planning
 - 📋 **009-hero-image-design** — proposal ready, awaiting planning
 - 📋 **010-whatsapp-channel-posting** — proposal ready, awaiting planning
-- 📋 **020-create-post-button-draft-page** ▫ — proposal ready, awaiting planning
 
 ## Recently Completed
 
@@ -39,6 +39,6 @@ _None._
 
 ## Stats
 
-- **Total changes:** 17
-- **Active:** 17
+- **Total changes:** 18
+- **Active:** 18
 - **Completed:** 0
