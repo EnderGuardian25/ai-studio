@@ -23,8 +23,9 @@ import { join, relative, resolve } from 'node:path'
 // ui/ included (021 design.md §6).
 //
 // 021 FR-13: a deny-list of Folio leftovers (021 design.md §6), switched on
-// pattern by pattern in the task that removes each one's last hit. There is
-// no legitimate Folio leftover, so `ui-exception:` does not apply to it either.
+// pattern by pattern in the task that removed each one's last hit; every
+// pattern is on since 021 T8. There is no legitimate Folio leftover, so
+// `ui-exception:` does not apply to it either.
 
 const ROOT = process.cwd()
 const SRC = resolve(ROOT, 'src')
@@ -77,16 +78,22 @@ const FOLIO_PATTERNS: Array<[string, RegExp, string[], string[]?]> = [
   ['opsz font-variation setting', /opsz|font-variation-settings/, []],
   // 4a (T2), the import-path half. The file-name half is FOLIO_FILE_NAME.
   ['Folio module import', /from\s+['"][^'"]*folio[^'"]*['"]/i, []],
+  // 4b (T8). The word on any line, comments included; `portfolio` passes.
+  ['Folio name', /\bfolio\b/i, []],
   // 5 (T6). A literal positive letter-spacing: Folio's small-caps tracking and
   // its 0.1em table head. The one small-caps tracking is the tracking-label
-  // key, used only by SMALL_CAPS; negative heading tracking passes.
-  ['positive tracking literal', /tracking-\[0?\.\d+em\]/, []],
+  // key, used only by SMALL_CAPS; negative heading tracking passes. Since T8
+  // also the property spelled out: an arbitrary property
+  // (`[letter-spacing:0.14em]`), CSS, or a style object (`letterSpacing`).
+  ['positive tracking literal', /tracking-\[0?\.\d+em\]|letter-?spacing\s*:\s*['"]?0?\.\d+em/i, []],
   // 6 (T6). Small caps outside the one atom (021 FR-07): the `uppercase` class,
   // as a whole token, in the app's UI code. src/lib and src/mcp are not UI
-  // (their comments say "uppercase" of enum values).
+  // (their comments say "uppercase" of enum values). The boundaries also catch
+  // the property spelled out (`[text-transform:uppercase]`, CSS, a style
+  // object), and since T8 in any case, as CSS keywords are.
   [
     'uppercase outside ui/atoms.ts',
-    new RegExp(`${START}uppercase${END}`),
+    new RegExp(`${START}uppercase${END}`, 'i'),
     ['src/components/ui/atoms.ts'],
     ['src/app/', 'src/components/'],
   ],
@@ -94,10 +101,18 @@ const FOLIO_PATTERNS: Array<[string, RegExp, string[], string[]?]> = [
   // CROP class constant (case-sensitive, so "CSS-crop" and "cropped" pass).
   ['proof plate or crop mark', /proof[- ]plate|crop[- ]mark/i, []],
   ['CROP constant', /\bCROP\b/, []],
-  // 8 (T3). A hard offset shadow: non-zero x and y offsets and a zero blur,
-  // in CSS or an arbitrary class. Graphite's soft layers (`0 1px 2px …`,
-  // `0 6px 20px -10px …`) pass.
-  ['hard offset shadow', /(?<![\d.-])[1-9]\d*px[ _][1-9]\d*px[ _]0(?:px)?(?=[ _])/, []],
+  // 8 (T3; tightened in T8). A hard offset shadow: non-zero x and y offsets
+  // (either sign) and a zero blur, in CSS or an arbitrary class. The first
+  // offset must open the shadow: it may not follow another length, so a soft
+  // `0 2px 2px 0` (y, blur, spread) is not read as x, y, blur. Graphite's soft
+  // layers (`0 1px 2px …`, `0 6px 20px -10px …`) pass.
+  [
+    'hard offset shadow',
+    /(?<![A-Za-z0-9.-])(?<!\d(?:px)?[ _])-?[1-9]\d*px[ _]-?[1-9]\d*px[ _]0(?:px)?(?=$|[ _,;)\]])/,
+    [],
+  ],
+  // 9 (T8). Folio's 2 px block rule.
+  ['2 px block rule', new RegExp(`${START}border-[tb]-2${END}`), []],
   // 10 (T2)
   ['drop entrance', new RegExp(`${START}animate-drop${END}`), []],
 ]
@@ -107,7 +122,7 @@ const FOLIO_PATTERNS: Array<[string, RegExp, string[], string[]?]> = [
 const FOLIO_FILE_NAME = /folio/i
 
 const SHARED_NAME =
-  /^\s*(?:export\s+(?:default\s+)?)?(?:async\s+)?(?:const|let|function)\s+(FOCUS|SCROLL_FOCUS|SMALL_CAPS|EYEBROW|FIELD_LABEL|PAGE_TITLE|PAGE_LEAD|SECTION_HEAD|SECTION_NUMERAL|SUB_HEAD|KIT_TITLE|STEP_HEAD|STEP_NUMERAL|STEP_LEAD|GROUP_HEAD|ASIDE_HEAD|NOTICE|WARN_NOTICE|ICON|ICON_SM|ICON_BUTTON|TEXT_LINK|TAG|TABLE_HEAD_ROW|COMPACT_FIELD|COMPACT_TEXTAREA|PILL_BADGE|PageHead|PageTitle|SectionHead|SectionHeader|Notice|FieldLabel|StatusWord|GateNotice)\b/
+  /^\s*(?:export\s+(?:default\s+)?)?(?:async\s+)?(?:const|let|function)\s+(FOCUS|SCROLL_FOCUS|SMALL_CAPS|EYEBROW|FIELD_LABEL|PAGE_TITLE|PAGE_LEAD|SECTION_HEAD|SECTION_NUMERAL|SUB_HEAD|KIT_TITLE|STEP_HEAD|STEP_NUMERAL|STEP_LEAD|GROUP_HEAD|ASIDE_HEAD|NOTICE|WARN_NOTICE|ICON|ICON_SM|ICON_BUTTON|TEXT_LINK|TAG|TABLE_HEAD_ROW|ROW|COMPACT_FIELD|COMPACT_TEXTAREA|PILL_BADGE|PageHead|PageTitle|SectionHead|SectionHeader|Notice|FieldLabel|StatusWord|GateNotice)\b/
 const UI_DIR = 'src/components/ui/'
 
 function sourceFiles(dir: string): string[] {
@@ -226,7 +241,7 @@ function findFolioLeftovers(file: string, text: string): string[] {
 describe('Folio deny-list (021 FR-13, AC-05)', () => {
   const files = sourceFiles(SRC)
 
-  it('finds no Folio leftover in src/ for the patterns switched on so far', () => {
+  it('finds no Folio leftover in src/, with every §6 pattern on', () => {
     const hits = files.flatMap((f) =>
       findFolioLeftovers(relative(ROOT, f).split('\\').join('/'), readFileSync(f, 'utf8'))
     )
@@ -246,19 +261,33 @@ describe('Folio deny-list (021 FR-13, AC-05)', () => {
     // 3
     ['<h1 className="[font-variation-settings:\'opsz\'_144]">', 'font-variation-settings'],
     ["  axes: ['opsz'],", 'opsz'],
-    // 4a, the import path
-    ["import { EYEBROW } from '@/components/ui/folio'", "from '@/components/ui/folio'"],
-    ["import { BLOCK, ROW } from './folio'", "from './folio'"],
-    ['export * from "./Folio"', 'from "./Folio"'],
+    // 4a, the import path (a path where the word is not whole, so 4b stays
+    // quiet; a whole-word path fires both, see the case below the table)
+    ["import { EYEBROW } from '@/components/ui/folioAtoms'", "from '@/components/ui/folioAtoms'"],
+    ["import { ROW } from './folios'", "from './folios'"],
+    ['export * from "./FolioKit"', 'from "./FolioKit"'],
+    // 4b, the word (021 T8)
+    ['// the Folio proof sheet', 'Folio'],
+    ['{/* folio: paper and ink */}', 'folio'],
+    ["const theme = 'FOLIO'", 'FOLIO'],
     // 5
     ['<th className="py-2 tracking-[0.1em]">', 'tracking-[0.1em]'],
     ["export const SMALL_CAPS = 'text-ui-2xs font-semibold tracking-[0.14em]'", 'tracking-[0.14em]'],
     ['<p className="md:tracking-[.05em]">', 'tracking-[.05em]'],
+    // 5, the property spelled out (021 T8)
+    ['<p className="[letter-spacing:0.14em]">', 'letter-spacing:0.14em'],
+    ['  letter-spacing: 0.1em;', 'letter-spacing: 0.1em'],
+    ["<p style={{ letterSpacing: '0.14em' }}>", "letterSpacing: '0.14em"],
     // 6
     ['<span className="ml-2 text-ui-2xs uppercase text-fg-muted">{a.type}</span>', 'uppercase'],
     ["cn('uppercase', open && 'block')", 'uppercase'],
     ['<p className="md:uppercase">', 'uppercase'],
     ['// an uppercase micro-label', 'uppercase'],
+    // 6, the property spelled out, and any case (021 T8)
+    ['<p className="[text-transform:uppercase]">', 'uppercase'],
+    ['<p className="md:[text-transform:UPPERCASE]">', 'UPPERCASE'],
+    ['  text-transform: uppercase;', 'uppercase'],
+    ["<p style={{ textTransform: 'uppercase' }}>", 'uppercase'],
     // 7
     ['// A proof-plate crop mark (DESIGN_SYSTEM.md §8.12)', 'proof-plate'],
     ['{/* The Proof Plate (§8.12): paper and a hairline edge. */}', 'Proof Plate'],
@@ -269,6 +298,14 @@ describe('Folio deny-list (021 FR-13, AC-05)', () => {
     ['active:shadow-[2px_2px_0_0_rgb(0_0_0/0.2)]', '2px_2px_0'],
     ['  --shadow-raised: 4px 4px 0 0 rgb(33 28 24);', '4px 4px 0'],
     ['  box-shadow: 6px 6px 0px rgb(var(--fg));', '6px 6px 0px'],
+    // 8, negative offsets, inset, and a shadow with no colour (021 T8)
+    ['  box-shadow: -2px 2px 0 0 rgb(0 0 0 / 0.2);', '-2px 2px 0'],
+    ['active:shadow-[2px_-2px_0_0_rgb(0_0_0/0.2)]', '2px_-2px_0'],
+    ['shadow-[inset_-3px_-3px_0_rgb(0_0_0)]', '-3px_-3px_0'],
+    ['  box-shadow: 4px 4px 0;', '4px 4px 0'],
+    // 9 (021 T8)
+    ['<div className="border-t-2 border-fg pt-4">', 'border-t-2'],
+    ["cn('mb-6', open && 'md:border-b-2')", 'border-b-2'],
     // 10
     ['<div className="surface-raised animate-drop">', 'animate-drop'],
     ["cn('menu', open && 'motion-safe:animate-drop')", 'animate-drop'],
@@ -288,8 +325,8 @@ describe('Folio deny-list (021 FR-13, AC-05)', () => {
     // 6: other tokens that contain the word
     '<p className="normal-case">{name.toUpperCase()}</p>',
     '<p className="uppercased-x xuppercase">',
-    // 4a: a use of the word that is not an import path (4b, T8, covers words)
-    "import { BLOCK, ROW } from '@/components/ui/atoms'",
+    // 4a and 4b: imports of the new modules, and a word that only contains it
+    "import { ROW } from '@/components/ui/atoms'",
     "import { ROW_TITLE } from '@/components/campaigns/classes'",
     '// a portfolio of posts',
     // 7: other uses of the words
@@ -300,6 +337,15 @@ describe('Folio deny-list (021 FR-13, AC-05)', () => {
     '  --shadow-panel: 0 1px 2px rgb(24 24 22 / 0.04), 0 6px 20px -10px rgb(24 24 22 / 0.10);',
     '  --shadow-raised: inset 0 1px 0 rgb(255 255 255 / 0.06), 0 2px 4px rgb(0 0 0 / 0.30);',
     "shadow-[10px_20px_0.5px_rgb(0_0_0)] h-[52px] w-[52px] pl-[7px]",
+    // 8 (021 T8): a soft shadow whose y, blur and spread read "2px 2px 0", in
+    // CSS and as a class, and Graphite's dark inset highlight (x 0, blur 0)
+    '  box-shadow: 0 2px 2px 0 rgb(0 0 0 / 0.2);',
+    'shadow-[0_2px_2px_0_rgb(0_0_0/0.2)] shadow-[0px_2px_2px_0px_rgb(0_0_0)]',
+    '  --shadow-panel: inset 0 1px 0 rgb(255 255 255 / 0.04), 0 1px 2px rgb(0 0 0 / 0.30), 0 8px 24px -12px rgb(0 0 0 / 0.50);',
+    // 9: other border widths and sides
+    '<div className="border-t border-b border-line-subtle border-2 border-x-2 border-t-20">',
+    // 5 and 6: other letter-spacing and text-transform values
+    '<p style={{ letterSpacing: \'-0.01em\', textTransform: \'none\' }} className="[text-transform:capitalize]">',
     // 10: other animations
     '<div className="surface-raised origin-top-left animate-pop">',
     '<div className="animate-dropdown xanimate-drop">',
@@ -316,6 +362,12 @@ describe('Folio deny-list (021 FR-13, AC-05)', () => {
     expect(
       findFolioLeftovers('src/components/admin/brandkits/googleFonts.ts', '<p className="font-text" />')
     ).toHaveLength(1)
+  })
+
+  // 021 T8: the old module path names the word whole, so 4a and 4b both fire.
+  it('flags an import of the old folio module under both 4a and 4b', () => {
+    const hits = findFolioLeftovers('src/components/x.tsx', "import { EYEBROW } from '@/components/ui/folio'")
+    expect(hits.map((h) => h.slice(h.lastIndexOf('(')))).toEqual(['(Folio module import)', '(Folio name)'])
   })
 
   it('flags a module named after Folio, whatever its case or extension (4a)', () => {
@@ -352,7 +404,7 @@ describe('Folio deny-list (021 FR-13, AC-05)', () => {
 describe('Shared-name guard (014 FR-05, AC-02)', () => {
   const files = sourceFiles(SRC)
 
-  it('finds no copy of a shared atom, primitive or the small-caps literal outside src/components/ui/', () => {
+  it('finds no copy of a shared atom or primitive outside src/components/ui/', () => {
     const hits = files.flatMap((f) =>
       findSharedCopies(relative(ROOT, f).split('\\').join('/'), readFileSync(f, 'utf8'))
     )
@@ -374,6 +426,8 @@ describe('Shared-name guard (014 FR-05, AC-02)', () => {
       '<th className="tracking-[0.1em]">', // 11: the same (pattern 5)
       "export const PILL_BADGE = 'x'", // 12 (021 T2)
       'export function GateNotice({ title }: Props) {', // 13 (021 T2)
+      "const ROW = 'border-b py-3'", // 14 (021 T8)
+      "export const ROW_TITLE = 'x'", // 15: a longer name (campaigns/classes.ts)
     ].join('\n')
     const lines = (hits: string[]) => hits.map((h) => h.split(':')[1])
     expect(lines(findSharedCopies('src/components/team/ApiKeysCard.tsx', sample))).toEqual([
@@ -384,6 +438,7 @@ describe('Shared-name guard (014 FR-05, AC-02)', () => {
       '6',
       '12',
       '13',
+      '14',
     ])
     expect(findSharedCopies('src/components/ui/atoms.ts', sample)).toEqual([])
   })

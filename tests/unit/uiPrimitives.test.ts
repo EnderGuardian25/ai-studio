@@ -86,11 +86,10 @@ describe('PageTitle', () => {
 })
 
 describe('SectionHead', () => {
-  it('renders an h2 by default, with the id on the heading, and no numeral even when one is passed (021 A11)', () => {
+  it('renders an h2 by default, with the id on the heading, and no numeral (021 A11)', () => {
     const html = renderToStaticMarkup(
       h(SectionHead, {
         title: 'Copy',
-        numeral: '01',
         id: 'copy-head',
         className: 'mb-3',
         children: 'Saved',
@@ -115,6 +114,15 @@ describe('SectionHead', () => {
 
   it('sets the card head at 16 px / 600 (the study .card-hd h2)', () => {
     expect(SECTION_HEAD.split(' ')).toEqual(expect.arrayContaining(['text-ui-lg', 'font-semibold']))
+  })
+
+  // 021 T8: an h3 that heads its own bezel card (the brand kit's sections,
+  // under the kit's h2) keeps its level and takes the card-head style.
+  it('renders an h3 in the card-head style with level={3} and card', () => {
+    const html = renderToStaticMarkup(h(SectionHead, { title: 'Fonts', level: 3, card: true }))
+    expect(html).toBe(
+      `<div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-2"><h3 class="${SECTION_HEAD}">Fonts</h3></div>`,
+    )
   })
 })
 
@@ -200,9 +208,9 @@ describe('StatusChip', () => {
   })
 
   it('keeps the status path: its label and colours, plus the two no-wrap utilities', () => {
-    const html = renderToStaticMarkup(h(StatusChip, { status: 'unfinished', className: 'x' }))
+    const html = renderToStaticMarkup(h(StatusChip, { status: 'queued', className: 'x' }))
     expect(html).toBe(
-      `<span class="${BASE} bg-status-scheduled/12 text-status-scheduled x">Unfinished</span>`,
+      `<span class="${BASE} bg-status-scheduled/12 text-status-scheduled x">Queued</span>`,
     )
     expect(html).toContain('rounded-ui-pill')
     expect(html).not.toContain('uppercase')

@@ -27,9 +27,6 @@ export const EYEBROW = `${SMALL_CAPS} text-fg-muted`
 export const PAGE_TITLE = 'text-ui-xl md:text-ui-2xl font-bold leading-[1.15] tracking-tight'
 export const PAGE_LEAD = 'mt-1.5 text-ui-sm text-fg-muted'
 
-// Removed in 021 T8. SectionHead no longer renders a numeral (021 A11); the
-// wave 2 screen tasks delete the last direct spans.
-export const SECTION_NUMERAL = 'italic text-ui-base text-accent'
 // A card head (the study's .card-hd h2): 16 px / 600.
 export const SECTION_HEAD = 'text-ui-lg font-semibold leading-snug tracking-[-0.01em]'
 
@@ -71,12 +68,8 @@ export const PILL_BADGE =
 export const TABLE_HEAD_ROW =
   'border-b border-line-subtle text-left text-ui-2xs font-semibold text-fg-muted'
 
-// A ruled row (§6: lists as ruled rows, not cards).
+// A ruled row (§6: lists as ruled rows, not cards; the study's .thread li + li).
 export const ROW = 'border-b border-line-subtle py-3'
-
-// A section's body under a hairline rule. Kept for the cards that wave 2 has
-// not yet moved onto a bezel card (021 T7); deleted in T8 if unused.
-export const BLOCK = 'border-t border-line-subtle pt-4'
 
 // A compact field, the §8.3 field at --text-sm. Written out in full because
 // `cn` is a plain join: overriding fieldClasses' padding would leave two

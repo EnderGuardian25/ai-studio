@@ -12,8 +12,6 @@ type PostStatus =
   | 'generating'
   | 'generated'
   | 'cancelled'
-  // Unfinished (autosaved) brief-wizard sessions on the dashboard:
-  | 'unfinished'
 
 // The tones a free-text chip can take, for states with no `status` entry
 // (Connected, Invalid, Active, Deactivated, Revoked): each reuses a status's
@@ -53,7 +51,6 @@ const statusConfig: Record<PostStatus, { label: string; classes: string }> = {
   generating: { label: 'Generating', classes: 'bg-status-exported/12 text-status-exported' },
   generated: { label: 'Generated', classes: 'bg-status-published/12 text-status-published' },
   cancelled: { label: 'Cancelled', classes: 'bg-status-draft/12 text-status-draft' },
-  unfinished: { label: 'Unfinished', classes: 'bg-status-scheduled/12 text-status-scheduled' },
 }
 
 // Two overloads rather than one union parameter, with the `status` one last:

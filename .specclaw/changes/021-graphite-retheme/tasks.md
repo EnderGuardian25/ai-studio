@@ -128,7 +128,7 @@ There are 8 tasks in 3 waves. All the work lands on `v2`, after 018 and 022 (R12
     - **Library:** the search is a pill field; `SegmentedToggle` gets the Graphite track; `PostCard` tiles keep the post square and unrounded inside its frame (A3); `PublishDialog` and `PublishHistoryDrawer` go onto the overlay surface. `PublishDialog`'s props stay stable (it is shared with 010).
     - **Brief:**
       - `cardCls` / `rowCls`: the selected look is per §8;
-      - `Stepper` labels: `SMALL_CAPS` stays (a micro label), and the numerals go;
+      - `Stepper` labels: `SMALL_CAPS` stays (a micro label), and the Folio italic numerals go; the Stepper keeps its step numbers in 22 px discs, because the number is part of each step button's name (`1Campaign`, FR-12; ruled at the T4 review, wording amended in T8);
       - `StepHead`: drop the `SECTION_NUMERAL` span;
       - template swatches keep their `ui-exception`;
       - the Review step stays extensible (008).
@@ -221,7 +221,7 @@ There are 8 tasks in 3 waves. All the work lands on `v2`, after 018 and 022 (R12
 
 ### Wave 3 — Cleanup, docs and final gates
 
-- [ ] `T8` — Full deny-list on; remove the numeral prop and leftovers; new Graphite `DESIGN_SYSTEM.md`; CLAUDE.md pointer; final gates and captures
+- [x] `T8` — Full deny-list on; remove the numeral prop and leftovers; new Graphite `DESIGN_SYSTEM.md`; CLAUDE.md pointer; final gates and captures
   - Files: `tests/unit/uiTokenGuard.test.ts`, `src/components/ui/SectionHead.tsx`, `src/components/ui/atoms.ts`, any `src/` file still holding a `\bfolio\b` comment, a `border-[tb]-2` rule or an unused atom, `docs/ui-reference/DESIGN_SYSTEM.md`, `docs/ui-reference/screen-light.png`, `docs/ui-reference/screen-dark.png`, `CLAUDE.md` (the "UI / Design system" section only)
   - Estimate: medium
   - Kind: refactor

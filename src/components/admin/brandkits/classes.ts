@@ -43,4 +43,4 @@ export const CODE_FIELD =
 
 // The kit name while editing: the §8.3 field set at the kit title's size.
 export const TITLE_FIELD =
-  'w-full max-w-md rounded-ui-md border border-line bg-surface-raised px-4 py-1.5 text-ui-lg font-semibold text-fg transition-[border-color,box-shadow] duration-fast ease-standard focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-focus'
+  'w-full max-w-md rounded-ui-md border border-line bg-surface-raised px-4 py-1.5 text-ui-xl font-semibold text-fg transition-[border-color,box-shadow] duration-fast ease-standard focus:outline focus:outline-2 focus:outline-offset-2 focus:outline-focus'

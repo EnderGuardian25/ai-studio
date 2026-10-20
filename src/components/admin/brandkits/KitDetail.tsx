@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/Input'
 import { FieldLabel } from '@/components/ui/FieldLabel'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { SectionHead } from '@/components/ui/SectionHead'
-import { COMPACT_FIELD, EYEBROW, FOCUS, ICON, ICON_BUTTON, PILL_BADGE, SECTION_HEAD, TAG } from '@/components/ui/atoms'
+import { COMPACT_FIELD, EYEBROW, FOCUS, ICON, ICON_BUTTON, PILL_BADGE, TAG } from '@/components/ui/atoms'
 import { apiFetch } from '@/lib/apiFetch'
 import type { AspectRatio } from '@prisma/client'
 import { ASPECT_LABELS, ASPECT_VALUES, dimensionsLabel } from '@/lib/aspectRatio'
@@ -248,7 +248,7 @@ export function KitDetail({ kit, onRefresh }: KitDetailProps) {
               className={TITLE_FIELD}
             />
           ) : (
-            <h2 className={`flex flex-wrap items-center gap-x-2.5 gap-y-1 ${SECTION_HEAD}`}>
+            <h2 className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-ui-xl font-semibold leading-snug tracking-tight">
               <span className="min-w-0 max-w-full break-words">{kit.name}</span>
               {kit.isDefault && <span className={`${PILL_BADGE} tracking-normal`}>System default</span>}
             </h2>
@@ -279,7 +279,7 @@ export function KitDetail({ kit, onRefresh }: KitDetailProps) {
       <div className="space-y-3.5">
         {/* Colors — each swatch shows the kit's own colour (data, not tokens). */}
         <section className={SECTION}>
-          <SectionHead level={3} title="Color Palette" className="mb-3" />
+          <SectionHead level={3} card title="Color Palette" className="mb-3" />
           {editing ? (
             <ColorEditor colors={colors} onChange={setColors} />
           ) : (
@@ -300,7 +300,7 @@ export function KitDetail({ kit, onRefresh }: KitDetailProps) {
             uploaded, on raised paper in a hairline ring; the primary one takes
             the 1.5 px ink ring of a selected version. */}
         <section className={SECTION}>
-          <SectionHead level={3} title="Logos" className="mb-3">
+          <SectionHead level={3} card title="Logos" className="mb-3">
             <input
               ref={fileRef}
               type="file"
@@ -375,7 +375,7 @@ export function KitDetail({ kit, onRefresh }: KitDetailProps) {
 
         {/* Fonts */}
         <section className={SECTION}>
-          <SectionHead level={3} title="Fonts" className="mb-3" />
+          <SectionHead level={3} card title="Fonts" className="mb-3" />
           {editing ? (
             <FontEditor fonts={fonts} onChange={setFonts} />
           ) : fonts.length === 0 ? (
@@ -393,7 +393,7 @@ export function KitDetail({ kit, onRefresh }: KitDetailProps) {
 
         {/* Templates */}
         <section className={SECTION}>
-          <SectionHead level={3} title="HTML Templates" className="mb-3">
+          <SectionHead level={3} card title="HTML Templates" className="mb-3">
             <input
               ref={templateImageRef}
               type="file"
@@ -491,13 +491,13 @@ export function KitDetail({ kit, onRefresh }: KitDetailProps) {
 
         {/* Brand Voice Prompt */}
         <section className={SECTION}>
-          <SectionHead level={3} title="Brand Voice Prompt" className="mb-3" />
+          <SectionHead level={3} card title="Brand Voice Prompt" className="mb-3" />
           <PromptSection kitId={kit.id} prompts={kit.prompts} onRefresh={onRefresh} />
         </section>
 
         {/* Artifacts */}
         <section className={SECTION}>
-          <SectionHead level={3} title="Artifacts" className="mb-3">
+          <SectionHead level={3} card title="Artifacts" className="mb-3">
             <input
               ref={artifactRef}
               type="file"
