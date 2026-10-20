@@ -49,7 +49,7 @@ This change has **2 tasks in 2 waves**:
 
 ### Wave 2 — Gate
 
-- [ ] `T2` — The full gate, CI, and the results recorded
+- [~] `T2` — The full gate, CI, and the results recorded
   - Files: `docs/handoff.md`, `CLAUDE.md`
   - Estimate: small
   - Kind: test
