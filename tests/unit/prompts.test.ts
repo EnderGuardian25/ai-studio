@@ -243,7 +243,8 @@ describe('SCRIPT_SUPPORT_NOTE — no-emoji guidance', () => {
     // 2026-10-01.1: the CLI refine prompt gained SCRIPT_SUPPORT_NOTE (final F1 / I-3).
     // 2026-10-01.2: VERIFIER_SYSTEM no longer paraphrases class criteria (final F1b / M-1).
     // 2026-10-11.1: the design prompts take the fenced headline, not the caption (012 FR-09).
-    expect(PROMPT_VERSION).toBe('2026-10-11.1')
+    // 2026-10-21.1: hero image styles (009): the image-style contract in the art-director, Path B and refine prompts.
+    expect(PROMPT_VERSION).toBe('2026-10-21.1')
   })
 })
 

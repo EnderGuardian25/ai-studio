@@ -99,3 +99,30 @@ describe('buildRefineUserMessage + retry note', () => {
     expect(buildRefineUserMessage({ ...msg, retryReasons: [] })).toBe(buildRefineUserMessage(msg))
   })
 })
+
+// ── 009 FR-06: the stamped layout contract reaches the refine prompt ────────
+describe('buildRefineSystemPrompt: compositionContract (009)', () => {
+  const size = {
+    subject: 'a device',
+    regions: [{ rect: { x: 0, y: 0, w: 45, h: 100 }, purpose: 'text' as const, minAreaPct: 20 }],
+  }
+
+  it.each(['api', 'cli'] as const)('%s: appends the contract sentence, after the background note and before the script note', (mode) => {
+    const p = buildRefineSystemPrompt({
+      ...base,
+      mode,
+      backgroundImageUrl: 'https://cdn.example.com/bg.png',
+      compositionContract: { label: 'Product showcase', version: 2, size },
+    })
+    const sentence =
+      'This post uses the Product showcase layout (contract v2). Keep headline, body text and the logo inside: the left 45% of the frame, full height.'
+    expect(p).toContain(sentence)
+    expect(p.indexOf('New background image:')).toBeLessThan(p.indexOf(sentence))
+    expect(p.indexOf(sentence)).toBeLessThan(p.indexOf('Text & language fidelity'))
+  })
+
+  it.each(['api', 'cli'] as const)('%s: absent for a classic draft (byte-identical)', (mode) => {
+    expect(buildRefineSystemPrompt({ ...base, mode })).not.toContain('This post uses the')
+    expect(buildRefineSystemPrompt({ ...base, mode, compositionContract: undefined })).toBe(buildRefineSystemPrompt({ ...base, mode }))
+  })
+})

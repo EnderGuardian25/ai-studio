@@ -27,6 +27,13 @@ import { MOCK_PUPPETEER } from "@/lib/testHooks"
 // not text or a logo.
 export const FULL_BLEED_AREA_PCT = 60
 
+// The observation is bounded (T4, carry-over of the T3 review): measureLayoutBoxes
+// waits for networkidle0, which can take up to SET_CONTENT_TIMEOUT_MS (60 s), and
+// an observation must not stretch the generation's liveness segment (the action
+// budget, models/budget.ts, sizes its step to this value). On expiry it records
+// nothing. A real measurement is about 1 to 2 s.
+export const LAYOUT_OBSERVE_TIMEOUT_MS = 15_000
+
 export type LayoutObservation = { ok: true } | { ok: false; outside: number }
 
 export interface MeasureOptions {
@@ -107,17 +114,30 @@ export async function measureLayoutBoxes(html: string, opts: MeasureOptions): Pr
   return boxes
 }
 
-// Null when the measurement did not run or errored (logged); never throws.
+// Null when the measurement did not run, errored or timed out (logged); never
+// throws. `timeoutMs` exists so a test can prove the timeout path.
 export async function observeLayout(
   html: string,
   textRegions: ReadonlyArray<Region>,
-  opts: MeasureOptions
+  opts: MeasureOptions,
+  timeoutMs: number = LAYOUT_OBSERVE_TIMEOUT_MS
 ): Promise<LayoutObservation | null> {
   if (MOCK_PUPPETEER) return null
+  let timer: ReturnType<typeof setTimeout> | undefined
   try {
-    return evaluateLayout(await measureLayoutBoxes(html, opts), textRegions)
+    const work = measureLayoutBoxes(html, opts)
+    work.catch(() => {}) // the race below owns the outcome; never an unhandled rejection
+    const boxes = await Promise.race([
+      work,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`timed out after ${timeoutMs} ms`)), timeoutMs)
+      }),
+    ])
+    return evaluateLayout(boxes, textRegions)
   } catch (err) {
     console.warn(`[layout] observation failed, recording nothing: ${err instanceof Error ? err.message : String(err)}`)
     return null
+  } finally {
+    if (timer) clearTimeout(timer)
   }
 }

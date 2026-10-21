@@ -137,6 +137,7 @@ vi.mock('@/lib/drafts/refineAttempt', () => ({
 vi.mock('@/lib/drafts/revisions', () => ({
   commitDraftRevision: h.commit,
   draftModelStamp: () => ({ model: null, modelSubstitutedFrom: null }),
+  draftCompositionStamp: () => null,
   recordRejectedRender: vi.fn(),
   currentRenderStamp: vi.fn(),
   draftStampFields: vi.fn(),

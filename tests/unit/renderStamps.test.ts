@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { Prisma } from '@prisma/client'
 
 // F3 (change 004 final fix wave, AC-04): the generation and regenerate-design
 // paths write DraftRevision rows outside revisions.ts. Each must stamp the row
@@ -92,8 +93,25 @@ vi.mock('@/lib/agent/pathA', () => ({
   runPathADesign: async () => ({ htmlContent: '<html>a</html>', exportUrl: 'exports/a.png' }),
   assertTemplateMatchesBrief: () => {},
 }))
+// 009 FR-12: Path B returns the run's composition stamp; every writer carries it.
+const KEPT = {
+  requestedArchetype: 'product-showcase',
+  appliedArchetype: 'product-showcase',
+  contractVersion: 1,
+  imageQuality: 'high',
+}
 vi.mock('@/lib/agent/pathB', () => ({
-  runPathBDesign: async () => ({ htmlContent: '<html>b</html>', exportUrl: 'exports/b.png', backgroundImageUrl: null }),
+  runPathBDesign: async () => ({
+    htmlContent: '<html>b</html>',
+    exportUrl: 'exports/b.png',
+    backgroundImageUrl: null,
+    composition: {
+      requestedArchetype: 'product-showcase',
+      appliedArchetype: 'product-showcase',
+      contractVersion: 1,
+      imageQuality: 'high',
+    },
+  }),
 }))
 vi.mock('@/lib/agent/generationErrors', () => ({ humanizeGenerationError: (e: unknown) => String(e) }))
 // The route's auth wrapper → a pass-through with a fixed teammate.
@@ -152,6 +170,9 @@ describe('generation v1 "Original design" revision', () => {
     expect(db.revisionCreates[0]).toMatchObject({ revisionNumber: 1, instruction: 'Original design', ...STAMP, ...FREEFORM })
     expect(db.draftWrites.find((w) => w.op === 'create')!.data).toMatchObject({ ...STAMP, ...DRAFT_FREEFORM })
     expect(db.draftWrites.find((w) => w.op === 'create')!.data).not.toHaveProperty('model')
+    // 009: the run's composition stamp lands on both rows, unchanged.
+    expect(db.revisionCreates[0].composition).toEqual(KEPT)
+    expect(db.draftWrites.find((w) => w.op === 'create')!.data.composition).toEqual(KEPT)
   })
 
   it('async path (brief wizard): finalizeDraftV1 stamps the v1 row and the draft', async () => {
@@ -161,12 +182,18 @@ describe('generation v1 "Original design" revision', () => {
     expect(db.revisionCreates[0]).toMatchObject({ revisionNumber: 1, instruction: 'Original design', ...STAMP, ...FREEFORM })
     const finalize = db.draftWrites.find((w) => w.data.status === 'EXPORTED')!
     expect(finalize.data).toMatchObject({ ...STAMP, ...DRAFT_FREEFORM })
+    expect(db.revisionCreates[0].composition).toEqual(KEPT)
+    expect(finalize.data.composition).toEqual(KEPT)
   })
 
   it('a TEMPLATE brief stamps the DESIGN_TEMPLATE model (Haiku by default)', async () => {
     db.draft = { id: 'd1', templateId: 't1', brief: { ...(brief as object), designMode: 'TEMPLATE' } }
     await runGenerationForDraft('d1', { userId: 'u1', teamId: 'team1' })
     expect(db.revisionCreates[0]).toMatchObject({ model: 'claude-haiku-4-5', modelSubstitutedFrom: null })
+    // 009: a Path A draft is classic (the evidence's denominator), never null.
+    const classic = { requestedArchetype: 'classic', appliedArchetype: 'classic', contractVersion: null, imageQuality: 'default' }
+    expect(db.revisionCreates[0].composition).toEqual(classic)
+    expect(db.draftWrites.find((w) => w.data.status === 'EXPORTED')!.data.composition).toEqual(classic)
   })
 })
 
@@ -204,6 +231,9 @@ describe('regenerate-design', () => {
     expect(db.revisionCreates).toHaveLength(1)
     expect(db.revisionCreates[0]).toMatchObject({ instruction: 'Regenerated design', ...STAMP, ...FREEFORM })
     expect(db.draftWrites.at(-1)!.data).toMatchObject({ ...STAMP, ...DRAFT_FREEFORM })
+    // 009: the new run's composition stamp (re-resolved from the brief) is the one stored.
+    expect(db.revisionCreates[0].composition).toEqual(KEPT)
+    expect(db.draftWrites.at(-1)!.data.composition).toEqual(KEPT)
   })
 
   it('008: with no design stamp, resolves DESIGN_FREEFORM from the team default before the claim', async () => {
@@ -286,26 +316,29 @@ describe('RenderStamp.model (008 FR-08, D4)', () => {
   })()
 
   it('currentRenderStamp(model) carries the arg that crossed the boundary and the refused value', () => {
-    expect(currentRenderStamp(resolved)).toEqual({
+    expect(currentRenderStamp(resolved, null)).toEqual({
       ...STAMP,
       model: 'claude-sonnet-5-5',
       modelSubstitutedFrom: 'OPUS',
+      composition: null,
     })
-    expect(currentRenderStamp(null)).toEqual({ ...STAMP, model: null, modelSubstitutedFrom: null })
+    expect(currentRenderStamp(null, null)).toEqual({ ...STAMP, model: null, modelSubstitutedFrom: null, composition: null })
   })
 
   it('draftStampFields maps model → designModel, and nothing else changes name', () => {
-    expect(draftStampFields(currentRenderStamp(resolved))).toEqual({
+    expect(draftStampFields(currentRenderStamp(resolved, null))).toEqual({
       ...STAMP,
       designModel: 'claude-sonnet-5-5',
       designModelSubstitutedFrom: 'OPUS',
+      // 009: no composition stamp is SQL NULL, not a JSON null.
+      composition: Prisma.DbNull,
     })
   })
 
   it("restoredRenderStamp copies the revision's own model, whether or not its PNG is re-rendered (A6)", () => {
     const row = { promptVersion: 'pv-old', fontSet: 'fonts-old', model: 'claude-sonnet-4-6', modelSubstitutedFrom: 'HAIKU' }
-    expect(restoredRenderStamp(row, false)).toEqual(row)
-    expect(restoredRenderStamp(row, true)).toEqual({ ...row, fontSet: 'fonts-test' })
+    expect(restoredRenderStamp(row, false)).toEqual({ ...row, composition: null })
+    expect(restoredRenderStamp(row, true)).toEqual({ ...row, fontSet: 'fonts-test', composition: null })
     // A pre-008 row reads as unknown, never as the current model.
     expect(restoredRenderStamp({ promptVersion: 'pv', fontSet: 'f' }, false)).toMatchObject({
       model: null,

@@ -6,7 +6,8 @@ import { resolveCopyProvider } from '@/providers/registry'
 import { buildBriefInput } from '@/lib/agent/briefInput'
 import { runPathADesign, assertTemplateMatchesBrief } from '@/lib/agent/pathA'
 import { runPathBDesign } from '@/lib/agent/pathB'
-import { currentRenderStamp, draftStampFields, type RenderStamp } from '@/lib/drafts/revisions'
+import { currentRenderStamp, draftStampFields, revisionStampFields, type RenderStamp } from '@/lib/drafts/revisions'
+import { classicStamp } from '@/lib/designData'
 import { humanizeGenerationError } from '@/lib/agent/generationErrors'
 import { generationSkipFields, type BackgroundSkipFields } from '@/lib/drafts/backgroundNotice'
 import type { GenerationActor } from '@/lib/agent/types'
@@ -151,7 +152,8 @@ async function produceDesign(
       backgroundImageUrl: null,
       // Path A has no background step: nothing was skipped.
       backgroundSkip: generationSkipFields(null),
-      stamp: currentRenderStamp(model),
+      // 009: a Path A draft is classic (and gives the evidence its denominator).
+      stamp: currentRenderStamp(model, classicStamp()),
     }
   }
   const result = await runPathBDesign(brief, kit!, headline, campaignBriefing, actor, model, { onBeforeDesign })
@@ -160,7 +162,9 @@ async function produceDesign(
     exportUrl: result.exportUrl,
     backgroundImageUrl: result.backgroundImageUrl,
     backgroundSkip: generationSkipFields(result.background),
-    stamp: currentRenderStamp(model),
+    // 009 FR-12: the run's composition stamp (the image style asked for, the
+    // one applied, why not), resolved by runPathBDesign.
+    stamp: currentRenderStamp(model, result.composition),
   }
 }
 
@@ -196,7 +200,7 @@ async function finalizeDraftV1(
         instruction: 'Original design',
         htmlSnapshot: design.htmlContent,
         exportUrl: design.exportUrl,
-        ...design.stamp,
+        ...revisionStampFields(design.stamp),
       },
     })
   })
@@ -263,7 +267,7 @@ export async function generateDraftForBrief(
         instruction: 'Original design',
         htmlSnapshot: design.htmlContent,
         exportUrl: design.exportUrl,
-        ...design.stamp,
+        ...revisionStampFields(design.stamp),
       },
     })
     return created

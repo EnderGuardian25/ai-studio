@@ -16,6 +16,14 @@
 // MOCK_AI skips the step entirely so the E2E suite stays deterministic — unless
 // the brief topic (or, for refine, the instruction) carries a __MOCK_BG__
 // sentinel (the NFR-06 seam, testHooks.ts).
+//
+// Hero image styles (change 009): for a hero plan the same step writes the
+// image prompt from the archetype's contract (the closed decision still returns
+// only { needed, prompt }: nothing the model says supplies or moves a region),
+// makes ONE image call, persists it, and runs the pixel check on the image
+// BEFORE the design call. The check fails closed: only an explicit `{ ok: true }`
+// keeps the archetype; every other exit settles to classic over the SAME image
+// (settleComposition, designData/plan.ts).
 
 import Anthropic from '@anthropic-ai/sdk'
 import { internalModel, type ResolvedModel } from '@/lib/models/resolve'
@@ -29,11 +37,15 @@ import {
   backgroundSeamText,
   mockBackgroundDecision,
   mockImageProvider,
+  mockRegionSamples,
   shouldMockBackground,
 } from '@/lib/testHooks'
+import { dimensionsFor } from '@/lib/aspectRatio'
+import { evaluateRegions, type HeroCheckResult, type HeroPlan } from '@/lib/designData'
+import { sampleRegionLuminance } from '@/lib/renderer/puppeteer'
 import type { ResolvedBrandKit } from '@/lib/brandkit/resolve'
 import { resolveImageProvider } from '@/providers/registry'
-import { imageSizeFor } from '@/providers/imageCapabilities'
+import { imageSizeFor, type ImageTier } from '@/providers/imageCapabilities'
 import type { ImageProvider } from '@/providers/interfaces/ImageProvider'
 import { persistDataUrlImage } from '@/lib/storage/minio'
 import { runClaudeCli, stripCodeFences } from '@/lib/agent/claudeCli'
@@ -52,6 +64,16 @@ import {
 
 export type { BackgroundResult, BackgroundSkipReason } from '@/lib/drafts/backgroundNotice'
 
+// The step's outcome with the hero extras (009): the tier the provider reported
+// and, for a hero plan only, the pixel check's result. A skip is unchanged.
+// Assignable to BackgroundResult, so every existing consumer is untouched.
+export type BackgroundOutcome =
+  | { url: string; quality?: ImageTier; check?: HeroCheckResult }
+  | Extract<BackgroundResult, { url: null }>
+
+// CLOSED (009 FR-05): zod's default object parsing strips unknown keys, so an
+// `archetype`, `safeArea`, `regions` or `role` in the reply is discarded. No
+// code reads a region from a model reply; regions live in designData only.
 const decisionSchema = z.object({
   needed: z.boolean(),
   prompt: z.string().optional().default(''),
@@ -149,8 +171,12 @@ async function runBackgroundStep(
     // The text the NFR-06 seam reads its sentinel from (testHooks.ts).
     seamText: string
     kind: 'generation' | 'refine'
+    // A hero plan (009), generation only: the needed flag is ignored (the user
+    // required an image), an empty prompt is no image, one image call is made
+    // (with the operator's quality tier when set) and its pixels are checked.
+    hero?: HeroPlan
   },
-): Promise<BackgroundResult> {
+): Promise<BackgroundOutcome> {
   // NFR-06 seam: without a __MOCK_BG__ sentinel, MOCK_AI skips the step (no
   // background, nothing recorded) exactly as it always has.
   const mockSeam = shouldMockBackground(opts.seamText)
@@ -172,7 +198,9 @@ async function runBackgroundStep(
     const decision = mockSeam ? mockBackgroundDecision(opts.seamText) : await runDecision(buildPrompt())
     if (!decision) return skip('DECISION_ERROR', 'decision response was not valid JSON')
     stage = 'provider'
-    if (!decision.needed || !decision.prompt.trim()) return skip('NOT_NEEDED')
+    // A hero plan ignores `needed`: the person chose the style, so an image is
+    // required, and only an empty prompt means there is none (no-image).
+    if (opts.hero ? !decision.prompt.trim() : !decision.needed || !decision.prompt.trim()) return skip('NOT_NEEDED')
     // refine only: the held resolver failure, now that a background was wanted.
     if (!resolved.provider) return skip('PROVIDER_ERROR', resolved.detail)
 
@@ -187,16 +215,53 @@ async function runBackgroundStep(
     // wired yet: there is no existing OpenAI-error auth-classification helper to
     // hang this off (unlike isClaudeAuthFailure for the CLI), and inventing one is
     // out of scope here.
-    const result = await provider.generateImage(decision.prompt, opts.brandKitId, imageSizeFor(provider.providerName, opts.aspectRatio))
+    // ONE image call on every exit. The fourth argument exists only for a hero
+    // plan with IMAGE_QUALITY set: a classic call is exactly what it always was.
+    const size = imageSizeFor(provider.providerName, opts.aspectRatio)
+    const heroQuality = opts.hero ? env.IMAGE_QUALITY : undefined
+    const result = heroQuality
+      ? await provider.generateImage(decision.prompt, opts.brandKitId, size, { quality: heroQuality })
+      : await provider.generateImage(decision.prompt, opts.brandKitId, size)
     // persistDataUrlImage enforces the raster allow-list and returns a stable
     // public URL; a provider that already returns an http(s) URL passes through.
     const url = result.url.startsWith('data:')
       ? await persistDataUrlImage(result.url, 'background')
       : result.url
     log(`background ready in ${((Date.now() - startedAt) / 1000).toFixed(1)}s · ${url}`)
-    return { url }
+    if (!opts.hero) return { url }
+    // The pixel check runs on the bytes the provider returned (a data: URL: the
+    // sampler refuses anything else, which settles to check-error).
+    const check = await checkHero(result.url, opts.hero, mockSeam, opts.seamText)
+    return { url, ...(result.quality ? { quality: result.quality } : {}), check }
   } catch (err) {
     return skip(stage === 'decision' ? 'DECISION_ERROR' : 'PROVIDER_ERROR', errorText(err))
+  }
+}
+
+// The pixel check for a hero image (009 FR-09/FR-10): the sampler (or, under
+// MOCK_AI with a __MOCK_BG__ sentinel, the seam's synthetic samples) feeds the
+// REAL evaluateRegions. It FAILS CLOSED: a sampler error, a timeout, a seam
+// error or any other throw is `check-error`, and only an explicit `{ ok: true }`
+// verdict is a pass. Never throws.
+async function checkHero(
+  imageUrl: string,
+  hero: HeroPlan,
+  mockSeam: boolean,
+  seamText: string,
+): Promise<HeroCheckResult> {
+  try {
+    const regions = hero.sizeContract.regions
+    const tone = hero.contract.textTone
+    const samples =
+      (mockSeam ? mockRegionSamples(seamText, regions, tone) : null) ??
+      (await sampleRegionLuminance(imageUrl, regions, dimensionsFor(hero.size)))
+    const verdict = evaluateRegions(samples, regions, tone)
+    if (verdict.ok === true) return { ok: true }
+    log(`hero check failed (${verdict.reason}) for ${hero.requestedArchetype}`)
+    return { ok: false, reason: verdict.reason }
+  } catch (err) {
+    log(`hero check could not run (${errorText(err)})`)
+    return { ok: false, reason: 'check-error' }
   }
 }
 
@@ -225,6 +290,10 @@ async function resolveProvider(opts: {
  * Path B initial generation / regeneration: decide (biased toward yes) and
  * generate a background for the brief. Returns the public image URL, or the
  * reason there is none. Never throws.
+ *
+ * `hero` (009) is the plan of a non-classic image style: the decision prompt
+ * is written from its contract, `needed` is ignored, and the result carries
+ * the pixel check (and the provider's quality tier). Absent: today's step.
  */
 export async function generateBackgroundForBrief(
   brief: Brief,
@@ -233,7 +302,8 @@ export async function generateBackgroundForBrief(
   headline: string,
   campaignBriefing: string | null | undefined,
   actor: GenerationActor,
-): Promise<BackgroundResult> {
+  hero?: HeroPlan,
+): Promise<BackgroundOutcome> {
   return runBackgroundStep(
     () =>
       buildBackgroundDecisionPrompt({
@@ -244,6 +314,7 @@ export async function generateBackgroundForBrief(
         tone: brief.tone,
         headline,
         campaignBriefing,
+        ...(hero ? { hero: { label: hero.label, contract: hero.contract, size: hero.sizeContract } } : {}),
       }),
     {
       actor,
@@ -252,6 +323,7 @@ export async function generateBackgroundForBrief(
       imageProviderKey: brief.imageProviderKey,
       seamText: brief.topic,
       kind: 'generation',
+      hero,
     },
   )
 }

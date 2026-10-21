@@ -11,6 +11,17 @@ import type { ResolvedModel } from '@/lib/models/resolve'
 import { buildPathBSystemPrompt, buildPathBUserMessage } from '@/lib/agent/prompts/pathB'
 import { parseBriefImages } from '@/lib/agent/briefInput'
 import { generateBackgroundForBrief, type BackgroundResult } from '@/lib/agent/background'
+import {
+  compositionStampSchema,
+  evaluateLayout,
+  planComposition,
+  settleComposition,
+  type CompositionStamp,
+  type HeroPlan,
+  type Region,
+} from '@/lib/designData'
+import { observeLayout, type LayoutObservation } from '@/lib/renderer/layoutFacts'
+import { MOCK_PUPPETEER, mockLayoutBoxes } from '@/lib/testHooks'
 
 // Re-export for existing importers; canonical home is agent/briefInput.ts.
 export { buildBriefInput } from '@/lib/agent/briefInput'
@@ -22,6 +33,42 @@ export type PathBDesignResult = DesignAgentResult & {
   // The background step's full outcome, including why it skipped (005
   // FR-06) — the callers store an unintended skip on the draft (FR-07).
   background: BackgroundResult
+  // The composition stamp of this run (009 FR-12): the image style asked for,
+  // the one applied, why not, and the layout observation. The callers write it
+  // with the design (finalizeDraftV1, regenerate-design).
+  composition: CompositionStamp
+}
+
+// The layout observation of a KEPT hero archetype (009 FR-11): one more page
+// load of the final HTML, which only records. Under MOCK_PUPPETEER nothing is
+// measured; the seam supplies boxes and the REAL evaluateLayout compares them.
+// An error records nothing (observeLayout never throws).
+//
+// Bound: observeLayout races the measurement against LAYOUT_OBSERVE_TIMEOUT_MS
+// (15 s); on expiry it records nothing. budget.ts sizes layoutMeasureMs to that
+// bound, so the segment budget holds. An abandoned page still holds its
+// renderer slot until setContent's own 60 s cap.
+async function observeKeptLayout(
+  html: string,
+  plan: HeroPlan,
+  kit: ResolvedBrandKit,
+  backgroundImageUrl: string | null,
+  canvas: { width: number; height: number },
+  seamText: string,
+): Promise<LayoutObservation | null> {
+  const textRegions: Region[] = plan.sizeContract.regions.filter((r) => r.purpose === 'text')
+  if (MOCK_PUPPETEER) {
+    const boxes = mockLayoutBoxes(seamText, textRegions)
+    return boxes ? evaluateLayout(boxes, textRegions) : null
+  }
+  const logoUrls = Array.from(
+    new Set([kit.logoUrl, ...kit.logos.map((l) => l.url)].filter((u): u is string => !!u))
+  )
+  return observeLayout(html, textRegions, {
+    ...canvas,
+    logoUrls,
+    excludeUrls: backgroundImageUrl ? [backgroundImageUrl] : [],
+  })
 }
 
 // Runs the Path B (freeform) design pipeline for a given brief + its on-image
@@ -83,8 +130,18 @@ export async function runPathBDesign(
   // full-bleed background before the design call. A skip (with its reason)
   // on no provider/failure — the design proceeds with CSS/SVG visuals as
   // before. See agent/background.ts.
-  const background = await generateBackgroundForBrief(brief, kit, headline, campaignBriefing, actor)
+  //
+  // 009: the brief's image style plans the composition first. A hero plan
+  // writes the image prompt from the archetype's contract and gets its pixels
+  // checked; every exit that is not an explicit pass settles to classic over the
+  // same image (settleComposition), so there is never a second image call.
+  const plan = planComposition({ imageStyle: brief.imageStyle, aspectRatio: brief.aspectRatio })
+  const heroPlan = plan.kind === 'hero' ? plan : undefined
+  const background = await generateBackgroundForBrief(brief, kit, headline, campaignBriefing, actor, heroPlan)
   const backgroundImageUrl = background.url
+  const settled = settleComposition(plan, background)
+  // The contract reaches the design prompt only when the archetype was KEPT.
+  const kept = heroPlan && settled.appliedArchetype !== 'classic' ? heroPlan : undefined
 
   const systemPrompt = buildPathBSystemPrompt({
     kit,
@@ -94,6 +151,7 @@ export async function runPathBDesign(
     artifactUrls,
     referenceTemplateHtml,
     backgroundImageUrl,
+    ...(kept ? { composition: { label: kept.label, contract: kept.contract, size: kept.sizeContract } } : {}),
   })
   const userMessage = buildPathBUserMessage({
     campaignBriefing,
@@ -107,6 +165,7 @@ export async function runPathBDesign(
     width,
     height,
     briefImages,
+    heroPrecedence: !!kept,
   })
 
   await opts?.onBeforeDesign?.()
@@ -124,5 +183,15 @@ export async function runPathBDesign(
         actor,
       })
 
-  return { ...result, backgroundImageUrl, background }
+  // The layout observation, only for an applied non-classic archetype. A
+  // violation is recorded and shown, never a fallback (no second design call).
+  let composition = settled
+  if (kept) {
+    const observation = await observeKeptLayout(result.htmlContent, kept, kit, backgroundImageUrl, { width, height }, brief.topic)
+    if (observation && !observation.ok) {
+      composition = compositionStampSchema.parse({ ...settled, observations: ['layout-violation'] })
+    }
+  }
+
+  return { ...result, backgroundImageUrl, background, composition }
 }

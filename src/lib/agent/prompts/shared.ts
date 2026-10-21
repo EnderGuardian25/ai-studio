@@ -15,7 +15,9 @@ import { HEADLINE_MAX } from '@/lib/captions/headline'
 // 2026-10-11.1: Path A/B and the background decision take the fenced on-image
 // headline instead of the caption (012 FR-09); Path A fills its other text
 // slots only from the brief topic and description.
-export const PROMPT_VERSION = '2026-10-11.1'
+// 2026-10-21.1: hero image styles (009): the image-style contract in the
+// art-director, Path B and refine prompts.
+export const PROMPT_VERSION = '2026-10-21.1'
 
 // The on-image headline block every design prompt carries (012 FR-09): the
 // one line the design prints, never a caption. It is model output (or, for a

@@ -255,3 +255,18 @@ describe('resolveImageProvider — a gemini row serves a GeminiImageProvider', (
     vi.doUnmock('@/lib/prisma')
   })
 })
+
+describe('GeminiImageProvider — quality option (009 FR-16)', () => {
+  it('accepts the option and ignores it: the request is unchanged and no quality is returned', async () => {
+    fetchMock.mockResolvedValue(jsonResponse(successBody()))
+    const plain = await new GeminiImageProvider(KEY).generateImage('p', 'kit-1', '4:5')
+    const [, plainInit] = fetchMock.mock.calls[0] as [string, RequestInit]
+    fetchMock.mockClear()
+    fetchMock.mockResolvedValue(jsonResponse(successBody()))
+    const withTier = await new GeminiImageProvider(KEY).generateImage('p', 'kit-1', '4:5', { quality: 'high' })
+    const [, tierInit] = fetchMock.mock.calls[0] as [string, RequestInit]
+    expect(tierInit.body).toBe(plainInit.body)
+    expect(withTier).toEqual(plain)
+    expect(withTier).not.toHaveProperty('quality')
+  })
+})

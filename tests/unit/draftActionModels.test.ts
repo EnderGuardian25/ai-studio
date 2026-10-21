@@ -253,3 +253,53 @@ describe('retry (FR-08)', () => {
     })
   })
 })
+
+// ── 009 FR-12: every writer carries the draft's composition stamp ───────────
+// (T5 re-stamps a refine that replaced the hero image; here a refine only
+// carries, so it never drops the stamp.)
+
+describe('the composition stamp is carried by refine, reject, Override and inline edit (009 FR-12)', () => {
+  const KEPT = { requestedArchetype: 'editorial-split', appliedArchetype: 'editorial-split', contractVersion: 1, imageQuality: 'default' }
+
+  it('a verified refine commit carries the draft stamp', async () => {
+    h.draft = draft({ composition: KEPT })
+    await post({ instruction: 'darker' })
+    expect(h.commit.mock.calls[0][0].composition).toEqual(KEPT)
+  })
+
+  it('a rejected render carries it too', async () => {
+    h.draft = draft({ composition: KEPT })
+    h.result = NOT_APPLIED
+    await post({ instruction: 'darker' })
+    expect(h.reject.mock.calls[0][0].composition).toEqual(KEPT)
+  })
+
+  it('an Override commits with it', async () => {
+    h.draft = draft({
+      composition: KEPT,
+      pendingConflict: { conflictId: 'c1', pendingHtml: '<html>p</html>', explanation: 'x', model: SONNET, modelSubstitutedFrom: null },
+    })
+    await post({ overrideConflictId: 'c1' })
+    expect(h.commit.mock.calls[0][0].composition).toEqual(KEPT)
+  })
+
+  it('an inline edit commits with it', async () => {
+    const { POST: inlineEdit } = await import('@/app/api/drafts/[id]/inline-edit/route')
+    h.draft = draft({ composition: KEPT, status: 'EXPORTED', pendingAction: null })
+    await inlineEdit(
+      new Request('http://test/x', { method: 'POST', body: JSON.stringify({ html: '<html><body>edited</body></html>' }) }) as never,
+      ctx,
+    )
+    expect(h.commit.mock.calls[0][0].composition).toEqual(KEPT)
+  })
+
+  it('a pre-009 draft (no stamp) and a corrupt one both carry null: unknown is honest', async () => {
+    h.draft = draft()
+    await post({ instruction: 'darker' })
+    expect(h.commit.mock.calls[0][0].composition).toBeNull()
+    h.commit.mockClear()
+    h.draft = draft({ composition: { appliedArchetype: 'bogus' } })
+    await post({ instruction: 'darker' })
+    expect(h.commit.mock.calls[0][0].composition).toBeNull()
+  })
+})

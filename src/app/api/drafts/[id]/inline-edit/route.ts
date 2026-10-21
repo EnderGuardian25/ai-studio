@@ -5,7 +5,7 @@ import { withTeamAuth, parseBody, type TeamAuthedUser } from '@/lib/api/handler'
 import { canAccessContent } from '@/lib/authz/visibility'
 import { dimensionsFor } from '@/lib/aspectRatio'
 import { resolveExportUrl } from '@/lib/storage/minio'
-import { commitDraftRevision, draftModelStamp, RevisionConflictError } from '@/lib/drafts/revisions'
+import { commitDraftRevision, draftCompositionStamp, draftModelStamp, RevisionConflictError } from '@/lib/drafts/revisions'
 import {
   sanitizeInlineHtml,
   inlineEditBlockReason,
@@ -80,6 +80,8 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
     height,
     // 008 A6: hand-edited HTML is still the current model's output.
     model: draftModelStamp(draft),
+    // 009: the HTML is still the render its composition stamp describes.
+    composition: draftCompositionStamp(draft),
   })
 
   return NextResponse.json({
@@ -187,6 +189,8 @@ async function handleElementEdit(raw: unknown, draftId: string, user: TeamAuthed
       expectedRevisionNumber: baseRevisionNumber,
       // 008 A6: the edited element is still the current model's output.
       model: draftModelStamp(draft),
+      // 009: the HTML is still the render its composition stamp describes.
+      composition: draftCompositionStamp(draft),
     })
   } catch (err) {
     if (err instanceof RevisionConflictError) {

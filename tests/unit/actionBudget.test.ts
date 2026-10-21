@@ -29,7 +29,8 @@ const { STEP_BUDGETS, MARGIN_MS, RENDER_ALLOWANCE_MS, actionSegments, actionBudg
   await import('@/lib/models/budget')
 const { STUCK_GENERATION_MS } = await import('@/lib/drafts/recovery')
 const { GENERATION_LEASE_MS } = await import('@/lib/scheduler/generationRunner')
-const { SET_CONTENT_TIMEOUT_MS } = await import('@/lib/renderer/puppeteer')
+const { SET_CONTENT_TIMEOUT_MS, HERO_CHECK_TIMEOUT_MS } = await import('@/lib/renderer/puppeteer')
+const { LAYOUT_OBSERVE_TIMEOUT_MS } = await import('@/lib/renderer/layoutFacts')
 const { TX_MAX_WAIT_MS } = await import('@/lib/drafts/revisions')
 const { IMAGE_GENERATION_TIMEOUT_MS } = await import('@/providers/imageCapabilities')
 const { OpenAIImageProvider } = await import('@/providers/implementations/image/openai')
@@ -54,6 +55,9 @@ describe('the real catalogue fits every segment (design §5)', () => {
   // design §5's "worst case at the placeholders" column, in seconds. One
   // departure: the scheduler's last segment is 830 here (design 820 + post-
   // action 0 + the completing write 10), which the table rounds to ≈ 840.
+  // 009 T4: a hero image adds its pixel check (20 s) to the two background
+  // segments and its layout observation (15 s) to the two design segments;
+  // the scheduler's rows are unchanged (its briefs are always classic).
   it('each segment’s worst case is the one design §5 states', () => {
     const worst = Object.fromEntries(
       actionSegments().map((s) => {
@@ -63,10 +67,10 @@ describe('the real catalogue fits every segment (design §5)', () => {
     )
     expect(worst).toEqual({
       'Async generation: create → captions saved (headline write)': '240 api',
-      'Async generation: captions saved → pre-design touch': '210 api',
-      'Async generation: pre-design touch → finalize': '820 api',
-      'Regenerate design: claim → pre-design touch': '210 api',
-      'Regenerate design: pre-design touch → settle': '820 api',
+      'Async generation: captions saved → pre-design touch': '230 api',
+      'Async generation: pre-design touch → finalize': '835 api',
+      'Regenerate design: claim → pre-design touch': '230 api',
+      'Regenerate design: pre-design touch → settle': '835 api',
       'Refine: claim → attempt-1 touch': '210 api',
       'Refine: attempt-1 touch → attempt-2 touch': '810 api',
       'Refine: attempt-2 touch → pre-commit touch': '810 api',
@@ -80,7 +84,7 @@ describe('the real catalogue fits every segment (design §5)', () => {
   it('CLI mode is modelled too (in-process render, no tool tail), and sits under API mode', () => {
     const design = actionSegments().find((s) => s.segment === 'pre-design touch → finalize')!
     const cliOnly = { ...design, api: [] }
-    expect(segmentWorstCase(cliOnly, CATALOGUE, STEP_BUDGETS)).toEqual({ worstMs: 700_000, mode: 'cli' })
+    expect(segmentWorstCase(cliOnly, CATALOGUE, STEP_BUDGETS)).toEqual({ worstMs: 715_000, mode: 'cli' })
   })
 })
 
@@ -146,6 +150,8 @@ describe('every bound is imported from where it is enforced, never copied', () =
     expect(STEP_BUDGETS).toEqual({
       imageMs: IMAGE_GENERATION_TIMEOUT_MS,
       renderMs: SET_CONTENT_TIMEOUT_MS + RENDER_ALLOWANCE_MS,
+      heroCheckMs: HERO_CHECK_TIMEOUT_MS,
+      layoutMeasureMs: LAYOUT_OBSERVE_TIMEOUT_MS,
       txMs: TX_MAX_WAIT_MS,
       apiToolTailDesignMs: IMAGE_GENERATION_TIMEOUT_MS + SET_CONTENT_TIMEOUT_MS + RENDER_ALLOWANCE_MS,
       apiToolTailRefineMs: IMAGE_GENERATION_TIMEOUT_MS,
@@ -155,6 +161,8 @@ describe('every bound is imported from where it is enforced, never copied', () =
     expect([IMAGE_GENERATION_TIMEOUT_MS, SET_CONTENT_TIMEOUT_MS, TX_MAX_WAIT_MS, MARGIN_MS]).toEqual([
       120_000, 60_000, 10_000, 60_000,
     ])
+    // 009: the two hero steps are bounded by their own timers, not by setContent's cap.
+    expect([HERO_CHECK_TIMEOUT_MS, LAYOUT_OBSERVE_TIMEOUT_MS]).toEqual([20_000, 15_000])
   })
 
   it('budget.ts imports the limits and steps and holds no copy of them (no 15-minute or model-timeout literal)', () => {
@@ -162,7 +170,8 @@ describe('every bound is imported from where it is enforced, never copied', () =
     for (const [name, home] of [
       ['STUCK_GENERATION_MS', '@/lib/drafts/recovery'],
       ['GENERATION_LEASE_MS', '@/lib/scheduler/generationRunner'],
-      ['SET_CONTENT_TIMEOUT_MS', '@/lib/renderer/puppeteer'],
+      ['HERO_CHECK_TIMEOUT_MS, SET_CONTENT_TIMEOUT_MS', '@/lib/renderer/puppeteer'],
+      ['LAYOUT_OBSERVE_TIMEOUT_MS', '@/lib/renderer/layoutFacts'],
       ['TX_MAX_WAIT_MS', '@/lib/drafts/revisions'],
       ['IMAGE_GENERATION_TIMEOUT_MS', '@/providers/imageCapabilities'],
     ]) {
@@ -184,7 +193,7 @@ describe('every bound is imported from where it is enforced, never copied', () =
     new OpenAIImageProvider('sk-FAKE')
     expect(h.openAiOptions.at(-1)).toEqual({ apiKey: 'sk-FAKE', timeout: IMAGE_GENERATION_TIMEOUT_MS, maxRetries: 0 })
     const gemini = src('src/providers/implementations/image/gemini.ts')
-    expect(gemini).toMatch(/import \{ IMAGE_GENERATION_TIMEOUT_MS \} from "\.\.\/\.\.\/imageCapabilities"/)
+    expect(gemini).toMatch(/import \{ IMAGE_GENERATION_TIMEOUT_MS, type ImageTier \} from "\.\.\/\.\.\/imageCapabilities"/)
     expect(gemini).not.toMatch(/120_000/)
   })
 })

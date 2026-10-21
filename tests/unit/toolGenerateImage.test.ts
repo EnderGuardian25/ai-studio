@@ -105,3 +105,12 @@ describe('toolGenerateImage — actor vs. brief owner', () => {
     ).rejects.toThrow('No image provider configured for this team')
   })
 })
+
+describe('toolGenerateImage — quality (009 FR-16)', () => {
+  it('never passes the hero quality option: the design agent tool call keeps its three arguments', async () => {
+    const generateImage = vi.fn(async () => ({ url: 'https://cdn.example.com/x.png' }))
+    h.resolveImageProvider.mockResolvedValue({ providerName: 'openai', generateImage })
+    await toolGenerateImage('p', 'kit-1', 'brief-1', { userId: 'u', teamId: 't' }, 'SQUARE')
+    expect(generateImage.mock.calls[0]).toHaveLength(3)
+  })
+})

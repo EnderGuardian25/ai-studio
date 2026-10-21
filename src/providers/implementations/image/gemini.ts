@@ -1,5 +1,5 @@
 import type { ImageProvider } from "../../interfaces/ImageProvider"
-import { IMAGE_GENERATION_TIMEOUT_MS } from "../../imageCapabilities"
+import { IMAGE_GENERATION_TIMEOUT_MS, type ImageTier } from "../../imageCapabilities"
 
 // Gemini native image generation over plain fetch (005 FR-13; no SDK, NFR-05).
 //
@@ -59,7 +59,14 @@ export class GeminiImageProvider implements ImageProvider {
 
   // size is the provider-native value from imageSizeFor (imageCapabilities.ts):
   // an aspect-ratio string such as "1:1", "4:5" or "9:16".
-  async generateImage(prompt: string, _brandKitId?: string, size?: string): Promise<{ url: string }> {
+  // `options` is accepted and ignored (009 FR-16): Gemini has no quality knob,
+  // so no quality is returned and the stamp records `default`.
+  async generateImage(
+    prompt: string,
+    _brandKitId?: string,
+    size?: string,
+    _options?: { quality?: ImageTier }
+  ): Promise<{ url: string }> {
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), IMAGE_GENERATION_TIMEOUT_MS)
     let res: Response

@@ -20,7 +20,8 @@
 
 import type { Catalogue, Surface } from '@/lib/models/catalogue'
 import { IMAGE_GENERATION_TIMEOUT_MS } from '@/providers/imageCapabilities'
-import { SET_CONTENT_TIMEOUT_MS } from '@/lib/renderer/puppeteer'
+import { HERO_CHECK_TIMEOUT_MS, SET_CONTENT_TIMEOUT_MS } from '@/lib/renderer/puppeteer'
+import { LAYOUT_OBSERVE_TIMEOUT_MS } from '@/lib/renderer/layoutFacts'
 import { TX_MAX_WAIT_MS } from '@/lib/drafts/revisions'
 import { STUCK_GENERATION_MS } from '@/lib/drafts/recovery'
 import { GENERATION_LEASE_MS } from '@/lib/scheduler/generationRunner'
@@ -36,6 +37,16 @@ export interface StepBudgets {
   imageMs: number
   /** setContent + screenshot + upload. */
   renderMs: number
+  /** 009: a hero image's pixel check (the sampler's own Promise.race bound). Classic skips it. */
+  heroCheckMs: number
+  /**
+   * 009: the layout observation of a kept hero archetype, one more page load of
+   * the final HTML, bounded by observeLayout's own timer (it records nothing on
+   * expiry). It could not be sized like a render (setContent's 60 s plus the 30 s
+   * allowance): that pushed the API-mode design segment to 910 s, over the
+   * 900 s limit once the 60 s margin is kept. Classic skips it.
+   */
+  layoutMeasureMs: number
   /** A transaction's connection wait. */
   txMs: number
   /** API design loop: the tool work a turn can start just before its deadline (generateImage + renderHtml). */
@@ -50,6 +61,8 @@ export interface StepBudgets {
 export const STEP_BUDGETS: StepBudgets = {
   imageMs: IMAGE_GENERATION_TIMEOUT_MS,
   renderMs: SET_CONTENT_TIMEOUT_MS + RENDER_ALLOWANCE_MS,
+  heroCheckMs: HERO_CHECK_TIMEOUT_MS,
+  layoutMeasureMs: LAYOUT_OBSERVE_TIMEOUT_MS,
   txMs: TX_MAX_WAIT_MS,
   apiToolTailDesignMs: IMAGE_GENERATION_TIMEOUT_MS + SET_CONTENT_TIMEOUT_MS + RENDER_ALLOWANCE_MS,
   apiToolTailRefineMs: IMAGE_GENERATION_TIMEOUT_MS,
@@ -98,6 +111,8 @@ const backgroundDecision = { model: ['INTERNAL_BACKGROUND'] } as const
 const verifier = { model: ['INTERNAL_VERIFIER'] } as const
 const image = { step: 'imageMs' } as const
 const render = { step: 'renderMs' } as const
+const heroCheck = { step: 'heroCheckMs' } as const
+const layoutMeasure = { step: 'layoutMeasureMs' } as const
 const tx = { step: 'txMs' } as const
 const toolTailDesign = { step: 'apiToolTailDesignMs' } as const
 const toolTailRefine = { step: 'apiToolTailRefineMs' } as const
@@ -129,10 +144,22 @@ export function actionSegments(): ActionSegment[] {
   }
   return [
     seg('Async generation', 'create → captions saved (headline write)', STUCK, [caption]),
-    seg('Async generation', 'captions saved → pre-design touch', STUCK, [backgroundDecision, image]),
-    seg('Async generation', 'pre-design touch → finalize', STUCK, [design, toolTailDesign, tx], [design, render, tx]),
-    seg('Regenerate design', 'claim → pre-design touch', STUCK, [backgroundDecision, image]),
-    seg('Regenerate design', 'pre-design touch → settle', STUCK, [freeform, toolTailDesign, tx], [freeform, render, tx]),
+    seg('Async generation', 'captions saved → pre-design touch', STUCK, [backgroundDecision, image, heroCheck]),
+    seg(
+      'Async generation',
+      'pre-design touch → finalize',
+      STUCK,
+      [design, toolTailDesign, layoutMeasure, tx],
+      [design, render, layoutMeasure, tx],
+    ),
+    seg('Regenerate design', 'claim → pre-design touch', STUCK, [backgroundDecision, image, heroCheck]),
+    seg(
+      'Regenerate design',
+      'pre-design touch → settle',
+      STUCK,
+      [freeform, toolTailDesign, layoutMeasure, tx],
+      [freeform, render, layoutMeasure, tx],
+    ),
     seg('Refine', 'claim → attempt-1 touch', STUCK, [backgroundDecision, image]),
     seg('Refine', 'attempt-1 touch → attempt-2 touch', STUCK, refineAttempt.api, refineAttempt.cli),
     seg('Refine', 'attempt-2 touch → pre-commit touch', STUCK, refineAttempt.api, refineAttempt.cli),

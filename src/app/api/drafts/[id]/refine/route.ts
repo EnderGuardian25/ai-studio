@@ -16,7 +16,8 @@ import { modelError, parseModelField } from '@/lib/models/requests'
 import { buildRefineSystemPrompt, buildRefineUserMessage } from '@/lib/agent/prompts/refine'
 import { generateBackgroundForRefine } from '@/lib/agent/background'
 import { refineSkipFields } from '@/lib/drafts/backgroundNotice'
-import { commitDraftRevision, recordRejectedRender, type ModelStamp } from '@/lib/drafts/revisions'
+import { commitDraftRevision, draftCompositionStamp, recordRejectedRender, type ModelStamp } from '@/lib/drafts/revisions'
+import type { CompositionStamp } from '@/lib/designData'
 import { claimWhere, logLostClaim } from '@/lib/drafts/claim'
 import { claimDraftAction, startDraftAction, touchDraftAction } from '@/lib/drafts/draftActions'
 import { runRefineAttempts, settleRefine } from '@/lib/drafts/refineAttempt'
@@ -124,6 +125,7 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
       width,
       height,
       { model: pending.model, modelSubstitutedFrom: pending.modelSubstitutedFrom },
+      draftCompositionStamp(draft),
     )
   }
 
@@ -282,6 +284,8 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
           model,
           // 019: the final draft write is guarded on this run's claim.
           claim,
+          // 009 FR-12: carried unchanged (T5 re-stamps a refine that replaced the image).
+          composition: draftCompositionStamp(draft),
         })
       },
       conflict: async (conflict) => {
@@ -325,6 +329,7 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
           diagnostics: notApplied.diagnostics,
           // 008 FR-08: the rejected render records the attempt's model.
           model,
+          composition: draftCompositionStamp(draft),
           claim,
         })
       },
@@ -342,6 +347,7 @@ async function commitRevision(
   width: number,
   height: number,
   model: ModelStamp,
+  composition: CompositionStamp | null,
 ) {
   const { revisionId, exportKey } = await commitDraftRevision({
     draftId,
@@ -350,6 +356,7 @@ async function commitRevision(
     width,
     height,
     model,
+    composition,
   })
 
   return NextResponse.json({

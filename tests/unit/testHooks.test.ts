@@ -442,3 +442,27 @@ describe('buildMockRefineReply', () => {
     expect(a).toBe(b)
   })
 })
+
+// ── 009 FR-17: the hero check and layout seams ──────────────────────────────
+describe('hero seams (mockRegionSamples, mockLayoutBoxes)', () => {
+  const regions = [{ rect: { x: 0, y: 0, w: 45, h: 100 }, purpose: 'text' as const, minAreaPct: 20 }]
+
+  it('are dormant unless MOCK_AI is exactly "true": null, and no throw on a sentinel', async () => {
+    for (const env of [{}, { MOCK_AI: '1' }, { MOCK_AI: 'TRUE' }, { MOCK_AI: 'false' }] as Array<Record<string, string>>) {
+      const hooks = await loadHooks(env)
+      expect(hooks.mockRegionSamples('__MOCK_BG__ __MOCK_HERO_CHECK_ERROR__', regions, 'light')).toBeNull()
+      expect(hooks.mockRegionSamples('__MOCK_BG__ __MOCK_HERO_BUSY__', regions, 'light')).toBeNull()
+      expect(hooks.mockLayoutBoxes('__MOCK_HERO_LAYOUT__', regions)).toBeNull()
+    }
+  })
+
+  it('with MOCK_AI on: calm by default, a thrown error for the check-error sentinel, one outside box for the layout sentinel', async () => {
+    const hooks = await loadHooks({ MOCK_AI: 'true' })
+    const calm = hooks.mockRegionSamples('x', regions, 'light')!
+    expect(calm).toHaveLength(1)
+    expect(calm[0].areaPct).toBe(45)
+    expect(() => hooks.mockRegionSamples('__MOCK_HERO_CHECK_ERROR__', regions, 'light')).toThrow(/CHECK_ERROR/)
+    expect(hooks.mockLayoutBoxes('x', regions)).toHaveLength(1)
+    expect(hooks.mockLayoutBoxes('__MOCK_HERO_LAYOUT__', regions)).toHaveLength(2)
+  })
+})

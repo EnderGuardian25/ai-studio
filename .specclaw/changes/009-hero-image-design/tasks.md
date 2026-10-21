@@ -100,7 +100,7 @@ Nothing ships the hero prompt without the check and the stamp (T4 lands them tog
 
 ### Wave 4 — Prompts, pipeline, quality and the stamp
 
-- [ ] `T4` — The prompts, the pipeline wiring, the fail-closed check, quality, the budget, the mock seams and the stamp on every writer
+- [x] `T4` — The prompts, the pipeline wiring, the fail-closed check, quality, the budget, the mock seams and the stamp on every writer
   - Files: `src/lib/agent/prompts/{background,pathB,refine,shared}.ts`, `src/lib/agent/{background,pathB,generateDraft}.ts`, `src/lib/drafts/revisions.ts`, `src/app/api/drafts/[id]/{regenerate-design/route,inline-edit/route,refine/route,revisions/[rev]/restore/route,rejected/[revisionId]/adopt/route}.ts` (stamp carry only), `src/providers/interfaces/ImageProvider.ts`, `src/providers/implementations/image/{openai,gemini}.ts`, `src/lib/env.ts`, `.env.example`, `src/lib/testHooks.ts`, `src/lib/models/budget.ts`, `tests/unit/{heroPrompts,heroSeams}.test.ts` (new) plus the extended files named in design.md section 12 (`background`, `renderStamps`, `draftRevisions`, `draftActionModels`, `refinePrompt`, `prompts`, `geminiImage`, `toolGenerateImage`, `imageQuality`, `testHooks`, `actionBudget`, and any fixture that spreads a `RenderStamp`)
   - Estimate: large
   - Kind: impl

@@ -8,6 +8,7 @@ import { claimWhere, DraftClaimLostError, type DraftClaim } from '@/lib/drafts/c
 import type { DraftNotApplied } from '@/lib/api-types'
 import type { BackgroundSkipFields } from '@/lib/drafts/backgroundNotice'
 import type { ResolvedModel } from '@/lib/models/resolve'
+import { compositionStampSchema, parseCompositionStamp, type CompositionStamp } from '@/lib/designData'
 
 // ── The revision chain vs. rejected renders (change 004 Phase 2, T15/T16) ────
 // DraftRevision holds two kinds of row. COMMITTED rows are the chain: numbered
@@ -39,13 +40,20 @@ import type { ResolvedModel } from '@/lib/models/resolve'
 // (`model`: the arg that crossed the boundary) and the refused value the
 // resolver substituted away from (`modelSubstitutedFrom`), so every revision
 // writer that carries promptVersion carries the model too. A DraftRevision row
-// takes the stamp as-is; a Draft write goes through draftStampFields, because
-// the draft's columns are designModel / designModelSubstitutedFrom.
+// takes the stamp through revisionStampFields; a Draft write goes through
+// draftStampFields, because the draft's columns are designModel /
+// designModelSubstitutedFrom.
+//
+// 009 FR-12: it also carries the composition stamp (the image style asked for,
+// the one applied, why not, the observations), one JSON value on both tables.
+// null is "unknown" (a pre-009 row, or a writer that never knew), as for the
+// model.
 export interface RenderStamp {
   promptVersion: string | null
   fontSet: string | null
   model: string | null
   modelSubstitutedFrom: string | null
+  composition: CompositionStamp | null
 }
 
 // The model half of a RenderStamp, as stored. A render made now takes it from
@@ -82,11 +90,50 @@ export function draftModelStamp(draft: {
 // HTML, or the stored stamp a write carries forward (A6). Resolve it once per
 // render and write the same value to the draft and the revision row. null = no
 // model is known for this render; history reads it as "unknown", the 004 rule.
-export function currentRenderStamp(model: ResolvedModel | ModelStamp | null): RenderStamp {
+// 009: `composition` has no default, so a caller that forgets it is a type
+// error: pass the run's stamp, a carried one, or null for "unknown".
+export function currentRenderStamp(
+  model: ResolvedModel | ModelStamp | null,
+  composition: CompositionStamp | null,
+): RenderStamp {
   return {
     promptVersion: PROMPT_VERSION,
     fontSet: getFontSetId(),
     ...modelStampOf(model),
+    composition,
+  }
+}
+
+// The draft's CURRENT composition stamp (009), carried forward by a write whose
+// HTML is still the render that stamp describes (an inline edit, an Override, a
+// refine that keeps the image). A stored value that no longer parses is null:
+// unknown is honest.
+export function draftCompositionStamp(draft: { composition?: unknown }): CompositionStamp | null {
+  return parseCompositionStamp(draft.composition)
+}
+
+// The composition stamp as a Json column value: SQL NULL (not a JSON null) when
+// there is none, otherwise the value, validated by its schema and invariants at
+// every write.
+export function toJsonColumn(composition: CompositionStamp | null): Prisma.InputJsonValue | typeof Prisma.DbNull {
+  return composition ? (compositionStampSchema.parse(composition) as Prisma.InputJsonValue) : Prisma.DbNull
+}
+
+// A RenderStamp as DraftRevision columns: the four existing fields plus the
+// composition column. It replaces the `...stamp` spread at every revision writer.
+export function revisionStampFields(stamp: RenderStamp): {
+  promptVersion: string | null
+  fontSet: string | null
+  model: string | null
+  modelSubstitutedFrom: string | null
+  composition: Prisma.InputJsonValue | typeof Prisma.DbNull
+} {
+  return {
+    promptVersion: stamp.promptVersion,
+    fontSet: stamp.fontSet,
+    model: stamp.model,
+    modelSubstitutedFrom: stamp.modelSubstitutedFrom,
+    composition: toJsonColumn(stamp.composition),
   }
 }
 
@@ -97,12 +144,14 @@ export function draftStampFields(stamp: RenderStamp): {
   fontSet: string | null
   designModel: string | null
   designModelSubstitutedFrom: string | null
+  composition: Prisma.InputJsonValue | typeof Prisma.DbNull
 } {
   return {
     promptVersion: stamp.promptVersion,
     fontSet: stamp.fontSet,
     designModel: stamp.model,
     designModelSubstitutedFrom: stamp.modelSubstitutedFrom,
+    composition: toJsonColumn(stamp.composition),
   }
 }
 
@@ -118,6 +167,7 @@ export function restoredRenderStamp(
     fontSet?: string | null
     model?: string | null
     modelSubstitutedFrom?: string | null
+    composition?: unknown
   },
   rerendered: boolean,
 ): RenderStamp {
@@ -126,6 +176,8 @@ export function restoredRenderStamp(
     fontSet: rerendered ? getFontSetId() : (revision.fontSet ?? null),
     model: revision.model ?? null,
     modelSubstitutedFrom: revision.modelSubstitutedFrom ?? null,
+    // 009: the row's own stamp (null on a legacy row, or one that no longer parses).
+    composition: parseCompositionStamp(revision.composition),
   }
 }
 
@@ -301,6 +353,12 @@ export interface CommitRevisionArgs {
   // reads as unknown (null). Ignored by an adopt, which carries the rejected
   // row's own stamp.
   model?: ResolvedModel | ModelStamp | null
+  // 009 FR-12: the composition stamp of the render `html` is. Required, so a
+  // writer that forgets it is a type error: an inline edit and an Override pass
+  // the draft's current stamp, the refine's verified commit the carried stamp
+  // (or refineReplacedStamp), a fresh render its own. null = unknown. Ignored
+  // by an adopt, which carries the rejected row's own stamp.
+  composition: CompositionStamp | null
 }
 
 // Thrown (and never retried — only P2002 is) when the expectedRevisionNumber
@@ -372,7 +430,7 @@ export async function commitDraftRevision(
   // refuses it. 008: a fresh commit's model is the caller's (args.model).
   const stamp = adoptRejectedRevisionId
     ? await rejectedRenderStamp(draftId, adoptRejectedRevisionId)
-    : currentRenderStamp(args.model ?? null)
+    : currentRenderStamp(args.model ?? null, args.composition)
 
   let finalExportKey = args.exportKey
   // Set only when THIS call rendered + uploaded the export — the only object
@@ -431,7 +489,7 @@ export async function commitDraftRevision(
         instruction,
         htmlSnapshot: html,
         exportUrl: committedExportKey,
-        ...stamp,
+        ...revisionStampFields(stamp),
       },
       select: { id: true },
     })
@@ -525,13 +583,14 @@ export async function commitDraftRevision(
 async function rejectedRenderStamp(draftId: string, revisionId: string): Promise<RenderStamp> {
   const row = await prisma.draftRevision.findFirst({
     where: { id: revisionId, draftId },
-    select: { promptVersion: true, fontSet: true, model: true, modelSubstitutedFrom: true },
+    select: { promptVersion: true, fontSet: true, model: true, modelSubstitutedFrom: true, composition: true },
   })
   return {
     promptVersion: row?.promptVersion ?? null,
     fontSet: row?.fontSet ?? null,
     model: row?.model ?? null,
     modelSubstitutedFrom: row?.modelSubstitutedFrom ?? null,
+    composition: parseCompositionStamp(row?.composition),
   }
 }
 
@@ -699,6 +758,9 @@ export interface RecordRejectedRenderArgs {
   // so a later "Use anyway" reinstates the render with its model. Omitted
   // reads as unknown (null).
   model?: ResolvedModel | null
+  // 009 FR-12: the composition stamp the attempt's render carries: the draft's
+  // current one (a refine of the current design). null = unknown.
+  composition: CompositionStamp | null
   // 019: the refine's claim. The discard and the final draft write are guarded
   // on it; a miss throws DraftClaimLostError and nothing is recorded.
   claim: DraftClaim
@@ -720,7 +782,7 @@ export async function recordRejectedRender(
   // F3: the rejected row carries the stamp of ITS render, so a later "Use
   // anyway" can reinstate it. The draft's stamp is untouched: its current
   // render did not change. 008: with the attempt's model.
-  const stamp = currentRenderStamp(args.model ?? null)
+  const stamp = currentRenderStamp(args.model ?? null, args.composition)
 
   let exportKey: string | null = null
   let exported: RejectionDiagnostics['export'] = 'none'
@@ -756,7 +818,7 @@ export async function recordRejectedRender(
           htmlSnapshot: html ?? args.unusableHtml ?? '',
           exportUrl: exportKey,
           rejection: rejection as Prisma.InputJsonValue,
-          ...stamp,
+          ...revisionStampFields(stamp),
         },
         select: { id: true },
       })

@@ -22,6 +22,7 @@ import type { PipelineMode } from '@/lib/agent/config'
 import { renderClassSemantics } from '@/lib/agent/instructionClasses'
 import { renderEnvelopeProtocol } from '@/lib/agent/refineEnvelope'
 import { fenceUntrusted } from '@/lib/agent/untrusted'
+import { refineContractText, type SizeContract } from '@/lib/designData'
 import { placeholderNote, SCRIPT_SUPPORT_NOTE } from './shared'
 
 export interface RefinePromptOptions {
@@ -33,6 +34,9 @@ export interface RefinePromptOptions {
   // Freshly generated background image (agent/background.ts refine pre-step) —
   // present only when the instruction asked for a new background.
   backgroundImageUrl?: string | null
+  // The draft's stamped hero contract (009): the version it was made under, at
+  // its size. Absent for a classic draft: the prompt is unchanged.
+  compositionContract?: { label: string; version: number; size: SizeContract }
 }
 
 // Instruction fragment injected when the refine pre-step generated a new background.
@@ -52,12 +56,15 @@ function refinePlaceholderNote(hasInlineAssets: boolean): string {
 }
 
 export function buildRefineSystemPrompt(opts: RefinePromptOptions): string {
-  const { kit, mode, width, height, hasInlineAssets, backgroundImageUrl } = opts
+  const { kit, mode, width, height, hasInlineAssets, backgroundImageUrl, compositionContract } = opts
+  const contractNote = compositionContract ? `
+
+${refineContractText(compositionContract)}` : ''
 
   if (mode === 'cli') {
     return `You are a design refinement agent. Apply the user's instruction as a targeted edit to the HTML, staying on-brand. Classify the instruction first (classes below): content the instruction does not name stays exactly as it is, and content a replace or remove names must be gone.
 
-${buildBrandKitSystemContext(kit)}${refinePlaceholderNote(hasInlineAssets)}${backgroundNote(backgroundImageUrl)}
+${buildBrandKitSystemContext(kit)}${refinePlaceholderNote(hasInlineAssets)}${backgroundNote(backgroundImageUrl)}${contractNote}
 ${SCRIPT_SUPPORT_NOTE}
 
 ${renderClassSemantics()}
@@ -73,7 +80,7 @@ ${renderEnvelopeProtocol()}`
 
   return `You are a design refinement agent. Here is the current HTML design. Apply the user's instruction as a targeted edit, as its classes (below) require — content the instruction does not name stays exactly as it is, and content a replace or remove names must be gone.
 
-${buildBrandKitSystemContext(kit)}${backgroundNote(backgroundImageUrl)}
+${buildBrandKitSystemContext(kit)}${backgroundNote(backgroundImageUrl)}${contractNote}
 ${SCRIPT_SUPPORT_NOTE}
 
 ${renderClassSemantics()}

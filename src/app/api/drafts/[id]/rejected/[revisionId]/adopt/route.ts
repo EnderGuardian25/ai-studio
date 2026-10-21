@@ -103,6 +103,9 @@ export const POST = withTeamAuth<{ id: string; revisionId: string }>(async (_req
       // The rejected row's own export, reused as-is — nothing re-renders.
       exportKey: row.exportUrl as string,
       adoptRejectedRevisionId: row.id,
+      // 009: an adopt carries the rejected row's own composition stamp
+      // (rejectedRenderStamp reads it); this value is ignored.
+      composition: null,
     })
     return NextResponse.json({
       reply: 'Design updated',

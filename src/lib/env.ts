@@ -2,6 +2,7 @@ import { z } from 'zod'
 // The catalogue has no imports at all, so this can't form a cycle (config.ts
 // imports env.ts).
 import { CATALOGUE, MODEL_KEYS, type ModelKey } from './models/catalogue'
+import { parseImageTier } from '@/providers/imageCapabilities'
 
 // Centralized, zod-validated environment configuration. Server-only — never
 // import from client components ("use client" files): non-NEXT_PUBLIC_ vars
@@ -105,6 +106,12 @@ const envSchema = z.object({
     }),
   // Diagnostics on by default; "0" silences (claudeCli.ts compares !== "0").
   CLAUDE_CLI_DEBUG: z.string().default('1'),
+
+  // --- Hero image quality (009 FR-16) ---
+  // standard | high (any case). Applied only to the hero image styles' image
+  // call, never to a classic post. Unset, blank or unknown is treated as unset:
+  // a tuning knob must never fail the boot (unlike CLAUDE_CLI_MODEL).
+  IMAGE_QUALITY: z.string().optional().transform((raw) => parseImageTier(raw)),
 
   // --- Puppeteer renderer ---
   PUPPETEER_EXECUTABLE_PATH: z.string().optional(),

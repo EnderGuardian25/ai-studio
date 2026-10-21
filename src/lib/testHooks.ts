@@ -19,6 +19,8 @@ import type { ConstrainTarget, InstructionClass } from '@/lib/agent/instructionC
 // module for MOCK_AI + the two seams below.
 import type { VerifyResult } from '@/lib/drafts/refineVerify'
 import type { ImageProvider } from '@/providers/interfaces/ImageProvider'
+// Type-only (erased): the module stays free of a runtime import of designData.
+import type { Rect, Region, RegionSample, TextTone } from '@/lib/designData'
 import { CAPTION_CHANNELS, type CaptionTarget } from '@/lib/channels'
 import { HEADLINE_MAX } from '@/lib/captions/headline'
 
@@ -314,6 +316,72 @@ export function mockImageProvider(provider: ImageProvider, topic: string): Image
     return { url: MOCK_BACKGROUND_DATA_URL }
   }
   return mocked
+}
+
+// ── 009 FR-17: the hero check and layout seams ───────────────────────────────
+//
+// Read from the same seam text as the __MOCK_BG__ family (a hero case carries
+// __MOCK_BG__ plus one of these). Each seam returns DATA that the caller feeds
+// to the REAL evaluateRegions / evaluateLayout, so the E2E exercises the pure
+// logic and its verdict, never a stub of it. All dormant outside MOCK_AI: they
+// return null, and the caller runs the real sampler / measurement.
+
+export const HERO_MOCK_SENTINELS = {
+  busy: '__MOCK_HERO_BUSY__',
+  contrast: '__MOCK_HERO_CONTRAST__',
+  checkError: '__MOCK_HERO_CHECK_ERROR__',
+  layout: '__MOCK_HERO_LAYOUT__',
+} as const
+
+const HERO_SAMPLE_COUNT = 256
+const samplesOf = (region: Region, lum: (i: number) => number): RegionSample => ({
+  luminance: Array.from({ length: HERO_SAMPLE_COUNT }, (_, i) => lum(i)),
+  // Rect units are canvas percent, so the area share is w * h / 100.
+  areaPct: (region.rect.w * region.rect.h) / 100,
+})
+
+/**
+ * Synthetic luminance samples for a hero image's regions: calm by default (a
+ * dark area for light text, a light one for dark text), alternating dark and
+ * light for __MOCK_HERO_BUSY__ (high lightness variance), flat and on the wrong
+ * side of the text colour for __MOCK_HERO_CONTRAST__, and a thrown error for
+ * __MOCK_HERO_CHECK_ERROR__ (the caller settles any throw to check-error).
+ * null when MOCK_AI is off.
+ */
+export function mockRegionSamples(
+  seamText: string,
+  regions: ReadonlyArray<Region>,
+  textTone: TextTone,
+): RegionSample[] | null {
+  if (!MOCK_AI) return null
+  if (seamText.includes(HERO_MOCK_SENTINELS.checkError)) {
+    throw new Error(`Mock hero check failure (${HERO_MOCK_SENTINELS.checkError} sentinel)`)
+  }
+  if (seamText.includes(HERO_MOCK_SENTINELS.busy)) {
+    return regions.map((r) => samplesOf(r, (i) => (i % 2 === 0 ? 0.02 : 0.6)))
+  }
+  if (seamText.includes(HERO_MOCK_SENTINELS.contrast)) {
+    const flat = textTone === 'light' ? 0.4 : 0.05
+    return regions.map((r) => samplesOf(r, () => flat))
+  }
+  const calm = textTone === 'light' ? 0.02 : 0.8
+  return regions.map((r) => samplesOf(r, (i) => calm + (i % 2 === 0 ? 0.001 : -0.001)))
+}
+
+/**
+ * Synthetic canvas-percent boxes for the layout observation (MOCK_PUPPETEER
+ * measures nothing): one box inside the first text region, plus one in the
+ * bottom-right corner for __MOCK_HERO_LAYOUT__, which lies outside every text
+ * region of both archetypes at both sizes. null when MOCK_AI is off.
+ */
+export function mockLayoutBoxes(seamText: string, textRegions: ReadonlyArray<Region>): Rect[] | null {
+  if (!MOCK_AI) return null
+  const first = textRegions[0]?.rect
+  const boxes: Rect[] = first
+    ? [{ x: first.x + first.w * 0.1, y: first.y + first.h * 0.1, w: first.w * 0.5, h: Math.min(10, first.h * 0.2) }]
+    : []
+  if (seamText.includes(HERO_MOCK_SENTINELS.layout)) boxes.push({ x: 92, y: 92, w: 6, h: 6 })
+  return boxes
 }
 
 /** Deterministic 1×1 transparent PNG returned by the mock Puppeteer renderer. */
