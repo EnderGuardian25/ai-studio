@@ -1,6 +1,6 @@
 {
   "change": "009-hero-image-design",
-  "phase": "build",
+  "phase": "verify",
   "branch": "v2",
   "size": "architectural",
   "phases": {
@@ -8,6 +8,7 @@
     "spec": { "status": "done", "at": "2026-10-21T11:42:53Z" },
     "design": { "status": "done", "at": "2026-10-21T11:42:53Z" },
     "tasks": { "status": "done", "at": "2026-10-21T11:42:54Z" },
-    "build": { "status": "in-progress", "at": "2026-10-21T11:43:25Z" }
+    "build": { "status": "in-progress", "at": "2026-10-21T11:43:25Z" },
+    "verify": { "status": "passed", "at": "2026-10-21T13:28:34Z", "verdict": "PASS" }
   }
 }
