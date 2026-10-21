@@ -3,6 +3,13 @@ import { existsSync } from "fs"
 import pLimit from "p-limit"
 import { MOCK_PUPPETEER, MOCK_PNG_BUFFER } from "@/lib/testHooks"
 import { env } from "@/lib/env"
+import {
+  SAMPLE_GRID_MAX,
+  mapRegionToImage,
+  relativeLuminance,
+  type Region,
+  type RegionSample,
+} from "@/lib/designData"
 
 const COMMON_LINUX_PATHS = [
   "/usr/bin/chromium-browser",
@@ -299,4 +306,159 @@ export async function getImageDimensions(dataUrl: string): Promise<{ width: numb
   // Test seam: a deterministic square so E2E needs no real Chromium.
   if (MOCK_PUPPETEER) return { width: 1080, height: 1080 }
   return limit(() => dimensionsOnce(dataUrl))
+}
+
+// ── Hero-image region sampler (change 009, design.md section 5) ──────────────
+// Point samples of relative luminance for the regions of a generated image, on
+// a network-blocked page. Every failure of this path is a HeroCheckError, which
+// the caller settles to the classic design (fail closed, FR-09).
+export const HERO_CHECK_TIMEOUT_MS = 20_000
+
+export class HeroCheckError extends Error {
+  constructor(message: string, options?: { cause?: unknown }) {
+    super(message, options)
+    this.name = "HeroCheckError"
+  }
+}
+
+interface PxRect {
+  sx: number
+  sy: number
+  sw: number
+  sh: number
+  gw: number
+  gh: number
+}
+
+// Grid for one region: at most SAMPLE_GRID_MAX points, in the rect's aspect,
+// never more points than the rect has pixels on either axis.
+function gridFor(w: number, h: number): { gw: number; gh: number } {
+  const gw0 = Math.max(1, Math.round(Math.sqrt((SAMPLE_GRID_MAX * w) / h)))
+  const gw = Math.min(gw0, Math.max(1, Math.floor(w)))
+  const gh = Math.min(Math.max(1, Math.round(SAMPLE_GRID_MAX / gw0)), Math.max(1, Math.floor(h)))
+  return { gw, gh }
+}
+
+async function heroSampleOnce(
+  dataUrl: string,
+  regions: ReadonlyArray<Region>,
+  canvas: { width: number; height: number },
+  holder: { page: Page | null; closed: boolean }
+): Promise<Array<RegionSample | null>> {
+  const browser = await getBrowser()
+  const page = await browser.newPage()
+  holder.page = page
+  try {
+    if (holder.closed) throw new HeroCheckError("hero check timed out")
+    await page.setRequestInterception(true)
+    page.on("request", (req) => {
+      const u = req.url()
+      if (u.startsWith("data:") || u === "about:blank") req.continue().catch(() => {})
+      else req.abort().catch(() => {})
+    })
+    await page.setContent("<!doctype html><html><body></body></html>", {
+      waitUntil: "domcontentloaded",
+      timeout: SET_CONTENT_TIMEOUT_MS,
+    })
+    // 1. Natural dimensions, as the page decodes them.
+    const natural = await page.evaluate(async (url: string) => {
+      const img = new Image()
+      img.src = url
+      await img.decode()
+      return { w: img.naturalWidth, h: img.naturalHeight }
+    }, dataUrl)
+    // 2. The mapping, in Node (the pure function, tested without a browser).
+    const mapped = regions.map((r) => mapRegionToImage(r.rect, { w: canvas.width, h: canvas.height }, natural))
+    const rects: PxRect[] = []
+    for (const m of mapped) {
+      if (!m) continue
+      const sx = Math.min(Math.max(0, m.px.x), natural.w)
+      const sy = Math.min(Math.max(0, m.px.y), natural.h)
+      const sw = Math.min(m.px.w, natural.w - sx)
+      const sh = Math.min(m.px.h, natural.h - sy)
+      rects.push({ sx, sy, sw, sh, ...gridFor(sw, sh) })
+    }
+    // 3. Point samples, smoothing off (A3): a textured region reads as textured.
+    const raw = rects.length
+      ? await page.evaluate(
+          async (url: string, rs: PxRect[]) => {
+            const img = new Image()
+            img.src = url
+            await img.decode()
+            return rs.map((r) => {
+              const c = document.createElement("canvas")
+              c.width = r.gw
+              c.height = r.gh
+              const ctx = c.getContext("2d", { willReadFrequently: true })!
+              ctx.imageSmoothingEnabled = false
+              ctx.drawImage(img, r.sx, r.sy, r.sw, r.sh, 0, 0, r.gw, r.gh)
+              return Array.from(ctx.getImageData(0, 0, r.gw, r.gh).data)
+            })
+          },
+          dataUrl,
+          rects
+        )
+      : []
+    // 4. Luminance in Node: alpha under 128 dropped, one formula (evaluate.ts).
+    let k = 0
+    return mapped.map((m) => {
+      if (!m) return null
+      const data = raw[k++]
+      const luminance: number[] = []
+      for (let i = 0; i < data.length; i += 4) {
+        if (data[i + 3] < 128) continue
+        luminance.push(relativeLuminance(data[i], data[i + 1], data[i + 2]))
+      }
+      return { luminance, areaPct: m.areaPct }
+    })
+  } finally {
+    holder.closed = true
+    await page.close().catch(() => {})
+  }
+}
+
+// `null` for a region the mapping rejects. Throws HeroCheckError for anything
+// else: a non-data: URL, an undecodable image, a browser error, the timeout.
+// `timeoutMs` exists so a test can prove the timeout path; production callers
+// take the default.
+export async function sampleRegionLuminance(
+  dataUrl: string,
+  regions: ReadonlyArray<Region>,
+  canvas: { width: number; height: number },
+  timeoutMs: number = HERO_CHECK_TIMEOUT_MS
+): Promise<Array<RegionSample | null>> {
+  // Test seam: calm, dark, near-uniform samples (a calm result passes tone
+  // `light`). The busy, contrast and error cases are produced upstream.
+  if (MOCK_PUPPETEER) {
+    return regions.map((r) => ({
+      luminance: Array.from({ length: 256 }, (_, i) => 0.02 + (i % 2 === 0 ? 0.001 : -0.001)),
+      areaPct: (r.rect.w * r.rect.h) / 100,
+    }))
+  }
+  if (typeof dataUrl !== "string" || !dataUrl.startsWith("data:")) {
+    throw new HeroCheckError("hero check accepts data: URLs only")
+  }
+  return limit(async () => {
+    const holder: { page: Page | null; closed: boolean } = { page: null, closed: false }
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const work = heroSampleOnce(dataUrl, regions, canvas, holder)
+    work.catch(() => {}) // the race below owns the outcome; never an unhandled rejection
+    try {
+      return await Promise.race([
+        work,
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(() => {
+            holder.closed = true
+            holder.page?.close().catch(() => {})
+            reject(new HeroCheckError(`hero check timed out after ${timeoutMs} ms`))
+          }, timeoutMs)
+        }),
+      ])
+    } catch (err) {
+      if (err instanceof HeroCheckError) throw err
+      throw new HeroCheckError(`hero check failed: ${err instanceof Error ? err.message : String(err)}`, { cause: err })
+    } finally {
+      if (timer) clearTimeout(timer)
+    }
+  })
 }

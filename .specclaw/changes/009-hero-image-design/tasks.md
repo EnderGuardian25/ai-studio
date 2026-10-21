@@ -83,7 +83,7 @@ Nothing ships the hero prompt without the check and the stamp (T4 lands them tog
 
 ### Wave 3 — The sampler and the layout measurement
 
-- [ ] `T3` — The Chromium sampler, the layout extraction, the real-render fixtures, and the threshold tuning
+- [x] `T3` — The Chromium sampler, the layout extraction, the real-render fixtures, and the threshold tuning
   - Files: `src/lib/renderer/puppeteer.ts`, `src/lib/renderer/layoutFacts.ts` (new), `tests/render/{heroFixtures,hero-sampler.test,hero-layout.test}.ts` (new), `reports/T3.md`
   - Estimate: medium
   - Kind: test
