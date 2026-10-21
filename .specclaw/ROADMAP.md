@@ -1,7 +1,7 @@
 # bistec-studio roadmap — changes 004–023
 
 **Updated:** 2026-10-21 · **Branch:** all of this lands on `v2` (see Branching at the bottom); handoff in `docs/handoff.md` top section.
-**Status (2026-10-21):** **013–022 are verified PASS** (018, 022, 021, 019 and 020 on 2026-10-19 and 2026-10-20; see the table). **023** (scheduler heartbeat, which took over 006 item 7) is **built**: T1 and T2 are committed, and T3 (docs and the gate) is closing. **Next: `/specclaw:verify 023-scheduler-heartbeat`, then 009 hero imagery, Phase 1.** 006 (the rest), 007 and 010 stay proposals.
+**Status (2026-10-21):** **013–022 are verified PASS** (018, 022, 021, 019 and 020 on 2026-10-19 and 2026-10-20; see the table). **023** (scheduler heartbeat, which took over 006 item 7) is **verified PASS** (11/11). **Next: 009 hero imagery, Phase 1.** 006 (the rest), 007 and 010 stay proposals.
 
 **(Superseded) Status (2026-10-14):** **016** (fresh-start cleanup) and **017** (publish API fixes) are **verified PASS**, with CI green. **018** (post-008 small fixes) is building; T1 is a committed WIP. **019** (claim token) and **020** (Create post button off the draft page) are approved and not yet planned. After them: 006, 007, 009 and 010 (proposals).
 
@@ -42,7 +42,7 @@ This file sequences the open changes. Each change's own `proposal.md` is the sou
 | 020 | [Create post button off the draft page](changes/020-create-post-button-draft-page/) | Hides the floating button on the draft page                                                                                                            | bounded       | ✅ verified PASS (7/7)                                                 |
 | 021 | [Graphite re-theme](changes/021-graphite-retheme/)                                  | Re-themes the whole app from Folio to Graphite                                                                                                         | architectural | ✅ verified PASS (19/19)                                               |
 | 022 | [Prod data and deploy restore](changes/022-prod-data-and-deploy-restore/)           | Makes the adopted `v2` deployable over company prod data                                                                                               | bounded       | ✅ verified PASS (11/11)                                               |
-| 023 | [Scheduler heartbeat](changes/023-scheduler-heartbeat/)                             | A `WorkerHeartbeat` per loop, a "Scheduler offline" banner on the queue panel, the retry reason (took 006 item 7)                                      | bounded       | 🔨 built (T1–T2); T3 docs and gate closing; verify next                |
+| 023 | [Scheduler heartbeat](changes/023-scheduler-heartbeat/)                             | A `WorkerHeartbeat` per loop, a "Scheduler offline" banner on the queue panel, the retry reason (took 006 item 7)                                      | bounded       | ✅ verified PASS (11/11, 2026-10-21)                                   |
 
 ## Hard dependencies
 
@@ -63,7 +63,7 @@ B4 scheduler fix (ops) ───────────────► 010 sche
 - **008 → 006.** 006's generation traces read 008's stamps instead of re-deriving the model: `DraftCaption.model` (per caption row), `Draft.headlineModel`, `Draft.designModel` and `DraftRevision.model`. Each is the full ID that ran, with a `…SubstitutedFrom` sibling. Cost comes from the catalogue's numeric per-MTok prices (`priceInputPerMTok` / `priceOutputPerMTok` in `src/lib/models/catalogue.ts`, with a dated `priceSource`), not from the `$` / `$$` / `$$$` tier, which is computed from them.
 - **012 → 008.** Build 012 first so 008 stamps `captionModel` on the new caption shape and names its surface `caption` from the start. If 008 goes first, it must use those names anyway. **Done:** 012 shipped first, and 008 stamps each caption row (`DraftCaption.model`) and the headline (`Draft.headlineModel`) under the `CAPTION` surface.
 - **011 foundation → 012 caption panels.** Same reason as 008: new UI, built once in the new style.
-- **~~006 item 7~~ → 023 (scheduler heartbeat) → 010.** Item 7 moved out of 006 into 023, which is built. A missed WhatsApp handoff is a missed post. It is the same "nothing self-reports" failure B4 was.
+- **~~006 item 7~~ → 023 (scheduler heartbeat) → 010.** Item 7 moved out of 006 into 023, which is verified PASS. A missed WhatsApp handoff is a missed post. It is the same "nothing self-reports" failure B4 was.
 
 ## Boundaries between overlapping changes
 
