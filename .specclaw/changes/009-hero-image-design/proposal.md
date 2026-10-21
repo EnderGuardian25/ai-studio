@@ -2,7 +2,7 @@
 
 **Created:** 2026-09-23
 **Re-scoped:** 2026-10-21 (Phase 1, thin slice, after the party panel and the user's decisions of the same day)
-**Status:** 🟡 Draft
+**Status:** ✅ Approved (2026-10-21, architectural, thin-slice Phase 1). The writer's own calls stand as written: the layout half is recorded only, the success bar is 4 of 6, scheduler/MCP/ACP stay classic, and quality applies to styled posts only.
 
 ## Problem
 
