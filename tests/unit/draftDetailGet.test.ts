@@ -35,7 +35,15 @@ vi.mock('@/providers/registry', async (importOriginal) => {
 })
 vi.mock('@/lib/brandkit/resolve', () => ({ resolveBrandKit: h.resolveBrandKit }))
 vi.mock('@/lib/storage/minio', () => ({ resolveExportUrl: async () => null }))
-vi.mock('@/lib/drafts/revisions', () => ({ COMMITTED_REVISION: {}, resolveNotAppliedOutcome: async () => null }))
+vi.mock('@/lib/drafts/revisions', async () => {
+  // The real tolerant parse: the GET reads the stamp through it (009 FR-15).
+  const { parseCompositionStamp } = await import('@/lib/designData')
+  return {
+    COMMITTED_REVISION: {},
+    resolveNotAppliedOutcome: async () => null,
+    draftCompositionStamp: (d: { composition?: unknown }) => parseCompositionStamp(d.composition),
+  }
+})
 vi.mock('@/lib/captions/store', () => ({
   loadDraftCaptions: async () => ({ captions: [] }),
   saveCaptionEdit: vi.fn(),
@@ -218,5 +226,54 @@ describe('GET /api/drafts/[id] — the stale-action sweep is guarded on the obse
     const { body } = await get()
     expect(JSON.stringify(body)).not.toContain('tok-secret')
     expect(body).not.toHaveProperty('pendingActionClaimId')
+  })
+})
+
+describe('GET /api/drafts/[id] — composition and compositionNotice (009 FR-15)', () => {
+  it('a pre-009 draft (no stamp) reports null and null', async () => {
+    h.draftFindUnique.mockResolvedValue({ ...exportedDraft(null), composition: null })
+    h.copyProviderIsClaude.mockResolvedValue(true)
+    const { body } = await get()
+    expect(body.composition).toBeNull()
+    expect(body.compositionNotice).toBeNull()
+  })
+
+  it('a kept archetype reports the stamp and no notice', async () => {
+    const stamp = {
+      requestedArchetype: 'product-showcase',
+      appliedArchetype: 'product-showcase',
+      contractVersion: 1,
+      imageQuality: 'default',
+    }
+    h.draftFindUnique.mockResolvedValue({ ...exportedDraft(null), composition: stamp })
+    h.copyProviderIsClaude.mockResolvedValue(true)
+    const { body } = await get()
+    expect(body.composition).toEqual(stamp)
+    expect(body.compositionNotice).toBeNull()
+  })
+
+  it('a fallback reports the stamp and its notice with the reason', async () => {
+    const stamp = {
+      requestedArchetype: 'editorial-split',
+      appliedArchetype: 'classic',
+      contractVersion: null,
+      fallbackReason: 'busy',
+      imageQuality: 'default',
+    }
+    h.draftFindUnique.mockResolvedValue({ ...exportedDraft(null), composition: stamp })
+    h.copyProviderIsClaude.mockResolvedValue(true)
+    const { body } = await get()
+    expect(body.composition).toEqual(stamp)
+    expect(body.compositionNotice).toMatchObject({ reason: 'busy' })
+    expect((body.compositionNotice as { message: string }).message).toContain('Editorial split')
+  })
+
+  it('an unreadable stored value is null, never a throw', async () => {
+    h.draftFindUnique.mockResolvedValue({ ...exportedDraft(null), composition: { nonsense: true } })
+    h.copyProviderIsClaude.mockResolvedValue(true)
+    const { status, body } = await get()
+    expect(status).toBe(200)
+    expect(body.composition).toBeNull()
+    expect(body.compositionNotice).toBeNull()
   })
 })

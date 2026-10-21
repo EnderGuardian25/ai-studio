@@ -8,6 +8,8 @@
 import type { AspectRatio, Channel, DesignMode, TeamRole } from '@prisma/client'
 import type { Role } from '@/lib/auth'
 import type { BackgroundSkipped } from '@/lib/drafts/backgroundNotice'
+import type { CompositionNotice } from '@/lib/drafts/compositionNotice'
+import type { CompositionStamp } from '@/lib/designData'
 import type { ModelKey, ModelSpeed, ModelTier, UserSurface } from '@/lib/models/catalogue'
 import type { CredentialTier, PipelineMode } from '@/lib/models/resolve'
 
@@ -351,6 +353,10 @@ export interface DraftDetail {
   // 005 FR-07: set when the current design has no AI background for a reason
   // other than the model deciding it didn't need one.
   backgroundSkipped: BackgroundSkipped | null
+  // 009 FR-15: the stamped composition (null = before 009 or Path A history)
+  // and the plain-language notice derived from it (null = nothing to say).
+  composition: CompositionStamp | null
+  compositionNotice: CompositionNotice | null
   createdAt: string
   revisionCount: number
   currentRevisionNumber: number | null

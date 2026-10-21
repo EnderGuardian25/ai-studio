@@ -7,8 +7,9 @@ import { canAccessContent } from '@/lib/authz/visibility'
 import { resolveBrandKit } from '@/lib/brandkit/resolve'
 import { resolveExportUrl } from '@/lib/storage/minio'
 import { planDraftRecovery, STUCK_ACTION_REASON, STUCK_REASON } from '@/lib/drafts/recovery'
-import { COMMITTED_REVISION, resolveNotAppliedOutcome } from '@/lib/drafts/revisions'
+import { COMMITTED_REVISION, draftCompositionStamp, resolveNotAppliedOutcome } from '@/lib/drafts/revisions'
 import { backgroundSkippedFor } from '@/lib/drafts/backgroundNotice'
+import { compositionNoticeFor } from '@/lib/drafts/compositionNotice'
 import { parseCaptionPatch } from '@/lib/captions/requests'
 import { validateHeadline } from '@/lib/captions/headline'
 import { loadDraftCaptions, saveCaptionEdit, saveHeadlineEdit, settlePendingCaptions } from '@/lib/captions/store'
@@ -145,6 +146,8 @@ async function loadDraft(id: string) {
     copyProviderIsClaude(draft.brief.teamId, draft.brief.copyProviderKey ?? undefined),
   ])
 
+  const composition = draftCompositionStamp(draft)
+
   return {
     ownerId: draft.brief.userId,
     teamId: draft.teamId,
@@ -175,6 +178,9 @@ async function loadDraft(id: string) {
     // 005 FR-07: why there is no AI background, when that was not the
     // model's choice. The message is a fixed per-reason sentence.
     backgroundSkipped: backgroundSkippedFor(draft.backgroundSkipReason, draft.backgroundSkipDetail),
+    // 009 FR-15: the tolerant parse (null on anything unreadable) and its notice.
+    composition,
+    compositionNotice: compositionNoticeFor(composition),
     createdAt: draft.createdAt,
     revisionCount: draft._count.revisions,
     currentRevisionNumber: draft.currentRevisionNumber,

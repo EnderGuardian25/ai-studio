@@ -656,7 +656,8 @@ test.describe('Brief wizard (T8)', () => {
     // 008 FR-19: the Caption model and Design model rows, which render once
     // /api/models has loaded, and their two pickers.
     await expect(page.getByRole('term').filter({ hasText: /^Design model$/ })).toBeVisible()
-    await expect(page.getByRole('term')).toHaveCount(12)
+    // 13 rows since 009: a Path B brief (this walk) also has an Image style row.
+    await expect(page.getByRole('term')).toHaveCount(13)
     for (const name of ['Caption model', 'Design model']) {
       await expect(page.getByRole('combobox', { name, exact: true })).toBeVisible()
     }

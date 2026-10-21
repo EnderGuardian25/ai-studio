@@ -964,8 +964,9 @@ test.describe('§Y — the pickers (wave 2)', () => {
     await expect(hintOf(page, 'brief-caption-model')).toHaveText('Default')
     await expect(hintOf(page, 'brief-design-model')).toHaveText('Default')
     expect(await optionValues(design)).toEqual(ALL)
-    // The summary names the effective choices, in two more rows.
-    await expect(page.getByRole('term')).toHaveCount(12)
+    // The summary names the effective choices, in two more rows (13 with
+    // 009's Image style row, which a Path B brief carries).
+    await expect(page.getByRole('term')).toHaveCount(13)
     await expect(summary(page, 'Caption model')).toHaveText('Haiku 4.5')
     await expect(summary(page, 'Design model')).toHaveText('Sonnet 5.5')
     await expectNoAxeViolations(page, '/brief Review step (with the model pickers)')

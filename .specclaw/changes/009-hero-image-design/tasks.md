@@ -121,7 +121,7 @@ Nothing ships the hero prompt without the check and the stamp (T4 lands them tog
 
 ### Wave 5 — The UI, the co-changes and the E2E suite
 
-- [ ] `T5` — The brief picker and its API, the draft notice, the refine and regenerate co-changes, and E2E §AA
+- [x] `T5` — The brief picker and its API, the draft notice, the refine and regenerate co-changes, and E2E §AA
   - Files: `src/lib/brief/imageStyle.ts` (new), `src/app/api/briefs/route.ts`, `src/lib/brief/briefDraftPayload.ts`, `src/components/brief/{SizeDesignStep,ReviewStep,useBriefWizard,types}` and the brief page that passes the props, `src/lib/drafts/compositionNotice.ts` (new), `src/components/drafts/CompositionNotice.tsx` (new), `src/app/(app)/drafts/[id]/page.tsx`, `src/app/api/drafts/[id]/route.ts`, `src/lib/api-types.ts`, `src/app/api/drafts/[id]/{refine/route,regenerate-design/route}.ts`, `tests/unit/{briefImageStyle,compositionNotice}.test.ts` (new), extended `refinePrompt`, `draftActionModels`, `draftDetailGet`, `briefDraftPayload`, `tests/e2e/hero-image.test.ts` (new), `tests/e2e/a11y.test.ts` (one case)
   - Estimate: large
   - Kind: impl

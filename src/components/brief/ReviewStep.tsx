@@ -13,6 +13,7 @@ import {
   reviewModelName,
   type BriefModelField,
 } from '@/lib/brief/modelPicks'
+import { styleLabel } from '@/lib/designData'
 import type { DesignMode, UploadedImage } from './types'
 import { ReviewRow, type ReviewRowProps } from './ReviewRow'
 import { Notice } from '@/components/ui/Notice'
@@ -26,6 +27,7 @@ interface ReviewStepProps {
   selectedCampaign: Campaign | null
   selectedBrandKit: BrandKitSummary | null
   aspectRatio: AspectRatio
+  imageStyle: string
   designMode: DesignMode
   selectedTemplate: TemplateSummary | null
   selectedRefTemplate: TemplateSummary | null
@@ -51,6 +53,7 @@ export function ReviewStep({
   selectedCampaign,
   selectedBrandKit,
   aspectRatio,
+  imageStyle,
   designMode,
   selectedTemplate,
   selectedRefTemplate,
@@ -87,6 +90,9 @@ export function ReviewStep({
     { label: 'Brand kit', value: selectedBrandKit?.name ?? '—' },
     { label: 'Size', value: `${ASPECT_LABELS[aspectRatio]} · ${dimensionsLabel(aspectRatio)} px` },
     { label: 'Path', value: `Path ${designMode === 'TEMPLATE' ? 'A — Template fill' : 'B — Freeform design'}` },
+    ...(designMode === 'GENERATE'
+      ? [{ label: 'Image style', value: imageStyle === 'classic' ? 'Classic' : styleLabel(imageStyle) }]
+      : []),
     {
       label: 'Template',
       value:

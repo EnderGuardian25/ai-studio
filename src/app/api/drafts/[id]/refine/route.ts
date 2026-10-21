@@ -17,7 +17,7 @@ import { buildRefineSystemPrompt, buildRefineUserMessage } from '@/lib/agent/pro
 import { generateBackgroundForRefine } from '@/lib/agent/background'
 import { refineSkipFields } from '@/lib/drafts/backgroundNotice'
 import { commitDraftRevision, draftCompositionStamp, recordRejectedRender, type ModelStamp } from '@/lib/drafts/revisions'
-import type { CompositionStamp } from '@/lib/designData'
+import { contractAt, refineReplacedStamp, styleLabel, type CompositionStamp, type SizeContract } from '@/lib/designData'
 import { claimWhere, logLostClaim } from '@/lib/drafts/claim'
 import { claimDraftAction, startDraftAction, touchDraftAction } from '@/lib/drafts/draftActions'
 import { runRefineAttempts, settleRefine } from '@/lib/drafts/refineAttempt'
@@ -190,7 +190,39 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
 
     // One system prompt and the ORIGINAL slim HTML for both attempts; the retry
     // only appends the miss (prompts/refine.ts buildRefineRetryNote).
-    const systemPrompt = buildRefineSystemPrompt({ kit, mode, width, height, hasInlineAssets, backgroundImageUrl })
+    // 009 FR-13: the draft's stamped hero contract, resolved at the version it
+    // was made under (versions are immutable). Classic, null and an unresolvable
+    // stamp pass nothing: the prompt is then byte-identical to before.
+    const prevStamp = draftCompositionStamp(draft)
+    let compositionContract: { label: string; version: number; size: SizeContract } | undefined
+    if (prevStamp && prevStamp.appliedArchetype !== 'classic' && prevStamp.contractVersion !== null) {
+      const size = contractAt(prevStamp.appliedArchetype, prevStamp.contractVersion, draft.brief.aspectRatio)
+      if (size) {
+        compositionContract = {
+          label: styleLabel(prevStamp.appliedArchetype),
+          version: prevStamp.contractVersion,
+          size,
+        }
+      } else {
+        console.warn(
+          `[refine] draft ${draft.id}: stamp ${prevStamp.appliedArchetype} v${prevStamp.contractVersion} does not resolve; contract omitted`,
+        )
+      }
+    }
+    // A refine that made a new background replaced the hero image, and no check
+    // runs on it: a non-classic draft is re-stamped classic. A classic draft
+    // keeps its stamp (refineReplacedStamp returns it unchanged).
+    const commitStamp = prevStamp && background.url ? refineReplacedStamp(prevStamp) : prevStamp
+
+    const systemPrompt = buildRefineSystemPrompt({
+      kit,
+      mode,
+      width,
+      height,
+      hasInlineAssets,
+      backgroundImageUrl,
+      compositionContract,
+    })
     const userMessage = (retryReasons?: string[]) =>
       buildRefineUserMessage({ slimHtml, hasHtml: !!draft.htmlContent, instruction, width, height, retryReasons })
 
@@ -284,8 +316,9 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
           model,
           // 019: the final draft write is guarded on this run's claim.
           claim,
-          // 009 FR-12: carried unchanged (T5 re-stamps a refine that replaced the image).
-          composition: draftCompositionStamp(draft),
+          // 009 FR-12/FR-13: the carried stamp, or the re-stamp when this refine
+          // replaced the background.
+          composition: commitStamp,
         })
       },
       conflict: async (conflict) => {
@@ -329,7 +362,9 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
           diagnostics: notApplied.diagnostics,
           // 008 FR-08: the rejected render records the attempt's model.
           model,
-          composition: draftCompositionStamp(draft),
+          // The rejected render carries the same stamp a commit would: if it also
+          // replaced the background, "Use anyway" adopts a classic render.
+          composition: commitStamp,
           claim,
         })
       },

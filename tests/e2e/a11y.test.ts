@@ -1,6 +1,7 @@
 import { test, expect, type Locator, type Page } from '@playwright/test'
 import { loginAs, type ApiClient } from '../helpers/api'
 import { expectNoAxeViolations } from '../helpers/axe'
+import { prisma, dbAvailable } from '../helpers/db'
 import {
   ADMIN_EMAIL,
   ADMIN_PASSWORD,
@@ -1147,6 +1148,37 @@ test.describe('axe scan (T18)', () => {
       await expect(page.getByRole('combobox', { name, exact: true })).toBeVisible()
     }
     await expectNoAxeViolations(page, '/drafts/[id]', { settle: true })
+  })
+
+  // 009 AC-19: /drafts/[id] with the composition notice shown, and /brief step 2
+  // with the Image style picker (Path B) on screen.
+  test('AC-19 (009): /drafts/[id] with the composition notice, and the Image style picker', async ({ page }) => {
+    test.skip(!MOCKED() || !dbAvailable, 'needs MOCK_AI + MOCK_PUPPETEER and the test DB (a stamp is set in the DB)')
+    const draft = await mintExportedDraft(api, `a11y-hero-${Date.now()}`)
+    await prisma!.draft.update({
+      where: { id: draft.id },
+      data: {
+        composition: {
+          requestedArchetype: 'product-showcase',
+          appliedArchetype: 'classic',
+          contractVersion: null,
+          fallbackReason: 'busy',
+          imageQuality: 'default',
+        },
+      },
+    })
+    await pageLogin(page)
+    await page.goto(`/drafts/${draft.id}`)
+    await expect(page.getByTestId('composition-notice')).toBeVisible({ timeout: 20_000 })
+    for (const name of ['Design model', 'Headline model', 'Instagram caption model', 'Refine model']) {
+      await expect(page.getByRole('combobox', { name, exact: true })).toBeVisible()
+    }
+    await expectNoAxeViolations(page, '/drafts/[id] with the composition notice', { settle: true })
+
+    await briefStepTwo(page)
+    await page.getByRole('button', { name: /Path B — Freeform/ }).click()
+    await expect(page.getByTestId('image-style-section')).toBeVisible()
+    await expectNoAxeViolations(page, '/brief step 2 with the image style picker', { settle: true })
   })
 
   test('AC-19: /campaigns/[id] and /projects/[id]', async ({ page }) => {

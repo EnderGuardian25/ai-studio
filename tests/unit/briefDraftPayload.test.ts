@@ -59,6 +59,25 @@ describe('briefDraftPayloadSchema', () => {
     expect(parsed.success && 'designModel' in parsed.data).toBe(false)
   })
 
+  // 009 FR-03 / AC-05: the image style survives autosave -> resume.
+  it('round-trips imageStyle through JSON', () => {
+    const picked: BriefDraftPayload = { ...base, designMode: 'GENERATE', imageStyle: 'editorial-split' }
+    const parsed = briefDraftPayloadSchema.safeParse(JSON.parse(JSON.stringify(picked)))
+    expect(parsed.success && parsed.data).toStrictEqual(picked)
+  })
+
+  it('imageStyle is optional: a payload without it (classic, or saved before 009) still parses, with none', () => {
+    const parsed = briefDraftPayloadSchema.safeParse(base)
+    expect(parsed.success).toBe(true)
+    expect(parsed.success && 'imageStyle' in parsed.data).toBe(false)
+  })
+
+  it('an unknown stored style still parses (the wizard reads it back as classic); a non-string or over-long one does not', () => {
+    expect(briefDraftPayloadSchema.safeParse({ ...base, imageStyle: 'retired-style' }).success).toBe(true)
+    expect(briefDraftPayloadSchema.safeParse({ ...base, imageStyle: 7 }).success).toBe(false)
+    expect(briefDraftPayloadSchema.safeParse({ ...base, imageStyle: 'x'.repeat(41) }).success).toBe(false)
+  })
+
   it('rejects a pick outside the closed model keys', () => {
     for (const bad of ['opus', 'gpt-4o', 'claude-opus-5-5', null]) {
       expect(briefDraftPayloadSchema.safeParse({ ...base, captionModel: bad }).success).toBe(false)

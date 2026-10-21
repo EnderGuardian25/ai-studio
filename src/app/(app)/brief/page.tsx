@@ -59,6 +59,8 @@ export default function NewBriefPage() {
             brandKitId={wizard.brandKitId}
             setBrandKitId={wizard.setBrandKitId}
             brandKitOptions={wizard.brandKitOptions}
+            imageStyle={wizard.imageStyle}
+            setImageStyle={wizard.setImageStyle}
             designMode={wizard.designMode}
             setDesignMode={wizard.setDesignMode}
             templateId={wizard.templateId}
@@ -100,6 +102,7 @@ export default function NewBriefPage() {
             selectedCampaign={wizard.selectedCampaign}
             selectedBrandKit={wizard.selectedBrandKit}
             aspectRatio={wizard.aspectRatio}
+            imageStyle={wizard.imageStyle}
             designMode={wizard.designMode}
             selectedTemplate={wizard.selectedTemplate}
             selectedRefTemplate={wizard.selectedRefTemplate}

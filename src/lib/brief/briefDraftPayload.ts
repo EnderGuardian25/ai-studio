@@ -41,6 +41,9 @@ export const briefDraftPayloadSchema = z.object({
   // Absent = untouched picker (A5): the server resolves the default.
   captionModel: modelKeySchema.optional(),
   designModel: modelKeySchema.optional(),
+  // 009 FR-03: the image style; absent = classic. An unknown stored value is
+  // read back as classic by the wizard (resumeImageStyle), never a parse failure.
+  imageStyle: z.string().max(40).optional(),
 })
 
 export type BriefDraftPayload = z.infer<typeof briefDraftPayloadSchema>

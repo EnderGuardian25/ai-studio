@@ -26,6 +26,7 @@ import { CaptionPanels } from '@/components/drafts/CaptionPanels'
 import { RefinementPanel } from '@/components/drafts/RefinementPanel'
 import { InlineEditModal } from '@/components/drafts/InlineEditModal'
 import { BackgroundNotice } from '@/components/drafts/BackgroundNotice'
+import { CompositionNotice } from '@/components/drafts/CompositionNotice'
 import { GeneratedWith } from '@/components/drafts/GeneratedWith'
 import { ModelPicker } from '@/components/ui/ModelPicker'
 import { PageTitle } from '@/components/ui/PageHead'
@@ -492,6 +493,9 @@ export default function DraftDetailPage() {
           {/* 005 FR-07: why this design has no AI background, when that
               was not the model's choice. Non-blocking. */}
           {draft.backgroundSkipped && <BackgroundNotice skipped={draft.backgroundSkipped} />}
+
+          {/* 009 FR-15: the image style asked for was not (fully) applied. */}
+          {draft.compositionNotice && <CompositionNotice notice={draft.compositionNotice} />}
 
           {/* The versions (§8.13, the study's .v): a thumbnail at the post's
               ratio, the number, the instruction. The current one is ringed in

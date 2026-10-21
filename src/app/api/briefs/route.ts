@@ -6,6 +6,7 @@ import { isAllowedAssetUrl } from '@/lib/storage/minio'
 import { Prisma, DesignMode, type AspectRatio, type Channel } from '@prisma/client'
 import { isPublishableChannel, PUBLISHABLE_CHANNELS } from '@/lib/channels'
 import { isAspectRatio } from '@/lib/aspectRatio'
+import { validateImageStyle } from '@/lib/brief/imageStyle'
 import { isCliMode } from '@/lib/agent/config'
 import { resolveBriefCopyKey } from '@/lib/brief/copyProvider'
 import { IMAGE_PROVIDERS } from '@/providers/imageCapabilities'
@@ -45,6 +46,7 @@ export const POST = withTeamAuth(async (req: NextRequest, _ctx, user) => {
     referenceTemplateId?: string
     captionModel?: unknown
     designModel?: unknown
+    imageStyle?: unknown
   }
 
   const {
@@ -95,6 +97,12 @@ export const POST = withTeamAuth(async (req: NextRequest, _ctx, user) => {
   // aspectRatio is optional; defaults to SQUARE for backward compatibility.
   if (aspectRatio != null && !isAspectRatio(aspectRatio)) {
     return NextResponse.json({ error: 'aspectRatio must be SQUARE, PORTRAIT, or STORY' }, { status: 400 })
+  }
+  // 009 FR-03: the image style (absent = classic). Checked against the design
+  // mode now; the size is resolved at call time (STORY records unsupported-size).
+  const style = validateImageStyle(body.imageStyle, designMode)
+  if (!style.ok) {
+    return NextResponse.json({ error: style.error }, { status: 400 })
   }
   // 008 FR-17: the Review step's optional model picks — the initial request
   // (FR-10). The design pick serves the surface of the chosen design path.
@@ -228,6 +236,7 @@ export const POST = withTeamAuth(async (req: NextRequest, _ctx, user) => {
       channels: normalizedChannels,
       aspectRatio: aspectRatio ?? 'SQUARE',
       designMode: designMode as DesignMode,
+      imageStyle: style.value,
       campaignId: campaignId ?? null,
       brandKitId: brandKitId ?? null,
       copyProviderKey: resolvedCopyKey,

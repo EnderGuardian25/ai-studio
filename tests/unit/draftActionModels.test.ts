@@ -21,6 +21,7 @@ const h = vi.hoisted(() => ({
   runRefineAttempts: vi.fn(),
   refineApi: vi.fn(),
   result: null as null | Record<string, unknown>,
+  bgUrl: null as string | null,
 }))
 
 vi.mock('@/lib/prisma', () => ({
@@ -48,7 +49,8 @@ vi.mock('@/lib/agent/config', async (importOriginal) => {
 vi.mock('@/lib/agent/designAgent', () => ({ runDesignAgentRefine: h.refineApi }))
 vi.mock('@/lib/agent/designAgentCli', () => ({ runDesignAgentCliRefine: vi.fn() }))
 vi.mock('@/lib/agent/background', () => ({
-  generateBackgroundForRefine: async () => ({ url: null, skip: 'NOT_NEEDED', detail: null }),
+  generateBackgroundForRefine: async () =>
+    h.bgUrl ? { url: h.bgUrl, skip: null, detail: null } : { url: null, skip: 'NOT_NEEDED', detail: null },
 }))
 vi.mock('@/lib/drafts/refineVerify', () => ({ verifyRefine: vi.fn() }))
 vi.mock('@/lib/agent/backgroundGeneration', () => ({ startBackgroundGeneration: async () => {} }))
@@ -116,6 +118,7 @@ const NOT_APPLIED = {
 beforeEach(() => {
   h.draft = draft()
   h.policy = null
+  h.bgUrl = null
   h.result = { kind: 'accepted', html: '<html>refined</html>', refineCalls: 1, verifierCalls: 0 }
   for (const fn of [h.draftUpdate, h.claim, h.commit, h.reject, h.runRefineAttempts, h.refineApi]) fn.mockReset()
   h.claim.mockResolvedValue({ action: 'REFINE', claimId: 'c1' })
@@ -300,6 +303,83 @@ describe('the composition stamp is carried by refine, reject, Override and inlin
     h.commit.mockClear()
     h.draft = draft({ composition: { appliedArchetype: 'bogus' } })
     await post({ instruction: 'darker' })
+    expect(h.commit.mock.calls[0][0].composition).toBeNull()
+  })
+})
+
+// ── 009 FR-13: refine carries the contract and re-stamps a replaced image ───
+
+describe('refine and the hero contract (009 FR-13, AC-17)', () => {
+  const KEPT = { requestedArchetype: 'editorial-split', appliedArchetype: 'editorial-split', contractVersion: 1, imageQuality: 'high' }
+  const CLASSIC = { requestedArchetype: 'classic', appliedArchetype: 'classic', contractVersion: null, imageQuality: 'default' }
+  const systemPrompt = () => h.refineApi.mock.calls[0][0].systemPrompt as string
+
+  it('a kept draft gets the stamped contract in the refine system prompt, at the stamped version and size', async () => {
+    h.draft = draft({ composition: KEPT })
+    await post({ instruction: 'darker' })
+    expect(systemPrompt()).toContain('This post uses the Editorial split layout (contract v1)')
+    expect(systemPrompt()).toContain('the left 50% of the frame, full height')
+  })
+
+  it('a PORTRAIT draft resolves its own size: the top region, not the left one', async () => {
+    h.draft = draft({
+      composition: { ...KEPT, requestedArchetype: 'product-showcase', appliedArchetype: 'product-showcase' },
+      brief: { id: 'b1', userId: 'u1', campaignId: null, brandKitId: null, aspectRatio: 'PORTRAIT', designMode: 'GENERATE' },
+    })
+    await post({ instruction: 'darker' })
+    expect(systemPrompt()).toContain('the top 38% of the frame')
+  })
+
+  it('a classic, a pre-009 and an unresolvable stamp get no contract block', async () => {
+    for (const composition of [
+      CLASSIC,
+      undefined,
+      { ...KEPT, contractVersion: 9 },
+      { ...KEPT, requestedArchetype: 'gone', appliedArchetype: 'gone' },
+    ]) {
+      h.refineApi.mockClear()
+      h.draft = draft(composition === undefined ? {} : { composition })
+      await post({ instruction: 'darker' })
+      expect(systemPrompt()).not.toContain('This post uses the')
+    }
+  })
+
+  it('a refine that made a new background re-stamps a kept draft classic with refine-replaced-image (requested and quality kept)', async () => {
+    h.draft = draft({ composition: KEPT })
+    h.bgUrl = 'http://minio/images/new.png'
+    await post({ instruction: 'change the background to a city' })
+    expect(h.commit.mock.calls[0][0].composition).toEqual({
+      requestedArchetype: 'editorial-split',
+      appliedArchetype: 'classic',
+      contractVersion: null,
+      fallbackReason: 'refine-replaced-image',
+      imageQuality: 'high',
+    })
+  })
+
+  it('the rejected render of such a refine carries the same re-stamp', async () => {
+    h.draft = draft({ composition: KEPT })
+    h.bgUrl = 'http://minio/images/new.png'
+    h.result = NOT_APPLIED
+    await post({ instruction: 'change the background to a city' })
+    expect(h.reject.mock.calls[0][0].composition).toMatchObject({ appliedArchetype: 'classic', fallbackReason: 'refine-replaced-image' })
+  })
+
+  it('a refine with no new background carries the stamp; a classic draft keeps its stamp even with one', async () => {
+    h.draft = draft({ composition: KEPT })
+    await post({ instruction: 'darker' })
+    expect(h.commit.mock.calls[0][0].composition).toEqual(KEPT)
+    h.commit.mockClear()
+    h.draft = draft({ composition: CLASSIC })
+    h.bgUrl = 'http://minio/images/new.png'
+    await post({ instruction: 'change the background to a city' })
+    expect(h.commit.mock.calls[0][0].composition).toEqual(CLASSIC)
+  })
+
+  it('a pre-009 draft stays null when the background is replaced (no stamp is invented)', async () => {
+    h.draft = draft()
+    h.bgUrl = 'http://minio/images/new.png'
+    await post({ instruction: 'change the background to a city' })
     expect(h.commit.mock.calls[0][0].composition).toBeNull()
   })
 })

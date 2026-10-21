@@ -5,6 +5,7 @@ import { Sparkles, Check } from 'lucide-react'
 import { Select } from '@/components/ui/Select'
 import type { AspectRatio } from '@prisma/client'
 import { ASPECT_LABELS } from '@/lib/aspectRatio'
+import { imageStyleOptions } from '@/lib/designData'
 import type { Campaign, TemplateSummary } from '@/lib/api-types'
 import { ASPECT_OPTIONS, SOURCE_LABEL } from './constants'
 import type { DesignMode, ResolvedKit } from './types'
@@ -25,6 +26,8 @@ interface SizeDesignStepProps {
   brandKitId: string
   setBrandKitId: (id: string) => void
   brandKitOptions: { value: string; label: string }[]
+  imageStyle: string
+  setImageStyle: (key: string) => void
   designMode: DesignMode
   setDesignMode: (m: DesignMode) => void
   templateId: string
@@ -48,6 +51,8 @@ export function SizeDesignStep({
   brandKitId,
   setBrandKitId,
   brandKitOptions,
+  imageStyle,
+  setImageStyle,
   designMode,
   setDesignMode,
   templateId,
@@ -147,6 +152,45 @@ export function SizeDesignStep({
           </button>
         </div>
       </div>
+
+      {/* Image style — Path B only (009 FR-03). A style an archetype can't draw
+          at the chosen size is disabled with its reason, never hidden. */}
+      {designMode === 'GENERATE' && (
+        <div className={SECTION} data-testid="image-style-section">
+          <FieldLabel className="mb-2.5">Image style</FieldLabel>
+          <p className="text-ui-xs text-fg-muted mb-3">
+            A hero style asks for an image made for the layout. If it can&apos;t be used, the classic style is used and
+            the post says why.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {imageStyleOptions(aspectRatio).map(opt => {
+              const selected = imageStyle === opt.key
+              return (
+                <button
+                  key={opt.key}
+                  type="button"
+                  disabled={!opt.supported}
+                  onClick={() => setImageStyle(opt.key)}
+                  aria-pressed={selected}
+                  data-testid={`image-style-${opt.key}`}
+                  className={cardCls(selected, 'p-4 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:shadow-none')}
+                >
+                  <div className="flex items-start gap-2">
+                    <span className="text-ui-base font-semibold leading-tight text-fg">{opt.label}</span>
+                    {selected && <Check {...ICON} aria-hidden className="ml-auto text-accent flex-shrink-0" />}
+                  </div>
+                  <div className="mt-1.5 text-ui-xs text-fg-muted">{opt.summary}</div>
+                  {!opt.supported && (
+                    <div className="mt-1.5 text-ui-xs text-fg-muted">
+                      Not available for the {ASPECT_LABELS[aspectRatio]} size
+                    </div>
+                  )}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Template picker — Path A */}
       {designMode === 'TEMPLATE' && (

@@ -6,6 +6,7 @@ import { useQuery } from '@tanstack/react-query'
 import { ApiError, apiFetch } from '@/lib/apiFetch'
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser'
 import { canSubmitBrief } from '@/lib/brief/copyProvider'
+import { CLASSIC_STYLE, resumeImageStyle } from '@/lib/brief/imageStyle'
 import { designPickForPath, refusedModelField, type BriefModelField } from '@/lib/brief/modelPicks'
 import { MODEL_NOT_ALLOWED } from '@/lib/models/requests'
 import type { ModelKey } from '@/lib/models/catalogue'
@@ -60,10 +61,14 @@ export interface UseBriefWizardResult {
 
   // Step 1 — Size & Design
   aspectRatio: AspectRatio
-  setAspectRatio: React.Dispatch<React.SetStateAction<AspectRatio>>
+  /** Also resets an image style the new size can't run (009 FR-03). */
+  setAspectRatio: (ratio: AspectRatio) => void
   brandKitId: string
   setBrandKitId: React.Dispatch<React.SetStateAction<string>>
   brandKitOptions: { value: string; label: string }[]
+  /** 009 FR-03: the image style key ('classic' or an archetype). Path B only. */
+  imageStyle: string
+  setImageStyle: (key: string) => void
   designMode: DesignMode
   /** Also resets a design model the new path can't run (008 FR-19). */
   setDesignMode: (mode: DesignMode) => void
@@ -124,7 +129,9 @@ export function useBriefWizard(): UseBriefWizardResult {
   const [campaignId, setCampaignId] = useState('')
 
   // Step 1 — Size & Design
-  const [aspectRatio, setAspectRatio] = useState<AspectRatio>('SQUARE')
+  const [aspectRatio, setAspectRatioState] = useState<AspectRatio>('SQUARE')
+  // 009 FR-03: Path B only; reset to classic when the size or path can't run it.
+  const [imageStyle, setImageStyle] = useState<string>(CLASSIC_STYLE)
   const [brandKitId, setBrandKitId] = useState('')
   const [designMode, setDesignModeState] = useState<DesignMode>('TEMPLATE')
   const [templateId, setTemplateId] = useState('')
@@ -149,11 +156,18 @@ export function useBriefWizard(): UseBriefWizardResult {
     setModelErrors(({ designModel: _refused, ...rest }) => rest)
   }, [])
 
+  // 009 FR-03: a size an archetype does not support (STORY) resets the style.
+  function setAspectRatio(ratio: AspectRatio) {
+    setAspectRatioState(ratio)
+    if (ratio === 'STORY') setImageStyle(CLASSIC_STYLE)
+  }
+
   // FR-19: a design pick the new path can't run (Opus → template fill) resets,
   // with the reason shown under the Review step's picker.
   function setDesignMode(mode: DesignMode) {
     if (mode === designMode) return
     setDesignModeState(mode)
+    if (mode === 'TEMPLATE') setImageStyle(CLASSIC_STYLE)
     const next = designPickForPath(designModel, mode)
     setDesignModel(next.pick) // clears the previous path's note and refusal
     if (next.note) setDesignModelNote(next.note)
@@ -235,6 +249,8 @@ export function useBriefWizard(): UseBriefWizardResult {
       // An untouched pick is undefined, which JSON.stringify leaves out.
       captionModel,
       designModel,
+      // Classic is the default: left out, like an untouched model pick.
+      imageStyle: imageStyle === CLASSIC_STYLE ? undefined : imageStyle,
     }
     if (autosaveStoppedRef.current) return
     if (isTrivialBriefDraft(latestPayloadRef.current)) return
@@ -256,6 +272,7 @@ export function useBriefWizard(): UseBriefWizardResult {
     images,
     captionModel,
     designModel,
+    imageStyle,
   ])
 
   // Resume: /brief?resume=<id> rehydrates the saved row and continues saving
@@ -276,7 +293,7 @@ export function useBriefWizard(): UseBriefWizardResult {
         draftIdRef.current = row.id
         setStep(p.step)
         setCampaignId(p.campaignId)
-        setAspectRatio(p.aspectRatio)
+        setAspectRatioState(p.aspectRatio)
         setBrandKitId(p.brandKitId)
         setDesignModeState(p.designMode)
         setTemplateId(p.templateId)
@@ -288,6 +305,11 @@ export function useBriefWizard(): UseBriefWizardResult {
         setImages(p.images.map((img) => ({ ...img })))
         setCaptionModelState(p.captionModel)
         setDesignModelState(p.designModel)
+        // An unknown or retired stored value resumes as classic; so does a style
+        // the stored size or path can't run.
+        setImageStyle(
+          p.aspectRatio === 'STORY' || p.designMode === 'TEMPLATE' ? CLASSIC_STYLE : resumeImageStyle(p.imageStyle),
+        )
       })
       .catch(() => {
         /* deleted/expired/foreign id → fresh wizard */
@@ -485,6 +507,8 @@ export function useBriefWizard(): UseBriefWizardResult {
         // pick is left out by JSON.stringify, so the server resolves the default.
         captionModel,
         designModel,
+        // 009 FR-03: sent only when a style was chosen; absent means classic.
+        imageStyle: designMode === 'GENERATE' && imageStyle !== CLASSIC_STYLE ? imageStyle : undefined,
       }
 
       const brief = await apiFetch<{ id: string }>('/api/briefs', {
@@ -564,6 +588,8 @@ export function useBriefWizard(): UseBriefWizardResult {
     standaloneCampaigns,
     aspectRatio,
     setAspectRatio,
+    imageStyle,
+    setImageStyle,
     brandKitId,
     setBrandKitId,
     brandKitOptions,
