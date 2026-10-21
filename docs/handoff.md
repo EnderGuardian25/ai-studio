@@ -1,33 +1,33 @@
 # bistec-studio — Session Handoff
 
-**Date:** 2026-10-21 (latest: **009 hero imagery Phase 1 BUILT (T1 to T5 committed, T6 gate closing); verify next, then OP-1 by the user**; before it: **023 scheduler heartbeat VERIFIED PASS**; gates 405/3/0/0, CI green at `f43669a` (runs 39493017393, 39493027033)). 2026-10-20: **020 Create post button, 019 claim token, 021 Graphite re-theme, 018 and 022 VERIFIED PASS; the build order is complete**. 2026-10-19: this repo adopted the fork's `v2` on 2026-10-18. The fork-era sections, 2026-10-07 to 2026-10-14, moved to [`fork-history.md`](fork-history.md). Previous: 2026-10-07 (005 verified PASS; 011 planned, wave 1 built). Previous: 2026-10-03 (004 finished and verified PARTIAL, Phase 0 only; 005 built 9/10, waiting on one operator check). Before that: 2026-09-28 (build session — 004 Waves 1–3 built, MinIO → silo, PR #42 + draft PR #43). Before that: 2026-09-23 (later, later the same day: proposal **012** per-channel captions + copy→caption rename, a floating **Create post** button folded into 011, and a launch-video legibility pass. Before that: planning session — proposals 008–011 + roadmap, 004 re-planned to 24 tasks incl. Phase 0, and the deploy pipeline found broken: Coolify 401 since 2026-09-15). Previous: 2026-07-28 (copy-edit status clobber fix).
+**Date:** 2026-10-21 (latest: **009 hero imagery Phase 1 VERIFIED PASS (25/25), commit `d3534e0`; OP-1 is the user's pending step**; before it: **023 scheduler heartbeat VERIFIED PASS**; gates: unit 2947/2947, render 47/47, E2E 422/3/0/0, CI green at `f8f063c` (runs 39604699552, 39604706638)). 2026-10-20: **020 Create post button, 019 claim token, 021 Graphite re-theme, 018 and 022 VERIFIED PASS; the build order is complete**. 2026-10-19: this repo adopted the fork's `v2` on 2026-10-18. The fork-era sections, 2026-10-07 to 2026-10-14, moved to [`fork-history.md`](fork-history.md). Previous: 2026-10-07 (005 verified PASS; 011 planned, wave 1 built). Previous: 2026-10-03 (004 finished and verified PARTIAL, Phase 0 only; 005 built 9/10, waiting on one operator check). Before that: 2026-09-28 (build session — 004 Waves 1–3 built, MinIO → silo, PR #42 + draft PR #43). Before that: 2026-09-23 (later, later the same day: proposal **012** per-channel captions + copy→caption rename, a floating **Create post** button folded into 011, and a launch-video legibility pass. Before that: planning session — proposals 008–011 + roadmap, 004 re-planned to 24 tasks incl. Phase 0, and the deploy pipeline found broken: Coolify 401 since 2026-09-15). Previous: 2026-07-28 (copy-edit status clobber fix).
 **Repo:** https://github.com/bistec-oss/studio, which `origin` points to. **The repo rules (branches, remotes, the `fork` remote, PR #43) are in [`CLAUDE.md`](../CLAUDE.md)'s top entry, which is authoritative.** This file does not repeat them.
 **Branch:** work continues on **`v2`**, pushed to `origin v2`. `main` is `671ad6e9` (PR #42) and deploys to company prod. `v2` → `main` is one PR, merged only on the user's go-ahead and after the pre-merge prod checklist below.
 **Production:** `https://studio.bistecglobal.com` serves company `main`. Its migration head is `20260728120000_heal_copy_edit_clobbered_drafts`. Merges to `main` build but do not deploy until the Coolify token is rotated (see CLAUDE.md).
 
 ---
 
-## ⏸️ 2026-10-20 — PICK UP HERE: 018, 022, 021, 019 and 020 VERIFIED PASS; the build order is complete
+## ⏸️ 2026-10-21 — PICK UP HERE: 018, 022, 021, 019, 020, 023 and 009 (Phase 1) VERIFIED PASS; nothing is mid-build
 
 ### Where things stand
 
-| Change                                    | State                                                       | Evidence                                                                                                                                                                                                       |
-| ----------------------------------------- | ----------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 018 post-008 small fixes                  | ✅ **VERIFIED PASS** (8/8 ACs)                              | E2E 390/3/0/0; CI green at `432a036f`; [verify-report](../.specclaw/changes/018-post-008-small-fixes/verify-report.md)                                                                                         |
-| 022 prod data and deploy restore          | ✅ **VERIFIED PASS** (11/11 ACs)                            | E2E 390/3/0/0; CI green at `12ef7e6c`; [verify-report](../.specclaw/changes/022-prod-data-and-deploy-restore/verify-report.md)                                                                                 |
-| 021 Graphite re-theme                     | ✅ **VERIFIED PASS** (19/19 ACs; AC-05 font-data carve-out) | E2E 397/3/0/0; render 15/15; CI green at `aa5f7a8`; [verify-report](../.specclaw/changes/021-graphite-retheme/verify-report.md)                                                                                |
-| 019 draft-action claim token              | **VERIFIED PASS** 9/9 ACs                                   | E2E 397/3/0/0; unit 2681/2681; test:upgrade 3/3; CI green at `7e86b96` (runs 39445592883, 39445602043); [reports](../.specclaw/changes/019-draft-action-claim-token/reports/T4.md)                             |
-| 020 Create post button off the draft page | **VERIFIED PASS** 7/7 ACs                                   | E2E 399/3/0/0; unit 2681/2681; CI green at `8d0d633` (runs 39466314229, 39466320752); [reports](../.specclaw/changes/020-create-post-button-draft-page/reports/T2.md)                                          |
-| 023 scheduler heartbeat                   | **VERIFIED PASS** 11/11 ACs                                 | E2E 405/3/0/0; unit 2706/2706; lint 0 errors / 7 warnings; CI green at `f43669a` (runs 39493017393, 39493027033); [reports](../.specclaw/changes/023-scheduler-heartbeat/reports/T2.md)                        |
-| 009 hero imagery, Phase 1                 | **BUILT**, verify next; OP-1 is the user's step             | T1 `bfe3d57` to T5 `f8f063c`, T6 docs and gate; E2E 422/3/0/0; unit 2947/2947; render 47/47; CI green at `f8f063c` (runs 39604699552, 39604706638); [spec](../.specclaw/changes/009-hero-image-design/spec.md) |
+| Change                                    | State                                                       | Evidence                                                                                                                                                                                                                         |
+| ----------------------------------------- | ----------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 018 post-008 small fixes                  | ✅ **VERIFIED PASS** (8/8 ACs)                              | E2E 390/3/0/0; CI green at `432a036f`; [verify-report](../.specclaw/changes/018-post-008-small-fixes/verify-report.md)                                                                                                           |
+| 022 prod data and deploy restore          | ✅ **VERIFIED PASS** (11/11 ACs)                            | E2E 390/3/0/0; CI green at `12ef7e6c`; [verify-report](../.specclaw/changes/022-prod-data-and-deploy-restore/verify-report.md)                                                                                                   |
+| 021 Graphite re-theme                     | ✅ **VERIFIED PASS** (19/19 ACs; AC-05 font-data carve-out) | E2E 397/3/0/0; render 15/15; CI green at `aa5f7a8`; [verify-report](../.specclaw/changes/021-graphite-retheme/verify-report.md)                                                                                                  |
+| 019 draft-action claim token              | **VERIFIED PASS** 9/9 ACs                                   | E2E 397/3/0/0; unit 2681/2681; test:upgrade 3/3; CI green at `7e86b96` (runs 39445592883, 39445602043); [reports](../.specclaw/changes/019-draft-action-claim-token/reports/T4.md)                                               |
+| 020 Create post button off the draft page | **VERIFIED PASS** 7/7 ACs                                   | E2E 399/3/0/0; unit 2681/2681; CI green at `8d0d633` (runs 39466314229, 39466320752); [reports](../.specclaw/changes/020-create-post-button-draft-page/reports/T2.md)                                                            |
+| 023 scheduler heartbeat                   | **VERIFIED PASS** 11/11 ACs                                 | E2E 405/3/0/0; unit 2706/2706; lint 0 errors / 7 warnings; CI green at `f43669a` (runs 39493017393, 39493027033); [reports](../.specclaw/changes/023-scheduler-heartbeat/reports/T2.md)                                          |
+| 009 hero imagery, Phase 1                 | **VERIFIED PASS** 25/25 ACs; OP-1 pending (the user's step) | T1 `bfe3d57` to T6 `ea1c36e`, verify `d3534e0`; E2E 422/3/0/0; unit 2947/2947; render 47/47; CI green at `f8f063c` (runs 39604699552, 39604706638); [verify-report](../.specclaw/changes/009-hero-image-design/verify-report.md) |
 
-- **009 (BUILT; verify next; [spec](../.specclaw/changes/009-hero-image-design/spec.md), [design](../.specclaw/changes/009-hero-image-design/design.md)):** a Path B brief can opt into a per-post **image style** (`product-showcase` or `editorial-split`). The image model is asked for a hero subject and told which part of the frame to leave empty; the returned image is **checked on real pixels** and fails closed; the design step puts the text and logo only in the empty part; the outcome is recorded as a **composition stamp** on every draft and revision; after the final render the text and logo positions are observed (recorded, never a fallback). `classic` is the default and today's behaviour, unchanged. Scheduled, MCP and ACP briefs are always classic. It does not close cause 5 (no reference images, so a device screen cannot show the real product UI): that is Phase 2.
+- **009 (VERIFIED PASS, 25/25 ACs, OP-1 pending; [verify-report](../.specclaw/changes/009-hero-image-design/verify-report.md), [spec](../.specclaw/changes/009-hero-image-design/spec.md), [design](../.specclaw/changes/009-hero-image-design/design.md)):** a Path B brief can opt into a per-post **image style** (`product-showcase` or `editorial-split`). The image model is asked for a hero subject and told which part of the frame to leave empty; the returned image is **checked on real pixels** and fails closed; the design step puts the text and logo only in the empty part; the outcome is recorded as a **composition stamp** on every draft and revision; after the final render the text and logo positions are observed (recorded, never a fallback). `classic` is the default and today's behaviour, unchanged. Scheduled, MCP and ACP briefs are always classic. It does not close cause 5 (no reference images, so a device screen cannot show the real product UI): that is Phase 2.
   - **T1 (`bfe3d57`):** three columns: `Brief.imageStyle` (TEXT, default `'classic'`, so a retired key needs no migration), `Draft.composition` and `DraftRevision.composition` (JSONB, null means "before 009"); the additive migration `20261022120000_hero_composition` and its manual down script `prisma/rollback/009-hero-image-design.down.sql`.
   - **T2 (`81d6521`):** `src/lib/designData`: the dataset, the canvas-to-image region mapping, the pure `evaluateRegions`, the planner and `settleComposition`, the stamp schema, the prompt text, the layout comparison and the quality tier parser.
-  - **T3 (`9894a99`):** the Chromium sampler in `puppeteer.ts`, `layoutFacts`, the real-render fixtures, and the thresholds tuned on real pixels (render suite 47/47 at T5).
+  - **T3 (`9894a99`):** the Chromium sampler in `puppeteer.ts`, `layoutFacts`, the real-render fixtures, and the thresholds tuned on synthetic fixtures (OP-1 checks them against real images) (render suite 47/47 at T5).
   - **T4 (`fb0ff0e`):** the prompts (a golden-string guard keeps classic byte-identical), the pipeline wiring, the fail-closed check, `IMAGE_QUALITY`, the action budget (two new bounded steps), the mock seams, and the stamp on every revision writer. `PROMPT_VERSION` is `2026-10-21.1`.
   - **T5 (`f8f063c`):** the wizard picker (Path B only, disabled for 9:16) and `imageStyle` on `POST /api/briefs`; `composition` and `compositionNotice` on `GET /api/drafts/[id]` and the draft notice; refine carries the contract, and a refine that replaces the image re-stamps; regenerate design re-resolves from the brief; E2E section AA (TC-HERO-01 to TC-HERO-16).
-  - **T6:** these docs and the full gate.
+  - **T6 (`ea1c36e`):** the docs and the full gate; verify PASS at `d3534e0`. Phases 2 (reference images and product screenshots) and 3 (full AI render) are not proposed; they wait on OP-1.
   - **The fallback rule.** A hero image that fails the check (`busy`, `contrast`, `region-invalid`, `check-error`) is **kept and reused under the classic prompt**; no second image call is made, so a fallback never doubles the image spend. No image at all is `no-image`; a retired or unknown key is `unknown-archetype`; 9:16 is `unsupported-size`.
   - **One deviation from the design (T5, amended in design section 8):** a rejected refine render carries its own commit stamp (`refineReplacedStamp(prev)` when the refine replaced the background), not `prev`, so "Use anyway" adopts a stamp that describes the render.
   - **E2E seams:** the four `__MOCK_HERO_*__` sentinels; see [`e2e-test-plan.md`](e2e-test-plan.md) section AA.
@@ -90,18 +90,29 @@
 
 1. ~~022~~ and ~~021~~ are done: both VERIFIED PASS (2026-10-19 and 2026-10-20).
 2. ~~019~~ and ~~020~~ are done: both VERIFIED PASS (2026-10-20). The build order 018 → 022 → 021 → 019 → 020 is complete.
-3. **The `v2` → `main` merge** waits on the user's go-ahead and the checklist below.
-4. **Company prod to-dos, live again:** B4, the team Claude tokens, the Coolify token rotation and MinIO → silo on prod. They are listed in CLAUDE.md.
+3. ~~023~~ and ~~009~~ (Phase 1) are done: both VERIFIED PASS (2026-10-21). 009 OP-1 is the user's step.
+4. **The `v2` → `main` merge** waits on the user's go-ahead and the checklist below.
+5. **Company prod to-dos, live again:** B4, the team Claude tokens, the Coolify token rotation and MinIO → silo on prod. They are listed in CLAUDE.md.
 
-**Next:** verify 009 (`/specclaw:verify`), then **OP-1 by the user** (the 009 section above). 023 is VERIFIED PASS.
+**Next step for a new session:** ask the user which to do next, or whether to prepare the merge. Do not start any change unprompted. The user's pending steps are **009 OP-1** (the 009 section above) and the **merge go-ahead**. Remaining roadmap work is proposals only, none planned: 006 (the rest; item 7 moved to 023), 007 (extends `src/lib/designData/` with a `composition` section), 010 (WhatsApp Channel; B4 must be fixed first, and the 023 heartbeat dependency is met), and 009 Phases 2 and 3 (to be proposed after OP-1).
 
-**Gates now:** unit 2947/2947, render 47/47, lint 0 errors / 7 warnings. The last full clean mock E2E: 422/3/0/0 (009 T6); the baseline before 009 was unit 2706/2706 and E2E 405/3/0/0 (023 T3).
+**Process:** one task at a time; an implementer subagent, then `specclaw:code-reviewer`, then the orchestrator re-runs tsc, lint and unit and commits; a full clean mock E2E and a CI check close each change; no real model calls. The user prefers subagent-driven work routed to the cheapest workable model (haiku for mechanical work, sonnet for implementation and review, opus only when needed). Party panels are on for proposals: ask before spending, and show the roster and the bill.
+
+**Gotchas added 2026-10-20/21:**
+
+- After a power cut or reboot, Docker Desktop may be stopped. Start it, and wait for `docker exec designer-postgres-1 pg_isready` before any DB or E2E work.
+- `npm run test:e2e:db` does not drop the test DB. A clean run drops `bistec_studio_test` first, then runs it. Never run prisma or a DB command without an explicit `DATABASE_URL`.
+- Haiku gate agents have twice handed back before a long E2E run finished. Wait on the run's log for a `MOCK_EXIT` line.
+- `specclaw-build check-report` needs a `## Verification` heading exactly; prettier may rewrite a report, so re-read it before checking.
+- After each push, check `gh run list --branch v2`. When this was written, the runs at `f8c5436` and `d3534e0` (docs and specclaw files only) were still pending or in progress.
+
+**Gates now** (009 T6, 2026-10-21): unit 2947/2947, render 47/47, lint 0 errors / 7 warnings, full clean mock E2E 422/3/0/0, build and `test:upgrade` pass. The baseline before 009 was unit 2706/2706 and E2E 405/3/0/0 (023 T3).
 
 ---
 
 ## 🚦 Pre-merge prod checklist: `v2` → `main` (022 FR-08)
 
-`main` deploys to company prod (`studio.bistecglobal.com`), which holds real data: the Hearts Academy team, its kit and the IRP posts. `v2` carries changes 004–022. Nothing in this section merges or deploys. **The merge waits on the user's go-ahead and on the three blocking steps below.**
+`main` deploys to company prod (`studio.bistecglobal.com`), which holds real data: the Hearts Academy team, its kit and the IRP posts. `v2` carries changes 004–023. Nothing in this section merges or deploys. **The merge waits on the user's go-ahead and on the three blocking steps below.**
 
 ### The named waiver
 
@@ -327,7 +338,7 @@ Stamps need nothing: `DraftCaption.model` and `Draft.headlineModel` are separate
 
 ---
 
-## ⏸️ 2026-10-07 — superseded by 2026-10-19 above (kept for history)
+## ⏸️ 2026-10-07 — superseded by 2026-10-21 above (kept for history)
 
 **005 is done and verified PASS.** **011 (app visual redesign) is planned, and wave 1 is built.** The build is paused at its one operator gate: **the user picks one of three design directions.** Everything is pushed to `v2`. Nothing is merged to `main`, and prod is unchanged.
 
@@ -600,7 +611,7 @@ Review proposals 005–012 with the user, then `/specclaw:plan` them in roadmap 
 
 ---
 
-## ⏸️ 2026-09-23 (earlier) — planning session 008–011
+## ⏸️ 2026-09-23 (earlier; superseded, see the top section) — planning session 008–011
 
 **Planning session, no product code changed.** Output: four new proposals (008–011), a roadmap sequencing 004–011, a revised 004 plan (now 24 tasks, including a new **Phase 0** for a broken deploy pipeline), and a handoff for the Coolify admin.
 
@@ -661,7 +672,7 @@ The post-merge run for PR #41 ([run 34988162569](https://github.com/bistec-oss/s
 
 ---
 
-## ⏸️ 2026-07-28 — previous pick-up point
+## ⏸️ 2026-07-28 — previous pick-up point (superseded, see the top section)
 
 ### The through-line: a merged, deployed, CI-green fix can be completely inert
 
