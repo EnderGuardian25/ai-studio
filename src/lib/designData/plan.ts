@@ -1,0 +1,103 @@
+// Composition planning and settling (009 FR-04, design.md section 8). Both are
+// pure and take structural inputs, so nothing here imports the background step.
+import type { AspectRatio } from '@prisma/client'
+import type { ImageTier } from '@/providers/imageCapabilities'
+import { archetypes, getArchetype, type ArchetypeMap, type Contract, type SizeContract } from './composition'
+import { compositionStampSchema, type CompositionStamp } from './stamp'
+
+export interface HeroPlan {
+  kind: 'hero'
+  // The brief's imageStyle, which is also the archetype key.
+  requestedArchetype: string
+  label: string
+  contractVersion: number
+  contract: Contract
+  size: AspectRatio
+  sizeContract: SizeContract
+}
+export interface ClassicPlan {
+  kind: 'classic'
+  requestedArchetype: string
+  // Absent for `imageStyle: 'classic'`.
+  fallbackReason?: 'unknown-archetype' | 'unsupported-size'
+}
+export type CompositionPlan = HeroPlan | ClassicPlan
+
+// The sampler's outcome for a hero image, as `runBackgroundStep` reports it.
+export type HeroCheckResult = { ok: true } | { ok: false; reason: 'busy' | 'contrast' | 'region-invalid' | 'check-error' }
+
+// What settle needs from the background step. A skip variant has no url.
+export interface SettleBackground {
+  url?: string | null
+  quality?: ImageTier
+  check?: HeroCheckResult | null
+}
+
+// A classic plan is decided before any image is requested. Absent, blank or
+// 'classic' is classic; an unknown or retired key is `unknown-archetype`; a
+// size the active archetype's current contract does not declare is
+// `unsupported-size`. `source` is injectable for tests only.
+export function planComposition(
+  input: { imageStyle: string | null | undefined; aspectRatio: AspectRatio },
+  source: ArchetypeMap = archetypes
+): CompositionPlan {
+  const requested = typeof input.imageStyle === 'string' && input.imageStyle !== '' ? input.imageStyle : 'classic'
+  if (requested === 'classic') return { kind: 'classic', requestedArchetype: 'classic' }
+  const archetype = getArchetype(requested, source)
+  if (!archetype || archetype.status !== 'active') {
+    return { kind: 'classic', requestedArchetype: requested, fallbackReason: 'unknown-archetype' }
+  }
+  const contract = archetype.versions[archetype.current]
+  const sizeContract = contract?.sizes[input.aspectRatio]
+  if (!contract || !sizeContract) {
+    return { kind: 'classic', requestedArchetype: requested, fallbackReason: 'unsupported-size' }
+  }
+  return {
+    kind: 'hero',
+    requestedArchetype: requested,
+    label: archetype.label,
+    contractVersion: archetype.current,
+    contract,
+    size: input.aspectRatio,
+    sizeContract,
+  }
+}
+
+// Only an explicit, completed pass keeps the archetype; every other exit takes
+// the fallback table (design.md section 8). A hero plan with a URL but no
+// check result fails closed as check-error.
+export function settleComposition(
+  plan: CompositionPlan,
+  background: SettleBackground | null | undefined
+): CompositionStamp {
+  const imageQuality = background?.quality ?? 'default'
+  const stamp = (rest: Pick<CompositionStamp, 'appliedArchetype' | 'contractVersion' | 'fallbackReason'>) =>
+    compositionStampSchema.parse({
+      requestedArchetype: plan.requestedArchetype,
+      imageQuality,
+      appliedArchetype: rest.appliedArchetype,
+      contractVersion: rest.contractVersion,
+      // Omitted, not undefined, when there is no reason.
+      ...(rest.fallbackReason ? { fallbackReason: rest.fallbackReason } : {}),
+    })
+
+  if (plan.kind === 'classic') {
+    return stamp({ appliedArchetype: 'classic', contractVersion: null, fallbackReason: plan.fallbackReason })
+  }
+  if (!background?.url) {
+    return stamp({ appliedArchetype: 'classic', contractVersion: null, fallbackReason: 'no-image' })
+  }
+  const check = background.check
+  if (check && check.ok === true) {
+    return stamp({
+      appliedArchetype: plan.requestedArchetype,
+      contractVersion: plan.contractVersion,
+      fallbackReason: undefined,
+    })
+  }
+  return stamp({
+    appliedArchetype: 'classic',
+    contractVersion: null,
+    fallbackReason: check && check.ok === false ? check.reason : 'check-error',
+  })
+}

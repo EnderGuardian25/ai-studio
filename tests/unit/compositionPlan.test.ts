@@ -1,0 +1,179 @@
+import { describe, it, expect } from 'vitest'
+import {
+  archetypes,
+  contractAt,
+  planComposition,
+  settleComposition,
+  type ArchetypeMap,
+  type CompositionPlan,
+  type HeroPlan,
+} from '@/lib/designData'
+
+const heroPlan = (key = 'product-showcase', size: 'SQUARE' | 'PORTRAIT' = 'SQUARE'): HeroPlan => {
+  const plan = planComposition({ imageStyle: key, aspectRatio: size })
+  if (plan.kind !== 'hero') throw new Error('expected a hero plan')
+  return plan
+}
+
+describe('planComposition (AC-03)', () => {
+  it('a known active key at a supported size is a hero plan at the current version', () => {
+    const plan = planComposition({ imageStyle: 'editorial-split', aspectRatio: 'PORTRAIT' })
+    expect(plan.kind).toBe('hero')
+    const hero = plan as HeroPlan
+    expect(hero.requestedArchetype).toBe('editorial-split')
+    expect(hero.contractVersion).toBe(archetypes['editorial-split'].current)
+    expect(hero.sizeContract).toBe(archetypes['editorial-split'].versions[1].sizes.PORTRAIT)
+    expect(hero.label).toBe('Editorial split')
+  })
+
+  it('classic, absent and blank are classic with no reason', () => {
+    for (const imageStyle of ['classic', undefined, null, '']) {
+      expect(planComposition({ imageStyle, aspectRatio: 'SQUARE' })).toEqual({
+        kind: 'classic',
+        requestedArchetype: 'classic',
+      })
+    }
+  })
+
+  it('an unknown key is unknown-archetype and keeps the requested value', () => {
+    expect(planComposition({ imageStyle: 'hero-centre', aspectRatio: 'SQUARE' })).toEqual({
+      kind: 'classic',
+      requestedArchetype: 'hero-centre',
+      fallbackReason: 'unknown-archetype',
+    })
+    expect(planComposition({ imageStyle: 'constructor', aspectRatio: 'SQUARE' })).toMatchObject({
+      fallbackReason: 'unknown-archetype',
+    })
+  })
+
+  it('a retired key is unknown-archetype', () => {
+    const source: ArchetypeMap = {
+      'product-showcase': { ...archetypes['product-showcase'], status: 'retired' },
+    }
+    expect(planComposition({ imageStyle: 'product-showcase', aspectRatio: 'SQUARE' }, source)).toMatchObject({
+      kind: 'classic',
+      fallbackReason: 'unknown-archetype',
+    })
+  })
+
+  it('STORY is unsupported-size for both archetypes', () => {
+    for (const imageStyle of ['product-showcase', 'editorial-split']) {
+      expect(planComposition({ imageStyle, aspectRatio: 'STORY' })).toEqual({
+        kind: 'classic',
+        requestedArchetype: imageStyle,
+        fallbackReason: 'unsupported-size',
+      })
+    }
+  })
+
+  it('a stamped (key, version, size) resolves to the exact contract after current moves on, and when retired', () => {
+    const v1 = archetypes['product-showcase'].versions[1]
+    const v2 = { ...v1, sizes: { SQUARE: { subject: v1.sizes.SQUARE!.subject, regions: [{ ...v1.sizes.SQUARE!.regions[0], rect: { x: 0, y: 0, w: 40, h: 100 } }] } } }
+    const source: ArchetypeMap = {
+      'product-showcase': { ...archetypes['product-showcase'], current: 2, versions: { 1: v1, 2: v2 } },
+    }
+    expect((planComposition({ imageStyle: 'product-showcase', aspectRatio: 'SQUARE' }, source) as HeroPlan).contractVersion).toBe(2)
+    expect(contractAt('product-showcase', 1, 'SQUARE', source)).toBe(v1.sizes.SQUARE)
+    const retired: ArchetypeMap = { 'product-showcase': { ...source['product-showcase'], status: 'retired' } }
+    expect(contractAt('product-showcase', 1, 'SQUARE', retired)).toBe(v1.sizes.SQUARE)
+  })
+})
+
+describe('settleComposition: every row of the fallback table (AC-06, AC-12)', () => {
+  it('row 1: hero plan, URL, check ok -> kept at the plan version, no reason', () => {
+    expect(settleComposition(heroPlan(), { url: 'u', check: { ok: true } })).toEqual({
+      requestedArchetype: 'product-showcase',
+      appliedArchetype: 'product-showcase',
+      contractVersion: 1,
+      imageQuality: 'default',
+    })
+  })
+
+  it.each(['busy', 'contrast', 'region-invalid', 'check-error'] as const)(
+    'row 2: hero plan, URL, check fails %s -> classic with that reason, version null',
+    (reason) => {
+      expect(settleComposition(heroPlan('editorial-split', 'PORTRAIT'), { url: 'u', check: { ok: false, reason } })).toEqual({
+        requestedArchetype: 'editorial-split',
+        appliedArchetype: 'classic',
+        contractVersion: null,
+        fallbackReason: reason,
+        imageQuality: 'default',
+      })
+    }
+  )
+
+  it('row 3: hero plan, URL, no check (or a null check) fails closed as check-error', () => {
+    for (const background of [{ url: 'u' }, { url: 'u', check: null }]) {
+      expect(settleComposition(heroPlan(), background)).toMatchObject({
+        appliedArchetype: 'classic',
+        contractVersion: null,
+        fallbackReason: 'check-error',
+      })
+    }
+  })
+
+  it('row 4: hero plan, no URL (skip, error, empty) -> classic, no-image', () => {
+    for (const background of [null, undefined, {}, { url: null }, { url: '' }]) {
+      expect(settleComposition(heroPlan(), background)).toMatchObject({
+        appliedArchetype: 'classic',
+        fallbackReason: 'no-image',
+      })
+    }
+  })
+
+  it('a check ok with no URL is still no-image (never kept without an image)', () => {
+    expect(settleComposition(heroPlan(), { check: { ok: true } })).toMatchObject({ fallbackReason: 'no-image' })
+  })
+
+  it('row 5: classic plan from an unknown key -> classic, unknown-archetype', () => {
+    const plan = planComposition({ imageStyle: 'gone', aspectRatio: 'SQUARE' })
+    expect(settleComposition(plan, { url: 'u' })).toEqual({
+      requestedArchetype: 'gone',
+      appliedArchetype: 'classic',
+      contractVersion: null,
+      fallbackReason: 'unknown-archetype',
+      imageQuality: 'default',
+    })
+  })
+
+  it('row 6: classic plan from an unsupported size -> classic, unsupported-size', () => {
+    const plan = planComposition({ imageStyle: 'product-showcase', aspectRatio: 'STORY' })
+    expect(settleComposition(plan, null)).toMatchObject({
+      requestedArchetype: 'product-showcase',
+      appliedArchetype: 'classic',
+      fallbackReason: 'unsupported-size',
+    })
+  })
+
+  it('row 7: classic plan, imageStyle classic -> today, no reason', () => {
+    const plan = planComposition({ imageStyle: 'classic', aspectRatio: 'SQUARE' })
+    const stamp = settleComposition(plan, { url: 'u' })
+    expect(stamp).toEqual({
+      requestedArchetype: 'classic',
+      appliedArchetype: 'classic',
+      contractVersion: null,
+      imageQuality: 'default',
+    })
+    expect('fallbackReason' in stamp).toBe(false)
+  })
+
+  it('imageQuality is the tier the provider reported, else default', () => {
+    expect(settleComposition(heroPlan(), { url: 'u', quality: 'high', check: { ok: true } }).imageQuality).toBe('high')
+    expect(settleComposition(heroPlan(), { url: 'u', quality: 'standard', check: { ok: false, reason: 'busy' } }).imageQuality).toBe('standard')
+    expect(settleComposition(heroPlan(), { url: 'u', check: { ok: true } }).imageQuality).toBe('default')
+  })
+
+  it('no code path keeps the archetype without an explicit ok:true', () => {
+    const plan: CompositionPlan = heroPlan()
+    const backgrounds = [
+      null,
+      {},
+      { url: 'u' },
+      { url: 'u', check: null },
+      { url: 'u', check: { ok: false, reason: 'busy' } },
+      { url: 'u', check: { ok: false, reason: 'check-error' } },
+      { url: 'u', check: { ok: 'yes' } },
+    ] as Parameters<typeof settleComposition>[1][]
+    for (const b of backgrounds) expect(settleComposition(plan, b).appliedArchetype).toBe('classic')
+  })
+})

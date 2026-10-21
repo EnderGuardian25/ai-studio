@@ -79,3 +79,15 @@ export function imageSizeFor(
 // FR-12): the OpenAI client's `timeout` (with no retries) and Gemini's abort
 // timer. src/lib/models/budget.ts imports it as the action budget's image step.
 export const IMAGE_GENERATION_TIMEOUT_MS = 120_000
+
+// ── Image quality tier (009 FR-16) ──────────────────────────────────────────
+// A neutral tier each provider implementation maps to its own word. Parsed
+// from the operator's IMAGE_QUALITY env; an unknown value is treated as unset
+// (a tuning knob must never fail the boot).
+export const IMAGE_TIERS = ['standard', 'high'] as const
+export type ImageTier = (typeof IMAGE_TIERS)[number]
+
+export function parseImageTier(raw: string | null | undefined): ImageTier | undefined {
+  const v = (raw ?? '').trim().toLowerCase()
+  return (IMAGE_TIERS as readonly string[]).includes(v) ? (v as ImageTier) : undefined
+}

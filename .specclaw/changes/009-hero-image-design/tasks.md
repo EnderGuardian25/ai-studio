@@ -66,7 +66,7 @@ Nothing ships the hero prompt without the check and the stamp (T4 lands them tog
 
 ### Wave 2 — The module and the pure logic
 
-- [ ] `T2` — `src/lib/designData/`: the dataset, the mapping, `evaluateRegions`, the planner, the stamp schema, the prompt text, the layout comparison, the quality tier parser
+- [x] `T2` — `src/lib/designData/`: the dataset, the mapping, `evaluateRegions`, the planner, the stamp schema, the prompt text, the layout comparison, the quality tier parser
   - Files: `src/lib/designData/{index,composition,regions,evaluate,layout,plan,stamp,promptText}.ts` (new), `src/providers/imageCapabilities.ts` (the tier parser only), `tests/unit/{designData,compositionPlan,designRegions,evaluateRegions,layoutObservation,compositionStamp,imageQuality}.test.ts` (new; `imageQuality` covers the parser only here)
   - Estimate: large
   - Kind: impl
