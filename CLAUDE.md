@@ -4,7 +4,7 @@ This repo contains planning documents for **bistec-studio**, an internal marketi
 
 ## ✅ Outstanding work — START HERE (updated 2026-10-21)
 
-- **⏸️ 2026-10-21 — PICK UP HERE. This repo is `bistec-oss/studio`, and since 2026-10-18 it carries the fork's `v2`. 018, 022, 021 (Graphite), 019 (claim token) and 020 (Create post button off the draft page) are VERIFIED PASS, so the build order is complete. **023 (scheduler heartbeat) is VERIFIED PASS. Next: 009 hero imagery, Phase 1 (proposal first).** The company prod to-dos below and the `v2` → `main` merge wait on the user's go-ahead and the pre-merge prod checklist.** Full detail: [`docs/handoff.md`](docs/handoff.md) top section and its **pre-merge prod checklist**.
+- **⏸️ 2026-10-21 — PICK UP HERE. This repo is `bistec-oss/studio`, and since 2026-10-18 it carries the fork's `v2`. 018, 022, 021 (Graphite), 019 (claim token) and 020 (Create post button off the draft page) are VERIFIED PASS, so the build order is complete. **023 (scheduler heartbeat) is VERIFIED PASS. 009 (hero imagery, Phase 1) is BUILT (T1 to T5 committed, T6 docs and gate closing); verify is next, then OP-1, which is the user's own pending step.** The company prod to-dos below and the `v2` → `main` merge wait on the user's go-ahead and the pre-merge prod checklist.** Full detail: [`docs/handoff.md`](docs/handoff.md) top section and its **pre-merge prod checklist**.
   - **The fork era (2026-10-07 to 2026-10-14) is in [`docs/fork-history.md`](docs/fork-history.md).** It is superseded context, not instructions. That file also holds the procedure for importing code from the fork.
   - **Repo rules. This entry is authoritative; `docs/handoff.md` links here.**
     - This repo is **`bistec-oss/studio`**, and **`origin` points to it**.
@@ -42,11 +42,20 @@ This repo contains planning documents for **bistec-studio**, an internal marketi
       - T1: the `WorkerHeartbeat` table, the additive migration `20261021120000_worker_heartbeat` and its manual down script `prisma/rollback/023-scheduler-heartbeat.down.sql`;
       - T2: `runTick` writes each loop's tick start and end (a failed write never fails the job); the pure `loopHealth` rule; `GET /api/scheduler/status`; the "Scheduler offline" banner on the campaign queue panel; `errorReason` shown while an entry retries; the seam `POST /api/test/worker-heartbeat`; E2E §Z TC-HB-01 to TC-HB-06;
       - T3: the handoff checklist line (a check, not a blocking step), these docs, the ROADMAP refresh and the gate. Gate: unit 2706/2706; lint 0 errors / 7 warnings; E2E 405/3/0/0.
+    - **009 (hero imagery, Phase 1 thin slice): BUILT; verify next.** [`spec.md`](.specclaw/changes/009-hero-image-design/spec.md), [`design.md`](.specclaw/changes/009-hero-image-design/design.md). A Path B brief can opt into a per-post image style (`product-showcase` or `editorial-split`); `classic` is the default and today's behaviour, unchanged. T1 `bfe3d57`, T2 `81d6521`, T3 `9894a99`, T4 `fb0ff0e`, T5 `f8f063c`. CI: green at `f8f063c` (runs 39604699552, 39604706638).
+      - T1: three columns (`Brief.imageStyle` TEXT default `'classic'`, `Draft.composition` and `DraftRevision.composition` JSONB null), the additive migration `20261022120000_hero_composition` and its manual down script `prisma/rollback/009-hero-image-design.down.sql`;
+      - T2: `src/lib/designData` (the dataset, the mapping, `evaluateRegions`, the planner, the stamp schema, the prompt text, the layout comparison, the quality tier parser);
+      - T3: the Chromium sampler, `layoutFacts` and the real-render fixtures, with the thresholds tuned on real pixels;
+      - T4: the prompts, the pipeline wiring, the fail-closed check (a hero image that fails the check is reused under the classic prompt, with no second image call), `IMAGE_QUALITY`, the budget, the mock seams and the composition stamp on every revision writer;
+      - T5: the brief picker (Path B only, disabled for 9:16) and `imageStyle` on `POST /api/briefs`, the draft notice, the refine and regenerate co-changes, and E2E §AA TC-HERO-01 to TC-HERO-16;
+      - T6: the docs (`e2e-test-plan.md` §AA, the handoff 009 section and its evidence query, this entry, the ROADMAP row, the design §8 amendment) and the full gate.
+      - **OP-1 is the user's pending operator step, not an acceptance criterion:** six briefs, classic against each style with real models; the hypothesis holds at 4 of 6 preferred. The steps, verbatim, are in `docs/handoff.md`. The build makes no real model calls and does not claim it.
+      - Scheduled, MCP and ACP briefs are always classic. `IMAGE_QUALITY` is optional and unset by default.
     - **020 (Create post button off the draft page): VERIFIED PASS,** 7/7 ACs ([`verify-report.md`](.specclaw/changes/020-create-post-button-draft-page/verify-report.md)). T1 `8d0d633`, T2 `bd0e0fb`. CI: green at `8d0d633` (runs 39466314229, 39466320752).
       - T1: `AppShell` hides the button on `/brief` and on `/drafts/`; E2E AC-01b (absent on the draft page) and AC-02b (refine Send not covered, mutation-checked); `DESIGN_SYSTEM.md` §8.9, the 011 FR-01/AC-01 amendment and `e2e-test-plan.md`.
       - T2: the full gate. Unit 2681/2681; lint 0 errors / 7 warnings; tsc clean; build passes; E2E 399/3/0/0.
       - Known gap: `docs/ui-reference/screen-light.png` and `screen-dark.png` still show the button (not recaptured, spec A3).
-  - **Gates now:** unit 2706/2706, lint 0 errors / 7 warnings. The last full clean mock E2E: 405/3/0/0 (023 T3, 2026-10-21).
+  - **Gates now:** unit 2947/2947, render 47/47, lint 0 errors / 7 warnings. The last full clean mock E2E: 422/3/0/0 (009 T6, 2026-10-21); the baseline before 009 was unit 2706/2706 and E2E 405/3/0/0 (023 T3).
   - **The company prod items are live to-dos again.** The fork era called them "company history"; they are not.
     - **B4:** the prod scheduler resource isn't running. Read [`docs/scheduler-b4-diagnosis-2026-08-03.md`](docs/scheduler-b4-diagnosis-2026-08-03.md) first.
     - **Team Claude tokens:** neither prod team has one, so scheduled and MCP runs fail on credentials.

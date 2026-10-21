@@ -1,11 +1,13 @@
 # bistec-studio — E2E Test Plan
 
 **Created:** 2026-06-23
-**Status:** ✅ Full §6 catalog implemented **and green**. **Latest full clean mock gate (change 016, 2026-10-13): 386 passed / 3 skipped / 0 failed / 0 flaky** (the 008 wave-2 gate before it was 391 / 3 / 0 / 0). The older counts below are history. **Unit as of 2026-07-27 (PR #40): 322/322.** The CI gate (`.github/workflows/e2e.yml`) passed on PRs #38, #39 and #40. Last full _local_ run with recorded counts (2026-07-22, `feature/team-tenancy` branch, post TC-REG-H7a de-flake): **171 passed, 4 skipped, 0 failed** (175 tests total; 0 flaky — TC-REG-H7a's parallel-fire assertion was rewritten to a timing-robust integrity invariant, see below), unit **264/264** at that time.
+**Status:** ✅ Full §6 catalog implemented **and green**. **Latest full clean mock gate (change 009 T6, 2026-10-21): 422 passed / 3 skipped / 0 failed / 0 flaky** (the 023 gate before it was 405 / 3 / 0 / 0; the 016 gate was 386 / 3 / 0 / 0). The older counts below are history. **Unit as of 2026-07-27 (PR #40): 322/322.** The CI gate (`.github/workflows/e2e.yml`) passed on PRs #38, #39 and #40. Last full _local_ run with recorded counts (2026-07-22, `feature/team-tenancy` branch, post TC-REG-H7a de-flake): **171 passed, 4 skipped, 0 failed** (175 tests total; 0 flaky — TC-REG-H7a's parallel-fire assertion was rewritten to a timing-robust integrity invariant, see below), unit **264/264** at that time.
 
 Last full run on `main` (2026-07-13, post brief-draft-recovery §P): **132 passed, 0 failed, 7 skipped** (`npm run test:e2e:mock`; the machine lacked `BISTEC_API_KEYS` in `.env.test`, so 3 §J ACP-auth cases skipped on top of the 4 intentional skips below — CI sets the keys as job env and runs them). The 2026-07-13 feature batch added `async-generation.test.ts` (F1 async + retry), a version back/forward-jump case (F2), F4 auto-scheduling cases in `campaign-scheduling.test.ts`, `brandkit-assistant.test.ts` (F5), and `image-to-template.test.ts` (F6); generation-dependent suites now poll via the `waitForDraft` helper (generation is async). A GitHub Actions gate (`.github/workflows/e2e.yml`) runs the whole suite — including the §K security-fix regressions — on every PR and push to `main`, and is **green as of 2026-07-13** (it had been red for weeks on a bad CI `TOKEN_ENCRYPTION_KEY` — it MUST be a valid 64-char hex string, else `crypto.ts` throws and the credential-encrypting routes 500). Runs on GitHub-hosted `ubuntu-latest` with the actions on the Node 24 runtime.
 
 > **Update (2026-10-13, change 017 publish API fixes):** a publish the platform refuses is no longer a 2xx. `POST /api/posts` (immediate) and `POST /api/posts/[id]/publish` (retry) answer **502** `{error, code:'PUBLISH_FAILED', postId, status:'FAILED'}`; the FAILED row is still written. **TC-PUB-03** now expects the 502 (and a failing retry's 502), and new **TC-PUB-10** drives the publish dialog: the failed channel shows "✕ failed" with its reason and the dialog stays open.
+
+> **Update (2026-10-21, change 009 hero imagery):** new suite **`hero-image.test.ts` (§AA, 16 cases, TC-HERO-01…16)**, plus one `a11y.test.ts` case (the draft page with the composition notice shown, and `/brief` step 2 with the image-style picker). The Review-step term count in `model-selection.test.ts` and `surfaces.test.ts` went 12 to 13, because a Path B brief now has an Image style row. New seams: the four `__MOCK_HERO_*__` sentinels (see §AA). Gate: 422 passed / 3 skipped / 0 failed / 0 flaky.
 
 > **Update (2026-10-13, change 016 fresh-start cleanup):** the legacy-only cases are removed with the code they tested: **TC-CAP-11, -12, -13 and -19** (§W: lazy migration, the backfill/report scripts, the 012 rollback down.sql, the review notice) and **TC-MODEL-12** (§Y: the 008 rollback round trip), plus the `makeLegacyDraft` helper. **TC-CAP-16** now nulls the headline directly through the test DB instead of using a migrated draft. §W now has 16 cases and §Y 19. A fresh test DB has no migration-created team; `npm run test:e2e:db` seeds Bistec, ClientX and NoKitCo by name. Gate: **386 passed / 3 skipped / 0 failed / 0 flaky**.
 
@@ -794,6 +796,49 @@ Serial (`test.describe.configure({ mode: 'serial' })`), because the `WorkerHeart
 
 The health rule itself (AC-02), the worker writes (AC-03) and the route's contract (AC-04) are unit-tested in `heartbeatStatus.test.ts`, `heartbeat.test.ts` and `schedulerStatusRoute.test.ts`.
 
+### AA. Hero imagery (`hero-image.test.ts`, change 009 T5 — AC-04, AC-05, AC-16 to AC-19, AC-21)
+
+Mock mode (`MOCK_AI` + `MOCK_PUPPETEER`). Every generation case runs in its **own fresh team** (disposed afterwards) with one enabled non-default IMAGE row, as §BG does; the wizard case (TC-HERO-13) and the payload case (TC-HERO-16) run in the seeded Bistec team and discard the unfinished brief they autosave. Cases that poll use `waitForDraft` / `waitForAction`. Needs `MOCK_AI` and `MOCK_PUPPETEER`; TC-HERO-10 and TC-HERO-14 also need `dbAvailable`.
+
+**The seams** (`src/lib/testHooks.ts`, consulted only under `MOCK_AI`, dormant in prod; the sentinel is read from the brief topic, or from a refine's instruction when that carries one):
+
+- **`__MOCK_BG__`** makes an image exist: the real resolver picks the provider and only its `generateImage` is swapped for a fixture PNG. A hero style needs it; without it the run settles to `no-image`. (The 005 background seam, §BG.)
+- **`__MOCK_HERO_BUSY__`**, **`__MOCK_HERO_CONTRAST__`**, **`__MOCK_HERO_CHECK_ERROR__`**: `mockRegionSamples` returns synthetic samples (busy: high lightness variance; contrast: flat and on the wrong side of the text colour) that go through the **real** `evaluateRegions`; `check-error` makes the seam throw, which the caller settles to `check-error`.
+- **`__MOCK_HERO_LAYOUT__`**: `mockLayoutBoxes` returns a box outside every text region, through the **real** layout comparison, so the observation `layout-violation` is recorded.
+- `__MOCK_BG_FAIL__` and `__MOCK_BG_NOT_NEEDED__` (§BG) give the no-image cases. Without a sentinel `MOCK_AI` keeps its early return, so no other suite changes. A unit test on `testHooks` asserts the seams return `null` with `MOCK_AI` off.
+- **Gotcha:** a refine whose instruction has no sentinel reads `__MOCK_BG__` from the brief topic, so a "carry the stamp" refine on a `__MOCK_BG__` draft needs `__MOCK_BG_NOT_NEEDED__` in its instruction.
+
+- **TC-HERO-01 — A classic brief (AC-21).** Stamp requested and applied `classic`, `imageQuality` `default`, no notice.
+- **TC-HERO-02 — `product-showcase` at 1:1 is kept (AC-21).** `contractVersion` 1, `imageUrl` set, the same stamp on the draft and the v1 revision, no notice.
+- **TC-HERO-03 — `editorial-split` at 4:5 is kept (AC-21).**
+- **TC-HERO-04 — `__MOCK_HERO_BUSY__` (AC-13).** Applied `classic`, reason `busy`, the notice shows, `imageUrl` is still set (the hero image reused, no second image call).
+- **TC-HERO-05 — `__MOCK_HERO_CONTRAST__`.** Applied `classic`, reason `contrast`.
+- **TC-HERO-06 — `__MOCK_HERO_CHECK_ERROR__` (AC-12).** Applied `classic`, reason `check-error`: the check fails closed.
+- **TC-HERO-07 — `__MOCK_BG_FAIL__`.** `no-image`; the composition notice and the background notice both show, each with its own cause.
+- **TC-HERO-08 — `__MOCK_BG_NOT_NEEDED__` (an empty prompt) with a hero style.** `no-image`.
+- **TC-HERO-09 — `STORY` with a style through the API.** Accepted and recorded as `unsupported-size`, on the classic image path.
+- **TC-HERO-10 — A retired key, then regenerate design (AC-18).** The test DB is written with a retired key; the new revision is `unknown-archetype`, and v1 keeps its stamp.
+- **TC-HERO-11 — Refine (AC-17).** A refine on a kept draft carries the stamp; a refine whose instruction carries `__MOCK_BG__` re-stamps `refine-replaced-image`; a refine on a classic draft is unchanged.
+- **TC-HERO-12 — `POST /api/briefs` validation (AC-04).** An unknown key, a `TEMPLATE` brief with a style and a non-string are 400; absent stores `classic`.
+- **TC-HERO-13 — The wizard (AC-05).** The picker appears on Path B only; the `STORY` disabled state with its reason, and the reset; the Review row; the request body; autosave and resume.
+- **TC-HERO-14 — Restore (AC-16).** Restore to v1 copies v1's stamp; a legacy null stamp stays null.
+- **TC-HERO-15 — `__MOCK_HERO_LAYOUT__` (AC-14).** The archetype is **kept**, `observations: ['layout-violation']`, the notice shows. The observation is never a fallback.
+- **TC-HERO-16 — The payload and the notice on the page (AC-19).** `GET /api/drafts/[id]` exposes `composition` and `compositionNotice`; the page shows the notice with no axe violation.
+
+| AC                                                                | E2E                                       |
+| ----------------------------------------------------------------- | ----------------------------------------- |
+| 009 AC-04 the API                                                 | TC-HERO-12                                |
+| 009 AC-05 the wizard                                              | TC-HERO-13, `a11y` `/brief` step 2        |
+| 009 AC-12, AC-13 fail closed, no second image call                | TC-HERO-04, TC-HERO-05, TC-HERO-06        |
+| 009 AC-14 the layout observation                                  | TC-HERO-15                                |
+| 009 AC-16 carried stamps                                          | TC-HERO-14                                |
+| 009 AC-17 refine                                                  | TC-HERO-11                                |
+| 009 AC-18 regenerate design                                       | TC-HERO-10                                |
+| 009 AC-19 the notice                                              | TC-HERO-07, TC-HERO-16, `a11y` draft page |
+| 009 AC-21 the suite (both styles, both sizes, every fallback row) | TC-HERO-01 to TC-HERO-16                  |
+
+The pure parts (the planner and every fallback row, `evaluateRegions`, the mapping, the prompts and their golden strings, the stamp schema, the budget) are unit-tested; the sampler and layout observation on real pixels are in `npm run test:render` (`hero-sampler.test.ts`, `hero-layout.test.ts`). The mock suite proves the mechanism, not the real-model thresholds: the real fallback rate is OP-1's evidence (see the 009 section of `docs/handoff.md`).
+
 ---
 
 ## 7. Fixes required to the existing specs (before/while implementing)
@@ -824,7 +869,7 @@ npx playwright show-report
 
 Last green run: **391 passed / 3 skipped / 0 failed / 0 flaky** (~9.0 min) on 2026-10-13 (`v2` at `b36be415`, change 008 wave-2 gate — fresh test DB, clean `.next`; the 3 skips are TC-REG-H11a/b/c). Earlier: **383 / 3 / 0 / 0** at the 008 wave-1 gate (2026-10-13, `d3c5685a`); **369 passed / 3 skipped / 0 failed / 0 flaky** (~7.7 min) on 2026-10-11 (`v2`, change 012 wave-3 gate). Earlier: **211 passed / 0 failed / 0 flaky / 4 intentional skips** (~3.2 min) on 2026-09-28 (`v2`, change 004 T21 — fresh test DB, clean `.next`); the T21 follow-up then added TC-FID-16/17 (3 cases, expected full count **214 / 4 skipped**), verified in a targeted run of `agui-refinement` + `refine-not-applied` (38/38) rather than a full run (earlier: 145/4 on 2026-07-17, `async-draft-actions` finalize; earlier baselines: 135/4 on 2026-07-14, 80/4 on 2026-06-30, skeleton 19/19 on 2026-06-23).
 
-CI gate: **`.github/workflows/e2e.yml`** runs the whole suite (§A–§Y, including §K, plus 015's `settle-race.test.ts`) with mocks on every PR and on pushes to `v2` and `main` (the fork, since change 013). It was red on `v2` from 014 wave 1 (run 37974533639) until change 015 fixed the refine settle race (green at run 38195143494, 2026-10-12); the 008 wave-1 run 38304451112 at `d3c5685a` was green too. After a push, check `gh run list --branch v2`, not just the local gate. To enforce it, mark the `e2e` check **required** in the `main` branch-protection settings.
+CI gate: **`.github/workflows/e2e.yml`** runs the whole suite (§A–§AA, including §K, plus 015's `settle-race.test.ts`) with mocks on every PR and on pushes to `v2` and `main` (the fork, since change 013). It was red on `v2` from 014 wave 1 (run 37974533639) until change 015 fixed the refine settle race (green at run 38195143494, 2026-10-12); the 008 wave-1 run 38304451112 at `d3c5685a` was green too. After a push, check `gh run list --branch v2`, not just the local gate. To enforce it, mark the `e2e` check **required** in the `main` branch-protection settings.
 
 ---
 
@@ -861,5 +906,6 @@ CI gate: **`.github/workflows/e2e.yml`** runs the whole suite (§A–§Y, includ
 | Change 008 model selection, wave 1 (AC-15 → AC-23)              | §Y TC-MODEL-01…12, `a11y` /team axe (see §Y map)                                       |
 | Change 008 model selection, wave 2 (AC-27 → AC-31, AC-33)       | §Y TC-MODEL-13…20, `a11y` /drafts/[id] axe (see §Y wave-2 map)                         |
 | Change 020 Create post button off the draft page (AC-01, AC-02) | `create-post-button.test.ts` AC-01, AC-01b, AC-02b (see the 020 update note after §X)  |
+| Change 009 hero imagery (AC-04, AC-05, AC-12 to AC-19, AC-21)   | §AA TC-HERO-01…16, `a11y` draft page and `/brief` axe (see §AA map)                    |
 
 > Items with no behavioral surface (M2 init race, M3 stdin, M7 polling, M8 crypto guards, M13 dead code) are best covered by unit tests; M7 polling can optionally be a UI test (draft auto-refresh while `IN_PROGRESS`).

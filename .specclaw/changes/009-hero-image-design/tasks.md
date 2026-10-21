@@ -139,7 +139,7 @@ Nothing ships the hero prompt without the check and the stamp (T4 lands them tog
 
 ### Wave 6 — Docs and the gate
 
-- [ ] `T6` — The docs, the full gate and CI
+- [x] `T6` — The docs, the full gate and CI
   - Files: `.env.example` (only if T4 left a gap), `docs/e2e-test-plan.md`, `docs/handoff.md`, `CLAUDE.md`, `.specclaw/ROADMAP.md`, `.specclaw/changes/009-hero-image-design/reports/T6.md`
   - Estimate: medium
   - Kind: test
