@@ -1,11 +1,12 @@
 {
   "change": "023-scheduler-heartbeat",
-  "phase": "tasks",
-  "branch": "",
+  "phase": "build",
+  "branch": "v2",
   "size": "bounded",
   "phases": {
     "proposal": { "status": "approved", "at": "2026-10-20T20:17:30Z" },
     "spec": { "status": "done", "at": "2026-10-20T20:22:08Z" },
-    "tasks": { "status": "done", "at": "2026-10-20T20:22:09Z" }
+    "tasks": { "status": "done", "at": "2026-10-20T20:22:09Z" },
+    "build": { "status": "in-progress", "at": "2026-10-20T20:22:48Z" }
   }
 }
