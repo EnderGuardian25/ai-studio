@@ -45,6 +45,7 @@ All §6 cases are now written. New/changed files:
   - **`loginAs` now creates an isolated `APIRequestContext`** (its own cookie jar). The previous version reused the shared `request` fixture, so the admin cookie leaked into editor calls and RBAC tests got 200 instead of 403.
   - Two production-safe `testHooks.ts` seams — `buildMockCopy()` routes the brief topic into the mock caption, and `shouldMockPublishFail()` lets a `__FAIL_ALWAYS__`/`__FAIL_ONCE__` sentinel in the brief topic drive deterministic publish failures (TC-PUB-03/04, TC-REG-H12b) within a single serve.
   - **`POST /api/test/scheduler-tick`** — a test-only seam that runs one `runScheduledJobs()` pass so §K H12 can drive the scheduler over HTTP (Playwright's loader can't resolve the transitive `@/` aliases in the app module graph). **Dormant in prod: hard-404 when `NODE_ENV==='production'` AND 404 unless `MOCK_SOCIAL` is set, plus admin-gated.**
+  - **`POST /api/test/worker-heartbeat`** — a test-only seam (change 023, §Z) that upserts one loop's `WorkerHeartbeat` row at offsets from now (`{ loop, startedAgoMs, endedAgoMs }`) or deletes every row (`{ clear: true }`). The tick seams call the job runners directly and never go through the worker's `loop()`, so they write no heartbeat, and no worker runs in E2E. **Dormant in prod: hard-404 when `NODE_ENV==='production'` AND 404 unless `MOCK_AI` is set, plus admin-gated.**
   - `playwright.config.ts`: the global `Content-Type: application/json` was **removed** (it overrode the multipart boundary and 500'd every upload route); `retries: 1` added (cold `next dev` route compiles flake under load).
   - ~~`.env.test` additions: `BISTEC_API_KEYS`/`BISTEC_ADMIN_API_KEYS`~~ **Superseded 2026-07-21 (team tenancy):** the env-key lists are deleted; the §J ACP-auth cases now mint real hashed `ApiKey` rows via `POST /api/team/api-keys` at test time — no env vars, no CI job env needed.
   - `npm run test:e2e:reg` runs the suite with `.env.test` loaded (handy for ad-hoc DB-aware runs); not required for a green run anymore (the H12 HTTP seam removed the reg-mode dependency).
@@ -773,6 +774,25 @@ Each case mints an EXPORTED draft (`mintExportedDraft`) and acts on it in the br
 | 018 AC-06 the revision list retries after a failed fetch | TC-RACE-05             |
 
 > **Update (2026-10-20, change 020):** `create-post-button.test.ts` (011 FR-01 to FR-03) now asserts the floating Create post button is absent on `/drafts/[id]` at 1440 and 375, and runs a check that the refine Send button is not covered at 1440. Its AC-01 case is narrowed to `/`, `/library` and `/campaigns`.
+
+### Z. Scheduler heartbeat (`scheduler-heartbeat.test.ts`, change 023 T2 — AC-05, AC-06, AC-08)
+
+Serial (`test.describe.configure({ mode: 'serial' })`), because the `WorkerHeartbeat` table is global. Every case clears the rows in `beforeEach` and the suite clears them in `afterAll`, so the default state for every other suite stays "no rows". No worker runs in E2E, so the cases seed the rows through the `POST /api/test/worker-heartbeat` seam and open a campaign page. Needs `MOCK_AI` and test-DB access; TC-HB-05 also needs `dbAvailable`.
+
+- **TC-HB-01 — Fresh heartbeats show no banner (AC-05).** Both loops fresh: no "Scheduler offline" banner. A generation loop that is inside a 10-minute tick (started 10 min ago, no end) also shows none, because the generation loop is allowed 30 minutes.
+- **TC-HB-02 — A stale generation loop (AC-05).** A generation loop idle for 4 minutes: the banner shows, names the generation loop and says planned posts will not generate.
+- **TC-HB-03 — A stale publishing loop (AC-05).** A publishing loop idle for 4 minutes: the banner shows and names the publishing loop.
+- **TC-HB-04 — No rows (AC-05).** The never-reported banner shows. This is also the state of a worker that was never started, which is B4's most likely cause.
+- **TC-HB-05 — The retry reason (AC-06).** A PENDING entry with `retryCount` 1 and an `errorReason` shows the reason beside its "retry 1" chip. A PENDING entry with `retryCount` 0 shows none.
+- **TC-HB-06 — The status route (AC-04, AC-08).** `GET /api/scheduler/status` is 401 without a valid session (the case sends a bogus session cookie, because the proxy redirects a cookie-less request to `/login` before the route runs). With a session its body has only the contract keys: `loops` and `offline`, and per loop `loop`, `state` and `lastSeenAt`.
+
+| AC                                                         | E2E                                    |
+| ---------------------------------------------------------- | -------------------------------------- |
+| 023 AC-05 the banner (none, generation, publishing, never) | TC-HB-01, TC-HB-02, TC-HB-03, TC-HB-04 |
+| 023 AC-06 the retry reason                                 | TC-HB-05                               |
+| 023 AC-04, AC-08 the status route and its keys             | TC-HB-06                               |
+
+The health rule itself (AC-02), the worker writes (AC-03) and the route's contract (AC-04) are unit-tested in `heartbeatStatus.test.ts`, `heartbeat.test.ts` and `schedulerStatusRoute.test.ts`.
 
 ---
 

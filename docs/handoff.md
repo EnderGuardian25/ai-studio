@@ -1,6 +1,6 @@
 # bistec-studio — Session Handoff
 
-**Date:** 2026-10-20 (latest: **020 Create post button, 019 claim token, 021 Graphite re-theme, 018 and 022 VERIFIED PASS; the build order is complete**). 2026-10-19: this repo adopted the fork's `v2` on 2026-10-18. The fork-era sections, 2026-10-07 to 2026-10-14, moved to [`fork-history.md`](fork-history.md). Previous: 2026-10-07 (005 verified PASS; 011 planned, wave 1 built). Previous: 2026-10-03 (004 finished and verified PARTIAL, Phase 0 only; 005 built 9/10, waiting on one operator check). Before that: 2026-09-28 (build session — 004 Waves 1–3 built, MinIO → silo, PR #42 + draft PR #43). Before that: 2026-09-23 (later, later the same day: proposal **012** per-channel captions + copy→caption rename, a floating **Create post** button folded into 011, and a launch-video legibility pass. Before that: planning session — proposals 008–011 + roadmap, 004 re-planned to 24 tasks incl. Phase 0, and the deploy pipeline found broken: Coolify 401 since 2026-09-15). Previous: 2026-07-28 (copy-edit status clobber fix).
+**Date:** 2026-10-21 (latest: **023 scheduler heartbeat is BUILT, verify next**; gates 405/3/0/0, CI green at `f43669a` (runs 39493017393, 39493027033)). 2026-10-20: **020 Create post button, 019 claim token, 021 Graphite re-theme, 018 and 022 VERIFIED PASS; the build order is complete**. 2026-10-19: this repo adopted the fork's `v2` on 2026-10-18. The fork-era sections, 2026-10-07 to 2026-10-14, moved to [`fork-history.md`](fork-history.md). Previous: 2026-10-07 (005 verified PASS; 011 planned, wave 1 built). Previous: 2026-10-03 (004 finished and verified PARTIAL, Phase 0 only; 005 built 9/10, waiting on one operator check). Before that: 2026-09-28 (build session — 004 Waves 1–3 built, MinIO → silo, PR #42 + draft PR #43). Before that: 2026-09-23 (later, later the same day: proposal **012** per-channel captions + copy→caption rename, a floating **Create post** button folded into 011, and a launch-video legibility pass. Before that: planning session — proposals 008–011 + roadmap, 004 re-planned to 24 tasks incl. Phase 0, and the deploy pipeline found broken: Coolify 401 since 2026-09-15). Previous: 2026-07-28 (copy-edit status clobber fix).
 **Repo:** https://github.com/bistec-oss/studio, which `origin` points to. **The repo rules (branches, remotes, the `fork` remote, PR #43) are in [`CLAUDE.md`](../CLAUDE.md)'s top entry, which is authoritative.** This file does not repeat them.
 **Branch:** work continues on **`v2`**, pushed to `origin v2`. `main` is `671ad6e9` (PR #42) and deploys to company prod. `v2` → `main` is one PR, merged only on the user's go-ahead and after the pre-merge prod checklist below.
 **Production:** `https://studio.bistecglobal.com` serves company `main`. Its migration head is `20260728120000_heal_copy_edit_clobbered_drafts`. Merges to `main` build but do not deploy until the Coolify token is rotated (see CLAUDE.md).
@@ -11,14 +11,20 @@
 
 ### Where things stand
 
-| Change                                    | State                                                       | Evidence                                                                                                                                                                           |
-| ----------------------------------------- | ----------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 018 post-008 small fixes                  | ✅ **VERIFIED PASS** (8/8 ACs)                              | E2E 390/3/0/0; CI green at `432a036f`; [verify-report](../.specclaw/changes/018-post-008-small-fixes/verify-report.md)                                                             |
-| 022 prod data and deploy restore          | ✅ **VERIFIED PASS** (11/11 ACs)                            | E2E 390/3/0/0; CI green at `12ef7e6c`; [verify-report](../.specclaw/changes/022-prod-data-and-deploy-restore/verify-report.md)                                                     |
-| 021 Graphite re-theme                     | ✅ **VERIFIED PASS** (19/19 ACs; AC-05 font-data carve-out) | E2E 397/3/0/0; render 15/15; CI green at `aa5f7a8`; [verify-report](../.specclaw/changes/021-graphite-retheme/verify-report.md)                                                    |
-| 019 draft-action claim token              | **VERIFIED PASS** 9/9 ACs                                   | E2E 397/3/0/0; unit 2681/2681; test:upgrade 3/3; CI green at `7e86b96` (runs 39445592883, 39445602043); [reports](../.specclaw/changes/019-draft-action-claim-token/reports/T4.md) |
-| 020 Create post button off the draft page | **VERIFIED PASS** 7/7 ACs                                   | E2E 399/3/0/0; unit 2681/2681; CI green at `8d0d633` (runs 39466314229, 39466320752); [reports](../.specclaw/changes/020-create-post-button-draft-page/reports/T2.md)              |
+| Change                                    | State                                                       | Evidence                                                                                                                                                                                |
+| ----------------------------------------- | ----------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 018 post-008 small fixes                  | ✅ **VERIFIED PASS** (8/8 ACs)                              | E2E 390/3/0/0; CI green at `432a036f`; [verify-report](../.specclaw/changes/018-post-008-small-fixes/verify-report.md)                                                                  |
+| 022 prod data and deploy restore          | ✅ **VERIFIED PASS** (11/11 ACs)                            | E2E 390/3/0/0; CI green at `12ef7e6c`; [verify-report](../.specclaw/changes/022-prod-data-and-deploy-restore/verify-report.md)                                                          |
+| 021 Graphite re-theme                     | ✅ **VERIFIED PASS** (19/19 ACs; AC-05 font-data carve-out) | E2E 397/3/0/0; render 15/15; CI green at `aa5f7a8`; [verify-report](../.specclaw/changes/021-graphite-retheme/verify-report.md)                                                         |
+| 019 draft-action claim token              | **VERIFIED PASS** 9/9 ACs                                   | E2E 397/3/0/0; unit 2681/2681; test:upgrade 3/3; CI green at `7e86b96` (runs 39445592883, 39445602043); [reports](../.specclaw/changes/019-draft-action-claim-token/reports/T4.md)      |
+| 020 Create post button off the draft page | **VERIFIED PASS** 7/7 ACs                                   | E2E 399/3/0/0; unit 2681/2681; CI green at `8d0d633` (runs 39466314229, 39466320752); [reports](../.specclaw/changes/020-create-post-button-draft-page/reports/T2.md)                   |
+| 023 scheduler heartbeat                   | **BUILT**, verify next                                      | E2E 405/3/0/0; unit 2706/2706; lint 0 errors / 7 warnings; CI green at `f43669a` (runs 39493017393, 39493027033); [reports](../.specclaw/changes/023-scheduler-heartbeat/reports/T2.md) |
 
+- **023 (BUILT, verify next; [spec](../.specclaw/changes/023-scheduler-heartbeat/spec.md)):** the scheduler reports its own health, so the next B4 is visible. 006 item 7 moved here.
+  - **T1 (`708c80e`):** the `WorkerHeartbeat` table (one row per loop), the additive migration `20261021120000_worker_heartbeat` and its manual down script `prisma/rollback/023-scheduler-heartbeat.down.sql`.
+  - **T2 (`f43669a`):** the worker wraps each loop in `runTick` (`heartbeat.ts`), which writes the tick start and end and never fails the job; the pure `loopHealth` rule (`heartbeatStatus.ts`); `GET /api/scheduler/status`; the "Scheduler offline" banner on the campaign queue panel; `errorReason` shown while an entry is retrying; the test seam `POST /api/test/worker-heartbeat`; and E2E section Z (TC-HB-01 to TC-HB-06).
+  - **T3:** these docs, the ROADMAP refresh and the full gate.
+  - **Gate:** unit 2706/2706; lint 0 errors / 7 warnings; E2E 405/3/0/0; CI green at `f43669a` (runs 39493017393, 39493027033).
 - **019 (VERIFIED PASS, 9/9 ACs; [verify-report](../.specclaw/changes/019-draft-action-claim-token/verify-report.md)):**
   - **T1 (`d521e11`):** the nullable `Draft.pendingActionClaimId` column, the migration `20261020120000_draft_action_claim_id` and its manual down script `prisma/rollback/019-draft-action-claim-token.down.sql`.
   - **T2 (`1b549b6`):** the claim mints a token; the heartbeat, release, complete, the caption settles and the stale sweep are guarded on it.
@@ -52,7 +58,9 @@
 3. **The `v2` → `main` merge** waits on the user's go-ahead and the checklist below.
 4. **Company prod to-dos, live again:** B4, the team Claude tokens, the Coolify token rotation and MinIO → silo on prod. They are listed in CLAUDE.md.
 
-**Gates now:** unit 2681/2681, lint 0 errors / 7 warnings. The last full clean mock E2E was 399/3/0/0 (020 T2, 2026-10-20).
+**Next:** verify 023 (`/specclaw:verify 023-scheduler-heartbeat`), then 009 hero imagery, Phase 1.
+
+**Gates now:** unit 2706/2706, lint 0 errors / 7 warnings. The last full clean mock E2E: 405/3/0/0 (023 T3).
 
 ---
 
@@ -100,6 +108,10 @@ Run these right after the deploy, before users create new drafts:
   - The migration `20261020120000_draft_action_claim_id` is additive: one nullable column. A redeploy applies it, and it appears in the migration list below without a hand edit.
   - The previous image runs against it, so an image rollback needs no down script. The manual down script is `prisma/rollback/019-draft-action-claim-token.down.sql`.
   - The `in_flight = 0` step covers in-flight claims. It also makes the one rolling-deploy edge case unlikely: an old container's sweep leaves the token, and a stalled new-image run could then match a claim the old container took on the same draft and action. That needs a stall of more than 15 minutes, so it is accepted.
+- **023 scheduler heartbeat (FR-08).** This is a check, not a blocking step.
+  - The migration `20261021120000_worker_heartbeat` is additive: one new table, no change to an existing one. A redeploy applies it.
+  - The previous image runs against it, so an image rollback needs no down script. The manual down script is `prisma/rollback/023-scheduler-heartbeat.down.sql`.
+  - **After the deploy, confirm the banner:** with the scheduler resource running, the "Scheduler offline" banner on a campaign's queue panel clears within about a minute of its first tick. A banner that stays means the scheduler resource is not running (B4); read [`scheduler-b4-diagnosis-2026-08-03.md`](scheduler-b4-diagnosis-2026-08-03.md). The banner is also the quick B4 signal.
 - **External `copyText` callers.** 016 removed the `copyText` field from MCP `get_draft` and `generate_post`, ACP `generate_post` and `POST /api/generate/copy`. The operator confirms that no external caller reads it, using each prod team's `/team` API keys and their last use. Any revert of these removals is its own change.
 - **The migration list.** Produce it at merge time; never keep it by hand:
 

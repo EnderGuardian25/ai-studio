@@ -76,7 +76,7 @@ This change has **3 tasks in 3 waves**:
 
 ### Wave 3 — Docs and the gate
 
-- [ ] `T3` — The docs, the ROADMAP refresh, the full gate and CI
+- [x] `T3` — The docs, the ROADMAP refresh, the full gate and CI
   - Files: `docs/handoff.md`, `CLAUDE.md`, `docs/scheduler-b4-diagnosis-2026-08-03.md`, `docs/e2e-test-plan.md`, `.specclaw/ROADMAP.md`
   - Estimate: small
   - Kind: test
