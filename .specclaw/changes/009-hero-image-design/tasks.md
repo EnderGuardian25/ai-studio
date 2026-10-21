@@ -45,7 +45,7 @@ Nothing ships the hero prompt without the check and the stamp (T4 lands them tog
 
 ### Wave 1 — Migration
 
-- [ ] `T1` — The three columns, their migration, the down script and the schema comments
+- [x] `T1` — The three columns, their migration, the down script and the schema comments
   - Files: `prisma/schema.prisma`, `prisma/migrations/20261022120000_hero_composition/migration.sql` (new), `prisma/rollback/009-hero-image-design.down.sql` (new)
   - Estimate: small
   - Kind: migration

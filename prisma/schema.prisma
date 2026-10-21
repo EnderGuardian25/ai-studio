@@ -493,6 +493,10 @@ model Brief {
   // writes them.
   captionModel        ModelKey?
   designModel         ModelKey?
+  // 009 FR-01: the requested hero-image style. Plain TEXT, validated in code,
+  // so a retired key needs no migration. The default keeps every pre-009 row
+  // (and the previous image's brief.create) on the classic plan.
+  imageStyle          String             @default("classic")
   createdAt           DateTime           @default(now())
   drafts              Draft[]
   scheduledGenerations ScheduledGeneration[]
@@ -575,6 +579,9 @@ model Draft {
   // (008 FR-08): the model whose output is the live htmlContent.
   designModel                  String?
   designModelSubstitutedFrom   String?
+  // 009: the composition stamp for the live htmlContent, validated in
+  // src/lib/designData/stamp.ts (tolerant parse at read). Null = before 009.
+  composition     Json?
   createdAt       DateTime        @default(now())
   // @default(now()) keeps the added column valid for pre-existing rows
   updatedAt       DateTime        @default(now()) @updatedAt
@@ -791,6 +798,9 @@ model DraftRevision {
   // unknown (pre-008). modelSubstitutedFrom = the refused value, or null.
   model                String?
   modelSubstitutedFrom String?
+  // 009: the composition stamp of this row's htmlSnapshot, part of the same
+  // render stamp, validated in src/lib/designData/stamp.ts. Null = before 009.
+  composition          Json?
   // Drafts whose current not-applied outcome references this rejected row.
   notAppliedOn   Draft[]  @relation("DraftNotAppliedRevision")
 
