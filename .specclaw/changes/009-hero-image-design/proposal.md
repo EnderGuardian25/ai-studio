@@ -48,6 +48,13 @@ Let the image model make the **hero**, keep HTML for everything that must be exa
 
    Enabled per team by an admin, and stamped on the draft so it can't be mistaken for a normal render.
 
+**Decisions (user, 2026-10-21):**
+
+- **This change is Phase 1 only.** Phases 2 and 3 become their own changes later, proposed when Phase 1 is proven. Items 4 and 7 above, and the product-screenshot part of the reference images, are out of scope here.
+- **On a failed safe-area check, fall back directly** to `classic-background`, with no regenerate. Open question 4 is answered.
+- **Quality: keep the provider default.** Add a per-team quality setting whose default is today's behaviour, and teams opt into `high` after it is measured on prod. The build makes no real model calls, so nothing can be measured first. Item 6 is reworded and open question 2 is answered.
+- **Size: architectural.** The change adds a new design-data module, schema for the brief's archetype and the kit's allow-list, and prompt changes.
+
 **Phasing (each phase independently revertible):**
 
 - **Phase 1:** archetypes, the layout contract, safe-area verification, quality. `classic-background` stays the default until the archetypes are proven.
@@ -58,16 +65,19 @@ Let the image model make the **hero**, keep HTML for everything that must be exa
 
 ### In Scope
 
-- Composition archetype dataset + kit-level allow/default + brief-level choice
-- Art-director decision schema extension and matching image + design prompt builders (`PROMPT_VERSION` bump)
-- Post-generation safe-area verification with regenerate-once / fallback
-- `ImageProvider` reference-image support; OpenAI edit-endpoint implementation; product-screenshot kit artifacts
-- `quality` setting for hero images
-- Phase 3 full-AI-render mode behind a per-team admin flag
-- Real-render tests of the safe-area check, using **004**'s rasterizing harness
+**Phase 1 only:**
+
+- a composition archetype dataset, a kit-level allow-list and default, and a brief-level choice (auto by default);
+- the art-director decision schema extension, and matching image and design prompt builders (`PROMPT_VERSION` bump);
+- post-generation safe-area verification, with a **direct fallback** to `classic-background`;
+- a per-team `quality` setting for hero images, defaulting to today's behaviour;
+- real-render tests of the safe-area check, using **004**'s rasterizing harness (`npm run test:render`).
 
 ### Out of Scope
 
+- **Phase 2:** `ImageProvider` reference images, the OpenAI edit endpoint and product-screenshot kit artifacts (a later change).
+- **Phase 3:** the experimental full AI render (a later change).
+- Regenerate-once on a failed safe-area check (the user chose a direct fallback).
 - New image **providers** (Gemini) and the `isDefault` resolution fix — proposal **005** (the fix is a **prerequisite**, see Dependencies)
 - Converting kit prose into measurable rules and the typography dataset — proposal **007** (this proposal adds a **composition** section alongside it)
 - Refine instruction fidelity — proposal **004**
@@ -93,6 +103,44 @@ Let the image model make the **hero**, keep HTML for everything that must be exa
 - Should the art-director step stay on Haiku, or move to Sonnet for hero mode, where the layout decision matters more? That becomes a **008** surface question if it is made user-selectable.
 - Is regenerate-once on a failed safe-area check worth the extra image cost, or should it fall straight back to `classic-background`?
 - For product screenshots on device screens: should the image model receive the screenshot as a reference (it may redraw it inaccurately), or should the design step composite the **real** screenshot into a device frame the image model leaves blank? The second is exact but needs a screen-region contract.
+
+**Party panel (2026-10-21, deep, CHANGES_REQUESTED): the upheld findings.**
+
+- (party-architect, BLOCK) The safe area has two sources of truth: the archetype dataset and the model's decision — see party-report.md
+- (party-architect, BLOCK) The per-team quality setting has no named storage or route to the provider, and the Impact list does not match the Phase 1 decisions — see party-report.md
+- (party-architect, BLOCK) The archetype that actually rendered is never recorded, and refine and regenerate are unnamed co-changes — see party-report.md
+- (party-architect, WARN) Nobody owns the design-data module: this change creates it, but 007 is said to own it — see party-report.md
+- (party-architect, WARN) The rules for picking an archetype (auto, kit default, allow-list) are not specified — see party-report.md
+- (party-architect, WARN) The safe-area check has no thresholds, no coordinate space, and no text colour to measure contrast against — see party-report.md
+- (party-architect, WARN) It is not defined what the fallback to `classic-background` renders, or what happens when no image comes back — see party-report.md
+- (party-architect, WARN) The only named test seam is a real-render test; the decision and fallback logic has no stub seam — see party-report.md
+- (party-architect, NOTE) Rebuttal to party-visionary: an emptiness check on the final render is not the same check, so it cannot cover both halves — see party-report.md
+- (party-ba, BLOCK) The central evidence is one informal comparison against a different product, with no baseline showing users see "flat" posts as a problem — see party-report.md
+- (party-ba, WARN) The proposal's Phase 1 contradicts its own evidence: the ChatGPT look depends on a photoreal hero subject and real product UI, which are excluded — see party-report.md
+- (party-ba, WARN) No acceptance criteria, so the main claim (posts look less flat) has nothing to fail against — see party-report.md
+- (party-ba, WARN) The proposal's own text still asserts the decided-against behaviour and the per-team Phase 3 and quality scope, so the stated scope is inconsistent — see party-report.md
+- (party-ba, WARN) "Auto" archetype selection has no stated chooser or behaviour, and "safe area" and "measurable" are undefined — see party-report.md
+- (party-ba, NOTE) The assumption that a safe-area luminance and variance check detects a usable text region is unverified — see party-report.md
+- (party-po, BLOCK) Phase 1 ships a new look with zero default exposure and no stated value for what it builds — see party-report.md
+- (party-po, WARN) Per-kit allow-list, kit default, and brief-level picker are optionality nobody asked for — see party-report.md
+- (party-po, WARN) Running cost is unstated and the Impact section contradicts the decisions — see party-report.md
+- (party-po, NOTE) Quality setting could be an env or config value instead of a per-team setting — see party-report.md
+- (party-po, NOTE) The safe-area check is a separable cut line, and 005 item 3 should ship first — see party-report.md
+- (party-security, BLOCK) The verifier's region comes from the model it is checking — see party-report.md
+- (party-security, WARN) The check reads the image and never where the text actually landed — see party-report.md
+- (party-security, WARN) An archetype from the brief or from auto is not stated to be checked against the kit allow-list — see party-report.md
+- (party-security, WARN) The fallback to classic-background is silent and leaves no record — see party-report.md
+- (party-security, WARN) The fallback only fires on a measured failure, so a check that cannot run passes — see party-report.md
+- (party-security, WARN) The per-team quality setting spends money but names no permission gate — see party-report.md
+- (party-security, NOTE) Rebuttal to party-po: shipping archetype prompts before the verifier ships the unchecked failure mode as the live state — see party-report.md
+- (party-visionary, WARN) The layout decision is used once and thrown away, so every later edit of the draft works blind to it — see party-report.md
+- (party-visionary, WARN) "Until proven" is the gate for the default flip and for Phase 2, and nothing records the evidence — see party-report.md
+- (party-visionary, WARN) Archetype keys become persisted references with no rule for retiring or revising them, which breaks the "independently revertible" claim — see party-report.md
+- (party-visionary, WARN) Layout now has two sources of truth: the archetype contract and the kit and briefing prose that already state layout rules — see party-report.md
+- (party-visionary, WARN) The layout contract allows one region, but the starting set already needs two and Phase 2 needs a third kind — see party-report.md
+- (party-visionary, WARN) The archetype contracts are percentages with no post size, so every future size change must re-audit every archetype — see party-report.md
+- (party-visionary, WARN) The per-team `quality` setting stores one provider's parameter in a provider-neutral place — see party-report.md
+- (party-visionary, WARN) Rebuttal of party-po's prompt-only variant: cheap to build, but it leaves layout as prose in the prompt builders, the pattern this proposal names as the cause — see party-report.md
 
 ---
 
