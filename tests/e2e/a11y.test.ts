@@ -762,17 +762,13 @@ test.describe('Labels: team (T16)', () => {
     await page.goto('/team')
     await expect(page.getByRole('heading', { name: 'AI Providers' })).toBeVisible()
 
-    // API mode offers COPY and IMAGE ("API key"); CLI mode hides COPY ("Image API key").
-    const register = page.getByRole('button', { name: /^(Register Provider|Register image key)$/ })
-    const cliMode = (await register.innerText()).includes('image key')
-    await register.click()
+    // Both modes offer COPY and IMAGE with one "API key" field since 024 FR-09.
+    await page.getByRole('button', { name: 'Register Provider', exact: true }).click()
     await expect(page.getByRole('heading', { name: 'Register new provider', level: 3 })).toBeVisible()
 
     // Row 7. Exact, so the "Show API key" button doesn't also match.
-    const keyLabel = cliMode ? 'Image API key' : 'API key'
-    const keyPlaceholder = cliMode
-      ? 'Image API key (sk-… OpenAI or AIza… Gemini)'
-      : 'API key (sk-ant-…, sk-…, or AIza… Gemini for images)'
+    const keyLabel = 'API key'
+    const keyPlaceholder = 'API key (sk-ant-…, sk-…, or AIza… Gemini for images)'
     await expectLabelled(page, keyLabel, { tag: 'INPUT', placeholder: keyPlaceholder })
     const key = page.getByLabel(keyLabel, { exact: true })
     await expectEyeCentred(key, page.getByRole('button', { name: 'Show API key' }))
@@ -945,14 +941,12 @@ test.describe('ARIA states (T17)', () => {
     await expect(page.getByRole('heading', { name: 'Library', level: 1 })).toBeVisible()
     await expectTablistsNamed(page, ['Filter by status'])
 
-    // /team with the register form open. CLI mode locks the slot to IMAGE and
-    // renders no toggle (the T16 case reads the mode the same way).
+    // /team with the register form open. Both modes render the slot toggle
+    // since 024 FR-09.
     await page.goto('/team')
-    const register = page.getByRole('button', { name: /^(Register Provider|Register image key)$/ })
-    const cliMode = (await register.innerText()).includes('image key')
-    await register.click()
+    await page.getByRole('button', { name: 'Register Provider', exact: true }).click()
     await expect(page.getByRole('heading', { name: 'Register new provider', level: 3 })).toBeVisible()
-    await expectTablistsNamed(page, cliMode ? [] : ['Provider slot'])
+    await expectTablistsNamed(page, ['Provider slot'])
 
     await openKit(page, kit.name)
     await expectTablistsNamed(page, ['Prompt view'])
@@ -1211,7 +1205,7 @@ test.describe('axe scan (T18)', () => {
     await pageLogin(page)
     await page.goto('/team')
     await expect(page.getByRole('heading', { name: 'AI Providers' })).toBeVisible()
-    await page.getByRole('button', { name: /^(Register Provider|Register image key)$/ }).click()
+    await page.getByRole('button', { name: 'Register Provider', exact: true }).click()
     await expect(page.getByRole('heading', { name: 'Register new provider', level: 3 })).toBeVisible()
     // 008 AC-22: the scan covers /team → Models too. It loads two queries of
     // its own, so wait for its form rather than relying on networkidle.

@@ -6,6 +6,7 @@ import { useQuery } from '@tanstack/react-query'
 import { ApiError, apiFetch } from '@/lib/apiFetch'
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser'
 import { canSubmitBrief } from '@/lib/brief/copyProvider'
+import { useCaptionRoute } from '@/lib/hooks/useCaptionRoute'
 import { CLASSIC_STYLE, resumeImageStyle } from '@/lib/brief/imageStyle'
 import { designPickForPath, refusedModelField, type BriefModelField } from '@/lib/brief/modelPicks'
 import { MODEL_NOT_ALLOWED } from '@/lib/models/requests'
@@ -105,6 +106,8 @@ export interface UseBriefWizardResult {
   providersLoaded: boolean
   /** True when POST /api/briefs would accept this submission (see canSubmitBrief). */
   copyProviderReady: boolean
+  /** The server's message when the team's chosen caption route cannot run (024 FR-10), else null. */
+  captionRouteMessage: string | null
 
   // Step 4 — model picks (008 FR-19). undefined = the picker is untouched (A5).
   captionModel: ModelKey | undefined
@@ -356,8 +359,18 @@ export function useBriefWizard(): UseBriefWizardResult {
   // will accept. cliMode must be LOADED before gating, or the warning flashes on
   // first paint (/api/me defaults it to false while in flight).
   const { cliMode, isLoading: meLoading } = useCurrentUser()
-  const copyProviderReady = canSubmitBrief(copyProviderKey || undefined, cliMode)
-  const providersLoaded = copyProvidersLoaded && imageProvidersLoaded && !meLoading
+  // 024 FR-10: once the team has chosen a caption route the route decides the
+  // credential, so the wizard sends no key and gates on the route's own state
+  // (the server's answer, not a client rule). A never-chosen team is unchanged.
+  const { data: captionRoute, isSuccess: captionRouteLoaded } = useCaptionRoute()
+  const routeChosen = captionRoute?.state === 'ready' || captionRoute?.state === 'not-ready'
+  const captionRouteMessage = captionRoute?.state === 'not-ready' ? captionRoute.message : null
+  const copyProviderReady =
+    captionRoute?.state === 'not-ready'
+      ? false
+      : canSubmitBrief(copyProviderKey || undefined, cliMode, routeChosen)
+  const providersLoaded =
+    copyProvidersLoaded && imageProvidersLoaded && captionRouteLoaded && !meLoading
 
   // Keep template selections consistent with the chosen brand kit AND size: any
   // template that doesn't belong to the selected kit, or doesn't match the chosen
@@ -475,7 +488,8 @@ export function useBriefWizard(): UseBriefWizardResult {
     setModelErrors({})
     if (!copyProviderReady) {
       setError(
-        'No copy provider is configured, and the server is not in CLI mode. Ask an admin to add a COPY provider in AI Providers.'
+        captionRouteMessage ??
+          'No copy provider is configured, and the server is not in CLI mode. Ask an admin to add a COPY provider in AI Providers.'
       )
       return
     }
@@ -496,7 +510,8 @@ export function useBriefWizard(): UseBriefWizardResult {
         brandKitId: brandKitId || undefined,
         // Omitted (not '') when no provider is registered, so the route takes its
         // CLI default instead of existence-checking an empty key.
-        copyProviderKey: copyProviderKey || undefined,
+        // A chosen route ignores the brief's key (024 FR-05), so none is sent.
+        copyProviderKey: routeChosen ? undefined : copyProviderKey || undefined,
         imageProviderKey: imageProviderKey || undefined,
         briefImages: images.length > 0 ? images.map(({ url, intent, filename }) => ({ url, intent, filename })) : undefined,
         // Path A embeds a single image; pass the first embed image through.
@@ -620,6 +635,7 @@ export function useBriefWizard(): UseBriefWizardResult {
     selectedBrandKit,
     providersLoaded,
     copyProviderReady,
+    captionRouteMessage,
     captionModel,
     setCaptionModel,
     designModel,

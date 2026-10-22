@@ -86,7 +86,7 @@ T2 is the one large task. The selector, the resolver, the stamp and the brief ke
 
 ### Wave 3 — The team route, the card, the wizard and the E2E
 
-- [ ] `T3` — `GET/PUT /api/team/caption-route`, the `/team` card, the COPY slot, the wizard gate and E2E section AB
+- [x] `T3` — `GET/PUT /api/team/caption-route`, the `/team` card, the COPY slot, the wizard gate and E2E section AB
   - Files: `src/app/api/team/caption-route/route.ts` (new), `src/components/team/CaptionRouteCard.tsx` (new), `src/app/(app)/team/page.tsx`, `src/components/brief/useBriefWizard.ts` (and the Review step's warning component it feeds), `src/lib/api-types.ts`, `tests/unit/captionRouteApi.test.ts` (new), `tests/e2e/caption-route.test.ts` (new)
   - Estimate: large
   - Kind: impl

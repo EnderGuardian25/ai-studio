@@ -255,6 +255,18 @@ export interface TeamModelPolicyInfo {
   newModels: ModelKey[]
 }
 
+// GET/PUT /api/team/caption-route (024 FR-08): the team's caption credential
+// route and whether it can run. /team renders this and the brief wizard gates
+// on it; neither re-derives it. No key, prefix or ciphertext is ever in it.
+export interface CaptionRouteState {
+  setting: 'CLI' | 'API_KEY' | null
+  state: 'unset' | 'ready' | 'not-ready'
+  effective: 'CLI' | 'API_KEY' | 'SERVER_KEY' | 'OTHER' | null
+  servingProviderId: string | null
+  message: string | null
+  mode: 'cli' | 'api'
+}
+
 // GET /api/models (any team member) — everything a picker needs to run the
 // client-side decideModel. Never a price or an apiId: the boundary is the
 // only consumer of ResolvedModel.arg (FR-13).

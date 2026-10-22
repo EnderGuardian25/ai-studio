@@ -38,6 +38,8 @@ interface ReviewStepProps {
   prompt: string
   providersLoaded: boolean
   copyProviderReady: boolean
+  /** The server's message for a chosen caption route that cannot run (024 FR-10). */
+  captionRouteMessage?: string | null
   error: string | null
   submitting: boolean
   // 008 FR-19: the model picks (undefined = untouched, A5)
@@ -64,6 +66,7 @@ export function ReviewStep({
   prompt,
   providersLoaded,
   copyProviderReady,
+  captionRouteMessage,
   error,
   submitting,
   captionModel,
@@ -155,9 +158,9 @@ export function ReviewStep({
       </div>
 
       {providersLoaded && !copyProviderReady && (
-        <Notice tone="warning" className="mt-6">
-          No copy provider is configured, and the server is not in CLI mode. An admin must add a
-          COPY provider in AI Providers before generating.
+        <Notice tone="warning" className="mt-6" data-testid="caption-route-warning">
+          {captionRouteMessage ??
+            'No copy provider is configured, and the server is not in CLI mode. An admin must add a COPY provider in AI Providers before generating.'}
         </Notice>
       )}
 

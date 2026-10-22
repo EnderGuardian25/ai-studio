@@ -113,6 +113,7 @@ export default function NewBriefPage() {
             prompt={wizard.prompt}
             providersLoaded={wizard.providersLoaded}
             copyProviderReady={wizard.copyProviderReady}
+            captionRouteMessage={wizard.captionRouteMessage}
             error={wizard.error}
             submitting={submitting}
             captionModel={wizard.captionModel}

@@ -8,3 +8,7 @@
 {"ev":"stop","span":"W1","at":"2026-10-22T18:22:31Z","ts":1792693351,"status":"ok"}
 {"ev":"start","span":"W2","kind":"wave","label":"wave 2","at":"2026-10-22T18:22:35Z","ts":1792693355}
 {"ev":"start","span":"T2","kind":"task","label":"selector+resolver+stamp+gate","parent":"W2","model":"sonnet","attempt":"1","at":"2026-10-22T18:22:36Z","ts":1792693355}
+{"ev":"stop","span":"T2","at":"2026-10-22T18:35:45Z","ts":1792694145,"status":"ok"}
+{"ev":"stop","span":"W2","at":"2026-10-22T18:35:45Z","ts":1792694145,"status":"ok"}
+{"ev":"start","span":"W3","kind":"wave","label":"wave 3","at":"2026-10-22T18:38:58Z","ts":1792694338}
+{"ev":"start","span":"T3","kind":"task","label":"route API + /team + wizard + E2E AB","parent":"W3","model":"sonnet","attempt":"1","at":"2026-10-22T18:38:58Z","ts":1792694338}
