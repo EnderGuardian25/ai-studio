@@ -84,10 +84,13 @@ test.describe('Scheduler heartbeat (§Z)', () => {
     await seed('generation', 10 * MIN, null)
 
     await pageLogin(page)
+    // Wait for the status query to settle before asserting an absence. Listen
+    // before navigating: the query fires on mount and next refetches at 60 s,
+    // so a listener attached after the page loads misses the only response.
+    const status = page.waitForResponse(r => r.url().includes('/api/scheduler/status') && r.status() === 200)
     await page.goto(`/campaigns/${camp.id}`)
     await expect(page.getByText(/Planned Posts \(0\)/)).toBeVisible()
-    // Wait for the status query to settle before asserting an absence.
-    await page.waitForResponse(r => r.url().includes('/api/scheduler/status') && r.status() === 200)
+    await status
     await expect(page.getByTestId('scheduler-offline-banner')).toHaveCount(0)
   })
 
