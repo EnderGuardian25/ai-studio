@@ -40,7 +40,7 @@ T2 is the one large task. The selector, the resolver, the stamp and the brief ke
 
 ### Wave 1 — Migration
 
-- [ ] `T1` — The `CaptionRoute` enum, the three columns, the migration and the down script
+- [x] `T1` — The `CaptionRoute` enum, the three columns, the migration and the down script
   - Files: `prisma/schema.prisma`, `prisma/migrations/20261023120000_caption_route/migration.sql` (new), `prisma/rollback/024-caption-credential-route.down.sql` (new)
   - Estimate: small
   - Kind: migration

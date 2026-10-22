@@ -269,6 +269,17 @@ model Team {
   memberships          TeamMembership[]
   // The team's model policy (008 FR-05); absent until an admin first saves it.
   modelPolicy          TeamModelPolicy?
+  // 024: the credential route the team chose for captions. Null = never chosen
+  // (today's behaviour, unchanged).
+  captionRoute         CaptionRoute?
+}
+
+// 024: the credential route a team can choose for captions. The stamp columns
+// (Draft.headlineRoute, DraftCaption.route) are plain TEXT because their domain
+// (CLI | API_KEY | SERVER_KEY | OTHER) is wider than this setting's.
+enum CaptionRoute {
+  CLI
+  API_KEY
 }
 
 // A team's model policy (008 FR-05), 1:1 with Team. No row = the catalogue's
@@ -575,6 +586,10 @@ model Draft {
   // edit leaves it (A6). …SubstitutedFrom = the refused value, or null.
   headlineModel                String?
   headlineModelSubstitutedFrom String?
+  // 024: the route that wrote `headline` (CLI | API_KEY | SERVER_KEY | OTHER),
+  // as TEXT, beside headlineModel. Written only with validated text. Null =
+  // before 024, or unknown.
+  headlineRoute                String?
   // Mirrors the current revision's DraftRevision.model / modelSubstitutedFrom
   // (008 FR-08): the model whose output is the live htmlContent.
   designModel                  String?
@@ -829,6 +844,10 @@ model DraftCaption {
   // row with no text). modelSubstitutedFrom = the refused value, or null.
   model                String?
   modelSubstitutedFrom String?
+  // 024: the route that wrote this row's text (CLI | API_KEY | SERVER_KEY |
+  // OTHER), as TEXT, beside model. Written only with validated text. Null =
+  // before 024, or no text.
+  route                String?
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @default(now()) @updatedAt
 
