@@ -39,7 +39,9 @@ export type PickerModels = Pick<
   | 'credential'
   | 'envDefault'
   | 'captionProviderIsClaude'
->
+> &
+  // Absent reads as `credential` (024 FR-06).
+  Partial<Pick<ModelsView, 'captionCredential'>>
 
 /** What the stamp hint names: "Same model as the current <caption | headline | design>". */
 export type StampNoun = 'caption' | 'headline' | 'design'
@@ -64,10 +66,20 @@ export interface PickerOption {
 export const TEAM_TOKEN_NOTICE =
   "This run uses your team's Claude allowance. Connect your own token in Settings to use yours."
 
-function decideInput(models: PickerModels, context: PickerContext): DecideInput {
+// 024 FR-06: the CAPTION surface reads captionCredential (a team on the API key
+// route bills the team's key whoever the caller is); every other surface reads
+// the caller's own credential.
+function credentialFor(
+  surface: UserSurface | undefined,
+  models: Pick<PickerModels, 'credential' | 'captionCredential'>,
+): ModelsView['credential'] {
+  return (surface === 'CAPTION' ? models.captionCredential : undefined) ?? models.credential
+}
+
+function decideInput(surface: UserSurface, models: PickerModels, context: PickerContext): DecideInput {
   return {
     policy: { allowed: models.allowed, defaults: models.defaults, gateOn: models.gateOn },
-    credential: models.credential,
+    credential: credentialFor(surface, models),
     mode: models.mode,
     envDefault: models.envDefault,
     stamp: context.stamp ?? null,
@@ -77,7 +89,7 @@ function decideInput(models: PickerModels, context: PickerContext): DecideInput 
 
 /** The effective set for this user and surface, cheapest first. A gated entry is absent (FR-22). */
 export function pickerOptions(surface: UserSurface, models: PickerModels): PickerOption[] {
-  return effectiveSet(surface, decideInput(models, {})).map((e) => ({
+  return effectiveSet(surface, decideInput(surface, models, {})).map((e) => ({
     value: e.key,
     label: `${e.displayName} · ${modelTier(e)}`,
     speed: e.speed,
@@ -90,7 +102,7 @@ export function preselection(
   models: PickerModels,
   context: PickerContext = {},
 ): DecideResult {
-  return decideModel(surface, decideInput(models, context))
+  return decideModel(surface, decideInput(surface, models, context))
 }
 
 /** The hint line for a pre-selection (FR-18). A refused stamp names itself first. */
@@ -121,7 +133,7 @@ export function hintText(
  */
 export function gatedHint(surface: UserSurface, models: PickerModels): string | null {
   // The resolver's own set, with and without the switch: no gate rule of our own.
-  const input = decideInput(models, {})
+  const input = decideInput(surface, models, {})
   const offered = new Set(effectiveSet(surface, input).map((e) => e.key))
   const hidden = effectiveSet(surface, { ...input, policy: { ...input.policy, gateOn: false } })
     .filter((e) => !offered.has(e.key))
@@ -136,10 +148,12 @@ export function gatedHint(surface: UserSurface, models: PickerModels): string | 
  * the run would use the team's token. Non-blocking; the run is allowed.
  */
 export function teamTokenNotice(
-  models: Pick<PickerModels, 'mode' | 'credential'>,
+  models: Pick<PickerModels, 'mode' | 'credential' | 'captionCredential'>,
   key: ModelKey | null | undefined,
+  surface?: UserSurface,
 ): boolean {
-  if (!key || models.mode !== 'cli' || models.credential !== 'team') return false
+  const credential = credentialFor(surface, models)
+  if (!key || models.mode !== 'cli' || credential !== 'team') return false
   return entryFor(key)?.personalTokenGated === true
 }
 

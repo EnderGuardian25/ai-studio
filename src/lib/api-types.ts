@@ -280,6 +280,13 @@ export interface ModelsView {
    * hidden (FR-18), and an explicit caption pick is a 400.
    */
   captionProviderIsClaude: boolean
+  /**
+   * 024 FR-06: the credential tier of a CAPTION run. 'team' when the team chose
+   * the API key route (the team's key bills, whoever calls); otherwise the
+   * plain `credential`. The CAPTION picker reads this, so it never offers a
+   * model the server will refuse.
+   */
+  captionCredential: CredentialTier
 }
 
 // ── Drafts ───────────────────────────────────────────────────────────────
@@ -320,6 +327,8 @@ export interface DraftCaptionDetail {
   // and the refused value the resolver substituted away from.
   model: string | null
   modelSubstitutedFrom: string | null
+  // 024 FR-04: the credential route that wrote it (null = before 024 / none).
+  route: string | null
 }
 
 export interface DraftDetail {

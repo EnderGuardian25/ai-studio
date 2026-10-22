@@ -44,14 +44,20 @@ export interface CaptionRowSettle {
    */
   model?: string
   modelSubstitutedFrom?: string | null
+  /** 024 FR-04: the credential route that wrote the new text, beside `model`. */
+  route?: string | null
 }
 
 // The model that wrote a caption reply (008 FR-08): the arg that crossed the
 // boundary (or a non-Claude provider's own ID), and the refused value the
 // resolver substituted away from, or null. writeCaptions produces it.
+//
+// 024 FR-04: `route` is the credential route that ran it (CLI | API_KEY |
+// SERVER_KEY | OTHER), null when unknown; written beside `model`, same rules.
 export interface CaptionStamp {
   model: string
   substitutedFrom: string | null
+  route: string | null
 }
 
 // What a caption write leaves in a row (design §5's table). A failure never
@@ -73,7 +79,9 @@ export function settleCaptionRow(
       status: 'READY',
       text: field.text,
       failureReason: null,
-      ...(stamp ? { model: stamp.model, modelSubstitutedFrom: stamp.substitutedFrom } : {}),
+      ...(stamp
+        ? { model: stamp.model, modelSubstitutedFrom: stamp.substitutedFrom, route: stamp.route }
+        : {}),
     }
   }
   if (row.text.trim() !== '') {

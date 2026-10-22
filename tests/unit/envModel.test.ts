@@ -8,6 +8,7 @@ vi.mock('@/lib/prisma', () => ({
   prisma: {
     teamModelPolicy: { findUnique: async () => null },
     userClaudeToken: { findFirst: async () => null },
+    team: { findUnique: async () => null },
   },
 }))
 vi.mock('@/lib/agent/config', () => ({

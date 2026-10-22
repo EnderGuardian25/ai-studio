@@ -29,6 +29,6 @@ export class OpenAICopyProvider implements CopyProvider {
     if (!content) {
       throw new Error("OpenAI returned an empty response")
     }
-    return { raw: content, modelId: this.model }
+    return { raw: content, modelId: this.model, route: 'OTHER' }
   }
 }

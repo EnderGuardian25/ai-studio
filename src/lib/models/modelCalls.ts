@@ -18,6 +18,7 @@
 
 import type { ModelKey, Surface } from './catalogue'
 import type { ModelSource, PipelineMode, ResolvedModel } from './resolve'
+import type { CaptionRoute } from './route'
 
 export interface ModelCallRecord {
   /** Epoch ms when the call was recorded. */
@@ -30,6 +31,8 @@ export interface ModelCallRecord {
   source: ModelSource
   substitutedFrom: string | null
   label: string | null
+  /** 024 FR-07: the caption credential route; null for every call that is not a caption. */
+  route: CaptionRoute | null
 }
 
 export interface ModelCallSink {
@@ -92,6 +95,7 @@ export function modelCallFor(
   model: ResolvedModel,
   mode: PipelineMode,
   label?: string,
+  route?: CaptionRoute | null,
 ): Omit<ModelCallRecord, 'at'> {
   return {
     surface: model.surface,
@@ -101,5 +105,6 @@ export function modelCallFor(
     source: model.source,
     substitutedFrom: model.substitutedFrom,
     label: label || null,
+    route: route ?? null,
   }
 }

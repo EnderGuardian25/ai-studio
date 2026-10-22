@@ -84,7 +84,10 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
           tone: { type: 'string' },
           channels: { type: 'array', items: { type: 'string' } },
           designMode: { type: 'string', enum: ['TEMPLATE', 'GENERATE'] },
-          copyProviderKey: { type: 'string' },
+          copyProviderKey: {
+            type: 'string',
+            description: 'Ignored once the team has chosen a caption route.',
+          },
           campaignId: { type: 'string' },
           description: { type: 'string' },
         },

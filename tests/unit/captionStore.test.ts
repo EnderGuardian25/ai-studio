@@ -152,7 +152,7 @@ describe('loadCaptionTexts (017 FR-06)', () => {
 
 describe('saveGenerationCaptions', () => {
   // 008 FR-08: the model that wrote the reply, and the value it substituted.
-  const STAMP = { model: 'claude-haiku-4-5', substitutedFrom: 'OPUS' }
+  const STAMP = { model: 'claude-haiku-4-5', substitutedFrom: 'OPUS', route: 'API_KEY' }
 
   it('writes READY text / FAILED-without-text per channel, guarded on PENDING, and the headline only when valid', async () => {
     await saveGenerationCaptions(
@@ -178,6 +178,7 @@ describe('saveGenerationCaptions', () => {
           failureReason: null,
           model: 'claude-haiku-4-5',
           modelSubstitutedFrom: 'OPUS',
+          route: 'API_KEY',
         },
       },
       {
@@ -188,6 +189,7 @@ describe('saveGenerationCaptions', () => {
           failureReason: 'empty',
           model: null,
           modelSubstitutedFrom: null,
+          route: null,
         },
       },
       {
@@ -198,6 +200,7 @@ describe('saveGenerationCaptions', () => {
           failureReason: null,
           model: 'claude-haiku-4-5',
           modelSubstitutedFrom: 'OPUS',
+          route: 'API_KEY',
         },
       },
     ])
@@ -209,7 +212,12 @@ describe('saveGenerationCaptions', () => {
     expect(h.captionUpdateMany).not.toHaveBeenCalled()
     expect(h.draftUpdateMany).toHaveBeenCalledWith({
       where: { id: 'd1' },
-      data: { headline: 'Big launch', headlineModel: 'claude-haiku-4-5', headlineModelSubstitutedFrom: 'OPUS' },
+      data: {
+        headline: 'Big launch',
+        headlineModel: 'claude-haiku-4-5',
+        headlineModelSubstitutedFrom: 'OPUS',
+        headlineRoute: 'API_KEY',
+      },
     })
   })
 
@@ -222,10 +230,11 @@ describe('saveGenerationCaptions', () => {
         failureReason: null,
         model: 'claude-haiku-4-5',
         modelSubstitutedFrom: 'OPUS',
+        route: 'API_KEY',
       },
     ])
     expect(captionRowsFromFields({ WHATSAPP: { ok: false, reason: 'missing' } }, STAMP)).toEqual([
-      { channel: 'WHATSAPP', text: '', status: 'FAILED', failureReason: 'missing', model: null, modelSubstitutedFrom: null },
+      { channel: 'WHATSAPP', text: '', status: 'FAILED', failureReason: 'missing', model: null, modelSubstitutedFrom: null, route: null },
     ])
   })
 })
@@ -372,7 +381,7 @@ describe('settleCaptionAction: a late settle is a no-op (019 AC-03)', () => {
       STALE,
       ['INSTAGRAM', 'LINKEDIN', 'HEADLINE'],
       { INSTAGRAM: { ok: true, text: 'stale ig' }, LINKEDIN: { ok: true, text: 'stale li' }, HEADLINE: { ok: true, text: 'stale h' } },
-      { model: 'm', substitutedFrom: null },
+      { model: 'm', substitutedFrom: null, route: null },
     )
     expect(rows.map((r) => [r.status, r.text])).toEqual([['PENDING', 'r2 ig'], ['PENDING', 'r2 li']])
     expect(draft.headline).toBe('old headline')
@@ -455,8 +464,8 @@ describe('saveCaptionEdit / saveHeadlineEdit (FR-12)', () => {
 // ── 008 T7 (FR-08, AC-07): the caption action's stamp writes ─────────────────
 
 describe('008 FR-08: settleCaptionAction stamps validated fields only', () => {
-  const STAMP = { model: 'claude-sonnet-5-5', substitutedFrom: 'claude-opus-5-5' }
-  const STAMP_FIELDS = ['model', 'modelSubstitutedFrom', 'headlineModel', 'headlineModelSubstitutedFrom']
+  const STAMP = { model: 'claude-sonnet-5-5', substitutedFrom: 'claude-opus-5-5', route: 'CLI' }
+  const STAMP_FIELDS = ['model', 'modelSubstitutedFrom', 'route', 'headlineModel', 'headlineModelSubstitutedFrom', 'headlineRoute']
 
   it('an ok field gets the new stamp; a failed field writes no stamp field, so the row keeps its own', async () => {
     h.captionFindMany.mockResolvedValue([
@@ -482,6 +491,7 @@ describe('008 FR-08: settleCaptionAction stamps validated fields only', () => {
       failureReason: null,
       model: 'claude-sonnet-5-5',
       modelSubstitutedFrom: 'claude-opus-5-5',
+      route: 'CLI',
     })
     // The FAILED (no text) and the kept-text rows: no stamp key at all.
     for (const d of data.slice(1)) for (const k of STAMP_FIELDS) expect(d).not.toHaveProperty(k)
@@ -497,6 +507,7 @@ describe('008 FR-08: settleCaptionAction stamps validated fields only', () => {
         headline: 'New line',
         headlineModel: 'claude-sonnet-5-5',
         headlineModelSubstitutedFrom: 'claude-opus-5-5',
+        headlineRoute: 'CLI',
       },
     })
     h.draftUpdateMany.mockClear()

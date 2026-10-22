@@ -44,6 +44,8 @@ const fake = vi.hoisted(() => {
       },
     },
     draftCaption: { updateMany: async () => ({ count: 1 }) },
+    // 024: the CAPTION surface reads the team's caption route.
+    team: { findUnique: async () => null },
     draftRevision: {
       create: async ({ data }: { data: Record<string, unknown> }) => {
         db.revisionCreates.push(data)
@@ -85,6 +87,7 @@ vi.mock('@/providers/registry', () => ({
     generateCaptions: async (_b: unknown, _t: unknown, model: { arg: string }) => ({
       raw: JSON.stringify({ headline: 'the headline', instagram: 'ig', linkedin: 'li', whatsapp: 'wa' }),
       modelId: model.arg,
+      route: null,
     }),
   }),
 }))

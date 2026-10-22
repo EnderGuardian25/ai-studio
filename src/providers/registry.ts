@@ -1,4 +1,3 @@
-import type { Prisma } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
 import { decrypt } from "@/lib/crypto"
 import type { CopyProvider } from "./interfaces/CopyProvider"
@@ -10,9 +9,11 @@ import { AnthropicCopyProvider } from "./implementations/copy/anthropic"
 import { ClaudeCliCopyProvider } from "./implementations/copy/claude-cli"
 import { MOCK_AI, buildMockCaptionReply } from "@/lib/testHooks"
 import { env } from "@/lib/env"
-import { isCliMode, pipelineMode } from "@/lib/agent/config"
+import { pipelineMode } from "@/lib/agent/config"
 import { modelCallFor, recordModelCall } from "@/lib/models/modelCalls"
 import { IMAGE_PROVIDERS } from "./imageCapabilities"
+import { loadCaptionRoute } from "./captionRoute"
+import { RouteNotReadyError } from "@/lib/models/route"
 
 function instantiateCopyProvider(providerName: string, apiKey: string): CopyProvider {
   switch (providerName.toLowerCase()) {
@@ -45,40 +46,6 @@ function instantiateImageProvider(providerName: string, apiKey: string): ImagePr
   }
 }
 
-// The registered COPY row a caption run uses: the brief's explicit providerKey
-// (team-scoped, enabled), else the team's enabled default. null = no row, so
-// resolveCopyProvider falls to the CLI (CLI mode) or ANTHROPIC_API_KEY.
-// Each caller selects only the columns it reads (018 FR-04): the draft poll
-// asks copyProviderIsClaude on every GET and needs the name alone, never the
-// encrypted key.
-async function findCopyProviderRecord<S extends Prisma.AvailableProviderSelect>(
-  teamId: string,
-  providerKey: string | undefined,
-  select: S,
-): Promise<Prisma.AvailableProviderGetPayload<{ select: S }> | null> {
-  if (providerKey) {
-    const record = await prisma.availableProvider.findFirst({
-      where: { slot: "COPY", providerKey, teamId, isEnabled: true },
-      select,
-    })
-    if (record) return record
-  }
-  return prisma.availableProvider.findFirst({
-    where: { slot: "COPY", teamId, isDefault: true, isEnabled: true },
-    select,
-  })
-}
-
-// Which model family each COPY provider name runs — keep in step with
-// instantiateCopyProvider. A name outside it can't run at all (that switch
-// throws "Unsupported provider"); the E2E registers placeholder names under
-// MOCK_AI, so an unknown name is not treated as "not Claude".
-const COPY_PROVIDER_FAMILY: Readonly<Record<string, "claude" | "other">> = {
-  cli: "claude",
-  anthropic: "claude",
-  openai: "other",
-}
-
 /**
  * 008 (spec open question 1, FR-17/FR-18): whether the provider a caption run
  * would use is Claude, so a caption model can be chosen. The same lookup as
@@ -89,8 +56,10 @@ const COPY_PROVIDER_FAMILY: Readonly<Record<string, "claude" | "other">> = {
  * NOT consulted: the mock stands in for whichever provider the team has.
  */
 export async function copyProviderIsClaude(teamId: string, providerKey?: string): Promise<boolean> {
-  const record = await findCopyProviderRecord(teamId, providerKey, { providerName: true })
-  return !record || COPY_PROVIDER_FAMILY[record.providerName.toLowerCase()] !== "other"
+  // 024 FR-03: the answer is the selector's. A decision that is not ok stays
+  // "Claude": the picker remains visible and the run fails closed on its own.
+  const decision = await loadCaptionRoute(teamId, providerKey)
+  return decision.ok ? decision.isClaude : true
 }
 
 // teamId is required (team-tenancy fix): both lookups below used to run with
@@ -100,6 +69,12 @@ export async function copyProviderIsClaude(teamId: string, providerKey?: string)
 // Every caller runs inside an already team-scoped request/generation context,
 // so the real team id is always available (mirrors resolveImageProvider).
 export async function resolveCopyProvider(teamId: string, providerKey?: string): Promise<CopyProvider> {
+  // 024 FR-03/FR-07: the route is decided before the MOCK_AI seam, so a chosen
+  // route that cannot run fails closed in the mock as in prod. A never-chosen
+  // team with nothing configured is ignored by the mock, as it always was.
+  const decision = await loadCaptionRoute(teamId, providerKey)
+  if (!decision.ok && decision.chosen) throw new RouteNotReadyError(decision)
+
   // Test seam: a deterministic RAW caption reply with no provider API call — the
   // real extractor still parses it (012 FR-21). The brief's copyProviderKey must
   // still reference a real enabled COPY provider (validated at brief creation) —
@@ -107,20 +82,30 @@ export async function resolveCopyProvider(teamId: string, providerKey?: string):
   // 008 FR-16: the seam short-circuits before the boundary, so it records the
   // CAPTION model it was handed (the E2E reads it through /api/test/model-calls)
   // and stamps model.arg, exactly as a real Claude provider would.
+  // 024 FR-07: it also records and stamps the decision's route (null when none).
   if (MOCK_AI) {
+    const route = decision.ok ? decision.route : null
     return {
       generateCaptions: async (brief, targets, model) => {
-        recordModelCall(modelCallFor(model, pipelineMode(), 'copy'))
-        return { raw: buildMockCaptionReply(brief?.topic ?? '', targets), modelId: model.arg }
+        recordModelCall(modelCallFor(model, pipelineMode(), 'copy', route))
+        return { raw: buildMockCaptionReply(brief?.topic ?? '', targets), modelId: model.arg, route }
       },
     }
   }
 
-  const record = await findCopyProviderRecord(teamId, providerKey, {
-    providerName: true,
-    encryptedApiKey: true,
-  })
-  if (record) {
+  if (!decision.ok) throw new Error(decision.message)
+  // Route, chosen flag and team id only: never a key, a prefix or a row id.
+  console.info(`[captions] route=${decision.route} chosen=${decision.chosen} team=${teamId}`)
+
+  // A registered row decides the provider (a chosen API_KEY team gets its
+  // anthropic row; a never-chosen team gets today's row). Its key is read here,
+  // for this one row, after the decision.
+  if (decision.row && decision.route !== "CLI") {
+    const record = await prisma.availableProvider.findFirst({
+      where: { id: decision.row.id, teamId },
+      select: { providerName: true, encryptedApiKey: true },
+    })
+    if (!record) throw new Error("COPY provider row disappeared while resolving captions")
     return instantiateCopyProvider(record.providerName, providerApiKey(record))
   }
 
@@ -131,16 +116,40 @@ export async function resolveCopyProvider(teamId: string, providerKey?: string):
   // this. This is why the "cli" placeholder AvailableProvider row is no longer
   // needed (though existing rows still resolve, via instantiateCopyProvider's
   // "cli" case); the mode itself is the signal.
-  if (isCliMode()) return new ClaudeCliCopyProvider()
+  // Only a chosen route renames the error: a never-chosen team keeps today's
+  // message byte-for-byte (NFR-01).
+  if (decision.route === "CLI") {
+    const cli = new ClaudeCliCopyProvider()
+    return decision.chosen ? withRouteNamedCredentialError(cli) : cli
+  }
 
   // The env.OPENAI_API_KEY fallback tier was removed (team-tenancy Task 11) —
   // COPY provider config lives entirely in AvailableProvider rows now. The
   // ANTHROPIC_API_KEY fallback stays: it's a server-wide credential, not a
   // per-team secret, and the API-mode fallback chain still expects it.
-  const anthropicKey = env.ANTHROPIC_API_KEY
-  if (anthropicKey) return new AnthropicCopyProvider(anthropicKey)
+  return new AnthropicCopyProvider(env.ANTHROPIC_API_KEY as string, "SERVER_KEY")
+}
 
-  throw new Error("No COPY provider configured — set ANTHROPIC_API_KEY, add a default COPY AvailableProvider, or run in CLI mode with a connected Claude token")
+// The CLI no-credential error is named at the caption call site, not the spawn
+// site: claudeCli.ts is shared with design and stays route-agnostic. The
+// original message and cause are kept, and generationErrors' /no claude
+// credential/i still matches.
+function withRouteNamedCredentialError(provider: CopyProvider): CopyProvider {
+  const inner = provider.generateCaptions.bind(provider)
+  provider.generateCaptions = async (...args) => {
+    try {
+      return await inner(...args)
+    } catch (err) {
+      if (err instanceof Error && /no claude credential/i.test(err.message)) {
+        throw new Error(
+          `Captions are set to the CLI route, but no Claude credential is available: ${err.message}`,
+          { cause: err },
+        )
+      }
+      throw err
+    }
+  }
+  return provider
 }
 
 // Resolve a raw Anthropic API key for direct SDK calls that bypass the

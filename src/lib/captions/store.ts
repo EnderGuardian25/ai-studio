@@ -22,6 +22,8 @@ export interface CaptionRow {
   /** 008 FR-08: the model whose output this row's text is (null = unknown / none). */
   model: string | null
   modelSubstitutedFrom: string | null
+  /** 024 FR-04: the credential route that wrote this row's text (null = before 024, or none). */
+  route: string | null
 }
 
 export interface DraftCaptions {
@@ -37,6 +39,7 @@ const ROW_SELECT = {
   updatedAt: true,
   model: true,
   modelSubstitutedFrom: true,
+  route: true,
 } satisfies Prisma.DraftCaptionSelect
 
 // ── Reading ─────────────────────────────────────────────────────────────────
@@ -130,6 +133,7 @@ export interface GenerationCaptionData {
   failureReason: string | null
   model: string | null
   modelSubstitutedFrom: string | null
+  route: string | null
 }
 
 // The row values a generation's caption result gives each registry channel it
@@ -154,6 +158,7 @@ export function captionRowsFromFields(
             failureReason: null,
             model: stamp.model,
             modelSubstitutedFrom: stamp.substitutedFrom,
+            route: stamp.route,
           },
         ]
       : [
@@ -164,6 +169,7 @@ export function captionRowsFromFields(
             failureReason: field.reason,
             model: null,
             modelSubstitutedFrom: null,
+            route: null,
           },
         ]
   })
@@ -173,8 +179,13 @@ export function captionRowsFromFields(
 export function headlineStampFields(stamp: CaptionStamp): {
   headlineModel: string
   headlineModelSubstitutedFrom: string | null
+  headlineRoute: string | null
 } {
-  return { headlineModel: stamp.model, headlineModelSubstitutedFrom: stamp.substitutedFrom }
+  return {
+    headlineModel: stamp.model,
+    headlineModelSubstitutedFrom: stamp.substitutedFrom,
+    headlineRoute: stamp.route,
+  }
 }
 
 // The async generation's write (design §4): every channel's row and the

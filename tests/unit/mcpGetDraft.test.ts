@@ -63,6 +63,7 @@ vi.mock('@/lib/prisma', () => ({
     // CLI mode, which the local .env that @prisma/client loads can set, the
     // credential tier is 'team').
     teamModelPolicy: { findUnique: async () => null },
+    team: { findUnique: async () => null },
     userClaudeToken: { findFirst: async () => null },
   },
 }))

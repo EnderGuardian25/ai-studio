@@ -18,6 +18,7 @@ import {
   type ModelErrorField,
 } from '@/lib/models/requests'
 import { copyProviderIsClaude } from '@/providers/registry'
+import { loadCaptionRoute } from '@/providers/captionRoute'
 import type { ModelKey, UserSurface } from '@/lib/models/catalogue'
 
 // Permissive schema: only guards the JSON parse. The thorough hand-rolled
@@ -117,7 +118,16 @@ export const POST = withTeamAuth(async (req: NextRequest, _ctx, user) => {
   }
   // CLI mode defaults copy to the local Claude CLI (OAuth chain) — no provider
   // key required; an explicit key overrides and is existence-checked below.
-  const copyKeyDecision = resolveBriefCopyKey(copyProviderKey, isCliMode())
+  // 024 FR-05: a team that chose a caption route ignores the provided key, and
+  // a chosen route that cannot run is refused before any brief is created.
+  const captionRoute = await loadCaptionRoute(user.teamId, undefined)
+  if (!captionRoute.ok && captionRoute.chosen) {
+    return NextResponse.json(
+      { error: captionRoute.message, code: 'CAPTION_ROUTE_NOT_READY' },
+      { status: 422 },
+    )
+  }
+  const copyKeyDecision = resolveBriefCopyKey(copyProviderKey, isCliMode(), captionRoute.chosen)
   if ('error' in copyKeyDecision) {
     return NextResponse.json({ error: copyKeyDecision.error }, { status: 400 })
   }

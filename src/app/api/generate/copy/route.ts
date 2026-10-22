@@ -48,9 +48,10 @@ export const POST = withTeamAuth(async (req: NextRequest, _ctx, user) => {
       resolved.resolved,
     )
     // Nothing is stored here, so the 012 response shape stays exactly
-    // {channel, text, status, failureReason}: the 008 stamp fields are dropped.
+    // {channel, text, status, failureReason}: the 008 stamp fields and the
+    // 024 route are dropped.
     const captions = captionRowsFromFields(fields, stamp).map(
-      ({ model: _model, modelSubstitutedFrom: _from, ...row }) => row,
+      ({ model: _model, modelSubstitutedFrom: _from, route: _route, ...row }) => row,
     )
     return NextResponse.json({
       headline: fields.HEADLINE?.ok ? fields.HEADLINE.text : null,

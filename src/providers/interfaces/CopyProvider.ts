@@ -1,5 +1,6 @@
 import type { CaptionTarget } from '@/lib/channels'
 import type { ResolvedModel } from '@/lib/models/resolve'
+import type { CaptionRoute } from '@/lib/models/route'
 
 // Input to copy generation — only what copy providers actually consume.
 // Design-path concerns (designMode, image URLs, template references) live on
@@ -29,9 +30,13 @@ export interface BriefInput {
 // non-Claude provider (OpenAI) ignores `model` and reports its own ID (spec
 // open question 1), which matches no catalogue entry, so a later regenerate
 // falls through to the team default.
+//
+// 024 FR-04: it also reports the credential route that ran it, for the stamp
+// beside the model. null = unknown (a mock with no decision).
 export interface CaptionReply {
   raw: string
   modelId: string
+  route: CaptionRoute | null
 }
 
 export interface CopyProvider {

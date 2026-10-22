@@ -9,12 +9,15 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 const h = vi.hoisted(() => ({
   userOpenAiKeyFindUnique: vi.fn(),
   availableProviderFindFirst: vi.fn(),
+  availableProviderFindMany: vi.fn(),
 }))
 
 vi.mock('@/lib/prisma', () => ({
   prisma: {
     userOpenAiKey: { findUnique: h.userOpenAiKeyFindUnique },
-    availableProvider: { findFirst: h.availableProviderFindFirst },
+    availableProvider: { findFirst: h.availableProviderFindFirst, findMany: h.availableProviderFindMany },
+    // 024: the caption route reads the team's setting (never chosen here).
+    team: { findUnique: async () => null },
   },
 }))
 
@@ -124,6 +127,7 @@ function copyProviderRow(overrides: Record<string, unknown> = {}) {
 beforeEach(() => {
   h.userOpenAiKeyFindUnique.mockReset()
   h.availableProviderFindFirst.mockReset()
+  h.availableProviderFindMany.mockReset()
 })
 
 describe('resolveImageProvider — personal tier', () => {
@@ -227,16 +231,28 @@ describe('resolveImageProvider — no provider configured', () => {
   })
 })
 
+// 024: the caption route loads the team's enabled COPY rows with one findMany
+// (filtered like the real WHERE), and reads the chosen row's key by id.
+function fakeCopyRows(rows: Array<ReturnType<typeof copyProviderRow>>) {
+  h.availableProviderFindMany.mockImplementation(async ({ where }: { where: Record<string, unknown> }) =>
+    rows.filter((r) => r.slot === where.slot && r.teamId === where.teamId && r.isEnabled === where.isEnabled),
+  )
+  h.availableProviderFindFirst.mockImplementation(async ({ where }: { where: Record<string, unknown> }) =>
+    rows.find((r) => r.id === where.id && r.teamId === where.teamId) ?? null,
+  )
+}
+
 describe('resolveCopyProvider — env.OPENAI_API_KEY fallback removed', () => {
   it('throws (does not silently fall back to env) when no default COPY provider is configured', async () => {
-    h.availableProviderFindFirst.mockResolvedValue(null)
+    fakeCopyRows([])
     await expect(resolveCopyProvider(TEAM_ID)).rejects.toThrow(/No COPY provider configured/)
   })
 
-  it('is team-scoped: the default-COPY-provider lookup is filtered by teamId (team-tenancy fix)', async () => {
-    h.availableProviderFindFirst.mockResolvedValue(null)
+  it('is team-scoped: the COPY-provider lookup is filtered by teamId (team-tenancy fix)', async () => {
+    fakeCopyRows([])
     await expect(resolveCopyProvider(TEAM_ID)).rejects.toThrow(/No COPY provider configured/)
-    for (const call of h.availableProviderFindFirst.mock.calls) {
+    expect(h.availableProviderFindMany).toHaveBeenCalled()
+    for (const call of h.availableProviderFindMany.mock.calls) {
       expect(call[0].where.teamId).toBe(TEAM_ID)
     }
   })
@@ -244,28 +260,18 @@ describe('resolveCopyProvider — env.OPENAI_API_KEY fallback removed', () => {
 
 describe('resolveCopyProvider — explicit providerKey (team-scoped)', () => {
   it('an explicit providerKey scoped to the caller\'s team resolves that provider', async () => {
-    h.availableProviderFindFirst.mockImplementation(async ({ where }: { where: Record<string, unknown> }) => {
-      if (where.slot === 'COPY' && where.providerKey === 'explicit-copy' && where.teamId === TEAM_ID) {
-        return copyProviderRow()
-      }
-      return null
-    })
+    fakeCopyRows([copyProviderRow()])
 
     const provider = await resolveCopyProvider(TEAM_ID, 'explicit-copy')
     expect((provider as unknown as { apiKey: string }).apiKey).toBe(TEAM_EXPLICIT_KEY)
   })
 
   it('an explicit providerKey row belonging to a FOREIGN team is not found — never resolves to it (falls through and throws, no default configured)', async () => {
-    h.availableProviderFindFirst.mockImplementation(async ({ where }: { where: Record<string, unknown> }) => {
-      // Simulate a real WHERE clause: a row scoped to OTHER_TEAM_ID never
-      // matches a query filtered by where.teamId === TEAM_ID — this is the
-      // exact cross-tenant leak the team-tenancy fix closed (registry.ts
-      // used to query with no teamId filter at all).
-      if (where.slot === 'COPY' && where.providerKey === 'explicit-copy' && where.teamId === OTHER_TEAM_ID) {
-        return copyProviderRow({ teamId: OTHER_TEAM_ID })
-      }
-      return null
-    })
+    // Simulate a real WHERE clause: a row scoped to OTHER_TEAM_ID never
+    // matches a query filtered by where.teamId === TEAM_ID — this is the
+    // exact cross-tenant leak the team-tenancy fix closed (registry.ts
+    // used to query with no teamId filter at all).
+    fakeCopyRows([copyProviderRow({ teamId: OTHER_TEAM_ID })])
 
     await expect(resolveCopyProvider(TEAM_ID, 'explicit-copy')).rejects.toThrow(/No COPY provider configured/)
   })

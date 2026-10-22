@@ -60,7 +60,7 @@ T2 is the one large task. The selector, the resolver, the stamp and the brief ke
 
 ### Wave 2 — The selector, the resolver, the stamp and the gate
 
-- [ ] `T2` — `selectRoute`, the loader, `resolveCopyProvider`, the stamp, the Opus-gate rule, the brief key, the seam field and the guard test
+- [x] `T2` — `selectRoute`, the loader, `resolveCopyProvider`, the stamp, the Opus-gate rule, the brief key, the seam field and the guard test
   - Files: `src/lib/models/route.ts` (new), `src/providers/captionRoute.ts` (new), `src/providers/registry.ts`, `src/providers/interfaces/CopyProvider.ts`, `src/providers/implementations/copy/{anthropic,claude-cli,openai}.ts`, `src/lib/captions/{generate,store,actionTargets}.ts`, `src/lib/models/{policy,modelCalls,pickerState}.ts`, `src/lib/api-types.ts`, `src/lib/brief/copyProvider.ts`, `src/app/api/briefs/route.ts`, `src/mcp/server.ts`, `tests/unit/{captionRouteSelect,captionRouteResolve,captionRouteStamp,captionRouteGate,modelArgParity}.test.ts` (new), and the adapted `tests/unit/{copyProviderCliMode,briefCopyProvider,modelBoundary,modelRequests}.test.ts` and any test that deep-equals a `ModelCallRecord`
   - Estimate: large
   - Kind: impl

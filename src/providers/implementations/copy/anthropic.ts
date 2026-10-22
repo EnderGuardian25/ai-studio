@@ -2,13 +2,16 @@ import Anthropic from "@anthropic-ai/sdk"
 import type { BriefInput, CaptionReply, CopyProvider } from "../../interfaces/CopyProvider"
 import type { CaptionTarget } from "@/lib/channels"
 import type { ResolvedModel } from "@/lib/models/resolve"
+import type { CaptionRoute } from "@/lib/models/route"
 import { createMessage, textOf } from "@/lib/models/anthropicCall"
 import { buildCaptionPrompt, CAPTION_MAX_TOKENS } from "@/lib/agent/prompts/caption"
 
 export class AnthropicCopyProvider implements CopyProvider {
   private client: Anthropic
 
-  constructor(apiKey: string) {
+  // 024 FR-04: 'API_KEY' for a team's registered key, 'SERVER_KEY' for the
+  // server-wide ANTHROPIC_API_KEY fallback.
+  constructor(apiKey: string, private route: CaptionRoute = "API_KEY") {
     this.client = new Anthropic({ apiKey })
   }
 
@@ -36,6 +39,6 @@ export class AnthropicCopyProvider implements CopyProvider {
     if (!text) {
       throw new Error("Anthropic returned an empty response")
     }
-    return { raw: text, modelId: model.arg }
+    return { raw: text, modelId: model.arg, route: this.route }
   }
 }

@@ -21,7 +21,9 @@ const h = vi.hoisted(() => ({
   token: null as null | { id: string },
   // The COPY row a caption run would use (the brief's key, else the team
   // default) — copyProviderIsClaude reads it. Default: the seeded 'cli' row.
-  copyRow: { id: 'p1', providerName: 'cli' } as null | { id: string; providerName: string },
+  // 024: a row with its own providerKey is reached only through the brief's key
+  // (it is not the team default); one without is the default.
+  copyRow: { id: 'p1', providerName: 'cli' } as null | { id: string; providerName: string; providerKey?: string },
   copyLookups: vi.fn(),
   draftFindUnique: vi.fn(),
   briefCreate: vi.fn(),
@@ -44,11 +46,24 @@ vi.mock('@/lib/prisma', () => ({
     },
     brandKitTemplate: { findUnique: async () => null },
     availableProvider: {
-      findFirst: async (args: { where: { slot: string } }) => {
-        if (args.where.slot === 'COPY') h.copyLookups(args.where)
+      findFirst: async () => h.copyRow,
+      // 024: the caption route loads the team's enabled COPY rows in one query.
+      findMany: async (args: { where: { slot: string } }) => {
+        h.copyLookups(args.where)
         return h.copyRow
+          ? [
+              {
+                id: h.copyRow.id,
+                providerKey: h.copyRow.providerKey ?? 'p1',
+                providerName: h.copyRow.providerName,
+                isDefault: h.copyRow.providerKey === undefined,
+                createdAt: new Date(0),
+              },
+            ]
+          : []
       },
     },
+    team: { findUnique: async () => null },
     brandKitArtifact: { findMany: async () => [] },
     brandKitDocument: { findMany: async () => [] },
     teamModelPolicy: { findUnique: async () => h.policy },
@@ -761,12 +776,10 @@ describe('spec open question 1: a caption pick needs a Claude caption provider',
     h.draftFindUnique.mockImplementation(async () =>
       draft({ brief: { ...(draft().brief as object), copyProviderKey: 'openai-key' } }),
     )
-    h.copyRow = { id: 'p1', providerName: 'openai' }
+    // Not the team default: the row is reached only through the brief's own key.
+    h.copyRow = { id: 'p1', providerName: 'openai', providerKey: 'openai-key' }
     expect((await send(regenerateCopy as Handler, { model: 'HAIKU' })).status).toBe(400)
-    expect(h.copyLookups.mock.calls[0][0]).toMatchObject({
-      providerKey: 'openai-key',
-      teamId: 'team1',
-    })
+    expect(h.copyLookups.mock.calls[0][0]).toMatchObject({ slot: 'COPY', teamId: 'team1' })
   })
 
   it('POST /api/briefs: a design pick alone is unaffected by an OpenAI caption provider', async () => {

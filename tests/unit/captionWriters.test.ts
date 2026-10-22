@@ -25,6 +25,8 @@ const h = vi.hoisted(() => {
     // local .env, which can set DESIGN_PROVIDER=cli. No personal token, so
     // 'team'; either mode resolves the same entries here (cliArg = apiId).
     userClaudeToken: { findFirst: async () => null },
+    // 024: the CAPTION surface reads the team's caption route (never chosen here).
+    team: { findUnique: async () => null },
     draft: {
       findUnique: async () => db.draft,
       create: async ({ data }: { data: Record<string, unknown> }) => {
@@ -83,7 +85,7 @@ vi.mock('@/providers/registry', () => ({
   resolveCopyProvider: async () => ({
     generateCaptions: async (_b: unknown, _t: unknown, model: { arg: string }) => {
       if (h.providerError) throw h.providerError
-      return { raw: h.reply, modelId: model.arg }
+      return { raw: h.reply, modelId: model.arg, route: null }
     },
   }),
 }))
@@ -175,7 +177,7 @@ afterEach(() => {
 })
 
 const provider = () => ({
-  generateCaptions: async (_b: unknown, _t: unknown, model: { arg: string }) => ({ raw: h.reply, modelId: model.arg }),
+  generateCaptions: async (_b: unknown, _t: unknown, model: { arg: string }) => ({ raw: h.reply, modelId: model.arg, route: null }),
 })
 const briefInput = { topic: 't', description: '', goal: 'g', tone: 'x', channels: [] }
 
@@ -221,22 +223,22 @@ describe('writeCaptions (design §3)', () => {
     const p = {
       generateCaptions: async (_b: unknown, _t: unknown, model: { arg: string }) => {
         seen.push(model)
-        return { raw: h.reply, modelId: model.arg }
+        return { raw: h.reply, modelId: model.arg, route: null }
       },
     }
     const substituted = { ...captionModel, substitutedFrom: 'OPUS' }
     const { stamp } = await writeCaptions(p, briefInput, GENERATION_TARGETS, substituted)
     expect(seen).toEqual([substituted])
-    expect(stamp).toEqual({ model: 'claude-haiku-4-5', substitutedFrom: 'OPUS' })
+    expect(stamp).toEqual({ model: 'claude-haiku-4-5', substitutedFrom: 'OPUS', route: null })
   })
 
   it("a non-Claude provider's own model ID is the stamp, with no Claude substitution attached (open question 1)", async () => {
-    const openai = { generateCaptions: async () => ({ raw: h.reply, modelId: 'gpt-4o' }) }
+    const openai = { generateCaptions: async () => ({ raw: h.reply, modelId: 'gpt-4o', route: null }) }
     const { stamp } = await writeCaptions(openai, briefInput, GENERATION_TARGETS, {
       ...captionModel,
       substitutedFrom: 'OPUS',
     })
-    expect(stamp).toEqual({ model: 'gpt-4o', substitutedFrom: null })
+    expect(stamp).toEqual({ model: 'gpt-4o', substitutedFrom: null, route: null })
   })
 
   it('a whole-reply failure still returns the stamp (the writers put it on no field)', async () => {
@@ -298,6 +300,7 @@ describe('runGenerationForDraft (async)', () => {
           headline: 'Applications are open',
           headlineModel: 'claude-haiku-4-5',
           headlineModelSubstitutedFrom: null,
+        headlineRoute: null,
         },
       },
     ])

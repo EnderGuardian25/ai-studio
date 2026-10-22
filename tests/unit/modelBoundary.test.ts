@@ -72,6 +72,8 @@ vi.mock('@/lib/prisma', () => ({
     teamModelPolicy: { findUnique: async () => h.policyRow },
     // No personal token: the caller's credential tier is 'team' in CLI mode.
     userClaudeToken: { findFirst: async () => null },
+    // 024: the CAPTION surface reads the team's caption route.
+    team: { findUnique: async () => null },
   },
 }))
 

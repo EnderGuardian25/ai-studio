@@ -235,6 +235,7 @@ describe('ModelPicker', () => {
     gateOn: false,
     mode: 'api',
     credential: 'n/a',
+    captionCredential: 'n/a',
     envDefault: null,
     captionProviderIsClaude: true,
     ...over,

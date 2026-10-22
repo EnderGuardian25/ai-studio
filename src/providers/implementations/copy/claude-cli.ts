@@ -20,6 +20,6 @@ export class ClaudeCliCopyProvider implements CopyProvider {
       label: "copy",
     })
     if (!text) throw new Error("Claude CLI returned an empty caption reply")
-    return { raw: text, modelId: model.arg }
+    return { raw: text, modelId: model.arg, route: 'CLI' }
   }
 }

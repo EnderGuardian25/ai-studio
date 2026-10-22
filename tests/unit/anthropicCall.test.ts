@@ -239,6 +239,7 @@ describe('AC-13: AnthropicCopyProvider', () => {
     await expect(provider.generateCaptions(brief, ['LINKEDIN'], SONNET)).resolves.toEqual({
       raw: '{"linkedin":"LI"}',
       modelId: 'claude-sonnet-5-5',
+      route: 'API_KEY',
     })
     // Through the boundary: the resolved arg, the thinking floor, one record.
     expect(create.mock.calls[0][0]).toMatchObject({ model: 'claude-sonnet-5-5', max_tokens: 16000 })

@@ -9,13 +9,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 const h = vi.hoisted(() => ({
   draftFindUnique: vi.fn(),
   draftUpdateMany: vi.fn(),
-  providerFindFirst: vi.fn(),
+  providerFindMany: vi.fn(),
+  teamFindUnique: vi.fn(),
   copyProviderIsClaude: vi.fn(),
   resolveBrandKit: vi.fn(),
 }))
 
 vi.mock('@/lib/prisma', () => ({
-  prisma: { draft: { findUnique: h.draftFindUnique, updateMany: h.draftUpdateMany }, availableProvider: { findFirst: h.providerFindFirst } },
+  prisma: { draft: { findUnique: h.draftFindUnique, updateMany: h.draftUpdateMany }, availableProvider: { findMany: h.providerFindMany }, team: { findUnique: h.teamFindUnique } },
 }))
 vi.mock('@/lib/api/handler', () => {
   const wrap =
@@ -107,7 +108,9 @@ async function get() {
 beforeEach(() => {
   h.draftFindUnique.mockReset()
   h.draftUpdateMany.mockReset().mockResolvedValue({ count: 1 })
-  h.providerFindFirst.mockReset()
+  // 024: the lookup reads the team's setting and its enabled COPY rows (never a key).
+  h.providerFindMany.mockReset().mockResolvedValue([])
+  h.teamFindUnique.mockReset().mockResolvedValue(null)
   h.copyProviderIsClaude.mockReset()
   h.copyProviderIsClaude.mockImplementation(realCopyProviderIsClaude)
   h.resolveBrandKit.mockReset()
@@ -141,27 +144,24 @@ describe("GET /api/drafts/[id] — captionProviderIsClaude is the draft's own", 
 })
 
 describe('GET /api/drafts/[id] — the provider lookup per poll (018 FR-04)', () => {
-  it('selects the provider name only, on both tiers of the lookup', async () => {
+  it('reads the enabled COPY rows of the team in one query, selecting no key (018 FR-04, 024 FR-03)', async () => {
     h.draftFindUnique.mockResolvedValue(exportedDraft('openai-copy'))
-    // The brief's own key misses, so the team default is read too.
-    h.providerFindFirst.mockResolvedValueOnce(null).mockResolvedValueOnce({ providerName: 'openai' })
+    h.providerFindMany.mockResolvedValue([
+      { id: 'r1', providerKey: 'openai-copy', providerName: 'openai', isDefault: false, createdAt: new Date(0) },
+    ])
     const { status, body } = await get()
     expect(status).toBe(200)
-    expect(h.providerFindFirst).toHaveBeenCalledTimes(2)
-    expect(h.providerFindFirst).toHaveBeenNthCalledWith(1, {
-      where: { slot: 'COPY', providerKey: 'openai-copy', teamId: 'team1', isEnabled: true },
-      select: { providerName: true },
-    })
-    expect(h.providerFindFirst).toHaveBeenNthCalledWith(2, {
-      where: { slot: 'COPY', teamId: 'team1', isDefault: true, isEnabled: true },
-      select: { providerName: true },
+    expect(h.providerFindMany).toHaveBeenCalledTimes(1)
+    expect(h.providerFindMany).toHaveBeenCalledWith({
+      where: { slot: 'COPY', teamId: 'team1', isEnabled: true },
+      select: { id: true, providerKey: true, providerName: true, isDefault: true, createdAt: true },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
     })
     expect(body.captionProviderIsClaude).toBe(false)
   })
 
   it('runs the provider lookup alongside the brand-kit read, not after it', async () => {
     h.draftFindUnique.mockResolvedValue(exportedDraft(null))
-    h.providerFindFirst.mockResolvedValue(null)
     let releaseKit!: (kit: { name: string }) => void
     h.resolveBrandKit.mockReturnValue(new Promise((resolve) => (releaseKit = resolve)))
     const pending = get()

@@ -36,8 +36,8 @@ export interface CaptionWrite {
 // to the resolved CAPTION model, so it is carried only when that model is the
 // one that ran: a non-Claude provider (open question 1) ignored it, and
 // recording a Claude substitution against gpt-4o's text would misattribute it.
-function captionStamp(model: ResolvedModel, modelId: string): CaptionStamp {
-  return { model: modelId, substitutedFrom: modelId === model.arg ? model.substitutedFrom : null }
+function captionStamp(model: ResolvedModel, modelId: string, route: string | null): CaptionStamp {
+  return { model: modelId, substitutedFrom: modelId === model.arg ? model.substitutedFrom : null, route }
 }
 
 export async function writeCaptions(
@@ -49,7 +49,8 @@ export async function writeCaptions(
 ): Promise<CaptionWrite> {
   console.info(`[captions] caption call (prompt ${CAPTION_PROMPT_VERSION}) for ${targets.join(', ')}`)
   const reply = await provider.generateCaptions(brief, targets, model)
-  const stamp = captionStamp(model, reply.modelId)
+  const stamp = captionStamp(model, reply.modelId, reply.route)
+  console.info(`[captions] route=${reply.route} model=${reply.modelId}`)
   const result = extractCaptionReply(reply.raw, targets)
 
   // JSON-quoted so a newline in model text can't forge a log line.

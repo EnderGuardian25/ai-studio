@@ -10,6 +10,8 @@ const h = vi.hoisted(() => ({
   policyFindUnique: vi.fn(),
   tokenFindFirst: vi.fn(),
   providerFindFirst: vi.fn(),
+  providerFindMany: vi.fn(),
+  teamFindUnique: vi.fn(),
   transaction: vi.fn(),
   txUpsert: vi.fn(),
   txDeleteMany: vi.fn(),
@@ -22,7 +24,8 @@ vi.mock('@/lib/prisma', () => ({
   prisma: {
     teamModelPolicy: { findUnique: h.policyFindUnique },
     userClaudeToken: { findFirst: h.tokenFindFirst },
-    availableProvider: { findFirst: h.providerFindFirst },
+    availableProvider: { findFirst: h.providerFindFirst, findMany: h.providerFindMany },
+    team: { findUnique: h.teamFindUnique },
     $transaction: h.transaction,
   },
 }))
@@ -81,6 +84,8 @@ beforeEach(() => {
     h.policyFindUnique,
     h.tokenFindFirst,
     h.providerFindFirst,
+    h.providerFindMany,
+    h.teamFindUnique,
     h.txUpsert,
     h.txDeleteMany,
     h.txCreateMany,
@@ -90,6 +95,9 @@ beforeEach(() => {
   h.policyFindUnique.mockResolvedValue(null)
   h.tokenFindFirst.mockResolvedValue(null)
   h.providerFindFirst.mockResolvedValue(null)
+  // 024: the caption route reads the team's setting and its enabled COPY rows.
+  h.providerFindMany.mockResolvedValue([])
+  h.teamFindUnique.mockResolvedValue(null)
   h.txUpsert.mockResolvedValue({})
   h.txDeleteMany.mockResolvedValue({ count: 0 })
   h.txCreateMany.mockResolvedValue({ count: 0 })
@@ -469,16 +477,20 @@ describe('loadModelsView — GET /api/models (FR-13)', () => {
   ])('captionProviderIsClaude: %s → %s', async (_label, row, expected) => {
     for (const mode of ['cli', 'api'] as const) {
       h.mode.mockReturnValue(mode)
-      h.providerFindFirst.mockResolvedValue(row)
+      h.providerFindMany.mockResolvedValue(
+        row ? [{ id: 'r1', providerKey: 'k1', createdAt: new Date(0), isDefault: true, ...row }] : [],
+      )
       const view = await loadModelsView({ userId: 'u1', teamId: 'team1' })
       expect(view.captionProviderIsClaude).toBe(expected)
     }
-    // The team's DEFAULT COPY provider, scoped to the session team, reading
-    // the provider name only (018 FR-04).
-    expect(h.providerFindFirst).toHaveBeenCalledWith({
-      where: { slot: 'COPY', teamId: 'team1', isDefault: true, isEnabled: true },
-      select: { providerName: true },
-    })
+    // The team's enabled COPY rows, scoped to the session team, never reading
+    // the encrypted key (018 FR-04, 024 FR-03).
+    expect(h.providerFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { slot: 'COPY', teamId: 'team1', isEnabled: true },
+        select: { id: true, providerKey: true, providerName: true, isDefault: true, createdAt: true },
+      }),
+    )
   })
 })
 

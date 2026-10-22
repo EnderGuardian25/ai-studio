@@ -113,7 +113,7 @@ export function ModelPicker({
           ))}
         </div>
       )}
-      {teamTokenNotice(models, shown) && (
+      {teamTokenNotice(models, shown, surface) && (
         <Notice tone="warning" role="status">
           {TEAM_TOKEN_NOTICE}
         </Notice>

@@ -12,6 +12,7 @@ import { env } from '@/lib/env'
 import { pipelineMode } from '@/lib/agent/config'
 import type { ModelsView, TeamModelPolicyInfo } from '@/lib/api-types'
 import { copyProviderIsClaude } from '@/providers/registry'
+import { captionCredentialFor } from '@/providers/captionRoute'
 import {
   CATALOGUE,
   USER_SURFACES,
@@ -247,9 +248,13 @@ export async function resolveModel(
 ): Promise<DecideResult> {
   const mode = pipelineMode()
   logBootLineOnce(mode)
+  // 024 FR-06: a CAPTION run on a team that chose the API key route is 'team'
+  // whoever calls. Every other surface keeps the caller's own tier.
   const [policy, credential] = await Promise.all([
     loadTeamPolicy(opts.teamId),
-    credentialTier(opts.userId, mode),
+    surface === 'CAPTION'
+      ? captionCredentialFor(opts.teamId).then((c) => c ?? credentialTier(opts.userId, mode))
+      : credentialTier(opts.userId, mode),
   ])
   const result = decideModel(surface, {
     requested: opts.requested,
@@ -279,10 +284,11 @@ export async function loadModelsView(user: {
   teamId: string
 }): Promise<ModelsView> {
   const mode = pipelineMode()
-  const [policy, credential, captionProviderIsClaude] = await Promise.all([
+  const [policy, credential, captionProviderIsClaude, captionOverride] = await Promise.all([
     loadTeamPolicy(user.teamId),
     credentialTier(user.userId, mode),
     copyProviderIsClaude(user.teamId),
+    captionCredentialFor(user.teamId),
   ])
   return {
     catalogue: CATALOGUE.map((e) => ({
@@ -300,5 +306,6 @@ export async function loadModelsView(user: {
     credential,
     envDefault: envDefaultFor(mode),
     captionProviderIsClaude,
+    captionCredential: captionOverride ?? credential,
   }
 }
