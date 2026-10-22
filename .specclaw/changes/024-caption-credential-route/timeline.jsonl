@@ -12,3 +12,7 @@
 {"ev":"stop","span":"W2","at":"2026-10-22T18:35:45Z","ts":1792694145,"status":"ok"}
 {"ev":"start","span":"W3","kind":"wave","label":"wave 3","at":"2026-10-22T18:38:58Z","ts":1792694338}
 {"ev":"start","span":"T3","kind":"task","label":"route API + /team + wizard + E2E AB","parent":"W3","model":"sonnet","attempt":"1","at":"2026-10-22T18:38:58Z","ts":1792694338}
+{"ev":"stop","span":"T3","at":"2026-10-22T18:53:12Z","ts":1792695192,"status":"ok"}
+{"ev":"stop","span":"W3","at":"2026-10-22T18:53:12Z","ts":1792695192,"status":"ok"}
+{"ev":"start","span":"W4","kind":"wave","label":"wave 4","at":"2026-10-22T18:53:21Z","ts":1792695201}
+{"ev":"start","span":"T4","kind":"task","label":"docs + full gate","parent":"W4","model":"sonnet","attempt":"1","at":"2026-10-22T18:53:21Z","ts":1792695201}

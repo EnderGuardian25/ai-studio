@@ -1,13 +1,13 @@
 # bistec-studio — Session Handoff
 
-**Date:** 2026-10-21 (latest: **009 hero imagery Phase 1 VERIFIED PASS (25/25), commit `d3534e0`; OP-1 is the user's pending step**; before it: **023 scheduler heartbeat VERIFIED PASS**; gates: unit 2947/2947, render 47/47, E2E 422/3/0/0, CI green at `f8f063c` (runs 39604699552, 39604706638)). 2026-10-20: **020 Create post button, 019 claim token, 021 Graphite re-theme, 018 and 022 VERIFIED PASS; the build order is complete**. 2026-10-19: this repo adopted the fork's `v2` on 2026-10-18. The fork-era sections, 2026-10-07 to 2026-10-14, moved to [`fork-history.md`](fork-history.md). Previous: 2026-10-07 (005 verified PASS; 011 planned, wave 1 built). Previous: 2026-10-03 (004 finished and verified PARTIAL, Phase 0 only; 005 built 9/10, waiting on one operator check). Before that: 2026-09-28 (build session — 004 Waves 1–3 built, MinIO → silo, PR #42 + draft PR #43). Before that: 2026-09-23 (later, later the same day: proposal **012** per-channel captions + copy→caption rename, a floating **Create post** button folded into 011, and a launch-video legibility pass. Before that: planning session — proposals 008–011 + roadmap, 004 re-planned to 24 tasks incl. Phase 0, and the deploy pipeline found broken: Coolify 401 since 2026-09-15). Previous: 2026-07-28 (copy-edit status clobber fix).
+**Date:** 2026-10-23 (latest: **024 caption credential route BUILT (T1 to T4); verify pending**; gates: unit 3024/3024, render 47/47, E2E 431/3/0/0, CI green at (pending) (runs pending)). 2026-10-21: **009 hero imagery Phase 1 VERIFIED PASS (25/25), commit `d3534e0`; OP-1 is the user's pending step**; before it: **023 scheduler heartbeat VERIFIED PASS**; gates: unit 2947/2947, render 47/47, E2E 422/3/0/0, CI green at `f8f063c` (runs 39604699552, 39604706638)). 2026-10-20: **020 Create post button, 019 claim token, 021 Graphite re-theme, 018 and 022 VERIFIED PASS; the build order is complete**. 2026-10-19: this repo adopted the fork's `v2` on 2026-10-18. The fork-era sections, 2026-10-07 to 2026-10-14, moved to [`fork-history.md`](fork-history.md). Previous: 2026-10-07 (005 verified PASS; 011 planned, wave 1 built). Previous: 2026-10-03 (004 finished and verified PARTIAL, Phase 0 only; 005 built 9/10, waiting on one operator check). Before that: 2026-09-28 (build session — 004 Waves 1–3 built, MinIO → silo, PR #42 + draft PR #43). Before that: 2026-09-23 (later, later the same day: proposal **012** per-channel captions + copy→caption rename, a floating **Create post** button folded into 011, and a launch-video legibility pass. Before that: planning session — proposals 008–011 + roadmap, 004 re-planned to 24 tasks incl. Phase 0, and the deploy pipeline found broken: Coolify 401 since 2026-09-15). Previous: 2026-07-28 (copy-edit status clobber fix).
 **Repo:** https://github.com/bistec-oss/studio, which `origin` points to. **The repo rules (branches, remotes, the `fork` remote, PR #43) are in [`CLAUDE.md`](../CLAUDE.md)'s top entry, which is authoritative.** This file does not repeat them.
 **Branch:** work continues on **`v2`**, pushed to `origin v2`. `main` is `671ad6e9` (PR #42) and deploys to company prod. `v2` → `main` is one PR, merged only on the user's go-ahead and after the pre-merge prod checklist below.
 **Production:** `https://studio.bistecglobal.com` serves company `main`. Its migration head is `20260728120000_heal_copy_edit_clobbered_drafts`. Merges to `main` build but do not deploy until the Coolify token is rotated (see CLAUDE.md).
 
 ---
 
-## ⏸️ 2026-10-21 — PICK UP HERE: 018, 022, 021, 019, 020, 023 and 009 (Phase 1) VERIFIED PASS; nothing is mid-build
+## ⏸️ 2026-10-23 — PICK UP HERE: 018, 022, 021, 019, 020, 023 and 009 (Phase 1) VERIFIED PASS; 024 is built (T1 to T4), verify pending
 
 ### Where things stand
 
@@ -20,7 +20,22 @@
 | 020 Create post button off the draft page | **VERIFIED PASS** 7/7 ACs                                   | E2E 399/3/0/0; unit 2681/2681; CI green at `8d0d633` (runs 39466314229, 39466320752); [reports](../.specclaw/changes/020-create-post-button-draft-page/reports/T2.md)                                                            |
 | 023 scheduler heartbeat                   | **VERIFIED PASS** 11/11 ACs                                 | E2E 405/3/0/0; unit 2706/2706; lint 0 errors / 7 warnings; CI green at `f43669a` (runs 39493017393, 39493027033); [reports](../.specclaw/changes/023-scheduler-heartbeat/reports/T2.md)                                          |
 | 009 hero imagery, Phase 1                 | **VERIFIED PASS** 25/25 ACs; OP-1 pending (the user's step) | T1 `bfe3d57` to T6 `ea1c36e`, verify `d3534e0`; E2E 422/3/0/0; unit 2947/2947; render 47/47; CI green at `f8f063c` (runs 39604699552, 39604706638); [verify-report](../.specclaw/changes/009-hero-image-design/verify-report.md) |
+| 024 caption credential route              | **Built (T1 to T4); verify pending**                        | T1 `d772715`, T2 `d4d14f2`, T3 `03961b9`; E2E 431/3/0/0; unit 3024/3024; render 47/47; CI green at (pending) (runs pending); [reports](../.specclaw/changes/024-caption-credential-route/reports/T3.md)                          |
 
+- **024 (built, T1 to T4; verify pending; [spec](../.specclaw/changes/024-caption-credential-route/spec.md), [design](../.specclaw/changes/024-caption-credential-route/design.md)):** 005 item 2. A team's admin names the caption route at `/team`: **Claude CLI (OAuth)** or **Anthropic API key**. The choice is stored on the team and read by one shared selector, so interactive, scheduled and MCP captions all use it and `/team` shows the same answer. **A team that never chooses keeps today's behaviour exactly** (the user's decision, 2026-10-22).
+  - **T1 (`d772715`):** the `CaptionRoute` enum (`CLI`, `API_KEY`), `Team.captionRoute` (null means never chosen), the stamp columns `Draft.headlineRoute` and `DraftCaption.route` (TEXT, nullable), the additive migration `20261023120000_caption_route` and its manual down script `prisma/rollback/024-caption-credential-route.down.sql`.
+  - **T2 (`d4d14f2`):** the pure `selectRoute('CAPTION', input)` (`src/lib/models/route.ts`); the loader `loadCaptionRoute` (`src/providers/captionRoute.ts`); `resolveCopyProvider` decides before the `MOCK_AI` seam; the route is stamped on each caption and headline row; an `API_KEY` run counts as the team credential tier for the Opus gate (`captionCredential` on `GET /api/models`); a chosen route stores the brief's key as `'cli'` and ignores a brief key; `POST /api/briefs` returns `422 CAPTION_ROUTE_NOT_READY` for a chosen route that is not ready; the model-calls record gains `route`; the guard test `modelArgParity.test.ts`.
+  - **T3 (`03961b9`):** `GET`/`PUT /api/team/caption-route` (PUT is team-admin only); the `/team` route card with its state line; the COPY slot is visible in both modes, with "Serving captions" chips on the rows (the false "Not used in CLI mode" label is gone); the wizard gate and the server's message on the Review step; E2E section AB, TC-ROUTE-01 to TC-ROUTE-09.
+  - **T4:** the checklist line below, these docs and the full gate. Gate: unit 3024/3024; render 47/47; lint 0 errors / 7 warnings; E2E 431/3/0/0; CI green at (pending) (runs pending).
+  - **Fails closed.** A chosen route with no usable credential never falls to the other route or to the server key: `API_KEY` with no enabled `anthropic` COPY row (or `CLI` in an API-mode server) reads `not-ready` on `/team`, and every caption run (interactive, scheduled, MCP) fails with a route-named message.
+  - **What it does not do.** The design step still needs a team Claude token, so this change alone does not make a scheduled post succeed on a team with none. The briefing assistant, brand-kit assistant, vision and the refine verifier are untouched (spec FR-12).
+  - **The evidence query.** Run it read-only against prod after the deploy and after a team has chosen a route:
+
+    ```sql
+    SELECT "route", count(*) FROM "DraftCaption" WHERE "route" IS NOT NULL GROUP BY 1;
+    ```
+
+    Rows written before 024 have a null `route` and are not counted.
 - **009 (VERIFIED PASS, 25/25 ACs, OP-1 pending; [verify-report](../.specclaw/changes/009-hero-image-design/verify-report.md), [spec](../.specclaw/changes/009-hero-image-design/spec.md), [design](../.specclaw/changes/009-hero-image-design/design.md)):** a Path B brief can opt into a per-post **image style** (`product-showcase` or `editorial-split`). The image model is asked for a hero subject and told which part of the frame to leave empty; the returned image is **checked on real pixels** and fails closed; the design step puts the text and logo only in the empty part; the outcome is recorded as a **composition stamp** on every draft and revision; after the final render the text and logo positions are observed (recorded, never a fallback). `classic` is the default and today's behaviour, unchanged. Scheduled, MCP and ACP briefs are always classic. It does not close cause 5 (no reference images, so a device screen cannot show the real product UI): that is Phase 2.
   - **T1 (`bfe3d57`):** three columns: `Brief.imageStyle` (TEXT, default `'classic'`, so a retired key needs no migration), `Draft.composition` and `DraftRevision.composition` (JSONB, null means "before 009"); the additive migration `20261022120000_hero_composition` and its manual down script `prisma/rollback/009-hero-image-design.down.sql`.
   - **T2 (`81d6521`):** `src/lib/designData`: the dataset, the canvas-to-image region mapping, the pure `evaluateRegions`, the planner and `settleComposition`, the stamp schema, the prompt text, the layout comparison and the quality tier parser.
@@ -91,10 +106,11 @@
 1. ~~022~~ and ~~021~~ are done: both VERIFIED PASS (2026-10-19 and 2026-10-20).
 2. ~~019~~ and ~~020~~ are done: both VERIFIED PASS (2026-10-20). The build order 018 → 022 → 021 → 019 → 020 is complete.
 3. ~~023~~ and ~~009~~ (Phase 1) are done: both VERIFIED PASS (2026-10-21). 009 OP-1 is the user's step.
+   - **024** is built (T1 to T4); the verify is pending. The user's order after it is **024 → 007 → 025 → 006**; 010 is deferred. The next step is to plan 007.
 4. **The `v2` → `main` merge** waits on the user's go-ahead and the checklist below.
 5. **Company prod to-dos, live again:** B4, the team Claude tokens, the Coolify token rotation and MinIO → silo on prod. They are listed in CLAUDE.md.
 
-**Next step for a new session:** ask the user which to do next, or whether to prepare the merge. Do not start any change unprompted. The user's pending steps are **009 OP-1** (the 009 section above) and the **merge go-ahead**. Remaining roadmap work is proposals only, none planned: 006 (the rest; item 7 moved to 023), 007 (extends `src/lib/designData/` with a `composition` section), 010 (WhatsApp Channel; B4 must be fixed first, and the 023 heartbeat dependency is met), and 009 Phases 2 and 3 (to be proposed after OP-1).
+**Next step for a new session:** ask the user which to do next, or whether to prepare the merge. Do not start any change unprompted. The user's pending steps are **009 OP-1** (the 009 section above) and the **merge go-ahead**. Remaining roadmap work (the user's order is 024 → 007 → 025 → 006; 010 is deferred; after 024's verify the next step is to plan 007) is proposals only: 006 (the rest; item 7 moved to 023), 007 (extends `src/lib/designData/` with a `composition` section), 010 (WhatsApp Channel; B4 must be fixed first, and the 023 heartbeat dependency is met), and 009 Phases 2 and 3 (to be proposed after OP-1).
 
 **Process:** one task at a time; an implementer subagent, then `specclaw:code-reviewer`, then the orchestrator re-runs tsc, lint and unit and commits; a full clean mock E2E and a CI check close each change; no real model calls. The user prefers subagent-driven work routed to the cheapest workable model (haiku for mechanical work, sonnet for implementation and review, opus only when needed). Party panels are on for proposals: ask before spending, and show the roster and the bill.
 
@@ -106,13 +122,13 @@
 - `specclaw-build check-report` needs a `## Verification` heading exactly; prettier may rewrite a report, so re-read it before checking.
 - After each push, check `gh run list --branch v2`. On 2026-10-22, CI at `f05f9bc` was red on a TC-HB-01 race (the response listener attached after `page.goto`, missing the only status response before the 60 s refetch). Fixed test-only at `d2daa38`; CI green at `4461ce2` (runs 39819431904, 39819438923: E2E 422/3/0/0). A `waitForResponse` must be created before the action that triggers the request.
 
-**Gates now** (009 T6, 2026-10-21): unit 2947/2947, render 47/47, lint 0 errors / 7 warnings, full clean mock E2E 422/3/0/0, build and `test:upgrade` pass. The baseline before 009 was unit 2706/2706 and E2E 405/3/0/0 (023 T3).
+**Gates now** (024 T4, 2026-10-23): unit 3024/3024, render 47/47, lint 0 errors / 7 warnings, full clean mock E2E 431/3/0/0, build and `test:upgrade` pass. The baseline before 024 was unit 2947/2947, render 47/47 and E2E 422/3/0/0 (009 T6).
 
 ---
 
 ## 🚦 Pre-merge prod checklist: `v2` → `main` (022 FR-08)
 
-`main` deploys to company prod (`studio.bistecglobal.com`), which holds real data: the Hearts Academy team, its kit and the IRP posts. `v2` carries changes 004–023. Nothing in this section merges or deploys. **The merge waits on the user's go-ahead and on the three blocking steps below.**
+`main` deploys to company prod (`studio.bistecglobal.com`), which holds real data: the Hearts Academy team, its kit and the IRP posts. `v2` carries changes 004–024. Nothing in this section merges or deploys. **The merge waits on the user's go-ahead and on the three blocking steps below.**
 
 ### The named waiver
 
@@ -163,6 +179,12 @@ Run these right after the deploy, before users create new drafts:
   - The migration `20261021120000_worker_heartbeat` is additive: one new table, no change to an existing one. A redeploy applies it.
   - The previous image runs against it, so an image rollback needs no down script. The manual down script is `prisma/rollback/023-scheduler-heartbeat.down.sql`.
   - **After the deploy, confirm the banner:** with the scheduler resource running, the "Scheduler offline" banner on a campaign's queue panel clears within about a minute of its first tick. A banner that stays means the scheduler resource is not running (B4); read [`scheduler-b4-diagnosis-2026-08-03.md`](scheduler-b4-diagnosis-2026-08-03.md). The banner is also the quick B4 signal.
+- **024 caption credential route (FR-13).** This is a check, not a blocking step.
+  - The migration `20261023120000_caption_route` is additive: one enum, one nullable column on `Team` and two nullable `TEXT` columns (`Draft.headlineRoute`, `DraftCaption.route`), no rewrite. A redeploy applies it.
+  - The previous image runs against it, so an image rollback needs no down script. The manual down script is `prisma/rollback/024-caption-credential-route.down.sql`; it discards every team's chosen route and every route stamp.
+  - **Nothing changes for a team that has not chosen a route.** After the deploy, choose each team's route at `/team`, and only after every container (app and scheduler) serves the new image. Until then behaviour is today's.
+  - **A team that chooses `API_KEY` needs an enabled `anthropic` COPY row first,** or its captions (interactive, scheduled and MCP) fail closed with the route-named error.
+  - **The design step still needs a team Claude token,** so this change alone does not make a scheduled post succeed on a team with none.
 - **External `copyText` callers.** 016 removed the `copyText` field from MCP `get_draft` and `generate_post`, ACP `generate_post` and `POST /api/generate/copy`. The operator confirms that no external caller reads it, using each prod team's `/team` API keys and their last use. Any revert of these removals is its own change.
 - **The migration list.** Produce it at merge time; never keep it by hand:
 

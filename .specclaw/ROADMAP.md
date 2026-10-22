@@ -1,7 +1,7 @@
 # bistec-studio roadmap — changes 004–025
 
 **Updated:** 2026-10-22 · **Branch:** all of this lands on `v2` (see Branching at the bottom); handoff in `docs/handoff.md` top section.
-**Status (2026-10-22):** The user set the order for the remaining work: **024 → 007 → 025 → 006**. **010 is deferred** (the user, 2026-10-22: "leave 010 out for now"). **024** (caption credential route, 005 item 2) is proposed, and its party panel runs first. **025** (hero imagery Phase 2: product screenshots composited into a blank device screen) is proposed and waits on OP-1. The `v2` → `main` merge is independent of this order; it waits on the ops steps and the user's go-ahead, and OP-1 (which unblocks 025) runs after that deploy.
+**Status (2026-10-22):** The user set the order for the remaining work: **024 → 007 → 025 → 006**. **010 is deferred** (the user, 2026-10-22: "leave 010 out for now"). **024** (caption credential route, 005 item 2) is **built (T1 to T4; verify pending)**, gates unit 3024/3024, render 47/47, E2E 431/3/0/0, CI green at (pending) (runs pending); the next step is to plan **007**. **025** (hero imagery Phase 2: product screenshots composited into a blank device screen) is proposed and waits on OP-1. The `v2` → `main` merge is independent of this order; it waits on the ops steps and the user's go-ahead, and OP-1 (which unblocks 025) runs after that deploy.
 
 **(Superseded) Status (2026-10-21):** **013–023 are verified PASS** (018, 022, 021, 019 and 020 on 2026-10-19 and 2026-10-20; 023 and 009 on 2026-10-21). **023** (scheduler heartbeat, which took over 006 item 7) is 11/11. **009 hero imagery, Phase 1 (the thin slice) is verified PASS, 25/25** (commit `d3534e0`); OP-1, the user's real-look comparison on prod, is pending. Phases 2 (reference images and product screenshots) and 3 (full AI render) are not proposed; they wait on OP-1. 006 (the rest), 007 and 010 stay proposals. Nothing is mid-build; the next step is the user's choice, or the `v2` → `main` merge on their go-ahead.
 
@@ -45,7 +45,7 @@ This file sequences the open changes. Each change's own `proposal.md` is the sou
 | 021 | [Graphite re-theme](changes/021-graphite-retheme/)                                  | Re-themes the whole app from Folio to Graphite                                                                                                         | architectural | ✅ verified PASS (19/19)                                                                       |
 | 022 | [Prod data and deploy restore](changes/022-prod-data-and-deploy-restore/)           | Makes the adopted `v2` deployable over company prod data                                                                                               | bounded       | ✅ verified PASS (11/11)                                                                       |
 | 023 | [Scheduler heartbeat](changes/023-scheduler-heartbeat/)                             | A `WorkerHeartbeat` per loop, a "Scheduler offline" banner on the queue panel, the retry reason (took 006 item 7)                                      | bounded       | ✅ verified PASS (11/11, 2026-10-21)                                                           |
-| 024 | [Caption credential route](changes/024-caption-credential-route/)                   | 005 item 2: a named per-team caption route (OAuth CLI or a registered Anthropic key) on 008's resolver; an honest `/team` COPY slot                    | bounded       | 📋 proposal (2026-10-22); next to build                                                        |
+| 024 | [Caption credential route](changes/024-caption-credential-route/)                   | 005 item 2: a named per-team caption route (OAuth CLI or a registered Anthropic key) on 008's resolver; an honest `/team` COPY slot                    | bounded       | 🔨 built T1 to T4 (2026-10-23); verify pending; E2E 431/3/0/0, CI green at (pending)           |
 | 025 | [Hero product screenshots](changes/025-hero-reference-images/)                      | 009 Phase 2: a real product screenshot composited into a blank device screen in the hero                                                               | architectural | 📋 proposal (2026-10-22); waits on OP-1                                                        |
 
 ## Hard dependencies
@@ -62,7 +62,7 @@ B4 scheduler fix (ops) ───────────────► 010 sche
 ## Soft dependencies (ordering that avoids rework)
 
 - **011 foundation + app shell → 008 pickers, 010 handoff screen.** Both add new UI. Build them once in the new style instead of in Frozen Light and again later.
-- **008 → 005 item 2.** 008 introduces the model resolver. 005's COPY provider selector (OAuth CLI vs API key) should sit on top of it, not beside it.
+- **008 → 005 item 2 (done by 024).** 008 introduced the model resolver. 005's COPY provider selector (OAuth CLI vs API key) sits on top of it, not beside it: 024 built it (built 2026-10-23; verify pending).
 - **007 ↔ 009.** 009's layout archetypes belong in the same design-system data module as 007's dataset. Whichever lands first creates the module; the other extends it.
 - **008 → 006.** 006's generation traces read 008's stamps instead of re-deriving the model: `DraftCaption.model` (per caption row), `Draft.headlineModel`, `Draft.designModel` and `DraftRevision.model`. Each is the full ID that ran, with a `…SubstitutedFrom` sibling. Cost comes from the catalogue's numeric per-MTok prices (`priceInputPerMTok` / `priceOutputPerMTok` in `src/lib/models/catalogue.ts`, with a dated `priceSource`), not from the `$` / `$$` / `$$$` tier, which is computed from them.
 - **012 → 008.** Build 012 first so 008 stamps `captionModel` on the new caption shape and names its surface `caption` from the start. If 008 goes first, it must use those names anyway. **Done:** 012 shipped first, and 008 stamps each caption row (`DraftCaption.model`) and the headline (`Draft.headlineModel`) under the `CAPTION` surface.
@@ -85,7 +85,7 @@ B4 scheduler fix (ops) ───────────────► 010 sche
 
 **The user's order from 2026-10-22 (current; it supersedes the stages below for the remaining work):**
 
-1. **024** caption credential route: small and self-contained; it can ride in the `v2` → `main` merge.
+1. **024** caption credential route: built (T1 to T4), verify pending; small and self-contained, it can ride in the `v2` → `main` merge. It completes 005 item 2 (the COPY route), which waited on 008's resolver.
 2. **007** brand-kit design system: the biggest quality gain with no prod dependency; it extends `src/lib/designData/` before 025 does.
 3. **025** hero product screenshots: after OP-1 passes and a small real-model check shows a blank device screen is achievable.
 4. **006** observability (the rest): the heaviest infrastructure; nothing depends on it. It needs a replay retention period first.
@@ -117,7 +117,7 @@ B4 scheduler fix (ops) ───────────────► 010 sche
 **Stage 6 — the rest, parallelisable:**
 
 - **011** remaining screens;
-- **005** remainder (onboarding, COPY route on 008's resolver, Gemini, CLI sandbox);
+- **005** remainder (onboarding, ~~COPY route on 008's resolver~~ (done by 024), Gemini, CLI sandbox);
 - **007**;
 - **006** PostHog + traces.
 

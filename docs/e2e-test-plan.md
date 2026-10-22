@@ -596,7 +596,7 @@ Each case uses a unique topic and `waitForDraft` / `waitForAction`, with one kit
 - **`GET` / `DELETE /api/test/model-calls`** (008 FR-16): the recorder's ring buffer.
   - It holds 200 records on `globalThis`, shared across `next dev` route modules, newest last.
   - It is gated like `/api/test/scheduler-tick`: 404 in production, 404 unless `MOCK_AI`, and admin-only.
-  - Each record is `{ surface, key, arg, mode, source, substitutedFrom, label }`. Every `MOCK_AI` branch on a model surface records the `ResolvedModel` it was handed before returning its mock.
+  - Each record is `{ surface, key, arg, mode, source, substitutedFrom, label, route }`. `route` (024 FR-07) is `CLI`, `API_KEY`, `SERVER_KEY` or `OTHER` on a caption (`label` `copy`) record, from the selector's decision, and `null` on every other record. Read a caption's route by filtering on `label === 'copy'`. Every `MOCK_AI` branch on a model surface records the `ResolvedModel` it was handed before returning its mock.
   - Each case `DELETE`s before the action it asserts on.
 - **Stamps are seeded through the test DB** (`prisma.draft.update` / `draftCaption.update`), as §W does.
 - **The verifier is reached with an _add_ instruction** ("Include a human character"). A bare mock document defaults to the add class, whose post-condition is the verifier (004 TC-FID-09).
@@ -838,6 +838,41 @@ Mock mode (`MOCK_AI` + `MOCK_PUPPETEER`). Every generation case runs in its **ow
 | 009 AC-21 the suite (both styles, both sizes, every fallback row) | TC-HERO-01 to TC-HERO-16                  |
 
 The pure parts (the planner and every fallback row, `evaluateRegions`, the mapping, the prompts and their golden strings, the stamp schema, the budget) are unit-tested; the sampler and layout observation on real pixels are in `npm run test:render` (`hero-sampler.test.ts`, `hero-layout.test.ts`). The mock suite proves the mechanism, not the real-model thresholds: the real fallback rate is OP-1's evidence (see the 009 section of `docs/handoff.md`).
+
+---
+
+### AB. Caption credential route (`caption-route.test.ts`, change 024 T3 — AC-02 to AC-11, AC-14)
+
+Serial (`test.describe.configure({ mode: 'serial' })`). Needs `MOCK_AI` + `MOCK_PUPPETEER` and test-DB access. Each case runs on its own fresh team (the §BG `freshTeam` pattern), so the seeded Bistec and ClientX teams stay "never chosen"; `beforeEach` and `afterAll` clear the model-calls ring (`DELETE /api/test/model-calls`). The route comes from `GET /api/test/model-calls`, filtering records by label `copy`. `MOCK_AI` replaces the provider after the route decision, so the cases exercise the route logic with mock replies.
+
+**The CLI route's happy path has no E2E.** `.env.test` runs API mode (`DESIGN_PROVIDER=claude-html`) and CLI mode bypasses the `MOCK_AI` seam, so a `CLI` route that serves captions is covered by the unit tests alone (`captionRouteSelect`, `captionRouteResolve`). The `CLI`-in-an-API-mode-server case (TC-ROUTE-04) is E2E: it is `not-ready` and fails closed. The header comment of the spec file says the same.
+
+- **TC-ROUTE-01 — A never-chosen team (AC-02, AC-11).** `GET` says `unset`. With a default `anthropic` row a caption run records route `API_KEY`; with a default `openai` row it records `OTHER`, as today.
+- **TC-ROUTE-02 — `API_KEY` chosen and ready (AC-04, AC-05).** `PUT API_KEY` with an `anthropic` row gives `ready` and `servingProviderId` is the row. A generated draft's caption rows and `headlineRoute` carry `API_KEY` (read through prisma) and the record says `API_KEY`.
+- **TC-ROUTE-03 — `API_KEY` with the row deleted (AC-04).** State `not-ready` with the route-named message; a caption run fails with that message and records no `copy` call; the server key is not used.
+- **TC-ROUTE-04 — `CLI` in this API-mode server (AC-04).** State `not-ready`, naming the CLI route and the server mode; the run fails closed.
+- **TC-ROUTE-05 — The brief key (AC-06, AC-07).** On an `API_KEY` team a brief created with an `openai` row's key is stored as `'cli'` and records `API_KEY`; with the route cleared the same key records `OTHER`. A chosen route that is not ready gives `422 CAPTION_ROUTE_NOT_READY` and no brief is created.
+- **TC-ROUTE-06 — The scheduler (AC-14).** A scheduled entry run through the generation tick seam on an `API_KEY` team records route `API_KEY`; with the row removed the entry's `errorReason` names the route and no draft is made.
+- **TC-ROUTE-07 — The Opus gate credential (AC-08).** `GET /api/models` returns `captionCredential: 'team'` for an `API_KEY` team and the plain `credential` otherwise.
+- **TC-ROUTE-08 — The API and `/team` (AC-09, AC-10, AC-11).** `PUT` is 401 without a valid session (the case sends a bogus session cookie, because the proxy redirects a cookie-less request to `/login`), 403 for an editor and 400 for a bad body; team A's `PUT` leaves team B at `unset`. `/team` shows the route card and its state line (`data-state` unset, ready, not-ready, unset), the "Serving captions" chips and the COPY slot, with neither stale string ("Not used in CLI mode", "safe to delete") and with "Register Provider".
+- **TC-ROUTE-09 — The wizard (AC-11).** A never-chosen team's Review step is unchanged (Generate live, no warning). A chosen and ready team's request has no `copyProviderKey`. A `not-ready` team's Generate is disabled and shows the server's route-named message.
+
+| AC                                                 | E2E / unit                                                        |
+| -------------------------------------------------- | ----------------------------------------------------------------- |
+| 024 AC-02 never-chosen is today's behaviour        | TC-ROUTE-01; unit `captionRouteSelect`                            |
+| 024 AC-03 chosen routes fail closed                | TC-ROUTE-03, TC-ROUTE-04; unit `captionRouteSelect`               |
+| 024 AC-04 the resolver                             | TC-ROUTE-02, TC-ROUTE-03, TC-ROUTE-04; unit `captionRouteResolve` |
+| 024 AC-05 the stamp                                | TC-ROUTE-02; unit `captionRouteStamp`                             |
+| 024 AC-06, AC-07 the brief key and the 422         | TC-ROUTE-05                                                       |
+| 024 AC-08 the Opus gate and the seam               | TC-ROUTE-01 to TC-ROUTE-04, TC-ROUTE-07; unit `captionRouteGate`  |
+| 024 AC-09, AC-10 the route API and its exact keys  | TC-ROUTE-08; unit `captionRouteApi`                               |
+| 024 AC-11 `/team` and the wizard                   | TC-ROUTE-02, TC-ROUTE-08, TC-ROUTE-09                             |
+| 024 AC-12 other consumers untouched                | unit `captionRouteApi` (the `resolveAnthropicApiKey` parity case) |
+| 024 AC-13 the arg-parity guard                     | unit `modelArgParity`                                             |
+| 024 AC-14 the scheduler and MCP use the team route | TC-ROUTE-06; unit `captionRouteResolve`                           |
+| 024 AC-15 the other suites stay green              | the full clean mock run; the T3 targeted run (83 passed)          |
+
+The pure parts (the selector table, the loader, the stamp writers, the gate rule, the picker, the route API, the arg-parity guard) are unit-tested without a server.
 
 ---
 
