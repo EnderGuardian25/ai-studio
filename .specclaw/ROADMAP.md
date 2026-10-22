@@ -1,7 +1,9 @@
-# bistec-studio roadmap — changes 004–023
+# bistec-studio roadmap — changes 004–025
 
-**Updated:** 2026-10-21 · **Branch:** all of this lands on `v2` (see Branching at the bottom); handoff in `docs/handoff.md` top section.
-**Status (2026-10-21):** **013–023 are verified PASS** (018, 022, 021, 019 and 020 on 2026-10-19 and 2026-10-20; 023 and 009 on 2026-10-21). **023** (scheduler heartbeat, which took over 006 item 7) is 11/11. **009 hero imagery, Phase 1 (the thin slice) is verified PASS, 25/25** (commit `d3534e0`); OP-1, the user's real-look comparison on prod, is pending. Phases 2 (reference images and product screenshots) and 3 (full AI render) are not proposed; they wait on OP-1. 006 (the rest), 007 and 010 stay proposals. Nothing is mid-build; the next step is the user's choice, or the `v2` → `main` merge on their go-ahead.
+**Updated:** 2026-10-22 · **Branch:** all of this lands on `v2` (see Branching at the bottom); handoff in `docs/handoff.md` top section.
+**Status (2026-10-22):** The user set the order for the remaining work: **024 → 007 → 025 → 006**. **010 is deferred** (the user, 2026-10-22: "leave 010 out for now"). **024** (caption credential route, 005 item 2) is proposed, and its party panel runs first. **025** (hero imagery Phase 2: product screenshots composited into a blank device screen) is proposed and waits on OP-1. The `v2` → `main` merge is independent of this order; it waits on the ops steps and the user's go-ahead, and OP-1 (which unblocks 025) runs after that deploy.
+
+**(Superseded) Status (2026-10-21):** **013–023 are verified PASS** (018, 022, 021, 019 and 020 on 2026-10-19 and 2026-10-20; 023 and 009 on 2026-10-21). **023** (scheduler heartbeat, which took over 006 item 7) is 11/11. **009 hero imagery, Phase 1 (the thin slice) is verified PASS, 25/25** (commit `d3534e0`); OP-1, the user's real-look comparison on prod, is pending. Phases 2 (reference images and product screenshots) and 3 (full AI render) are not proposed; they wait on OP-1. 006 (the rest), 007 and 010 stay proposals. Nothing is mid-build; the next step is the user's choice, or the `v2` → `main` merge on their go-ahead.
 
 **(Superseded) Status (2026-10-14):** **016** (fresh-start cleanup) and **017** (publish API fixes) are **verified PASS**, with CI green. **018** (post-008 small fixes) is building; T1 is a committed WIP. **019** (claim token) and **020** (Create post button off the draft page) are approved and not yet planned. After them: 006, 007, 009 and 010 (proposals).
 
@@ -29,7 +31,7 @@ This file sequences the open changes. Each change's own `proposal.md` is the sou
 | 007 | [Brand-kit design system](changes/007-brandkit-design-system/)                      | Turn adjectival kit prose into measurable rules; typography dataset                                                                                    | medium-large  | 📋 proposal                                                                                    |
 | 008 | [Model selection](changes/008-model-selection/)                                     | Choose Haiku / Sonnet / Opus per caption, design, refine and assistant chat                                                                            | medium-large  | ✅ verified PASS (32/32)                                                                       |
 | 009 | [Hero imagery](changes/009-hero-image-design/)                                      | Image model makes the hero subject, not wallpaper; layout archetypes; reference images                                                                 | large         | ✅ Phase 1 verified PASS (25/25, 2026-10-21); OP-1 pending (user); Phases 2 and 3 not proposed |
-| 010 | [WhatsApp Channel posting](changes/010-whatsapp-channel-posting/)                   | WhatsApp as a channel, with assisted handoff (Meta has no official Channel posting API)                                                                | medium        | 📋 proposal (new)                                                                              |
+| 010 | [WhatsApp Channel posting](changes/010-whatsapp-channel-posting/)                   | WhatsApp as a channel, with assisted handoff (Meta has no official Channel posting API)                                                                | medium        | ⏸️ deferred by the user (2026-10-22)                                                           |
 | 011 | [App visual redesign](changes/011-app-visual-redesign/)                             | New visual direction; opaque surfaces; floating bottom-right **Create post** button. The user picked Graphite on 2026-10-18, and 021 re-themed the app | large         | ✅ verified PASS (2026-10-09); superseded and finished by 021 Graphite                         |
 | 012 | [Per-channel captions](changes/012-per-channel-captions/)                           | Instagram / LinkedIn / WhatsApp captions, each published to its own channel; copy → caption                                                            | medium        | ✅ verified PASS (28/28)                                                                       |
 | 013 | [Fork CI, checks only](changes/013-fork-ci-checks-only/)                            | The fork's CI runs checks only: no image push, no deploy                                                                                               | bounded       | ✅ verified PASS (7/7)                                                                         |
@@ -43,6 +45,8 @@ This file sequences the open changes. Each change's own `proposal.md` is the sou
 | 021 | [Graphite re-theme](changes/021-graphite-retheme/)                                  | Re-themes the whole app from Folio to Graphite                                                                                                         | architectural | ✅ verified PASS (19/19)                                                                       |
 | 022 | [Prod data and deploy restore](changes/022-prod-data-and-deploy-restore/)           | Makes the adopted `v2` deployable over company prod data                                                                                               | bounded       | ✅ verified PASS (11/11)                                                                       |
 | 023 | [Scheduler heartbeat](changes/023-scheduler-heartbeat/)                             | A `WorkerHeartbeat` per loop, a "Scheduler offline" banner on the queue panel, the retry reason (took 006 item 7)                                      | bounded       | ✅ verified PASS (11/11, 2026-10-21)                                                           |
+| 024 | [Caption credential route](changes/024-caption-credential-route/)                   | 005 item 2: a named per-team caption route (OAuth CLI or a registered Anthropic key) on 008's resolver; an honest `/team` COPY slot                    | bounded       | 📋 proposal (2026-10-22); next to build                                                        |
+| 025 | [Hero product screenshots](changes/025-hero-reference-images/)                      | 009 Phase 2: a real product screenshot composited into a blank device screen in the hero                                                               | architectural | 📋 proposal (2026-10-22); waits on OP-1                                                        |
 
 ## Hard dependencies
 
@@ -78,6 +82,15 @@ B4 scheduler fix (ops) ───────────────► 010 sche
 | UI                  | **011** owns the app's look, and the app shell's floating **Create post** button. 008, 010 and 012 add screens _in_ that look; they do not restyle.                                                            |
 
 ## Recommended order
+
+**The user's order from 2026-10-22 (current; it supersedes the stages below for the remaining work):**
+
+1. **024** caption credential route: small and self-contained; it can ride in the `v2` → `main` merge.
+2. **007** brand-kit design system: the biggest quality gain with no prod dependency; it extends `src/lib/designData/` before 025 does.
+3. **025** hero product screenshots: after OP-1 passes and a small real-model check shows a blank device screen is achievable.
+4. **006** observability (the rest): the heaviest infrastructure; nothing depends on it. It needs a replay retention period first.
+
+010 is deferred. The stages below are kept as the earlier reasoning.
 
 **Stage 0 — ops + the deploy pipeline (do now).** These unblock things that are already built.
 

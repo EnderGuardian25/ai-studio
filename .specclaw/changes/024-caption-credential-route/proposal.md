@@ -129,3 +129,33 @@ That is today's order. The change is to name it and surface it, not to reorder i
 ---
 
 **To proceed:** Review this proposal and approve to begin planning.
+
+### Party panel (2026-10-22, CHANGES_REQUESTED) — upheld findings, see party-report.md
+
+- (party-ba, BLOCK) The named pain (scheduled/MCP credential failures) is not removed by this change; the real problem is that `/team` mislabels a route the resolver already runs.
+- (party-ba) No acceptance criteria; the "see or choose the route" claim has no falsifiable check.
+- (party-ba) "Route" means both a team setting and a per-brief outcome; "default" is ambiguous between `isDefault` and any enabled row.
+- (party-ba) Admin demand for an API-key caption route is assumed, not established.
+- (party-po, BLOCK) Do-nothing is not priced against the change's cost.
+- (party-po, BLOCK) The cheaper `/team`-only variant is never compared with the full package.
+- (party-po) Scope items 3 (`arg` follows the route) and 4 (Opus exemption) fix problems that do not exist yet.
+- (party-po) The new E2E route seam is priced at zero.
+- (party-po) Open questions 5, 7 and 8 are scope cut lines and should be named as such.
+- (party-architect, BLOCK) The helper must own the row selection (rows + explicit key + mode → route + row); one selection rule, one owner.
+- (party-architect, BLOCK) The `arg` and Opus-gate items make 008's resolver depend on the route; decide the direction or cut them.
+- (party-architect) The two-value enum does not cover the server-key fallback, a non-anthropic default row, a `cli` row, or a brief's stored `'cli'`.
+- (party-architect) The route seam cannot see the route under `MOCK_AI` unless selection runs first; fold the route into the model-calls record instead.
+- (party-architect) "Derive the route from the stamp" cannot work while `apiId` equals `cliArg`.
+- (party-architect) Route-named CLI errors belong at the caption call site, not the shared spawn site.
+- (party-architect) A UI-only slice that keeps a route state line still needs the shared selector.
+- (party-security, BLOCK) Deriving the route from the row makes a lost key silently fall to another billing account; keep an explicit record of an `API_KEY` choice and fail closed.
+- (party-security) A brief's `copyProviderKey` lets an editor or a stale queued brief pick the billing account; decide the route from the team setting alone.
+- (party-security) Exempting API-key runs from the Opus gate lets any caller spend the team's metered key on Opus.
+- (party-security) Nothing records which route ran; stamp the route at write time and log it.
+- (party-security) Any route-reporting test surface must be gated like `scheduler-tick`.
+- (party-security) A UI-only slice that opens COPY registration in CLI mode without the fail-closed check widens the fail-open path.
+- (party-visionary) The Anthropic COPY row would be both the team's key and the route switch; take an explicit setting now or name the future backfill rule.
+- (party-visionary) Without a route stamp, route history is lost for every caption until a later change adds it.
+- (party-visionary) Stored brief keys become a second persisted route source a `/team` change cannot reach.
+- (party-visionary) Key the helper by 008's surface enum (only `CAPTION` live) so later surfaces extend it.
+- (party-visionary) A UI-only slice without the shared helper rebuilds the drift this change exists to fix.
