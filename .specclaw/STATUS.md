@@ -1,7 +1,7 @@
 # 🦞 SpecClaw Dashboard
 
 **Project:** bistec-studio
-**Last Updated:** 2026-10-22 17:43 UTC
+**Last Updated:** 2026-10-22 18:18 UTC
 
 _1 unnumbered change · run `/specclaw:renumber` to order them_
 
@@ -27,13 +27,13 @@ _1 unnumbered change · run `/specclaw:renumber` to order them_
 - 🔍 **021-graphite-retheme** ▣ — verify PASS | 8/8 tasks (100%) | 0 failed | 42h47m
 - 🔍 **022-prod-data-and-deploy-restore** ▫ — verify PASS | 4/4 tasks (100%) | 0 failed | 5h22m
 - 🔍 **023-scheduler-heartbeat** ▫ — verify PASS | 3/3 tasks (100%) | 0 failed | PR #43 open | 5h24m
+- 📝 **024-caption-credential-route** ▣ — tasks done | 0/4 tasks (0%) | 0 failed | 24m
 
 ## Pending Proposals
 
 - 📋 **006-product-observability** — proposal ready, awaiting planning
 - 📋 **007-brandkit-design-system** — proposal ready, awaiting planning
 - 📋 **010-whatsapp-channel-posting** — proposal ready, awaiting planning
-- 📋 **024-caption-credential-route** — proposal ready, awaiting planning
 - 📋 **025-hero-reference-images** — proposal ready, awaiting planning
 
 ## Recently Completed
@@ -42,6 +42,6 @@ _None._
 
 ## Stats
 
-- **Total changes:** 20
-- **Active:** 20
+- **Total changes:** 21
+- **Active:** 21
 - **Completed:** 0
