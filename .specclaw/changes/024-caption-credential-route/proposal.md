@@ -114,6 +114,14 @@ That is today's order. The change is to name it and surface it, not to reorder i
 - **Complexity:** small to medium
 - **Risk:** medium. A wrong route bills the wrong account, and the CLI-mode prod teams run captions on the OAuth chain today. The default must stay unchanged for any team without a COPY row.
 
+## Decisions (user, 2026-10-22, after the party panel)
+
+These supersede the Proposed Solution where they differ.
+
+1. **Scope: the safe full route.** The admin sets the caption route at `/team`, and it is stored on the team (an explicit record, not inferred from the COPY row). One shared selector, keyed by 008's surface with only `CAPTION` live, decides the route and the row; `/team` reads the same answer from the server. A chosen `API_KEY` route with no usable key fails closed with a route-named error and a "route not ready" state on `/team`; it never falls through to another route. The route ran is stamped on each caption at write time. **Cut:** the model `arg` rework (a guard test with a message naming the deferred decision instead) and a new test route (the route is a field on the existing model-calls record).
+2. **The Opus gate stays.** An `API_KEY` caption run counts as the team credential tier, so Opus on the team key needs the admin's explicit allowance, as on a team token.
+3. **Team setting only.** The route is decided at run time from the team setting. A brief's stored `copyProviderKey` no longer picks the billing route; the stored `'cli'` marker means "use the team route".
+
 ## Open Questions
 
 1. **Storage.** Derive the route from the COPY row (recommended, no migration), or add a `Team.captionRoute` setting? The explicit setting lets an admin hold a key without using it, and costs a migration and a second source of truth.
