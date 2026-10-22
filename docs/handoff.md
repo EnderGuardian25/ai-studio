@@ -104,7 +104,7 @@
 - `npm run test:e2e:db` does not drop the test DB. A clean run drops `bistec_studio_test` first, then runs it. Never run prisma or a DB command without an explicit `DATABASE_URL`.
 - Haiku gate agents have twice handed back before a long E2E run finished. Wait on the run's log for a `MOCK_EXIT` line.
 - `specclaw-build check-report` needs a `## Verification` heading exactly; prettier may rewrite a report, so re-read it before checking.
-- After each push, check `gh run list --branch v2`. When this was written, the runs at `f8c5436` and `d3534e0` (docs and specclaw files only) were still pending or in progress.
+- After each push, check `gh run list --branch v2`. On 2026-10-22, CI at `f05f9bc` was red on a TC-HB-01 race (the response listener attached after `page.goto`, missing the only status response before the 60 s refetch). Fixed test-only at `d2daa38`; CI green at `4461ce2` (runs 39819431904, 39819438923: E2E 422/3/0/0). A `waitForResponse` must be created before the action that triggers the request.
 
 **Gates now** (009 T6, 2026-10-21): unit 2947/2947, render 47/47, lint 0 errors / 7 warnings, full clean mock E2E 422/3/0/0, build and `test:upgrade` pass. The baseline before 009 was unit 2706/2706 and E2E 405/3/0/0 (023 T3).
 
