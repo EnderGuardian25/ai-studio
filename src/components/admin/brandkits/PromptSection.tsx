@@ -1,16 +1,20 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useCallback, useState } from 'react'
 import { toast } from 'sonner'
 import { Sparkles, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { SegmentedToggle } from '@/components/ui/SegmentedToggle'
 import { fieldClasses, fieldEdge } from '@/components/ui/Input'
 import { FieldLabel } from '@/components/ui/FieldLabel'
+import { Notice } from '@/components/ui/Notice'
+import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { apiFetch } from '@/lib/apiFetch'
 import { cn } from '@/lib/utils'
 import { COMPACT_FIELD, ICON, PILL_BADGE, SCROLL_FOCUS } from '@/components/ui/atoms'
-import type { BrandKitPrompt as Prompt } from '@/lib/api-types'
+import type { BrandKitPrompt as Prompt, ImprovePromptResponse, UpgradeResponse } from '@/lib/api-types'
+import { RuleReviewPanel } from '@/components/textUpgrade/RuleReviewPanel'
+import { useRuleReview } from '@/components/textUpgrade/useRuleReview'
 
 // ─── Prompt Section ───────────────────────────────────────────────────────────
 
@@ -26,10 +30,31 @@ export function PromptSection({ kitId, prompts, onRefresh }: PromptSectionProps)
   const [description, setDescription] = useState('')
   const [loading, setLoading] = useState(false)
   const [view, setView] = useState<'active' | 'history' | 'new'>('active')
+  // The version an upgrade-seeded editor started from; null for any other draft.
+  const [seededBase, setSeededBase] = useState<number | null>(null)
+  const [lostRules, setLostRules] = useState<string[]>([])
   const descriptionId = React.useId()
   const draftId = React.useId()
+  const confirm = useConfirm()
 
   const active = prompts.find(p => p.isActive)
+  const baseVersion = seededBase ?? active?.version ?? 0
+
+  const request = useCallback(
+    (text: string) =>
+      apiFetch<UpgradeResponse>(`/api/admin/brandkits/${kitId}/prompts/upgrade`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, baseVersion }),
+      }),
+    [kitId, baseVersion],
+  )
+  const review = useRuleReview({ text: draft, setText: setDraft, request })
+
+  // Any new editor text (generate, improve, manual, seeded) starts a fresh review.
+  function startDraft(text: string, base: number | null, lost: string[] = []) {
+    setDraft(text); setSeededBase(base); setLostRules(lost); review.reset()
+  }
 
   async function generate() {
     setLoading(true)
@@ -40,7 +65,7 @@ export function PromptSection({ kitId, prompts, onRefresh }: PromptSectionProps)
         body: JSON.stringify({ description }),
       })
       setAiDraft(data.draft)
-      setDraft(data.draft)
+      startDraft(data.draft, null)
       setView('new')
     } catch (e: unknown) { toast.error(e instanceof Error ? e.message : 'Something went wrong') }
     finally { setLoading(false) }
@@ -49,13 +74,13 @@ export function PromptSection({ kitId, prompts, onRefresh }: PromptSectionProps)
   async function improve() {
     setLoading(true)
     try {
-      const data = await apiFetch<{ draft: string }>(`/api/admin/brandkits/${kitId}/prompts/improve`, {
+      const data = await apiFetch<ImprovePromptResponse>(`/api/admin/brandkits/${kitId}/prompts/improve`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({}),
       })
       setAiDraft(data.draft)
-      setDraft(data.draft)
+      startDraft(data.draft, null, data.lostRules ?? [])
       setView('new')
     } catch (e: unknown) { toast.error(e instanceof Error ? e.message : 'Something went wrong') }
     finally { setLoading(false) }
@@ -63,13 +88,32 @@ export function PromptSection({ kitId, prompts, onRefresh }: PromptSectionProps)
 
   async function saveVersion() {
     if (!draft.trim()) return
+    // The save route cannot reject a stale base, so an upgrade-seeded editor
+    // checks the active version first (a narrowing, not a guarantee).
+    if (seededBase !== null) {
+      try {
+        const list = await apiFetch<Prompt[]>(`/api/admin/brandkits/${kitId}/prompts`)
+        const current = list.find(p => p.isActive)?.version ?? 0
+        if (current !== seededBase) {
+          const ok = await confirm({
+            title: `Version ${current} was saved since you started this text. Saving now will replace it as the live prompt. Save anyway?`,
+            confirmLabel: 'Save anyway',
+            danger: false,
+          })
+          if (!ok) return
+        }
+      } catch (e: unknown) {
+        toast.error(e instanceof Error ? e.message : 'Something went wrong')
+        return
+      }
+    }
     try {
       await apiFetch(`/api/admin/brandkits/${kitId}/prompts`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content: draft }),
       })
-      setDraft(''); setAiDraft(''); setView('active')
+      startDraft('', null); setAiDraft(''); setView('active')
       onRefresh()
     } catch (e: unknown) { toast.error(e instanceof Error ? e.message : 'Something went wrong') }
   }
@@ -128,7 +172,16 @@ export function PromptSection({ kitId, prompts, onRefresh }: PromptSectionProps)
                 </div>
               </div>
             )}
-            <Button variant="ghost" size="sm" onClick={() => { setDraft(''); setView('new') }}>
+            {active && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => { startDraft(active.content, active.version); setAiDraft(''); setView('new') }}
+              >
+                Improve this version
+              </Button>
+            )}
+            <Button variant="ghost" size="sm" onClick={() => { startDraft('', null); setView('new') }}>
               Write manually
             </Button>
           </div>
@@ -175,6 +228,11 @@ export function PromptSection({ kitId, prompts, onRefresh }: PromptSectionProps)
           {aiDraft && (
             <p className="text-ui-xs text-fg-muted">AI-generated draft — review and edit before saving.</p>
           )}
+          {lostRules.length > 0 && (
+            <Notice tone="warning" role="status">
+              The rewrite dropped {lostRules.length} measurable rules: {lostRules.join(', ')}
+            </Notice>
+          )}
           <div className="flex flex-col gap-1.5">
             <FieldLabel htmlFor={draftId}>Brand voice prompt</FieldLabel>
             <textarea
@@ -186,11 +244,15 @@ export function PromptSection({ kitId, prompts, onRefresh }: PromptSectionProps)
               className={cn(fieldClasses, fieldEdge(), 'resize-none leading-relaxed')}
             />
           </div>
+          <RuleReviewPanel review={review} />
+          <p className="text-ui-xs text-fg-muted">
+            Save makes this the live prompt for new posts straight away. Restoring an older version later only changes posts you make after that; posts already made keep what they were generated with.
+          </p>
           <div className="flex flex-wrap gap-2">
             {/* An inline-form submit: Ink, so the kit's Save stays the view's
                 one accent primary (§8.2, 014 FR-08). */}
             <Button variant="ink" size="sm" onClick={saveVersion} disabled={!draft.trim()}>Save as new version</Button>
-            <Button variant="ghost" size="sm" onClick={() => { setDraft(''); setAiDraft(''); setView('active') }}>Cancel</Button>
+            <Button variant="ghost" size="sm" onClick={() => { startDraft('', null); setAiDraft(''); setView('active') }}>Cancel</Button>
           </div>
         </div>
       )}

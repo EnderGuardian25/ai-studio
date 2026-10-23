@@ -79,7 +79,7 @@ Each wave depends on the one before it, so there is no parallel work and no task
 
 ### Wave 3 — The UI and the E2E
 
-- [ ] `T3` — The hook, the panel, the editor integration and E2E section AC
+- [x] `T3` — The hook, the panel, the editor integration and E2E section AC
   - Files: `src/components/textUpgrade/{useRuleReview.ts,RuleReviewPanel.tsx}` (new), `src/components/admin/brandkits/PromptSection.tsx`, `tests/e2e/kit-upgrade.test.ts` (new)
   - Estimate: large
   - Kind: impl
