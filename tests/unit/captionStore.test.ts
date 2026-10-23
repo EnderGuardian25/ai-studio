@@ -57,7 +57,7 @@ beforeEach(() => {
   h.transaction.mockImplementation(async (ops: unknown) =>
     typeof ops === 'function' ? ops({ draft: { updateMany: h.draftUpdateMany }, draftCaption: { findMany: h.captionFindMany, updateMany: h.captionUpdateMany } }) : Promise.all(ops as unknown[]),
   )
-  h.captionCreateMany.mockResolvedValue({ count: 3 })
+  h.captionCreateMany.mockResolvedValue({ count: 2 })
   h.draftUpdateMany.mockResolvedValue({ count: 1 })
   h.captionUpdateMany.mockResolvedValue({ count: 1 })
 })
@@ -68,7 +68,7 @@ describe('loadDraftCaptions (AC-03)', () => {
     expect(await loadDraftCaptions('nope')).toBeNull()
   })
 
-  it('reads the stored rows, in registry order, and writes nothing', async () => {
+  it('reads the stored rows, in registry order, hides a legacy WHATSAPP row (026 FR-04) and writes nothing', async () => {
     h.draftFindUnique.mockResolvedValue({
       captions: [row('LINKEDIN', 'b'), row('WHATSAPP', 'c', 'PENDING'), row('INSTAGRAM', 'a')],
     })
@@ -76,7 +76,7 @@ describe('loadDraftCaptions (AC-03)', () => {
     const result = await loadDraftCaptions('d1')
 
     expect(result).toEqual({
-      captions: [row('INSTAGRAM', 'a'), row('LINKEDIN', 'b'), row('WHATSAPP', 'c', 'PENDING')],
+      captions: [row('INSTAGRAM', 'a'), row('LINKEDIN', 'b')],
     })
     expect(h.captionCreateMany).not.toHaveBeenCalled()
     expect(h.captionFindMany).not.toHaveBeenCalled()
@@ -94,32 +94,32 @@ describe('loadDraftCaptions (AC-03)', () => {
   })
 
   it('fills a missing registry channel with an empty READY row, then returns one per channel', async () => {
-    h.draftFindUnique.mockResolvedValue({ captions: [row('INSTAGRAM', 'a'), row('LINKEDIN', 'b')] })
-    h.captionFindMany.mockResolvedValue([row('WHATSAPP'), row('INSTAGRAM', 'a'), row('LINKEDIN', 'b')])
+    h.draftFindUnique.mockResolvedValue({ captions: [row('INSTAGRAM', 'a')] })
+    h.captionFindMany.mockResolvedValue([row('LINKEDIN'), row('INSTAGRAM', 'a')])
 
     const result = await loadDraftCaptions('d1')
 
     expect(h.captionCreateMany).toHaveBeenCalledWith({
-      data: [{ draftId: 'd1', channel: 'WHATSAPP', text: '', status: 'READY' }],
+      data: [{ draftId: 'd1', channel: 'LINKEDIN', text: '', status: 'READY' }],
       skipDuplicates: true,
     })
-    expect(result?.captions).toEqual([row('INSTAGRAM', 'a'), row('LINKEDIN', 'b'), row('WHATSAPP')])
+    expect(result?.captions).toEqual([row('INSTAGRAM', 'a'), row('LINKEDIN')])
   })
 
   it('fills every channel of a draft with no rows, on the client it is given', async () => {
     const db = {
       draft: { findUnique: vi.fn().mockResolvedValue({ captions: [] }) },
       draftCaption: {
-        createMany: vi.fn().mockResolvedValue({ count: 3 }),
-        findMany: vi.fn().mockResolvedValue([row('INSTAGRAM'), row('LINKEDIN'), row('WHATSAPP')]),
+        createMany: vi.fn().mockResolvedValue({ count: 2 }),
+        findMany: vi.fn().mockResolvedValue([row('INSTAGRAM'), row('LINKEDIN')]),
       },
     }
     const result = await loadDraftCaptions('d1', db as never)
     expect(db.draftCaption.createMany).toHaveBeenCalledWith({
-      data: ['INSTAGRAM', 'LINKEDIN', 'WHATSAPP'].map((channel) => ({ draftId: 'd1', channel, text: '', status: 'READY' })),
+      data: ['INSTAGRAM', 'LINKEDIN'].map((channel) => ({ draftId: 'd1', channel, text: '', status: 'READY' })),
       skipDuplicates: true,
     })
-    expect(result?.captions).toHaveLength(3)
+    expect(result?.captions).toHaveLength(2)
     expect(h.draftFindUnique).not.toHaveBeenCalled()
   })
 })
@@ -139,13 +139,13 @@ describe('loadCaptionTexts (017 FR-06)', () => {
     const texts = await loadCaptionTexts([
       { draftId: 'd1', channel: 'INSTAGRAM' },
       { draftId: 'd1', channel: 'LINKEDIN' },
-      { draftId: 'd1', channel: 'WHATSAPP' },
       { draftId: 'd2', channel: 'INSTAGRAM' },
+      { draftId: 'd2', channel: 'LINKEDIN' },
     ])
 
     expect(h.captionFindMany).toHaveBeenCalledTimes(1)
     expect(h.captionFindMany.mock.calls[0][0].where).toEqual({ draftId: { in: ['d1', 'd2'] } })
-    expect(Object.fromEntries(texts)).toEqual({ 'd1/INSTAGRAM': 'a', 'd1/LINKEDIN': 'b', 'd1/WHATSAPP': '', 'd2/INSTAGRAM': '' })
+    expect(Object.fromEntries(texts)).toEqual({ 'd1/INSTAGRAM': 'a', 'd1/LINKEDIN': 'b', 'd2/INSTAGRAM': '', 'd2/LINKEDIN': '' })
     expect(h.captionCreateMany).not.toHaveBeenCalled()
   })
 })
@@ -160,7 +160,6 @@ describe('saveGenerationCaptions', () => {
       {
         INSTAGRAM: { ok: true, text: 'ig' },
         LINKEDIN: { ok: false, reason: 'empty' },
-        WHATSAPP: { ok: true, text: 'wa' },
         HEADLINE: { ok: false, reason: 'missing' },
       },
       STAMP,
@@ -190,17 +189,6 @@ describe('saveGenerationCaptions', () => {
           model: null,
           modelSubstitutedFrom: null,
           route: null,
-        },
-      },
-      {
-        where: { draftId: 'd1', channel: 'WHATSAPP', status: 'PENDING' },
-        data: {
-          text: 'wa',
-          status: 'READY',
-          failureReason: null,
-          model: 'claude-haiku-4-5',
-          modelSubstitutedFrom: 'OPUS',
-          route: 'API_KEY',
         },
       },
     ])
@@ -233,15 +221,15 @@ describe('saveGenerationCaptions', () => {
         route: 'API_KEY',
       },
     ])
-    expect(captionRowsFromFields({ WHATSAPP: { ok: false, reason: 'missing' } }, STAMP)).toEqual([
-      { channel: 'WHATSAPP', text: '', status: 'FAILED', failureReason: 'missing', model: null, modelSubstitutedFrom: null, route: null },
+    expect(captionRowsFromFields({ INSTAGRAM: { ok: false, reason: 'missing' } }, STAMP)).toEqual([
+      { channel: 'INSTAGRAM', text: '', status: 'FAILED', failureReason: 'missing', model: null, modelSubstitutedFrom: null, route: null },
     ])
   })
 })
 
 describe('claimCaptionAction', () => {
   it('claims REGENERATE_COPY guarded on null and marks only the target channels PENDING', async () => {
-    const claim = await claimCaptionAction('d1', ['WHATSAPP', 'HEADLINE'])
+    const claim = await claimCaptionAction('d1', ['LINKEDIN', 'HEADLINE'])
     expect(claim).toEqual({ action: 'REGENERATE_COPY', claimId: expect.any(String) })
     // The WHERE is still the empty slot; the data carries the fresh token (019).
     expect(h.draftUpdateMany).toHaveBeenCalledWith({
@@ -249,7 +237,7 @@ describe('claimCaptionAction', () => {
       data: { pendingAction: 'REGENERATE_COPY', pendingActionClaimId: claim!.claimId },
     })
     expect(h.captionUpdateMany).toHaveBeenCalledWith({
-      where: { draftId: 'd1', channel: { in: ['WHATSAPP'] } },
+      where: { draftId: 'd1', channel: { in: ['LINKEDIN'] } },
       data: { status: 'PENDING' },
     })
   })
@@ -553,7 +541,7 @@ describe('008 A6: a user edit writes no stamp field', () => {
 describe('008 FR-09: loadDraftCaptions exposes each row stamp', () => {
   it('selects model and modelSubstitutedFrom with the row (the regenerate stamp tier reads them)', async () => {
     h.draftFindUnique.mockResolvedValue({
-      captions: ['INSTAGRAM', 'LINKEDIN', 'WHATSAPP'].map((c) => ({
+      captions: ['INSTAGRAM', 'LINKEDIN'].map((c) => ({
         ...row(c, 't'),
         model: c === 'LINKEDIN' ? 'claude-opus-5-5' : null,
         modelSubstitutedFrom: null,
@@ -562,6 +550,6 @@ describe('008 FR-09: loadDraftCaptions exposes each row stamp', () => {
     const loaded = await loadDraftCaptions('d1')
     const select = h.draftFindUnique.mock.calls[0][0].select.captions.select
     expect(select).toMatchObject({ model: true, modelSubstitutedFrom: true })
-    expect(loaded!.captions.map((c) => c.model)).toEqual([null, 'claude-opus-5-5', null])
+    expect(loaded!.captions.map((c) => c.model)).toEqual([null, 'claude-opus-5-5'])
   })
 })

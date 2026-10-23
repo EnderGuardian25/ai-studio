@@ -15,9 +15,9 @@ import { HEADLINE_MAX } from '@/lib/captions/headline'
 
 // Bump when caption prompt content changes materially; logged with every
 // caption call. Separate from PROMPT_VERSION, which versions the design prompts.
-export const CAPTION_PROMPT_VERSION = '2026-10-11.1'
+export const CAPTION_PROMPT_VERSION = '2026-10-23.1'
 
-// Room for three captions plus a headline, including non-Latin scripts at about
+// Room for two captions plus a headline, including non-Latin scripts at about
 // one token per character.
 export const CAPTION_MAX_TOKENS = 8192
 
@@ -49,12 +49,7 @@ export function buildCaptionPrompt(brief: BriefInput, targets: readonly CaptionT
     )
   }
   for (const s of channels) {
-    const length =
-      s.hardLimit !== null
-        ? `At most ${count(s.hardLimit)} characters.`
-        : s.softLimit !== null
-          ? `Aim for at most ${count(s.softLimit)} characters.`
-          : ''
+    const length = s.hardLimit !== null ? `At most ${count(s.hardLimit)} characters.` : ''
     bullets.push(`- "${s.jsonKey}" (${s.label}): ${s.brief}${length ? ` ${length}` : ''}`)
   }
 

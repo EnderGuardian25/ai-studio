@@ -19,10 +19,11 @@ export type CaptionResolution = { ok: true; text: string } | { ok: false; reason
 
 const count = (n: number) => n.toLocaleString('en-US')
 
-// Rule 1's reason: the channel is not publishable, or has no publisher. Shared
+// Rule 1's reason: the channel is not publishable, or has no publisher (WhatsApp:
+// 010 was dropped on 2026-10-23). Shared
 // with publishToChannel's publisher-map miss so both refusals read the same.
 export function unavailableReason(channel: Channel): string {
-  return `${channelLabel(channel)} publishing isn't available yet. Copy the caption and post it by hand.`
+  return `${channelLabel(channel)} publishing isn't available.`
 }
 
 // The first matching rule wins. A ready caption returns its stored text

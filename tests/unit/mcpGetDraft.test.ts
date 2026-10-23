@@ -98,6 +98,7 @@ const copyRoute = await import('@/app/api/generate/copy/route')
 
 const IG_TEXT = 'Instagram caption #launch'
 const LI_TEXT = 'LinkedIn caption, longer and more formal.'
+// A legacy row (026): the loader must hide it.
 const WA_TEXT = 'WhatsApp *caption*'
 
 type Row = { channel: Channel; text: string; status: 'PENDING' | 'READY' | 'FAILED'; failureReason: string | null }
@@ -149,7 +150,7 @@ beforeEach(() => {
 // ── getDraft (AC-10) ────────────────────────────────────────────────────────
 
 describe('getDraft', () => {
-  it('returns the headline and 3 captions in registry order, and no copyText', async () => {
+  it('returns the headline and 2 captions in registry order, hides a legacy WHATSAPP row, and no copyText', async () => {
     const out = await getDraft({ id: 'd1', teamId: 'team1' })
     expect(out).not.toHaveProperty('copyText')
     expect(out).toEqual({
@@ -157,7 +158,6 @@ describe('getDraft', () => {
       captions: [
         { channel: 'INSTAGRAM', text: IG_TEXT, status: 'READY' },
         { channel: 'LINKEDIN', text: LI_TEXT, status: 'READY' },
-        { channel: 'WHATSAPP', text: WA_TEXT, status: 'READY' },
       ],
       imageUrl: 'https://minio.test/bg.png',
       exportUrl: 'https://minio.test/signed.png',
@@ -221,7 +221,6 @@ describe('generatePost', () => {
       captions: [
         { channel: 'INSTAGRAM', text: IG_TEXT, status: 'READY' },
         { channel: 'LINKEDIN', text: LI_TEXT, status: 'READY' },
-        { channel: 'WHATSAPP', text: WA_TEXT, status: 'READY' },
       ],
     })
   })
@@ -241,6 +240,8 @@ describe('generatePost', () => {
       expect(Object.keys(caption).sort()).toEqual(Object.keys(item.properties).sort())
     }
     expect(item.properties.channel.enum).toEqual(out.captions.map((c) => c.channel))
+    // 026 AC-07: the contract names two channels.
+    expect(item.properties.channel.enum).toEqual(['INSTAGRAM', 'LINKEDIN'])
     expect(item.properties.status.enum).toEqual(['PENDING', 'READY', 'FAILED'])
   })
 
@@ -299,7 +300,7 @@ describe('POST /api/generate/copy', () => {
   it('returns {headline, captions} for the headline and every channel, with no copyText, writing nothing', async () => {
     const { status, body } = await post('Launch')
     expect(status).toBe(200)
-    expect(h.generateCaptions.mock.calls[0][1]).toEqual(['HEADLINE', 'INSTAGRAM', 'LINKEDIN', 'WHATSAPP'])
+    expect(h.generateCaptions.mock.calls[0][1]).toEqual(['HEADLINE', 'INSTAGRAM', 'LINKEDIN'])
     // 008: the CAPTION system default, resolved by the route.
     expect(h.generateCaptions.mock.calls[0][2]).toMatchObject({ surface: 'CAPTION', key: 'HAIKU', source: 'system' })
     expect(body).not.toHaveProperty('copyText')
@@ -308,7 +309,6 @@ describe('POST /api/generate/copy', () => {
       captions: [
         { channel: 'INSTAGRAM', text: 'Mock Instagram caption [Launch]', status: 'READY', failureReason: null },
         { channel: 'LINKEDIN', text: 'Mock LinkedIn caption [Launch]', status: 'READY', failureReason: null },
-        { channel: 'WHATSAPP', text: 'Mock *WhatsApp* caption [Launch]', status: 'READY', failureReason: null },
       ],
     })
     expectNoWrites()

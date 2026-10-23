@@ -47,7 +47,7 @@ export const AGENT_MANIFEST = {
           },
           captions: {
             type: 'array',
-            description: 'One caption per registry channel, in registry order (WhatsApp included)',
+            description: 'One caption per registry channel, in registry order (Instagram and LinkedIn)',
             items: {
               type: 'object',
               required: ['channel', 'text', 'status'],

@@ -32,7 +32,7 @@ describe('resolveCaptionForPublish — each refusal rule', () => {
   it('rule 1: WhatsApp is refused even with READY text', () => {
     expect(resolveCaptionForPublish('WHATSAPP', row({ text: 'Ready to go' }))).toEqual({
       ok: false,
-      reason: "WhatsApp publishing isn't available yet. Copy the caption and post it by hand.",
+      reason: "WhatsApp publishing isn't available.",
     })
   })
 
@@ -105,7 +105,7 @@ describe('resolveCaptionForPublish — each refusal rule', () => {
 describe('resolveCaptionForPublish — order of precedence', () => {
   it('rule 1 beats a missing row', () => {
     const r = resolveCaptionForPublish('WHATSAPP', null)
-    expect(r.ok === false && r.reason).toMatch(/^WhatsApp publishing isn't available yet/)
+    expect(r.ok === false && r.reason).toMatch(/^WhatsApp publishing isn't available\./)
   })
 
   it('rule 1 beats PENDING and FAILED', () => {

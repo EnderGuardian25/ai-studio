@@ -26,7 +26,7 @@ interface GeneratePostArgs {
 // template selection this surface doesn't have.
 export async function generatePost(args: GeneratePostArgs) {
   // Channel enum values are uppercase; tolerate lowercase from older callers.
-  // Only publishable channels are accepted (WhatsApp has no publisher yet).
+  // Only publishable channels are accepted (010, WhatsApp posting, was dropped on 2026-10-23).
   const channels = args.channels.map((c: string) => c.toUpperCase())
   if (!channels.every(isPublishableChannel)) {
     throw new Error(`channels entries must be one of: ${PUBLISHABLE_CHANNELS.join(', ')}`)
@@ -106,7 +106,7 @@ export async function generatePost(args: GeneratePostArgs) {
 }
 
 // The external caption list (012 FR-17): one `{channel, text, status}` per
-// registry channel, in registry order, WhatsApp included. Read through the
+// registry channel, in registry order. Read through the
 // loader, so every registry channel has its row.
 async function captionList(draftId: string) {
   const loaded = await loadDraftCaptions(draftId)

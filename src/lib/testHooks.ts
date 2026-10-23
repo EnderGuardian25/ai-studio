@@ -31,11 +31,10 @@ export const MOCK_SOCIAL_FAIL = process.env.MOCK_SOCIAL_FAIL === 'true'
 
 // ── 012 FR-21: the mock caption reply seam ──────────────────────────────────
 
-const DROP_CAPTION_SENTINELS: Record<CaptionTarget, string> = {
+const DROP_CAPTION_SENTINELS: Partial<Record<CaptionTarget, string>> = {
   HEADLINE: '__DROP_CAPTION_HEADLINE__',
   INSTAGRAM: '__DROP_CAPTION_INSTAGRAM__',
   LINKEDIN: '__DROP_CAPTION_LINKEDIN__',
-  WHATSAPP: '__DROP_CAPTION_WHATSAPP__',
 }
 
 /**
@@ -46,8 +45,7 @@ const DROP_CAPTION_SENTINELS: Record<CaptionTarget, string> = {
  *
  * Each caption embeds the brief topic, so the existing topic sentinels still
  * reach whatever reads a caption (__FAIL_ALWAYS__ / __FAIL_ONCE__ for the
- * publishers). The WhatsApp caption carries `**` so its normaliser is
- * exercised (it becomes `*WhatsApp*`).
+ * publishers).
  *
  * A "__DROP_CAPTION_<TARGET>__" sentinel in the topic omits that key, ONLY in
  * a reply that requests every channel (a generation or "Regenerate all"). So
@@ -56,7 +54,10 @@ const DROP_CAPTION_SENTINELS: Record<CaptionTarget, string> = {
  */
 export function buildMockCaptionReply(topic: string, targets: readonly CaptionTarget[]): string {
   const allChannels = CAPTION_CHANNELS.every((s) => targets.includes(s.channel))
-  const dropped = (target: CaptionTarget) => allChannels && topic.includes(DROP_CAPTION_SENTINELS[target])
+  const dropped = (target: CaptionTarget) => {
+    const sentinel = DROP_CAPTION_SENTINELS[target]
+    return allChannels && sentinel !== undefined && topic.includes(sentinel)
+  }
 
   const reply: Record<string, string> = {}
   if (targets.includes('HEADLINE') && !dropped('HEADLINE')) {
@@ -64,8 +65,7 @@ export function buildMockCaptionReply(topic: string, targets: readonly CaptionTa
   }
   for (const s of CAPTION_CHANNELS) {
     if (!targets.includes(s.channel) || dropped(s.channel)) continue
-    const label = s.channel === 'WHATSAPP' ? `**${s.label}**` : s.label
-    reply[s.jsonKey] = `Mock ${label} caption [${topic}]`
+    reply[s.jsonKey] = `Mock ${s.label} caption [${topic}]`
   }
 
   return [

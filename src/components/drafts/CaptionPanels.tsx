@@ -38,8 +38,8 @@ export interface CaptionPanelsProps {
   onActionStarted: () => void | Promise<unknown>
 }
 
-// The regenerate-copy bodies (012 FR-11): {} is "Regenerate all" (the three
-// captions, never the headline — A9). Each takes the model pick when one was
+// The regenerate-copy bodies (012 FR-11): {} is "Regenerate all" (the
+// registry captions, never the headline — A9). Each takes the model pick when one was
 // made (008 FR-17); JSON.stringify drops an undefined pick (A5).
 type RegenerateBody = ({ channel?: Channel } | { headline: true }) & { model?: ModelKey }
 
@@ -58,7 +58,7 @@ export function CaptionPanels({ draft, onSaved, onActionStarted }: CaptionPanels
   // the gap before pendingAction is seen. The background run is tracked via
   // the polled pendingAction and row status.
   const [firing, setFiring] = useState(false)
-  // One undo handle per caption panel, so "Regenerate all" can capture all three.
+  // One undo handle per caption panel, so "Regenerate all" can capture every channel.
   const [undoRefs] = useState(
     () => new Map(CAPTION_CHANNELS.map((s) => [s.channel, createRef<CaptionUndoHandle>()]))
   )
@@ -133,7 +133,7 @@ export function CaptionPanels({ draft, onSaved, onActionStarted }: CaptionPanels
         </Button>
       </SectionHead>
       {/* "Regenerate all"'s model (008 FR-20), pre-selected per FR-09's
-          mixed-stamp rule: the three rows' common stamp, else the team default. */}
+          mixed-stamp rule: the rows' common stamp, else the team default. */}
       {ready && (
         <ModelPicker
           id="draft-all-captions-model"

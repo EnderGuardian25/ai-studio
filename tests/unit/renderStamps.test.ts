@@ -85,7 +85,7 @@ vi.mock('@/lib/campaign/briefing', () => ({ getActiveCampaignBriefing: async () 
 vi.mock('@/providers/registry', () => ({
   resolveCopyProvider: async () => ({
     generateCaptions: async (_b: unknown, _t: unknown, model: { arg: string }) => ({
-      raw: JSON.stringify({ headline: 'the headline', instagram: 'ig', linkedin: 'li', whatsapp: 'wa' }),
+      raw: JSON.stringify({ headline: 'the headline', instagram: 'ig', linkedin: 'li' }),
       modelId: model.arg,
       route: null,
     }),

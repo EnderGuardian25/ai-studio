@@ -6,7 +6,7 @@ import type { CaptionTarget } from '@/lib/channels'
 // reply and validates each requested field on its own; anything ambiguous fails
 // closed.
 
-const ALL: CaptionTarget[] = ['HEADLINE', 'INSTAGRAM', 'LINKEDIN', 'WHATSAPP']
+const ALL: CaptionTarget[] = ['HEADLINE', 'INSTAGRAM', 'LINKEDIN']
 
 const reply = (obj: Record<string, unknown>) => JSON.stringify(obj)
 
@@ -14,7 +14,6 @@ const CLEAN = {
   headline: 'Applications are open',
   instagram: 'Join us.\n\n#Hiring',
   linkedin: 'We are hiring engineers.',
-  whatsapp: '*Hiring* now: https://example.com',
 }
 
 function okFields(raw: string, targets: CaptionTarget[] = ALL) {
@@ -25,8 +24,8 @@ function okFields(raw: string, targets: CaptionTarget[] = ALL) {
 
 describe('captionReplyKeys', () => {
   it('orders the headline first, then channels in registry order', () => {
-    expect(captionReplyKeys(['WHATSAPP', 'HEADLINE', 'INSTAGRAM'])).toEqual(['headline', 'instagram', 'whatsapp'])
-    expect(captionReplyKeys(ALL)).toEqual(['headline', 'instagram', 'linkedin', 'whatsapp'])
+    expect(captionReplyKeys(['LINKEDIN', 'HEADLINE', 'INSTAGRAM'])).toEqual(['headline', 'instagram', 'linkedin'])
+    expect(captionReplyKeys(ALL)).toEqual(['headline', 'instagram', 'linkedin'])
   })
 })
 
@@ -37,7 +36,6 @@ describe('extractCaptionReply — candidates', () => {
       HEADLINE: { ok: true, text: 'Applications are open' },
       INSTAGRAM: { ok: true, text: 'Join us.\n\n#Hiring' },
       LINKEDIN: { ok: true, text: 'We are hiring engineers.' },
-      WHATSAPP: { ok: true, text: '*Hiring* now: https://example.com' },
     })
     expect(r.discarded).toBe('')
   })
@@ -103,7 +101,7 @@ describe('extractCaptionReply — candidates', () => {
   })
 
   it('a literal newline, carriage return and tab inside a value parse', () => {
-    const raw = '{"headline": "Open now", "instagram": "Line one\nLine two\r\nLine three\tend", "linkedin": "LI", "whatsapp": "WA"}'
+    const raw = '{"headline": "Open now", "instagram": "Line one\nLine two\r\nLine three\tend", "linkedin": "LI"}'
     const r = okFields(raw)
     expect(r.fields.INSTAGRAM).toEqual({ ok: true, text: 'Line one\nLine two\nLine three\tend' })
   })
@@ -116,7 +114,6 @@ describe('extractCaptionReply — per field', () => {
     const r = okFields(reply(rest))
     expect(r.fields.LINKEDIN).toEqual({ ok: false, reason: 'missing' })
     expect(r.fields.INSTAGRAM).toEqual({ ok: true, text: 'Join us.\n\n#Hiring' })
-    expect(r.fields.WHATSAPP?.ok).toBe(true)
     expect(r.fields.HEADLINE?.ok).toBe(true)
   })
 
@@ -172,23 +169,23 @@ describe('extractCaptionReply — per field', () => {
     expect(marked.fields.LINKEDIN?.ok).toBe(true)
   })
 
-  it('WhatsApp has no hard limit at extraction (the soft guide is UI-only)', () => {
-    const r = okFields(reply({ ...CLEAN, whatsapp: 'w'.repeat(5000) }))
-    expect(r.fields.WHATSAPP).toEqual({ ok: true, text: 'w'.repeat(5000) })
+  it('a whatsapp key is an unknown key: no WhatsApp caption is requested (026 AC-04)', () => {
+    expect(extractCaptionReply(reply({ ...CLEAN, whatsapp: 'WA' }), ALL)).toMatchObject({
+      ok: false,
+      reason: 'unknown-keys',
+    })
   })
 
-  it('IG and LI lose every `**`; WhatsApp `**` becomes `*` (A3, per the registry)', () => {
+  it('IG and LI lose every `**` (A3, per the registry)', () => {
     const r = okFields(
       reply({
         ...CLEAN,
         instagram: '**Big** news ****now****',
         linkedin: 'A **bold** claim',
-        whatsapp: '**Bold** and ****very****',
       })
     )
     expect(r.fields.INSTAGRAM).toEqual({ ok: true, text: 'Big news now' })
     expect(r.fields.LINKEDIN).toEqual({ ok: true, text: 'A bold claim' })
-    expect(r.fields.WHATSAPP).toEqual({ ok: true, text: '*Bold* and *very*' })
   })
 
   it('returns fields for the requested targets only', () => {

@@ -10,7 +10,7 @@ import type { Channel, Post } from '@prisma/client'
 // The one channel → publisher map. Every publish surface (immediate API path,
 // FAILED-retry, scheduler tick, ACP tool) goes through this module so a new
 // channel or telemetry change is a single edit.
-// A channel with no entry (WhatsApp, until 010) fails closed and terminally,
+// A channel with no entry (WhatsApp: 010 was dropped on 2026-10-23) fails closed and terminally,
 // with the resolver's rule-1 reason.
 export const publishers: Partial<
   Record<Channel, { publish(url: string, caption: string, teamId: string): Promise<{ platformId: string }> }>

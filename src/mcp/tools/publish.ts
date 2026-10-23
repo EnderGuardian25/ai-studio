@@ -8,7 +8,7 @@ import { isPublishableChannel, PUBLISHABLE_CHANNELS } from '@/lib/channels'
 // and stale/incomplete drafts can't be pushed to a platform.
 export async function publishPost(args: { draftId: string; channel: string; teamId: string }) {
   // Rejected before any lookup or Post row: a channel with no publisher
-  // (WhatsApp, until 010) is never attempted.
+  // (WhatsApp: 010 was dropped on 2026-10-23) is never attempted.
   if (!isPublishableChannel(args.channel)) {
     throw new Error(`channel must be ${PUBLISHABLE_CHANNELS.join(' or ')}`)
   }

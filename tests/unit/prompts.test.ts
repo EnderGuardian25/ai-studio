@@ -256,7 +256,7 @@ describe('buildCaptionPrompt (012 FR-07)', () => {
     tone: 'Friendly',
     channels: ['INSTAGRAM', 'LINKEDIN'],
   }
-  const ALL = ['HEADLINE', 'INSTAGRAM', 'LINKEDIN', 'WHATSAPP'] as const
+  const ALL = ['HEADLINE', 'INSTAGRAM', 'LINKEDIN'] as const
 
   it('is pure and embeds the brief fields', () => {
     expect(buildCaptionPrompt(brief, ALL)).toEqual(buildCaptionPrompt(brief, ALL))
@@ -267,46 +267,44 @@ describe('buildCaptionPrompt (012 FR-07)', () => {
     expect(user).toContain('Tone: Friendly')
   })
 
-  it('takes the length guidance from the registry: hard limits and the WhatsApp soft guide', () => {
+  it('takes the length guidance from the registry: the hard limits', () => {
     const { user } = buildCaptionPrompt(brief, ALL)
     expect(user).toContain('"instagram" (Instagram): Hook in the first line.')
     expect(user).toContain('At most 2,200 characters.')
     expect(user).toContain('"linkedin" (LinkedIn): Professional and longer-form.')
     expect(user).toContain('At most 3,000 characters.')
-    expect(user).toContain('"whatsapp" (WhatsApp): Short and direct.')
-    expect(user).toContain('Aim for at most 1,000 characters.')
+    expect(user).not.toContain('whatsapp')
+    expect(user).not.toContain('WhatsApp')
     expect(user).toContain(
       '"headline": the short line printed on the post image: one line, at most 100 characters, no hashtags, no emoji, no markdown.'
     )
   })
 
   it('lists bullets headline first, then channels in registry order, whatever the target order', () => {
-    const { user } = buildCaptionPrompt(brief, ['WHATSAPP', 'INSTAGRAM', 'HEADLINE', 'LINKEDIN'])
+    const { user } = buildCaptionPrompt(brief, ['LINKEDIN', 'INSTAGRAM', 'HEADLINE'])
     const at = (k: string) => user.indexOf(`- "${k}"`)
     expect(at('headline')).toBeGreaterThan(-1)
     expect(at('headline')).toBeLessThan(at('instagram'))
     expect(at('instagram')).toBeLessThan(at('linkedin'))
-    expect(at('linkedin')).toBeLessThan(at('whatsapp'))
   })
 
   it('names exactly the requested keys in the output protocol and asks for nothing else', () => {
     const all = buildCaptionPrompt(brief, ALL).user
     expect(all).toContain(
-      'Reply with exactly one JSON object whose keys are exactly "headline", "instagram", "linkedin", "whatsapp", each a string. No other keys. Escape newlines as \\n.'
+      'Reply with exactly one JSON object whose keys are exactly "headline", "instagram", "linkedin", each a string. No other keys. Escape newlines as \\n.'
     )
     expect(all).toContain('nothing else')
 
     const one = buildCaptionPrompt(brief, ['LINKEDIN']).user
     expect(one).toContain('whose keys are exactly "linkedin", each a string.')
     expect(one).not.toContain('"instagram"')
-    expect(one).not.toContain('"whatsapp"')
     expect(one).not.toContain('"headline"')
   })
 
-  it('writes all three captions whatever brief.channels says (A5)', () => {
+  it('writes both captions whatever brief.channels says (A5)', () => {
     const { user } = buildCaptionPrompt({ ...brief, channels: ['INSTAGRAM'] }, ALL)
     expect(user).toContain('"linkedin"')
-    expect(user).toContain('"whatsapp"')
+    expect(user).not.toContain('"whatsapp"')
   })
 
   it('keeps the brand, voice and campaign briefing in the system prompt', () => {
@@ -327,6 +325,7 @@ describe('buildCaptionPrompt (012 FR-07)', () => {
 
   it('exports the caption prompt version and the token budget', () => {
     expect(CAPTION_PROMPT_VERSION).toMatch(/^\d{4}-\d{2}-\d{2}\.\d+$/)
+    expect(CAPTION_PROMPT_VERSION).toBe('2026-10-23.1')
     expect(CAPTION_MAX_TOKENS).toBe(8192)
   })
 
@@ -337,7 +336,7 @@ describe('buildCaptionPrompt (012 FR-07)', () => {
       return {
         ...real,
         CAPTION_CHANNELS: real.CAPTION_CHANNELS.map((s) =>
-          s.channel === 'INSTAGRAM' ? { ...s, hardLimit: 1234 } : s.channel === 'WHATSAPP' ? { ...s, softLimit: 777 } : s
+          s.channel === 'INSTAGRAM' ? { ...s, hardLimit: 1234 } : s
         ),
       }
     })
@@ -346,8 +345,6 @@ describe('buildCaptionPrompt (012 FR-07)', () => {
       const { user } = build(brief, ALL)
       expect(user).toContain('At most 1,234 characters.')
       expect(user).not.toContain('2,200')
-      expect(user).toContain('Aim for at most 777 characters.')
-      expect(user).not.toContain('1,000')
       expect(user).toContain('At most 3,000 characters.')
     } finally {
       vi.doUnmock('@/lib/channels')

@@ -1,11 +1,12 @@
 {
   "change": "026-drop-whatsapp-caption-refine-under-preview",
-  "phase": "tasks",
-  "branch": "",
+  "phase": "build",
+  "branch": "v2",
   "size": "bounded",
   "phases": {
     "proposal": { "status": "approved", "at": "2026-10-23T17:23:26Z" },
     "spec": { "status": "done", "at": "2026-10-23T17:26:01Z" },
-    "tasks": { "status": "done", "at": "2026-10-23T17:26:02Z" }
+    "tasks": { "status": "done", "at": "2026-10-23T17:26:02Z" },
+    "build": { "status": "in-progress", "at": "2026-10-23T17:28:34Z" }
   }
 }

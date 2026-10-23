@@ -101,7 +101,7 @@ const regenerateSchema = z
     return { targets: [...CHANNELS], ...model }
   })
 
-// {} → the three captions; { channel } → that caption; { headline: true } →
+// {} → every registry caption; { channel } → that caption; { headline: true } →
 // the headline — each with an optional `model` (008 FR-17). Still strict: any
 // other key is a 400, and so is { channel, headline, model }. A bad `model`
 // carries FR-17's code, so the client can tell a refused pick from a bad shape.

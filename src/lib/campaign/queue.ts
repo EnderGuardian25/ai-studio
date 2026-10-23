@@ -15,7 +15,7 @@ export const queueEntrySchema = z
     description: z.string().trim().optional(),
     goal: z.string().trim().min(1, 'goal is required'),
     tone: z.string().trim().min(1, 'tone is required'),
-    // Publishable channels only (WhatsApp has no publisher yet).
+    // Publishable channels only (010, WhatsApp posting, was dropped on 2026-10-23).
     channels: z
       .array(z.enum(PUBLISHABLE_CHANNELS as [Channel, ...Channel[]]))
       .min(1, 'at least one channel is required'),

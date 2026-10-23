@@ -214,7 +214,7 @@ describe('publishToChannel — the one resolver', () => {
     const err = await publishToChannel('WHATSAPP', 'exports/d1.png', 'd1', 'team1').catch((e) => e)
     expect(err).toBeInstanceOf(PublishError)
     expect(err.terminal).toBe(true)
-    expect(err.reason).toBe("WhatsApp publishing isn't available yet. Copy the caption and post it by hand.")
+    expect(err.reason).toBe("WhatsApp publishing isn't available.")
     const rule1 = resolveCaptionForPublish('WHATSAPP', row('WHATSAPP', 'ready text'))
     expect(rule1.ok === false && rule1.reason).toBe(err.reason)
     expect(h.resolveExportUrl).not.toHaveBeenCalled()

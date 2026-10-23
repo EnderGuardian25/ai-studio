@@ -19,7 +19,7 @@ function draft(
     status: 'EXPORTED',
     pendingAction: null,
     headline: 'Applications are open',
-    captions: (['INSTAGRAM', 'LINKEDIN', 'WHATSAPP'] as Channel[]).map((channel) => ({
+    captions: (['INSTAGRAM', 'LINKEDIN'] as Channel[]).map((channel) => ({
       channel,
       status: rows[channel] ?? 'READY',
     })),
@@ -48,18 +48,16 @@ describe('captionActionTargets', () => {
   })
 
   it('a generation (IN_PROGRESS) → its PENDING rows, plus the headline while it is null', () => {
-    const pending = { INSTAGRAM: 'PENDING', LINKEDIN: 'PENDING', WHATSAPP: 'PENDING' } as const
+    const pending = { INSTAGRAM: 'PENDING', LINKEDIN: 'PENDING' } as const
     expect(captionActionTargets(draft(pending, { status: 'IN_PROGRESS', headline: null }))).toEqual([
       'HEADLINE',
       'INSTAGRAM',
       'LINKEDIN',
-      'WHATSAPP',
     ])
     // Retry over a draft that already has a headline: the headline is not busy.
     expect(captionActionTargets(draft(pending, { status: 'IN_PROGRESS' }))).toEqual([
       'INSTAGRAM',
       'LINKEDIN',
-      'WHATSAPP',
     ])
   })
 

@@ -135,7 +135,7 @@ const policyRow = (allowedModels: string[], defaults: Array<{ surface: string; m
 
 const SENTENCE = (reason: string) => `The caption reply had no usable headline (${reason}). Retry to generate again.`
 
-const FULL = { headline: 'Applications are open', instagram: 'IG text', linkedin: 'LI text', whatsapp: 'WA text' }
+const FULL = { headline: 'Applications are open', instagram: 'IG text', linkedin: 'LI text' }
 const json = (o: Record<string, unknown>) => JSON.stringify(o)
 
 const brief = {
@@ -187,7 +187,7 @@ describe('writeCaptions (design §3)', () => {
     const { fields } = await writeCaptions(provider(), briefInput, GENERATION_TARGETS, captionModel)
     expect(fields.HEADLINE).toEqual({ ok: true, text: 'Applications are open' })
     expect(logged(info)[0]).toBe(
-      `[captions] caption call (prompt ${CAPTION_PROMPT_VERSION}) for HEADLINE, INSTAGRAM, LINKEDIN, WHATSAPP`
+      `[captions] caption call (prompt ${CAPTION_PROMPT_VERSION}) for HEADLINE, INSTAGRAM, LINKEDIN`,
     )
     expect(logged(warn)).toEqual([`[captions] discarded reply text: ${JSON.stringify('p'.repeat(500))}`])
   })
@@ -273,7 +273,6 @@ describe('createPendingDraft', () => {
         create: [
           { channel: 'INSTAGRAM', status: 'PENDING' },
           { channel: 'LINKEDIN', status: 'PENDING' },
-          { channel: 'WHATSAPP', status: 'PENDING' },
         ],
       },
     })
@@ -291,7 +290,6 @@ describe('runGenerationForDraft (async)', () => {
     expect(db.captionUpdateManys.map((u) => [u.where, u.data.status, u.data.text])).toEqual([
       [{ draftId: 'd1', channel: 'INSTAGRAM', status: 'PENDING' }, 'READY', 'IG text'],
       [{ draftId: 'd1', channel: 'LINKEDIN', status: 'PENDING' }, 'READY', 'LI text'],
-      [{ draftId: 'd1', channel: 'WHATSAPP', status: 'PENDING' }, 'READY', 'WA text'],
     ])
     expect(db.draftUpdateManys).toEqual([
       {
@@ -311,16 +309,17 @@ describe('runGenerationForDraft (async)', () => {
   })
 
   it('no valid headline ⇒ FAILED with the FR-09 sentence, the validated captions kept, no design run', async () => {
-    h.reply = json({ instagram: 'IG text', linkedin: 'LI text', whatsapp: 'WA text' })
+    h.reply = json({ instagram: 'IG text', linkedin: 'LI text' })
     await runGenerationForDraft('d1', actor)
     expect(h.pathB).not.toHaveBeenCalled()
-    expect(db.captionUpdateManys.map((u) => u.data.status)).toEqual(['READY', 'READY', 'READY'])
+    expect(db.captionUpdateManys.map((u) => u.data.status)).toEqual(['READY', 'READY'])
     const failed = db.draftUpdates.at(-1)!.data
     expect(failed).toMatchObject({ status: 'FAILED', failureReason: SENTENCE('missing') })
-    // Only rows still PENDING are failed; the READY ones above are untouched.
+    // Only registry rows still PENDING are failed; the READY ones above, and a
+    // hidden WhatsApp row (026 FR-05), are untouched.
     expect(failed.captions).toEqual({
       updateMany: {
-        where: { status: 'PENDING' },
+        where: { status: 'PENDING', channel: { in: ['INSTAGRAM', 'LINKEDIN'] } },
         data: { status: 'FAILED', text: '', failureReason: 'generation failed' },
       },
     })
@@ -328,7 +327,7 @@ describe('runGenerationForDraft (async)', () => {
   })
 
   it('a partial reply stores the failed channel as FAILED with no text, and still designs', async () => {
-    h.reply = json({ headline: 'H', instagram: 'IG text', whatsapp: 'WA text' })
+    h.reply = json({ headline: 'H', instagram: 'IG text' })
     await runGenerationForDraft('d1', actor)
     const li = db.captionUpdateManys.find((u) => u.where.channel === 'LINKEDIN')!
     expect(li.data).toMatchObject({ status: 'FAILED', text: '', failureReason: 'missing' })
@@ -348,14 +347,16 @@ describe('runGenerationForDraft (async)', () => {
 
 describe('generateDraftForBrief (sync: scheduler, MCP, ACP)', () => {
   it('throws HeadlineMissingError before any design is paid for, and creates no draft', async () => {
-    h.reply = json({ headline: '   ', instagram: 'IG text', linkedin: 'LI text', whatsapp: 'WA text' })
-    await expect(generateDraftForBrief(brief, { userId: null, teamId: 'team1' })).rejects.toThrow(SENTENCE('empty'))
+    h.reply = json({ headline: '   ', instagram: 'IG text', linkedin: 'LI text' })
+    await expect(generateDraftForBrief(brief, { userId: null, teamId: 'team1' })).rejects.toThrow(
+      SENTENCE('empty'),
+    )
     expect(h.pathB).not.toHaveBeenCalled()
     expect(db.draftCreates).toHaveLength(0)
   })
 
-  it('creates the draft with its headline, three rows and revision 1 in one transaction', async () => {
-    h.reply = json({ headline: 'H', instagram: 'IG text', whatsapp: 'WA text' })
+  it('creates the draft with its headline, two rows and revision 1 in one transaction', async () => {
+    h.reply = json({ headline: 'H', instagram: 'IG text' })
     await generateDraftForBrief(brief, { userId: null, teamId: 'team1' })
     expect(h.pathB.mock.calls[0][2]).toBe('H')
     expect(db.draftCreates[0]).toMatchObject({
@@ -365,7 +366,6 @@ describe('generateDraftForBrief (sync: scheduler, MCP, ACP)', () => {
         create: [
           { channel: 'INSTAGRAM', text: 'IG text', status: 'READY', failureReason: null },
           { channel: 'LINKEDIN', text: '', status: 'FAILED', failureReason: 'missing' },
-          { channel: 'WHATSAPP', text: 'WA text', status: 'READY', failureReason: null },
         ],
       },
     })
@@ -383,14 +383,26 @@ describe('generation on the resolver (008)', () => {
   })
 
   it('async: CAPTION and DESIGN_FREEFORM resolve to the system defaults with no policy row, and stamp what ran', async () => {
-    h.reply = json({ headline: 'H', instagram: 'IG text', whatsapp: 'WA text' })
+    h.reply = json({ headline: 'H', instagram: 'IG text' })
     await runGenerationForDraft('d1', actor)
     // Caption stamps on the ok rows only; the failed (text-less) row has none.
-    const byChannel = Object.fromEntries(db.captionUpdateManys.map((u) => [u.where.channel, u.data]))
-    expect(byChannel.INSTAGRAM).toMatchObject({ status: 'READY', model: 'claude-haiku-4-5', modelSubstitutedFrom: null })
-    expect(byChannel.WHATSAPP).toMatchObject({ status: 'READY', model: 'claude-haiku-4-5', modelSubstitutedFrom: null })
-    expect(byChannel.LINKEDIN).toMatchObject({ status: 'FAILED', model: null, modelSubstitutedFrom: null })
-    expect(db.draftUpdateManys[0].data).toMatchObject({ headline: 'H', headlineModel: 'claude-haiku-4-5' })
+    const byChannel = Object.fromEntries(
+      db.captionUpdateManys.map((u) => [u.where.channel, u.data]),
+    )
+    expect(byChannel.INSTAGRAM).toMatchObject({
+      status: 'READY',
+      model: 'claude-haiku-4-5',
+      modelSubstitutedFrom: null,
+    })
+    expect(byChannel.LINKEDIN).toMatchObject({
+      status: 'FAILED',
+      model: null,
+      modelSubstitutedFrom: null,
+    })
+    expect(db.draftUpdateManys[0].data).toMatchObject({
+      headline: 'H',
+      headlineModel: 'claude-haiku-4-5',
+    })
     // The design ran on the system default and its stamp went to v1 + the draft.
     expect(pathBModel()).toMatchObject({ key: 'SONNET', arg: 'claude-sonnet-5-5', source: 'system', substitutedFrom: null })
     expect(db.revisionCreates[0]).toMatchObject({ model: 'claude-sonnet-5-5', modelSubstitutedFrom: null })
@@ -480,18 +492,40 @@ describe('retry route (FR-10)', () => {
       headlineModel: null,
       headlineModelSubstitutedFrom: null,
       captions: {
-        updateMany: { where: {}, data: { status: 'PENDING', failureReason: null } },
+        updateMany: {
+          where: { channel: { in: ['INSTAGRAM', 'LINKEDIN'] } },
+          data: { status: 'PENDING', failureReason: null },
+        },
         createMany: {
           data: [
             { channel: 'INSTAGRAM', status: 'PENDING' },
             { channel: 'LINKEDIN', status: 'PENDING' },
-            { channel: 'WHATSAPP', status: 'PENDING' },
           ],
           skipDuplicates: true,
         },
       },
     })
     expect(h.startBackgroundGeneration).toHaveBeenCalledWith('d1', 'u1', 'team1')
+  })
+
+  it('resets only the registry channels, so a legacy WHATSAPP row is untouched (026 AC-06)', async () => {
+    db.draft = {
+      id: 'd1',
+      status: 'FAILED',
+      teamId: 'team1',
+      brief: { userId: 'u1', campaignId: null },
+    }
+    await retry(req, ctx)
+    const { updateMany, createMany } = db.draftUpdates[0].data.captions as {
+      updateMany: { where: { channel: { in: string[] } } }
+      createMany: { data: { channel: string }[] }
+    }
+    // Apply the reset's filter to a draft holding a legacy WHATSAPP row.
+    const rows = ['INSTAGRAM', 'LINKEDIN', 'WHATSAPP']
+    const reset = rows.filter((channel) => updateMany.where.channel.in.includes(channel))
+    expect(reset).toEqual(['INSTAGRAM', 'LINKEDIN'])
+    // A hidden row is never created either.
+    expect(createMany.data.map((d) => d.channel)).toEqual(['INSTAGRAM', 'LINKEDIN'])
   })
 
   it('a non-FAILED draft is left alone (409)', async () => {

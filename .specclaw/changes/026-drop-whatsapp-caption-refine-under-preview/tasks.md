@@ -37,7 +37,7 @@ This change has **3 tasks in 3 waves**:
 
 ### Wave 1 — Registry and server
 
-- [ ] `T1` — Remove WhatsApp from the caption registry; keep legacy rows hidden and untouched
+- [x] `T1` — Remove WhatsApp from the caption registry; keep legacy rows hidden and untouched
   - Files: `src/lib/channels.ts`, `src/lib/agent/prompts/caption.ts`, `src/lib/captions/resolve.ts`, `src/lib/testHooks.ts`, `src/app/api/drafts/[id]/retry/route.ts`, `src/acp/agent.ts`, `src/mcp/tools/generate.ts`, `src/mcp/tools/publish.ts`, `src/lib/publish/publishDraft.ts`, `src/lib/campaign/queue.ts`, `src/components/drafts/CaptionPanel.tsx`, `src/components/drafts/CaptionPanels.tsx` (comments and the "three captions" wording only); the unit tests listed in the spec's file map, each only where it fixes three channels
   - Estimate: medium
   - Kind: impl

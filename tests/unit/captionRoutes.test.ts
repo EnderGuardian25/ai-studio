@@ -62,7 +62,7 @@ const { POST: regenerate } = await import('@/app/api/drafts/[id]/regenerate-copy
 const { PATCH: patch } = await import('@/app/api/drafts/[id]/route')
 
 const ctx = { params: { id: 'd1' } }
-const ALL = ['INSTAGRAM', 'LINKEDIN', 'WHATSAPP']
+const ALL = ['INSTAGRAM', 'LINKEDIN']
 const CLAIM = { action: 'REGENERATE_COPY', claimId: 'claim-1' }
 
 function post(body?: string) {
@@ -203,12 +203,11 @@ describe('regenerate-copy — 008 FR-09 stamp tier, resolved before the claim', 
   const OPUS = 'claude-opus-5-5'
   const HAIKU = 'claude-haiku-4-5'
 
-  function rows(ig: string | null, li: string | null, wa: string | null) {
+  function rows(ig: string | null, li: string | null) {
     return {
       captions: [
         { channel: 'INSTAGRAM', text: 'ig', status: 'READY', model: ig, modelSubstitutedFrom: null },
         { channel: 'LINKEDIN', text: 'li', status: 'READY', model: li, modelSubstitutedFrom: null },
-        { channel: 'WHATSAPP', text: 'wa', status: 'READY', model: wa, modelSubstitutedFrom: null },
       ],
     }
   }
@@ -227,7 +226,7 @@ describe('regenerate-copy — 008 FR-09 stamp tier, resolved before the claim', 
   })
 
   it('{channel}: the stamp tier is THAT row\'s model only', async () => {
-    h.loadDraftCaptions.mockResolvedValue(rows(SONNET, OPUS, SONNET))
+    h.loadDraftCaptions.mockResolvedValue(rows(SONNET, OPUS))
     expect((await post(JSON.stringify({ channel: 'LINKEDIN' }))).status).toBe(202)
     expect(h.resolveModel).toHaveBeenCalledWith('CAPTION', { stamp: OPUS, userId: 'u1', teamId: 'team1' })
     expect(ranWith()).toMatchObject({ key: 'OPUS', source: 'stamp', substitutedFrom: null })
@@ -235,39 +234,39 @@ describe('regenerate-copy — 008 FR-09 stamp tier, resolved before the claim', 
 
   it('{headline:true}: the stamp tier is Draft.headlineModel', async () => {
     h.draftFindUnique.mockResolvedValue(exportedDraft({ headlineModel: HAIKU }))
-    h.loadDraftCaptions.mockResolvedValue(rows(SONNET, SONNET, SONNET))
+    h.loadDraftCaptions.mockResolvedValue(rows(SONNET, SONNET))
     await post(JSON.stringify({ headline: true }))
     expect(h.resolveModel.mock.calls[0][1]).toMatchObject({ stamp: HAIKU })
     expect(ranWith()).toMatchObject({ key: 'HAIKU', source: 'stamp' })
   })
 
   it('{} with three equal stamps → that stamp (like for like)', async () => {
-    h.loadDraftCaptions.mockResolvedValue(rows(SONNET, SONNET, SONNET))
+    h.loadDraftCaptions.mockResolvedValue(rows(SONNET, SONNET))
     await post('{}')
     expect(h.resolveModel.mock.calls[0][1]).toMatchObject({ stamp: SONNET })
     expect(ranWith()).toMatchObject({ key: 'SONNET', source: 'stamp' })
   })
 
   it.each([
-    ['mixed', [SONNET, OPUS, SONNET]],
-    ['one null', [SONNET, null, SONNET]],
+    ['mixed', [SONNET, OPUS]],
+    ['one null', [SONNET, null]],
   ] as const)('{} with %s stamps → no stamp tier: the team default, recorded as NO substitution', async (_n, s) => {
     policy.defaults = { CAPTION: 'HAIKU' }
-    h.loadDraftCaptions.mockResolvedValue(rows(s[0], s[1], s[2]))
+    h.loadDraftCaptions.mockResolvedValue(rows(s[0], s[1]))
     await post('{}')
     expect(h.resolveModel.mock.calls[0][1]).toMatchObject({ stamp: null })
     expect(ranWith()).toMatchObject({ key: 'HAIKU', source: 'team', substitutedFrom: null })
   })
 
   it('a null-stamp draft with no team default → the system default', async () => {
-    h.loadDraftCaptions.mockResolvedValue(rows(null, null, null))
+    h.loadDraftCaptions.mockResolvedValue(rows(null, null))
     await post('{}')
     expect(ranWith()).toMatchObject({ source: 'system', substitutedFrom: null })
   })
 
   it('a stamp since disallowed falls through and is recorded on the new stamp (AC-17)', async () => {
     policy.allowed = ['HAIKU', 'SONNET']
-    h.loadDraftCaptions.mockResolvedValue(rows(SONNET, OPUS, SONNET))
+    h.loadDraftCaptions.mockResolvedValue(rows(SONNET, OPUS))
     await post(JSON.stringify({ channel: 'LINKEDIN' }))
     expect(ranWith()).toMatchObject({ key: 'HAIKU', source: 'system', substitutedFrom: OPUS })
     // The settle receives the reply's stamp, substitution included.
@@ -281,7 +280,7 @@ describe('regenerate-copy — 008 FR-09 stamp tier, resolved before the claim', 
   })
 
   it('resolves after the rows are loaded (they carry the stamps) and BEFORE the claim', async () => {
-    h.loadDraftCaptions.mockResolvedValue(rows(SONNET, SONNET, SONNET))
+    h.loadDraftCaptions.mockResolvedValue(rows(SONNET, SONNET))
     await post('{}')
     expect(h.loadDraftCaptions.mock.invocationCallOrder[0]).toBeLessThan(h.resolveModel.mock.invocationCallOrder[0])
     expect(h.resolveModel.mock.invocationCallOrder[0]).toBeLessThan(h.claimCaptionAction.mock.invocationCallOrder[0])
@@ -297,7 +296,7 @@ describe('regenerate-copy — 008 FR-09 stamp tier, resolved before the claim', 
   })
 
   it('the onError settle passes no stamp (a failed run keeps every row stamp)', async () => {
-    h.loadDraftCaptions.mockResolvedValue(rows(SONNET, SONNET, SONNET))
+    h.loadDraftCaptions.mockResolvedValue(rows(SONNET, SONNET))
     await post(JSON.stringify({ channel: 'LINKEDIN' }))
     const onError = h.startDraftAction.mock.calls[0][5] as (e: unknown) => Promise<void>
     h.settleCaptionAction.mockClear()

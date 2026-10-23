@@ -93,26 +93,29 @@ describe('channelLabel', () => {
 
 // --- 012 FR-01 / AC-01: the per-channel registry ---
 describe('CAPTION_CHANNELS registry', () => {
-  it('covers every Channel enum value exactly once', () => {
+  it('covers every Channel enum value except WHATSAPP exactly once (026: the WhatsApp caption was dropped)', () => {
     const registered = CAPTION_CHANNELS.map((s) => s.channel)
     // Sorted equality fails on a missing value and on a duplicate alike.
-    expect([...registered].sort()).toEqual([...Object.values(Channel)].sort())
+    expect([...registered].sort()).toEqual([...Object.values(Channel)].filter((c) => c !== 'WHATSAPP').sort())
     expect(new Set(registered).size).toBe(registered.length)
   })
 
-  it('is ordered Instagram, LinkedIn, WhatsApp with unique JSON keys', () => {
-    expect(CAPTION_CHANNELS.map((s) => s.channel)).toEqual(['INSTAGRAM', 'LINKEDIN', 'WHATSAPP'])
-    expect(CAPTION_CHANNELS.map((s) => s.jsonKey)).toEqual(['instagram', 'linkedin', 'whatsapp'])
+  it('is ordered Instagram, LinkedIn with unique JSON keys (026 AC-01)', () => {
+    expect(CAPTION_CHANNELS.map((s) => s.channel)).toEqual(['INSTAGRAM', 'LINKEDIN'])
+    expect(CAPTION_CHANNELS.map((s) => s.jsonKey)).toEqual(['instagram', 'linkedin'])
   })
 
-  it('IG hard limit 2200, LI 3000, WA no hard limit and a 1000 soft limit', () => {
-    expect(captionSpec('INSTAGRAM')).toMatchObject({ hardLimit: 2200, softLimit: null })
-    expect(captionSpec('LINKEDIN')).toMatchObject({ hardLimit: 3000, softLimit: null })
-    expect(captionSpec('WHATSAPP')).toMatchObject({ hardLimit: null, softLimit: 1000 })
+  it('has no WhatsApp entry, so a lookup throws', () => {
+    expect(() => captionSpec('WHATSAPP')).toThrow(/No caption registry entry/)
+  })
+
+  it('IG hard limit 2200, LI 3000', () => {
+    expect(captionSpec('INSTAGRAM')).toMatchObject({ hardLimit: 2200 })
+    expect(captionSpec('LINKEDIN')).toMatchObject({ hardLimit: 3000 })
     expect(CHANNEL_CAPTION_LIMITS).toEqual({ INSTAGRAM: 2200, LINKEDIN: 3000 })
   })
 
-  it('derives the labels', () => {
+  it('derives the labels, and keeps WhatsApp for old Post rows (026 AC-01)', () => {
     expect(CHANNEL_LABELS).toEqual({ INSTAGRAM: 'Instagram', LINKEDIN: 'LinkedIn', WHATSAPP: 'WhatsApp' })
     expect(channelLabel('whatsapp')).toBe('WhatsApp')
   })
@@ -122,11 +125,9 @@ describe('CAPTION_CHANNELS registry', () => {
     expect(CHANNEL_VALUES).toEqual(['INSTAGRAM', 'LINKEDIN'])
   })
 
-  it('normalises model output: IG/LI drop every **, WhatsApp turns ** into *', () => {
+  it('normalises model output: IG/LI drop every **', () => {
     expect(captionSpec('INSTAGRAM').normalise('**Big** news ****x')).toBe('Big news x')
     expect(captionSpec('LINKEDIN').normalise('a ***b*** c')).toBe('a *b* c')
-    expect(captionSpec('WHATSAPP').normalise('**Big** news')).toBe('*Big* news')
-    expect(captionSpec('WHATSAPP').normalise('****x****')).toBe('*x*')
   })
 
   it('captionLength counts UTF-16 code units', () => {

@@ -104,7 +104,6 @@ export function CaptionPanel({
   }, [setModel, setModelError])
   const headingId = useId()
   const failureId = useId()
-  const helpId = useId()
   const counterId = useId()
   const warningId = useId()
   const [value, setValue] = useState(caption.text)
@@ -166,27 +165,16 @@ export function CaptionPanel({
 
   const length = captionLength(value)
   const over = spec.hardLimit !== null && length > spec.hardLimit
-  // The soft guide (WhatsApp) only warns: saving is never blocked.
-  const guide = spec.softLimit
   const counter =
     spec.hardLimit !== null
       ? `${count(length)} / ${count(spec.hardLimit)} (${spec.label})`
-      : guide !== null
-        ? `${count(length)} / ${count(guide)} guide`
-        : `${count(length)} characters`
-  const warning = over
-    ? `Over the ${spec.label} limit`
-    : guide !== null && length > guide
-      ? `Longer than the ${count(guide)}-character guide`
-      : null
-  // A channel Studio can't publish to (WhatsApp) is posted by hand.
-  const helper = spec.publishable ? null : `Not published from Studio yet. Copy it and post it in ${spec.label}.`
+      : `${count(length)} characters`
+  const warning = over ? `Over the ${spec.label} limit` : null
   const lastFailed = caption.status === 'READY' && caption.failureReason !== null
-  // The field's description: the notices about it, the helper, the counter
+  // The field's description: the notices about it, the counter
   // and any limit warning.
   const describedBy = [
     (caption.status === 'FAILED' || lastFailed) && failureId,
-    helper && helpId,
     counterId,
     warning && warningId,
   ]
@@ -328,11 +316,6 @@ export function CaptionPanel({
             placeholder={`Write the ${spec.label} caption…`}
           />
           <div className="mt-2 flex items-baseline gap-4">
-            {helper && (
-              <p id={helpId} className="min-w-0 text-ui-xs text-fg-muted">
-                {helper}
-              </p>
-            )}
             <span
               id={counterId}
               className={`ml-auto shrink-0 font-mono text-ui-2xs ${over ? 'font-semibold text-status-failed' : 'text-fg-muted'}`}

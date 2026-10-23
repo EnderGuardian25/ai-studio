@@ -25,16 +25,16 @@ const draft = (stamps: (string | null)[], headlineModel: string | null = null) =
 })
 
 describe('regenerateStampTier — AC-06', () => {
-  it('there are three caption channels (the rule is “all three rows”)', () => {
-    expect(ALL_CHANNELS).toHaveLength(3)
+  it('there are two caption channels (the rule is “both rows”)', () => {
+    expect(ALL_CHANNELS).toHaveLength(2)
   })
 
-  it('{} with [S, S, S] → S', () => {
-    expect(regenerateStampTier(targets({}), draft([S, S, S]))).toBe(S)
+  it('{} with [S, S] → S', () => {
+    expect(regenerateStampTier(targets({}), draft([S, S]))).toBe(S)
   })
 
-  it('{} with [S, O, S] → no stamp tier; resolution starts at the team default with no substitution', () => {
-    const stamp = regenerateStampTier(targets({}), draft([S, O, S]))
+  it('{} with [S, O] → no stamp tier; resolution starts at the team default with no substitution', () => {
+    const stamp = regenerateStampTier(targets({}), draft([S, O]))
     expect(stamp).toBeNull()
     const r = decideModel('CAPTION', {
       stamp,
@@ -53,13 +53,13 @@ describe('regenerateStampTier — AC-06', () => {
     ])
   })
 
-  it('{} with [S, null, S] → no stamp tier', () => {
-    expect(regenerateStampTier(targets({}), draft([S, null, S]))).toBeNull()
+  it('{} with [S, null] → no stamp tier', () => {
+    expect(regenerateStampTier(targets({}), draft([S, null]))).toBeNull()
   })
 
   it('{} with a missing row → no stamp tier', () => {
-    const d = draft([S, S, S])
-    expect(regenerateStampTier(targets({}), { ...d, captions: d.captions.slice(0, 2) })).toBeNull()
+    const d = draft([S, S])
+    expect(regenerateStampTier(targets({}), { ...d, captions: d.captions.slice(0, 1) })).toBeNull()
   })
 
   it('{ channel: LINKEDIN } uses the LinkedIn row’s stamp only', () => {
@@ -68,20 +68,18 @@ describe('regenerateStampTier — AC-06', () => {
       captions: [
         { channel: 'INSTAGRAM' as Channel, model: H },
         { channel: 'LINKEDIN' as Channel, model: O },
-        { channel: 'WHATSAPP' as Channel, model: null },
       ],
     }
     expect(regenerateStampTier(targets({ channel: 'LINKEDIN' }), d)).toBe(O)
-    expect(regenerateStampTier(targets({ channel: 'WHATSAPP' }), d)).toBeNull()
     expect(regenerateStampTier(targets({ channel: 'INSTAGRAM' }), d)).toBe(H)
   })
 
   it('{ headline: true } uses headlineModel, never a caption row', () => {
-    expect(regenerateStampTier(targets({ headline: true }), draft([S, S, S], O))).toBe(O)
-    expect(regenerateStampTier(targets({ headline: true }), draft([S, S, S], null))).toBeNull()
+    expect(regenerateStampTier(targets({ headline: true }), draft([S, S], O))).toBe(O)
+    expect(regenerateStampTier(targets({ headline: true }), draft([S, S], null))).toBeNull()
   })
 
   it('no targets → no stamp tier', () => {
-    expect(regenerateStampTier([], draft([S, S, S], S))).toBeNull()
+    expect(regenerateStampTier([], draft([S, S], S))).toBeNull()
   })
 })

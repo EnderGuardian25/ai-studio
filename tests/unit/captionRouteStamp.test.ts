@@ -82,11 +82,11 @@ describe('the writers put route beside model, and only with validated text', () 
 
   it('captionRowsFromFields: a validated row has both, a failed row neither', () => {
     const rows = captionRowsFromFields(
-      { LINKEDIN: { ok: true, text: 'x' }, WHATSAPP: { ok: false, reason: 'empty' } },
+      { LINKEDIN: { ok: true, text: 'x' }, INSTAGRAM: { ok: false, reason: 'empty' } },
       stamp,
     )
     expect(rows.find((r) => r.channel === 'LINKEDIN')).toMatchObject({ model: stamp.model, route: 'CLI' })
-    expect(rows.find((r) => r.channel === 'WHATSAPP')).toMatchObject({ model: null, route: null })
+    expect(rows.find((r) => r.channel === 'INSTAGRAM')).toMatchObject({ model: null, route: null })
   })
 
   it('settleCaptionRow: a stamp writes both; no stamp writes neither', () => {

@@ -349,10 +349,11 @@ export async function runGenerationForDraft(draftId: string, actor: GenerationAc
           failureReason: reason,
           // A row still PENDING here was never written (the caption call
           // itself failed); PENDING must mean "work is running", so it fails
-          // with the draft. Rows that were written are kept.
+          // with the draft. Rows that were written are kept, and so is a row
+          // for a channel outside the registry (a hidden WhatsApp row, 026).
           captions: {
             updateMany: {
-              where: { status: 'PENDING' },
+              where: { status: 'PENDING', channel: { in: CAPTION_CHANNELS.map((s) => s.channel) } },
               data: { status: 'FAILED', text: '', failureReason: 'generation failed' },
             },
           },

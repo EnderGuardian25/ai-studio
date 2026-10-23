@@ -32,7 +32,7 @@ describe('buildCaptionPrompt — campaign briefing', () => {
     tone: 'Friendly',
     channels: ['INSTAGRAM'],
   }
-  const TARGETS = ['HEADLINE', 'INSTAGRAM', 'LINKEDIN', 'WHATSAPP'] as const
+  const TARGETS = ['HEADLINE', 'INSTAGRAM', 'LINKEDIN'] as const
 
   it('injects the briefing into the system prompt after the voice section', () => {
     const { system } = buildCaptionPrompt({ ...brief, brandVoice: 'Bold.', campaignBriefing: BRIEFING }, TARGETS)

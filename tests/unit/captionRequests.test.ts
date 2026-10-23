@@ -14,8 +14,8 @@ import {
 import { modelKeyMessage } from '@/lib/models/requests'
 
 describe('parseCaptionPatch (FR-12)', () => {
-  it('accepts { channel, text } for every registry channel, WhatsApp included, text as typed', () => {
-    for (const channel of ['INSTAGRAM', 'LINKEDIN', 'WHATSAPP'] as const) {
+  it('accepts { channel, text } for every registry channel, text as typed', () => {
+    for (const channel of ['INSTAGRAM', 'LINKEDIN'] as const) {
       expect(parseCaptionPatch({ channel, text: '  **kept** ' })).toEqual({
         ok: true,
         value: { channel, text: '  **kept** ' },
@@ -61,7 +61,12 @@ describe('parseCaptionPatch (FR-12)', () => {
 
   it('an unknown channel names the registry channels', () => {
     expect(parseCaptionPatch({ channel: 'TIKTOK', text: 'x' })).toEqual({ ok: false, error: CHANNEL_MESSAGE })
-    expect(CHANNEL_MESSAGE).toBe('channel must be INSTAGRAM, LINKEDIN or WHATSAPP')
+    expect(CHANNEL_MESSAGE).toBe('channel must be INSTAGRAM or LINKEDIN')
+  })
+
+  it('WHATSAPP is refused on PATCH and on regenerate (026 AC-03)', () => {
+    expect(parseCaptionPatch({ channel: 'WHATSAPP', text: 'x' })).toEqual({ ok: false, error: CHANNEL_MESSAGE })
+    expect(parseRegenerateBody({ channel: 'WHATSAPP' })).toMatchObject({ ok: false, error: CHANNEL_MESSAGE })
   })
 
   it('non-string values get their own message', () => {
@@ -71,12 +76,12 @@ describe('parseCaptionPatch (FR-12)', () => {
 })
 
 describe('parseRegenerateBody (FR-11)', () => {
-  it('{} → "Regenerate all": the three captions, never the headline (A9)', () => {
-    expect(parseRegenerateBody({})).toStrictEqual({ ok: true, value: { targets: ['INSTAGRAM', 'LINKEDIN', 'WHATSAPP'] } })
+  it('{} → "Regenerate all": the two captions, never the headline (A9)', () => {
+    expect(parseRegenerateBody({})).toStrictEqual({ ok: true, value: { targets: ['INSTAGRAM', 'LINKEDIN'] } })
   })
 
   it('{ channel } → that caption only', () => {
-    expect(parseRegenerateBody({ channel: 'WHATSAPP' })).toStrictEqual({ ok: true, value: { targets: ['WHATSAPP'] } })
+    expect(parseRegenerateBody({ channel: 'LINKEDIN' })).toStrictEqual({ ok: true, value: { targets: ['LINKEDIN'] } })
   })
 
   it('{ headline: true } → the headline only', () => {
@@ -104,7 +109,7 @@ describe('parseRegenerateBody (FR-11)', () => {
   it('each form takes an optional model, returned beside the targets', () => {
     expect(parseRegenerateBody({ model: 'OPUS' })).toStrictEqual({
       ok: true,
-      value: { targets: ['INSTAGRAM', 'LINKEDIN', 'WHATSAPP'], model: 'OPUS' },
+      value: { targets: ['INSTAGRAM', 'LINKEDIN'], model: 'OPUS' },
     })
     expect(parseRegenerateBody({ channel: 'LINKEDIN', model: 'HAIKU' })).toStrictEqual({
       ok: true,

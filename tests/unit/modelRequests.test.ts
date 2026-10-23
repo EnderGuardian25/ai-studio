@@ -125,7 +125,7 @@ vi.mock('@/lib/agent/briefInput', () => ({ buildBriefInput: () => ({}) }))
 vi.mock('@/lib/captions/generate', () => ({ writeCaptions: h.writeCaptions }))
 vi.mock('@/lib/captions/store', () => ({
   loadDraftCaptions: async () => ({
-    captions: ['INSTAGRAM', 'LINKEDIN', 'WHATSAPP'].map((channel) => ({
+    captions: ['INSTAGRAM', 'LINKEDIN'].map((channel) => ({
       channel,
       model: 'claude-sonnet-5-5',
     })),
