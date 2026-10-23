@@ -549,3 +549,34 @@ export interface AdminBrandKitDetail {
   templates: BrandKitTemplateFull[]
   artifacts: BrandKitArtifact[]
 }
+
+// POST /api/admin/brandkits/[id]/prompts/improve (007 FR-15): `lostRules` is the
+// measurable rules (original spelling) the rewrite no longer carries.
+export interface ImprovePromptResponse {
+  draft: string
+  lostRules: string[]
+}
+
+// POST /api/admin/brandkits/[id]/prompts/upgrade (007 FR-05). Errors: 400 zod,
+// 404, 409 { code: 'STALE_BASE', activeVersion }, 422 { code, message },
+// 502 { code: 'UPGRADE_PARSE_FAILED', message }.
+export type UpgradeEdit = import('@/lib/designData/authoring').Edit
+export type UpgradeRejection = import('@/lib/designData/authoring').Rejection
+export type UpgradeResponse =
+  | {
+      outcome: 'edits'
+      baseVersion: number
+      edits: UpgradeEdit[]
+      rejected: UpgradeRejection[]
+      candidates: number
+    }
+  | {
+      outcome: 'none'
+      reason: 'no-candidates' | 'model-proposed-none' | 'all-rejected'
+      rejected: UpgradeRejection[]
+      candidates: number
+    }
+export interface UpgradeStaleBase {
+  code: 'STALE_BASE'
+  activeVersion: number
+}

@@ -61,7 +61,7 @@ Each wave depends on the one before it, so there is no parallel work and no task
 
 ### Wave 2 — The route, the seam and improve
 
-- [ ] `T2` — `POST …/prompts/upgrade`, the prompt builder, the MOCK seam and `lostRules` on improve
+- [x] `T2` — `POST …/prompts/upgrade`, the prompt builder, the MOCK seam and `lostRules` on improve
   - Files: `src/lib/kitUpgrade/{upgrade,prompt}.ts` (new), `src/app/api/admin/brandkits/[id]/prompts/upgrade/route.ts` (new), `src/app/api/admin/brandkits/[id]/prompts/improve/route.ts`, `src/lib/testHooks.ts`, `src/lib/api-types.ts`, `tests/unit/{kitUpgradePrompt,kitUpgradeRoute}.test.ts` (new)
   - Estimate: medium
   - Kind: impl

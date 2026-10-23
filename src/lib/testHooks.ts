@@ -211,6 +211,63 @@ export function buildMockBrandKitReply(lastUserMessage: string): string {
   ].join('\n')
 }
 
+// 007 FR-11: the kit-upgrade seam. Sentinels in the posted text select the
+// outcome; each is reachable with no real model. Dormant in production like
+// the neighbours (the route only reaches this under MOCK_AI).
+export const MOCK_UPGRADE_UNPARSEABLE = '__MOCK_UPGRADE_UNPARSEABLE__'
+export const MOCK_UPGRADE_NONE = '__MOCK_UPGRADE_NONE__'
+export const MOCK_UPGRADE_BAD = '__MOCK_UPGRADE_BAD__'
+export const MOCK_UPGRADE_OUTOFRANGE = '__MOCK_UPGRADE_OUTOFRANGE__'
+export const MOCK_IMPROVE_DROP_RULES = '__MOCK_IMPROVE_DROP_RULES__'
+
+export function buildMockKitUpgradeReply(
+  candidates: ReadonlyArray<{ id: string; mockReplacement: string }>,
+  text: string,
+): string {
+  const block = (proposals: unknown[]) =>
+    [
+      'Mock kit-upgrade reply for E2E tests.',
+      '',
+      '```kitedits',
+      JSON.stringify(proposals, null, 2),
+      '```',
+    ].join('\n')
+
+  if (text.includes(MOCK_UPGRADE_UNPARSEABLE)) {
+    return 'Mock kit-upgrade reply with no edits block: I would rather describe the changes in prose.'
+  }
+  if (text.includes(MOCK_UPGRADE_NONE)) return block([])
+  if (text.includes(MOCK_UPGRADE_BAD)) {
+    const [first, second, third] = candidates
+    const proposals: unknown[] = []
+    if (first) proposals.push({ candidateId: first.id, replacement: first.mockReplacement })
+    if (second) {
+      proposals.push({ candidateId: second.id, replacement: 'Leave it nicely roomy and balanced.' })
+    }
+    if (third) {
+      proposals.push({
+        candidateId: third.id,
+        replacement: 'Use #ff0000 for 40 percent of the canvas.',
+      })
+    }
+    proposals.push({
+      candidateId: 'no-such-candidate:0',
+      replacement: 'clear space of 1 to 2 wordmark letters on every side',
+    })
+    return block(proposals)
+  }
+  if (text.includes(MOCK_UPGRADE_OUTOFRANGE)) {
+    return block(
+      candidates.slice(0, 1).map((c) => ({
+        candidateId: c.id,
+        // Every number far outside any entry's range; still measurable.
+        replacement: c.mockReplacement.replace(/\d+(?:\.\d+)?/g, '997'),
+      })),
+    )
+  }
+  return block(candidates.map((c) => ({ candidateId: c.id, replacement: c.mockReplacement })))
+}
+
 /**
  * Deterministic image→template HTML (MOCK_AI, F6). A self-contained Path A
  * template with SAMPLE content in each slot (headline / body / photo) that the

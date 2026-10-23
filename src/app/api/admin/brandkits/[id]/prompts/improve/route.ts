@@ -4,8 +4,19 @@ import { withTeamAdmin } from '@/lib/api/handler'
 import { draftBrandVoice } from '@/lib/brandkit/voiceDraft'
 import { withClaudeAuth } from '@/lib/agent/userToken'
 import { AssistantModelError } from '@/lib/campaign/briefingAssistant'
+import { lostMeasurableRules, measurableSpans } from '@/lib/designData/authoring'
+import { buildImprovePrompt } from '@/lib/kitUpgrade/prompt'
+import { MOCK_IMPROVE_DROP_RULES } from '@/lib/testHooks'
 
 type Params = { id: string }
+
+function stripMeasurableSpans(text: string): string {
+  let out = text
+  for (const span of [...measurableSpans(text)].reverse()) {
+    out = out.slice(0, span.start) + out.slice(span.end)
+  }
+  return out
+}
 
 export const POST = withTeamAdmin<Params>(async (_req, { params }, user) => {
   const kit = await prisma.brandKit.findUnique({
@@ -25,13 +36,12 @@ export const POST = withTeamAdmin<Params>(async (_req, { params }, user) => {
   // mode-agnostic call live inside it (see src/lib/brandkit/voiceDraft.ts).
   // CLI mode bills the acting user's personal Claude token when connected
   // (the team token otherwise) — see src/lib/agent/userToken.ts.
-  const promptText = `You are a brand strategist. Improve the following brand voice prompt for an AI design agent.
-
-Current prompt:
-${currentPrompt}
-
-Make it more specific, actionable, and comprehensive. Add concrete guidance on visual composition, spacing, hierarchy, and specific do/don't rules. Keep the same second-person tone. Return only the improved prompt text, no preamble.`
-  const mockDraft = `${currentPrompt} [MOCK improved brand voice prompt for E2E tests — deterministic.]`
+  const promptText = buildImprovePrompt(currentPrompt)
+  // 007 FR-11: with the sentinel in the active prompt, the mock rewrite drops
+  // every measurable span, so the lost-rule flag is reachable without a model.
+  const mockDraft = currentPrompt.includes(MOCK_IMPROVE_DROP_RULES)
+    ? stripMeasurableSpans(currentPrompt)
+    : `${currentPrompt} [MOCK improved brand voice prompt for E2E tests — deterministic.]`
 
   let draft: string
   try {
@@ -47,5 +57,7 @@ Make it more specific, actionable, and comprehensive. Add concrete guidance on v
   }
 
   // Return the draft — admin must explicitly save it as a new version
-  return NextResponse.json({ draft })
+  // 007 FR-15: additive. The measurable rules the rewrite no longer carries.
+  const lostRules = lostMeasurableRules(currentPrompt, draft)
+  return NextResponse.json({ draft, lostRules })
 })
