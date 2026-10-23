@@ -21,7 +21,35 @@
 | 023 scheduler heartbeat                   | **VERIFIED PASS** 11/11 ACs                                 | E2E 405/3/0/0; unit 2706/2706; lint 0 errors / 7 warnings; CI green at `f43669a` (runs 39493017393, 39493027033); [reports](../.specclaw/changes/023-scheduler-heartbeat/reports/T2.md)                                                                                                                                  |
 | 009 hero imagery, Phase 1                 | **VERIFIED PASS** 25/25 ACs; OP-1 pending (the user's step) | T1 `bfe3d57` to T6 `ea1c36e`, verify `d3534e0`; E2E 422/3/0/0; unit 2947/2947; render 47/47; CI green at `f8f063c` (runs 39604699552, 39604706638); [verify-report](../.specclaw/changes/009-hero-image-design/verify-report.md)                                                                                         |
 | 024 caption credential route              | **VERIFIED PASS, 17/17 ACs**                                | T1 `d772715`, T2 `d4d14f2`, T3 `03961b9`; E2E 431/3/0/0; unit 3024/3024; render 47/47; CI green at `cd9d411` (runs 39837152549, 39837162772; the PR run passed on one rerun after a CI-runner Chromium launch timeout in the render harness); [reports](../.specclaw/changes/024-caption-credential-route/reports/T3.md) |
+| 007 brandkit design rules                 | **BUILT T1 to T4; verify next**                             | T1 `e267a08`, T2 `212b7b8`, T3 `3fc0811`; unit 3147/3147; E2E 442/3/0/0; render 47/47; lint 0 errors / 7 warnings; CI pending (run IDs follow the push); [reports](../.specclaw/changes/007-brandkit-design-system/reports/T3.md)                                                                                        |
 
+- **007 (BUILT, T1 to T4; verify next; [spec](../.specclaw/changes/007-brandkit-design-system/spec.md), [design](../.specclaw/changes/007-brandkit-design-system/design.md)):** brand-kit design rules, a detector and an upgrade. The kit voice prompt is where authors write adjectives ("generous clear space", "similar visual heights") that the design model reads as nothing. This change finds those phrases and helps the author replace them with a measured rule.
+  - **The flow.**
+    1. In the kit's New Version editor (`/admin/brandkits`), a live detector flags vague design phrases as the author types. It runs in the browser, makes no request and costs nothing.
+    2. "Improve this version" seeds the editor from the active version. "Upgrade" asks the model for measurable wording for each flagged phrase.
+    3. Each proposal shows the removed text beside the inserted text, a provenance label and a rationale. The author accepts or rejects each one, and an accept only edits the textarea.
+    4. The existing **Save** creates and activates a new version through the unchanged save route. **Restore means the old way:** every earlier version stays in the history, and restoring one makes it the active version again.
+  - **What the code decides and what the model decides.** The detector picks every anchor (the quote, its position and the dataset entry). The model only fills wording, inside the entry's allowed ranges. Code builds each edit and sets its provenance (`dataset` for an in-range number, `unverified` for one outside the range, shown as "Number not from the dataset, check it"). The prompt names roles ("brand colour 1", "the headline font"), never a hex or a font name.
+  - **Dataset.** Seven entries in `src/lib/designData/authoring/`: `logo-clear-space`, `mark-size-match`, `element-scale`, `margin-even`, `canvas-share`, `whitespace-share`, `edge-blend`. Generation prompts cannot import it (`designDataBoundary.test.ts`).
+  - **Improve with AI** gains one response field, `lostRules`: the measurable spans the rewrite dropped, shown above the editor. Its prompt and its draft are otherwise unchanged.
+  - **Limits, stated plainly.**
+    - It is a **text check only.** Nothing renders a post to confirm a new rule works.
+    - The stale-base check on Save is **client-only** (the save route is unchanged, so the server cannot refuse). The upgrade route itself does refuse a stale `baseVersion` with 409.
+    - A quote is replaced only when it occurs **exactly once** in the text. A repeated phrase is flagged but its edit is disabled as stale.
+    - The detector word list is **data and may miss or over-flag phrases.** For example a bare "dominates" flags `canvas-share` with no design noun, and "ample parking space" flags `logo-clear-space`. Flags are advisory and can be dismissed.
+    - 9:16, typography and the briefing editor are not covered (follow-ups).
+  - **Logs and how to grep them.** Every upgrade call logs one line: `[kit-upgrade] team=<id> kit=<id> candidates=<n> edits=<n> rejected=<n> entries=<keys>`. It holds no prompt text. `grep "\[kit-upgrade\]"` the app log. **A parse failure also logs up to 2000 characters of the model's raw reply.** A model that quotes the base text puts that text in the log, so treat the log as holding kit prompt text in that case.
+  - **The evidence query** (FR-17). Run it read-only against prod after the deploy, with the deploy date. Each new version is a Save that followed an edit session, since an accept is invisible to the server:
+
+    ```sql
+    SELECT "brandKitId", count(*) AS versions, max("createdAt") AS latest
+    FROM "BrandKitPrompt" WHERE "createdAt" >= '<deploy date>' GROUP BY 1 ORDER BY 2 DESC;
+    ```
+
+  - **OQ-1 (resolved, user 2026-10-23: "no stamp for now").** No column records which entries an accepted version drew on, and the accept rate is not observable. Uptake is measured by the log line and the query above. A later change can add a nullable `BrandKitPrompt.upgradeEntries` column.
+  - **Operator step: the navy/teal drift on the Hearts Academy kit** (a check, not a blocker; FR-18). The kit's "teal-to-green is the primary canvas" has no number, so renders drift navy. To close it, a team admin opens the Hearts Academy kit on prod (`cms3jg09p000at5ijivpi3zhe`) at `/admin/brandkits`, uses "Improve this version", accepts the `canvas-share` edit with the numbers they choose (for example brand colour 1 at 60% of the canvas), and saves. **The author chooses the numbers.** Then update CLAUDE.md's "One open drift" line.
+  - **Operator step (optional): a real-model look.** Run one upgrade on a real kit and read the edits. The build makes no real model call and does not claim the real wording is good.
+  - **T4:** these docs and the gate. Gate: unit 3147/3147; render 47/47; lint 0 errors / 7 warnings; E2E 442/3/0/0; CI pending (run IDs follow the push). No migration, no env var.
 - **024 (VERIFIED PASS, 17/17 ACs; [verify-report](../.specclaw/changes/024-caption-credential-route/verify-report.md), [spec](../.specclaw/changes/024-caption-credential-route/spec.md), [design](../.specclaw/changes/024-caption-credential-route/design.md)):** 005 item 2. A team's admin names the caption route at `/team`: **Claude CLI (OAuth)** or **Anthropic API key**. The choice is stored on the team and read by one shared selector, so interactive, scheduled and MCP captions all use it and `/team` shows the same answer. **A team that never chooses keeps today's behaviour exactly** (the user's decision, 2026-10-22).
   - **T1 (`d772715`):** the `CaptionRoute` enum (`CLI`, `API_KEY`), `Team.captionRoute` (null means never chosen), the stamp columns `Draft.headlineRoute` and `DraftCaption.route` (TEXT, nullable), the additive migration `20261023120000_caption_route` and its manual down script `prisma/rollback/024-caption-credential-route.down.sql`.
   - **T2 (`d4d14f2`):** the pure `selectRoute('CAPTION', input)` (`src/lib/models/route.ts`); the loader `loadCaptionRoute` (`src/providers/captionRoute.ts`); `resolveCopyProvider` decides before the `MOCK_AI` seam; the route is stamped on each caption and headline row; an `API_KEY` run counts as the team credential tier for the Opus gate (`captionCredential` on `GET /api/models`); a chosen route stores the brief's key as `'cli'` and ignores a brief key; `POST /api/briefs` returns `422 CAPTION_ROUTE_NOT_READY` for a chosen route that is not ready; the model-calls record gains `route`; the guard test `modelArgParity.test.ts`.
@@ -106,7 +134,7 @@
 1. ~~022~~ and ~~021~~ are done: both VERIFIED PASS (2026-10-19 and 2026-10-20).
 2. ~~019~~ and ~~020~~ are done: both VERIFIED PASS (2026-10-20). The build order 018 → 022 → 021 → 019 → 020 is complete.
 3. ~~023~~ and ~~009~~ (Phase 1) are done: both VERIFIED PASS (2026-10-21). 009 OP-1 is the user's step.
-   - **024** is built (T1 to T4); the verify is pending. The user's order after it is **024 → 007 → 025 → 006**; 010 is deferred. The next step is to plan 007.
+   - **024** is VERIFIED PASS. **007** is built (T1 to T4); its verify is pending. The user's order is **024 → 007 → 025 → 006**; 010 is deferred. After 007's verify the next change is 025, which waits on 009 OP-1: ask the user.
 4. **The `v2` → `main` merge** waits on the user's go-ahead and the checklist below.
 5. **Company prod to-dos, live again:** B4, the team Claude tokens, the Coolify token rotation and MinIO → silo on prod. They are listed in CLAUDE.md.
 
@@ -185,6 +213,10 @@ Run these right after the deploy, before users create new drafts:
   - **Nothing changes for a team that has not chosen a route.** After the deploy, choose each team's route at `/team`, and only after every container (app and scheduler) serves the new image. Until then behaviour is today's.
   - **A team that chooses `API_KEY` needs an enabled `anthropic` COPY row first,** or its captions (interactive, scheduled and MCP) fail closed with the route-named error.
   - **The design step still needs a team Claude token,** so this change alone does not make a scheduled post succeed on a team with none.
+- **007 brand-kit design rules (FR-18).** This is a check, not a blocking step.
+  - **No migration and no env var.** The change adds one route (`POST /api/admin/brandkits/[id]/prompts/upgrade`), one additive field on the Improve response and the editor panel.
+  - **Nothing changes for a team that does not use the new buttons.** Generation prompts, `buildBrandKitSystemContext` and `PROMPT_VERSION` (`2026-10-21.1`) are unchanged, and so is the save route. An image rollback needs no down script.
+  - **The Hearts Academy drift fix is an operator step** (the 007 section above), not a blocker.
 - **External `copyText` callers.** 016 removed the `copyText` field from MCP `get_draft` and `generate_post`, ACP `generate_post` and `POST /api/generate/copy`. The operator confirms that no external caller reads it, using each prod team's `/team` API keys and their last use. Any revert of these removals is its own change.
 - **The migration list.** Produce it at merge time; never keep it by hand:
 

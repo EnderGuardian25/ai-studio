@@ -596,7 +596,7 @@ Each case uses a unique topic and `waitForDraft` / `waitForAction`, with one kit
 - **`GET` / `DELETE /api/test/model-calls`** (008 FR-16): the recorder's ring buffer.
   - It holds 200 records on `globalThis`, shared across `next dev` route modules, newest last.
   - It is gated like `/api/test/scheduler-tick`: 404 in production, 404 unless `MOCK_AI`, and admin-only.
-  - Each record is `{ surface, key, arg, mode, source, substitutedFrom, label, route }`. `route` (024 FR-07) is `CLI`, `API_KEY`, `SERVER_KEY` or `OTHER` on a caption (`label` `copy`) record, from the selector's decision, and `null` on every other record. Read a caption's route by filtering on `label === 'copy'`. Every `MOCK_AI` branch on a model surface records the `ResolvedModel` it was handed before returning its mock.
+  - Each record is `{ surface, key, arg, mode, source, substitutedFrom, label, route }`. `route` (024 FR-07) is `CLI`, `API_KEY`, `SERVER_KEY` or `OTHER` on a caption (`label` `copy`) record, from the selector's decision, and `null` on every other record. Read a caption's route by filtering on `label === 'copy'`. Every `MOCK_AI` branch on a model surface records the `ResolvedModel` it was handed before returning its mock. The upgrade route (007) records under the label `kit-upgrade` (surface `ASSISTANT_BRANDKIT`); read it by filtering on that label.
   - Each case `DELETE`s before the action it asserts on.
 - **Stamps are seeded through the test DB** (`prisma.draft.update` / `draftCaption.update`), as §W does.
 - **The verifier is reached with an _add_ instruction** ("Include a human character"). A bare mock document defaults to the add class, whose post-condition is the verifier (004 TC-FID-09).
@@ -873,6 +873,55 @@ Serial (`test.describe.configure({ mode: 'serial' })`). Needs `MOCK_AI` + `MOCK_
 | 024 AC-15 the other suites stay green              | the full clean mock run; the T3 targeted run (83 passed)          |
 
 The pure parts (the selector table, the loader, the stamp writers, the gate rule, the picker, the route API, the arg-parity guard) are unit-tested without a server.
+
+---
+
+### AC. Brand-kit design rules (`kit-upgrade.test.ts`, change 007 T3 — AC-10 to AC-14)
+
+Serial (`test.describe.configure({ mode: 'serial' })`). Needs `MOCK_AI` and test-DB access; it skips without `MOCK_AI`. Each case logs in as the seeded admin (and the editor where it needs one), creates its own kit through `POST /api/admin/brandkits` and its prompt through `POST …/prompts`, and `beforeEach` clears the model-calls ring (`DELETE /api/test/model-calls`). The upgrade call is read from `GET /api/test/model-calls`, filtering records by label `kit-upgrade`.
+
+**Sentinels** (exported from `src/lib/testHooks.ts`, dormant in production; a sentinel in the posted text steers the mock reply):
+
+- `__MOCK_UPGRADE_UNPARSEABLE__`: the reply has no ` ```kitedits ` block (502 `UPGRADE_PARSE_FAILED`).
+- `__MOCK_UPGRADE_NONE__`: the reply proposes nothing (200 `none`, `model-proposed-none`).
+- `__MOCK_UPGRADE_BAD__`: the reply holds one good proposal and three bad ones (an unknown candidate, a non-measurable wording and a forbidden literal), so the response has one edit and three rejection reasons.
+- `__MOCK_UPGRADE_OUTOFRANGE__`: the reply's number is outside the entry's range (the edit comes back `provenance: 'unverified'`).
+- `__MOCK_IMPROVE_DROP_RULES__`: for Improve with AI. When the active prompt holds it, the mock draft is the prompt with its measurable spans removed. Without it the draft is today's string.
+
+- **TC-KU-01 — The live detector (AC-13).** Typing the Hearts fixture into the New Version textarea shows four flagged rows within the debounce and makes no request to `…/upgrade`. The brand-voice fixture shows none.
+- **TC-KU-02 — The upgrade (AC-10).** `POST …/upgrade` with the fixture and the right `baseVersion` returns four edits, entry keys as the detector found them, `provenance: 'dataset'`, and one `kit-upgrade` record.
+- **TC-KU-03 — Every edit is measurable (AC-06).** Each `replacement` passes the exported `isMeasurable`, and each `quote` occurs exactly once in the posted text.
+- **TC-KU-04 — Parse failure (AC-10).** `UNPARSEABLE` is 502 `UPGRADE_PARSE_FAILED`, not a 200 with an empty list. The UI shows the error and a "Try again" button.
+- **TC-KU-05 — Nothing to propose (AC-10).** `NONE` is 200 `none` / `model-proposed-none`. A text with no vague phrase is `none` / `no-candidates` with no recorder entry.
+- **TC-KU-06 — Rejections and provenance (AC-07, AC-08, AC-10).** `BAD` is 200 `edits` with one edit and the three rejection reasons. `OUTOFRANGE` gives `provenance: 'unverified'` and the UI shows "Number not from the dataset, check it".
+- **TC-KU-07 — The editor flow (AC-13).** "Improve this version", Upgrade; each edit shows the removed text beside the inserted text (an insert shows "After the sentence with …" and no removal), the provenance label and the rationale. Accept two, reject one: the textarea changes and the version list does not. Save creates one new active version equal to the textarea. Accepting nothing and saving creates a version equal to the base. The Save note's words are on the page.
+- **TC-KU-08 — The stale base (AC-12).** A second save through the API moves the active version. `…/upgrade` with the old `baseVersion` is 409 `STALE_BASE` with no recorder entry. In the UI, Save in an upgrade-seeded editor shows the "was saved since you started" confirm; Cancel saves nothing and "Save anyway" saves.
+- **TC-KU-09 — Stale edits and dismiss (AC-13).** Editing the textarea so a quote no longer occurs once disables that edit as stale. Dismissing a flag hides it until reload.
+- **TC-KU-10 — Lost rules (AC-14).** Improve with AI on a kit whose active prompt holds `__MOCK_IMPROVE_DROP_RULES__` and "1.5 wordmark letters" returns `lostRules` holding `1.5 wordmark letters`. On a normal kit `lostRules` is `[]` and `draft` is today's shape. The UI shows the dropped spans above the editor.
+- **TC-KU-11 — Auth and tenancy (AC-11).** 401 with no valid session (a bogus session cookie, because the proxy redirects a cookie-less request), 403 for the editor, 404 for another team's kit and for a deleted kit, 400 for a missing, empty or over-long `text` and for a negative `baseVersion`.
+
+| AC                                            | E2E / unit                                                           |
+| --------------------------------------------- | -------------------------------------------------------------------- |
+| 007 AC-01 to AC-03 the detector               | TC-KU-01; unit `designDetect`                                        |
+| 007 AC-04, AC-05 the dataset and "measurable" | unit `designAuthoring`, `designMeasurable`                           |
+| 007 AC-06 every edit is measurable            | TC-KU-03; unit `kitUpgradeValidate`                                  |
+| 007 AC-07, AC-08 validation and provenance    | TC-KU-06; unit `kitUpgradeValidate`                                  |
+| 007 AC-09 roles, not literals                 | unit `kitUpgradePrompt`, `kitUpgradeValidate`                        |
+| 007 AC-10 the three outcomes                  | TC-KU-02, TC-KU-04, TC-KU-05, TC-KU-06                               |
+| 007 AC-11 auth and tenancy                    | TC-KU-11                                                             |
+| 007 AC-12 the stale base                      | TC-KU-08                                                             |
+| 007 AC-13 the editor flow                     | TC-KU-01, TC-KU-07, TC-KU-09                                         |
+| 007 AC-14 Improve flags lost rules            | TC-KU-10; unit `designLostRules`                                     |
+| 007 AC-15 host-agnostic review                | unit `kitUpgradeReview`                                              |
+| 007 AC-16 boundaries and purity               | unit `designDataBoundary`                                            |
+| 007 AC-17 generation and save untouched       | unit `generationUntouched`; the `git diff` checks in `reports/T4.md` |
+| 007 AC-18 one fenced-block extractor          | unit `fencedBlock`, `brandKitAssistant`                              |
+| 007 AC-19 grounding and the model call        | unit `kitUpgradePrompt`, `kitUpgradeRoute`                           |
+| 007 AC-20 observability and docs              | unit `kitUpgradeRoute` (the log line); `docs/handoff.md` 007 section |
+| 007 AC-21 the design system                   | unit `uiTokenGuard`; the T3 screenshots at 390 and 1440 px           |
+| 007 AC-22 nothing regressed                   | the full clean mock run, unit, render, build, CI                     |
+
+The pure parts (the dataset, detector, measurable check, validator, review reducer, prompt builder and route) are unit-tested without a server. The mock suite proves the mechanism with mock replies, not the real model's wording.
 
 ---
 

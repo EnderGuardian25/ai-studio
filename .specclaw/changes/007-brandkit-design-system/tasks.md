@@ -106,7 +106,7 @@ Each wave depends on the one before it, so there is no parallel work and no task
 
 ### Wave 4 — Docs and the gate
 
-- [ ] `T4` — The docs, the full gate and CI
+- [x] `T4` — The docs, the full gate and CI
   - Files: `docs/handoff.md`, `docs/e2e-test-plan.md`, `CLAUDE.md`, `.specclaw/ROADMAP.md`
   - Estimate: small
   - Kind: docs
