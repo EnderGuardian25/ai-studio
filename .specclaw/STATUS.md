@@ -1,7 +1,7 @@
 # 🦞 SpecClaw Dashboard
 
 **Project:** bistec-studio
-**Last Updated:** 2026-10-23 01:48 UTC
+**Last Updated:** 2026-10-23 05:08 UTC
 
 _1 unnumbered change · run `/specclaw:renumber` to order them_
 
@@ -10,25 +10,25 @@ _1 unnumbered change · run `/specclaw:renumber` to order them_
 - 🔨 **001-marketing-post-studio-v1** — 18/29 tasks (62%) | 0 failed
 - ✅ **002-brief-draft-recovery** — 6/6 tasks (100%) | 0 failed
 - ✅ **003-async-draft-actions** — 12/12 tasks (100%) | 0 failed
-- 🔍 **004-design-instruction-fidelity** — verify PASS | 23/24 tasks (95%) | 0 failed | PR #43 open | 369h59m
-- 🔍 **005-provider-flexibility-onboarding** — verify PASS | 10/10 tasks (100%) | 0 failed | PR #43 open | 122h0m
-- 🔨 **007-brandkit-design-system** ▣ — build in-progress | 4/4 tasks (100%) | 0 failed | PR #43 open | 1h23m
-- 🔍 **008-model-selection** ▣ — verify PASS | 19/19 tasks (100%) | 0 failed | PR #43 open | 27h54m
-- 🔍 **009-hero-image-design** ▣ — verify PASS | 6/6 tasks (100%) | 0 failed | PR #43 open | 11h49m
-- 🔍 **011-app-visual-redesign** — verify PASS | 13/13 tasks (100%) | 0 failed | PR #43 open | 59h23m
-- 🔍 **012-per-channel-captions** ▣ — verify PASS | 16/16 tasks (100%) | 0 failed | PR #43 open | 26h43m
-- 🔍 **013-fork-ci-checks-only** ▫ — verify PASS | 3/3 tasks (100%) | 0 failed | PR #43 open | 13h13m
-- 🔍 **014-ui-a11y-consistency-pass** ▣ — verify PASS | 18/18 tasks (100%) | 0 failed | PR #43 open | 42h45m
-- 🔍 **015-draft-action-settle-race** ▫ — verify PASS | 3/3 tasks (100%) | 0 failed | PR #43 open | 25m
-- 🔍 **016-fresh-start-cleanup** ▫ — verify PASS | 5/5 tasks (100%) | 0 failed | PR #43 open | 2m
-- 🔍 **017-publish-api-fixes** ▫ — verify PASS | 3/3 tasks (100%) | 0 failed | PR #43 open
-- 🔍 **018-post-008-small-fixes** ▫ — verify PASS | 4/4 tasks (100%) | 0 failed | PR #43 open | 1h2m
-- 🔍 **019-draft-action-claim-token** ▫ — verify PASS | 4/4 tasks (100%) | 0 failed | PR #43 open | 4h14m
-- 🔍 **020-create-post-button-draft-page** ▫ — verify PASS | 2/2 tasks (100%) | 0 failed | PR #43 open | 1h16m
+- 🔍 **004-design-instruction-fidelity** — verify PASS | 23/24 tasks (95%) | 0 failed | PR #43 closed | 369h59m
+- 🔍 **005-provider-flexibility-onboarding** — verify PASS | 10/10 tasks (100%) | 0 failed | PR #43 closed | 122h0m
+- 🔍 **007-brandkit-design-system** ▣ — verify PASS | 4/4 tasks (100%) | 0 failed | PR #43 closed | 3h17m
+- 🔍 **008-model-selection** ▣ — verify PASS | 19/19 tasks (100%) | 0 failed | PR #43 closed | 27h54m
+- 🔍 **009-hero-image-design** ▣ — verify PASS | 6/6 tasks (100%) | 0 failed | PR #43 closed | 11h49m
+- 🔍 **011-app-visual-redesign** — verify PASS | 13/13 tasks (100%) | 0 failed | PR #43 closed | 59h23m
+- 🔍 **012-per-channel-captions** ▣ — verify PASS | 16/16 tasks (100%) | 0 failed | PR #43 closed | 26h43m
+- 🔍 **013-fork-ci-checks-only** ▫ — verify PASS | 3/3 tasks (100%) | 0 failed | PR #43 closed | 13h13m
+- 🔍 **014-ui-a11y-consistency-pass** ▣ — verify PASS | 18/18 tasks (100%) | 0 failed | PR #43 closed | 42h45m
+- 🔍 **015-draft-action-settle-race** ▫ — verify PASS | 3/3 tasks (100%) | 0 failed | PR #43 closed | 25m
+- 🔍 **016-fresh-start-cleanup** ▫ — verify PASS | 5/5 tasks (100%) | 0 failed | PR #43 closed | 2m
+- 🔍 **017-publish-api-fixes** ▫ — verify PASS | 3/3 tasks (100%) | 0 failed | PR #43 closed
+- 🔍 **018-post-008-small-fixes** ▫ — verify PASS | 4/4 tasks (100%) | 0 failed | PR #43 closed | 1h2m
+- 🔍 **019-draft-action-claim-token** ▫ — verify PASS | 4/4 tasks (100%) | 0 failed | PR #43 closed | 4h14m
+- 🔍 **020-create-post-button-draft-page** ▫ — verify PASS | 2/2 tasks (100%) | 0 failed | PR #43 closed | 1h16m
 - 🔍 **021-graphite-retheme** ▣ — verify PASS | 8/8 tasks (100%) | 0 failed | 42h47m
 - 🔍 **022-prod-data-and-deploy-restore** ▫ — verify PASS | 4/4 tasks (100%) | 0 failed | 5h22m
-- 🔍 **023-scheduler-heartbeat** ▫ — verify PASS | 3/3 tasks (100%) | 0 failed | PR #43 open | 5h24m
-- 🔍 **024-caption-credential-route** ▣ — verify PASS | 4/4 tasks (100%) | 0 failed | PR #43 open | 6h45m
+- 🔍 **023-scheduler-heartbeat** ▫ — verify PASS | 3/3 tasks (100%) | 0 failed | PR #43 closed | 5h24m
+- 🔍 **024-caption-credential-route** ▣ — verify PASS | 4/4 tasks (100%) | 0 failed | PR #43 closed | 6h45m
 
 ## Pending Proposals
 
