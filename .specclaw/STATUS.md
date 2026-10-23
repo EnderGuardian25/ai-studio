@@ -1,7 +1,7 @@
 # 🦞 SpecClaw Dashboard
 
 **Project:** bistec-studio
-**Last Updated:** 2026-10-23 15:32 UTC
+**Last Updated:** 2026-10-23 15:40 UTC
 
 _1 unnumbered change · run `/specclaw:renumber` to order them_
 
@@ -12,6 +12,7 @@ _1 unnumbered change · run `/specclaw:renumber` to order them_
 - ✅ **003-async-draft-actions** — 12/12 tasks (100%) | 0 failed
 - 🔍 **004-design-instruction-fidelity** — verify PASS | 23/24 tasks (95%) | 0 failed | PR #43 closed | 369h59m
 - 🔍 **005-provider-flexibility-onboarding** — verify PASS | 10/10 tasks (100%) | 0 failed | PR #43 closed | 122h0m
+- 📝 **006-product-observability** ▣ — tasks done | 0/6 tasks (0%) | 0 failed | 17m
 - 🔍 **007-brandkit-design-system** ▣ — verify PASS | 4/4 tasks (100%) | 0 failed | PR #43 closed | 3h17m
 - 🔍 **008-model-selection** ▣ — verify PASS | 19/19 tasks (100%) | 0 failed | PR #43 closed | 27h54m
 - 🔍 **009-hero-image-design** ▣ — verify PASS | 6/6 tasks (100%) | 0 failed | PR #43 closed | 11h49m
@@ -32,7 +33,6 @@ _1 unnumbered change · run `/specclaw:renumber` to order them_
 
 ## Pending Proposals
 
-- 📋 **006-product-observability** ▣ — proposal ready, awaiting planning
 - 📋 **010-whatsapp-channel-posting** — proposal ready, awaiting planning
 - 📋 **025-hero-reference-images** — proposal ready, awaiting planning
 
@@ -42,6 +42,6 @@ _None._
 
 ## Stats
 
-- **Total changes:** 22
-- **Active:** 22
+- **Total changes:** 23
+- **Active:** 23
 - **Completed:** 0
