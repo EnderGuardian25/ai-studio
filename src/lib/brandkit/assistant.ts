@@ -8,6 +8,7 @@ import type { ModelKey } from '@/lib/models/catalogue'
 import { buildDocsContext } from '@/lib/campaign/documents'
 import { sampleImageColors } from '@/lib/renderer/puppeteer'
 import { fenceUntrusted, UNTRUSTED_CONTENT_GUARD } from '@/lib/agent/untrusted'
+import { extractFencedJson } from '@/lib/agent/fencedBlock'
 import { MOCK_AI, MOCK_PUPPETEER, buildMockBrandKitReply } from '@/lib/testHooks'
 
 // F5 — conversational brand-kit creation from references. Mirrors the campaign
@@ -50,20 +51,10 @@ export interface BrandKitSuggestion {
   colors: string[]
 }
 
-const BLOCK_FENCE = /```brandkit\s*\n([\s\S]*?)```/g
-
 // Parse the LAST ```brandkit block. Returns null when missing/malformed.
 export function extractBrandKitBlock(text: string): Omit<BrandKitSuggestion, 'colors'> & { colors: string[] } | null {
-  let match: RegExpExecArray | null = null
-  for (const m of text.matchAll(BLOCK_FENCE)) match = m
-  const raw = match?.[1]?.trim()
-  if (!raw) return null
-  try {
-    const parsed = brandKitBlockSchema.safeParse(JSON.parse(raw))
-    return parsed.success ? parsed.data : null
-  } catch {
-    return null
-  }
+  const r = extractFencedJson(text, 'brandkit', brandKitBlockSchema)
+  return r.ok ? r.data : null
 }
 
 // Reference images the vision model + color sampler work from (feedToAI only).

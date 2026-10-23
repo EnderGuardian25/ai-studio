@@ -41,7 +41,7 @@ Each wave depends on the one before it, so there is no parallel work and no task
 
 ### Wave 1 — The pure core
 
-- [ ] `T1` — The authoring dataset, the detector, the measurable check, validation and provenance, the review reducer, the fenced-block helper and the boundary guard
+- [x] `T1` — The authoring dataset, the detector, the measurable check, validation and provenance, the review reducer, the fenced-block helper and the boundary guard
   - Files: `src/lib/designData/authoring/{index,entries,measurable,detect,validate,roles}.ts` (new), `src/lib/kitUpgrade/review.ts` (new), `src/lib/agent/fencedBlock.ts` (new), `src/lib/brandkit/assistant.ts` (`extractBrandKitBlock` only), `tests/unit/{designAuthoring,designMeasurable,designDetect,designLostRules,kitUpgradeValidate,kitUpgradeReview,fencedBlock,designDataBoundary,generationUntouched}.test.ts` (new), `tests/unit/fixtures/hearts-kit-adjectives.ts` (new)
   - Estimate: large
   - Kind: impl
