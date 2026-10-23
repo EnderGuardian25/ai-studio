@@ -1,2 +1,4 @@
 {"ev":"start","span":"propose","kind":"phase","label":"propose","at":"2026-10-23T00:24:25Z","ts":1792715065}
 {"ev":"stop","span":"propose","at":"2026-10-23T00:32:23Z","ts":1792715543,"status":"ok"}
+{"ev":"start","span":"plan","kind":"phase","label":"plan","at":"2026-10-23T00:45:28Z","ts":1792716328}
+{"ev":"stop","span":"plan","at":"2026-10-23T00:53:21Z","ts":1792716801,"status":"ok"}
