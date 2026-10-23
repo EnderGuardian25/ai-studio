@@ -95,6 +95,15 @@ The alternative of loading real Claude Code skills (`ui-ux-pro-max`, `high-end-v
 - **Detector: design instructions only.** It flags vague size, spacing, proportion, colour-share and layout words (for example "generous", "similar heights", "dominant"), each with a measurable suggestion. Brand-voice words ("warm", "confident") are left alone.
 - **Dataset provenance — decided 2026-09-15, unchanged.** The dataset is **authored in-house** from public typographic convention and published standards (WCAG contrast minimums, modular type scales). Deriving it from an installed design skill's data was checked and **rejected on licence grounds**: `ui-ux-pro-max` and `high-end-visual-design` ship **no licence file at all**, and absent a licence there is no grant to copy or redistribute their datasets. No bytes from those packages enter this repository.
 
+## Decisions (user, 2026-10-23, after the party panel)
+
+These supersede the sections above where they differ.
+
+1. **Scope: the detector and the upgrade assistant.** Ship the dataset, the live adjective detector and the rule-by-rule AI upgrade for size, spacing, proportion and colour share. **Typography (font pairings, a type scale) moves to a follow-up change.**
+2. **Go-live: into the editor, then Save.** Accepted edits are written into the kit prompt editor's text. The author reads the full text and clicks the existing Save, which activates the version as today (the shared save route is unchanged). The UI says plainly that Save puts the text live for new posts, and that restoring an older version fixes future posts only.
+3. **Fonts and colours by role.** Edits refer to the kit's structured fields by role ("the headline font", "brand colour 1"), never by a literal font name or hex value.
+4. **"Improve with AI" flags lost rules.** The button stays, but its rewrite is run through the detector before save, and any measurable rule (a number with a unit) that disappeared is flagged to the author.
+
 ## Open Questions
 
 - ~~Should the upgrade assistant rewrite a kit prompt wholesale, or propose a diff?~~ **Resolved 2026-10-23:** a rule-by-rule diff.
