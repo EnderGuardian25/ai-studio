@@ -98,9 +98,9 @@ test.describe('§Q — async draft actions', () => {
     expect(done.pendingAction).toBeNull()
     expect(done.pendingActionError).toBeNull()
     // The mock caption reply embeds the topic in every caption: {} is
-    // "Regenerate all" (012 FR-11), so all three were (re)generated.
+    // "Regenerate all" (012 FR-11), so both were (re)generated (026: two captions).
     const captions = done.captions as { text: string; status: string }[]
-    expect(captions).toHaveLength(3)
+    expect(captions).toHaveLength(2)
     for (const c of captions) {
       expect(c.status).toBe('READY')
       expect(c.text).toContain(topic)

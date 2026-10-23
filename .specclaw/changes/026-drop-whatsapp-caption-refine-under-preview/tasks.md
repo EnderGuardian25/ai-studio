@@ -79,7 +79,7 @@ This change has **3 tasks in 3 waves**:
 
 ### Wave 3 — Docs and gate
 
-- [ ] `T3` — Docs, the full gate and CI
+- [x] `T3` — Docs, the full gate and CI
   - Files: `docs/e2e-test-plan.md` (§W: the case changes, TC-CAP-21 and TC-CAP-22), `docs/ui-reference/DESIGN_SYSTEM.md` (the draft-page column text near "The right column of the draft page holds two bezel cards", and the picker-name list without "WhatsApp caption model"), `docs/mcp-acp-guide.md` (only if it says WhatsApp captions), `.specclaw/ROADMAP.md`, `docs/handoff.md` (a 026 section with no operator steps; release note: new drafts carry two captions, and old WhatsApp captions are hidden, not deleted), `CLAUDE.md` (the top entry)
   - Estimate: small
   - Kind: docs

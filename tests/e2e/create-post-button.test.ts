@@ -140,22 +140,23 @@ test.describe('Create post button (011 FR-01 – FR-03)', () => {
     }
   })
 
-  // AC-02b (020) — at 1440px nothing fixed covers the refine Send button when
-  // it sits where the floating button would: its bottom edge 24px above the
-  // viewport bottom, inside the button's right-hand band. It is disabled while
-  // the input is empty, but elementFromPoint still sees it.
-  test('AC-02b: the refine Send button is not covered at 1440px', async ({ page }) => {
+  // AC-02b (020) — at 1440px nothing fixed covers the last control in the
+  // right-hand column when it sits where the floating button would: its bottom
+  // edge 24px above the viewport bottom, inside the button's right-hand band.
+  // Since 026 that is the LinkedIn caption's Regenerate (Refine design, and its
+  // Send button, moved to the left column under the preview).
+  test('AC-02b: the last caption control is not covered at 1440px', async ({ page }) => {
     test.skip(!MOCKED(), 'needs MOCK_AI + MOCK_PUPPETEER to mint a draft')
     const draftId = await createExportedDraft(api, `fab-ac02b-${Date.now()}`)
     await page.setViewportSize({ width: 1440, height: 900 })
     await pageLogin(page)
     await page.goto(`/drafts/${draftId}`)
 
-    const send = page.getByRole('button', { name: 'Send', exact: true })
+    const send = page.getByRole('button', { name: 'Regenerate LinkedIn caption', exact: true })
     await expect(send).toBeVisible()
     await send.scrollIntoViewIfNeeded()
     const result = await send.evaluate((el) => {
-      // Scroll the page so Send's bottom edge is 24px above the viewport
+      // Scroll the page so the control's bottom edge is 24px above the viewport
       // bottom, where the floating button's own bottom edge sits.
       const before = el.getBoundingClientRect()
       window.scrollBy(0, before.bottom - (window.innerHeight - 24))

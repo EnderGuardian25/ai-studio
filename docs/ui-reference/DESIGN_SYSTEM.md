@@ -530,6 +530,7 @@ The draft page's preview (021 FR-11), in place of Folio's proof plate:
 - **The bar:** the micro-label "Preview" (`EYEBROW`) on the left, and a mono `--text-2xs` `--fg-muted` line on the right, "1080 × 1350 · v2 of 4".
 - **The post** is centred, up to 392 px wide, **at its own aspect ratio** (1:1, 4:5 or 9:16), on `--canvas`, `object-contain`. **The post and its immediate wrapper are never rounded, filtered or transformed** (A3, the "shown as rendered" E2E).
 - **The expand badge** sits on the post's top right, inset 10 px, shown on hover and keyboard focus; the post itself is the "View full screen" button. The badge is a `--control-sm` square at 10 px radius with fixed paper-on-ink values (`#fbfaf8` fill, `#181816` icon, its own drop shadow), because it sits on an image of any colour. It is a documented `ui-exception` (§11). The library tiles' expand button uses the same values.
+- **Below the stage (026):** the Refine Design card (§8.14) sits directly under this card in the same left column (`flex min-w-0 flex-col gap-3.5`), shown once the draft is ready. Below the `xl` breakpoint the order is Preview, Refine Design, Captions.
 - Under the post: the 008 "Generated with" line, then `BackgroundNotice` (§8.14), then the versions (§8.13), the note and Undo, and at the foot, under a `--line-subtle` rule, the Design model picker (Path B, once ready).
 - **Library tiles** (`PostCard`) are `.surface` cards, padding 10 px, `hover:shadow-raised`. The thumbnail inside stays square-cornered with no filter; the title is `--text-base` 600, then the meta row and the status chip, then Publish (secondary sm), History (ghost sm) and Delete (`ICON_BUTTON`).
 - **There are no crop marks and no proof plate** anywhere; the guard forbids their names (§11, pattern 7).
@@ -543,24 +544,23 @@ The draft page's preview (021 FR-11), in place of Folio's proof plate:
 
 ### 8.14 Caption and refine cards
 
-The right column of the draft page holds two bezel cards, **Captions** and **Refine Design**, each with a card head (`SectionHead`, 16 px 600, the study's `.card-hd`).
+Since 026 the draft page has two columns. The left column holds the Preview card (§8.12) and, under it, the **Refine Design** bezel card. The right column holds the **Captions** bezel card. Each card has a card head (`SectionHead`, 16 px 600, the study's `.card-hd`).
 
-**The Captions card (012).** `CaptionPanels` (`src/components/drafts/`) is a `<section>` bezel card whose h2 "Captions" has **"Regenerate all"** in its tail (and "Regenerating…" while it runs). Under the head sit the "All captions model" picker and, while the draft generates, "Writing the captions…". Inside are **four sub-panels**, ruled apart on `--line-subtle` (`divide-y`, 20 px each), each a `SectionHead level={3}` with a `useId` id, in this order:
+**The Captions card (012).** `CaptionPanels` (`src/components/drafts/`) is a `<section>` bezel card whose h2 "Captions" has **"Regenerate all"** in its tail (and "Regenerating…" while it runs). Under the head sit the "All captions model" picker and, while the draft generates, "Writing the captions…". Inside are **three sub-panels**, ruled apart on `--line-subtle` (`divide-y`, 20 px each), each a `SectionHead level={3}` with a `useId` id, in this order:
 
-| h3            | Field                                                                   | Helper text                                                                                    | Counter (mono, right)                 |
-| ------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- | ------------------------------------- |
-| **Headline**  | single-line pill `Input`, placeholder "Write the headline…"             | "The text on the image. Regenerate the design to use a changed headline."                      | `n / 100`, `--status-failed` past 100 |
-| **Instagram** | the caption textarea (§8.3), placeholder "Write the Instagram caption…" | none                                                                                           | `1,234 / 2,200 (Instagram)`           |
-| **LinkedIn**  | the caption textarea                                                    | none                                                                                           | `412 / 3,000 (LinkedIn)`              |
-| **WhatsApp**  | the caption textarea                                                    | "Not published from Studio yet. Copy it and post it in WhatsApp." (left of the counter, wraps) | `412 / 1,000 guide`                   |
+| h3            | Field                                                                   | Helper text                                                               | Counter (mono, right)                 |
+| ------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------- | ------------------------------------- |
+| **Headline**  | single-line pill `Input`, placeholder "Write the headline…"             | "The text on the image. Regenerate the design to use a changed headline." | `n / 100`, `--status-failed` past 100 |
+| **Instagram** | the caption textarea (§8.3), placeholder "Write the Instagram caption…" | none                                                                      | `1,234 / 2,200 (Instagram)`           |
+| **LinkedIn**  | the caption textarea                                                    | none                                                                      | `412 / 3,000 (LinkedIn)`              |
 
-- **Names (014 FR-12).** Every field is `aria-labelledby` its h3, so its accessible name is "Headline", "Instagram", "LinkedIn" or "WhatsApp". Its `aria-describedby` lists only what is rendered, in this order: the failure notice, the helper text, the counter, the limit or guide warning. The headline's lists its inline error, the helper and the counter.
+- **Names (014 FR-12).** Every field is `aria-labelledby` its h3, so its accessible name is "Headline", "Instagram" or "LinkedIn". Its `aria-describedby` lists only what is rendered, in this order: the failure notice, the helper text, the counter, the limit warning. The headline's lists its inline error, the helper and the counter.
 - **Saving.** Every field saves on blur (the PATCH). The tail shows Saving… / Saved (`--status-published` 600) / Unsaved changes (`--status-scheduled` 600). Saving is **never** blocked by a limit. A headline PATCH error shows inline as `<p role="alert">`, with `aria-invalid` and a `--status-failed` edge; the typed value stays.
 - **The panel tail, in order:** save state · **Undo** (only while a snapshot exists) · **Copy** · **Generate / Regenerate**. The headline's tail has no Copy.
   - **Generate / Regenerate:** "Generate" when the field is empty, otherwise "Regenerate"; named "Generate <Label> caption" / "Regenerate <Label> caption" (the headline: "Generate headline" / "Regenerate headline"). A spinner shows while that panel's own row is `PENDING`.
   - **Undo:** one per panel, named "Undo <Label> caption" / "Undo headline". It restores **only its own panel** through the PATCH.
   - **Copy:** `navigator.clipboard.writeText`, named "Copy <Label> caption". Toast "Caption copied"; on failure "Couldn't copy. Select the text and copy it manually." Disabled while the row is `PENDING` or the field is empty.
-- **"Regenerate all"** regenerates the three captions and **never the headline** (012 A9). It first waits for every panel's in-flight blur-save, then captures an Undo snapshot in each caption panel.
+- **"Regenerate all"** regenerates the two captions and **never the headline** (012 A9). It first waits for every panel's in-flight blur-save, then captures an Undo snapshot in each caption panel.
 - **Locking.** While any regenerate POST is in flight, or the draft has a pending action, every Regenerate, Undo and "Regenerate all" is disabled. The headline field is disabled while a `REGENERATE_COPY` action holds the draft.
 - **Skeletons.** Only a `PENDING` row shows one: a `role="status"` region named "Generating the <Label> caption" (the headline: "Generating the headline"). **Empty text on a row that is not `PENDING` always shows the editable field** (the TC-ASYNC-10 lesson).
 - **Notices** (`Notice`, §8.18; icon `AlertTriangle`, `aria-hidden`), above the field:
@@ -572,7 +572,7 @@ The right column of the draft page holds two bezel cards, **Captions** and **Ref
 
   The last-failed notice goes once the row is saved after an edit, or regenerated successfully. Failed and last-failed never show together. (The Review notice was removed by change 016.)
 
-- **Limits and warnings** (from the channel registry, `src/lib/channels.ts`; numbers `en-US`): past a **hard** limit the counter turns 600 `--status-failed` and a line below reads "Over the <Label> limit". Past WhatsApp's **soft** 1,000 guide the counter stays muted and a `--status-scheduled` line reads "Longer than the 1,000-character guide". A channel with no limit shows `n characters`.
+- **Limits and warnings** (from the channel registry, `src/lib/channels.ts`; numbers `en-US`): past a **hard** limit the counter turns 600 `--status-failed` and a line below reads "Over the <Label> limit". A channel with no limit shows `n characters`. (WhatsApp had a soft 1,000 guide and a "Not published from Studio yet" helper until 026 removed the WhatsApp caption; `CaptionChannelSpec` no longer has `softLimit` or `publishable`.)
 
 **The Refine Design card** (`RefinementPanel`): a `<section>` bezel card, its h2 "Refine Design" (whose `id` names the prompt) with the request count in mono `--text-2xs`.
 
@@ -652,7 +652,7 @@ A feature module never redefines a shared name.
 - **Options:** only the models this user can run on this surface on this team: the team's allowed models that the surface supports, minus Opus when the switch applies. They are cheapest first, valued by key (`HAIKU`, `SONNET`, `OPUS`), and labelled `<name> · <tier> (<speed>)`, for example "Sonnet 5.5 · $$ (medium)".
 - **Pre-selection:** what the server would run if the picker is left alone (the stamp, then the team default, then the system default).
 - **The send rule:** the picker reports `undefined` until the user picks a different model, and the caller then omits `model` from the request. Picking the pre-selected model again reports `undefined` too.
-- **Accessible name:** `FieldLabel` "Model", or a surface-specific name wherever more than one picker shares a screen: "Caption model" and "Design model" (wizard Review); "Refine model", "Design model", "Headline model", "All captions model" and "Instagram / LinkedIn / WhatsApp caption model" (draft page); "Briefing assistant model" and "Brand kit assistant model" (the assistant drawers). Each is unique on its screen.
+- **Accessible name:** `FieldLabel` "Model", or a surface-specific name wherever more than one picker shares a screen: "Caption model" and "Design model" (wizard Review); "Refine model", "Design model", "Headline model", "All captions model" and "Instagram / LinkedIn caption model" (draft page); "Briefing assistant model" and "Brand kit assistant model" (the assistant drawers). Each is unique on its screen.
 - **Disabled** while any action on the screen is pending, like the controls beside it.
 - **One model** shows as plain text, `--text-sm` `--fg`, "Model: Haiku 4.5", with no select.
 - **Hidden** (renders nothing) while `/api/models` loads, when no model can run the surface, and for captions when the caption provider isn't Claude.

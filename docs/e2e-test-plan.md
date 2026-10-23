@@ -518,14 +518,14 @@ Refine writes by its own rule: it resolves the provider **first** and, with none
 
 ### W. Per-channel captions (`captions.test.ts`, change 012 T10 + T13 — AC-12 → AC-24)
 
-Every draft carries an on-image **headline** and one **`DraftCaption` row per channel** (Instagram, LinkedIn, WhatsApp), each `PENDING` / `READY` / `FAILED`. `GET /api/drafts/[id]` returns `headline` and `captions[]` and has **no `copyText` key**. Every publish path resolves the matching channel's caption first and refuses a failed, pending, empty, over-limit or WhatsApp one **terminally**. **Removed by 016 (2026-10-13):** the legacy single-caption migration (boot backfill, lazy read, `captionMigration`, `legacyCaptionText`) and the 012 rollback are gone, and so are the cases that tested them (TC-CAP-11, -12, -13, -19).
+Every draft carries an on-image **headline** and one **`DraftCaption` row per channel** (Instagram and LinkedIn since 026; WhatsApp until 2026-10-23), each `PENDING` / `READY` / `FAILED`. **026 (2026-10-23):** WhatsApp left the caption registry, so new drafts carry two captions and an old WhatsApp row is hidden, not deleted; TC-CAP-21 and TC-CAP-22 are new and the cases below were retargeted to two channels (`.specclaw/changes/026-drop-whatsapp-caption-refine-under-preview/reports/T2.md`). `GET /api/drafts/[id]` returns `headline` and `captions[]` and has **no `copyText` key**. Every publish path resolves the matching channel's caption first and refuses a failed, pending, empty, over-limit or WhatsApp one **terminally**. **Removed by 016 (2026-10-13):** the legacy single-caption migration (boot backfill, lazy read, `captionMigration`, `legacyCaptionText`) and the 012 rollback are gone, and so are the cases that tested them (TC-CAP-11, -12, -13, -19).
 
 Each case uses a unique topic, `waitForDraft` / `waitForAction` from `tests/helpers/api.ts`, and one kit + one campaign per worker (keeps the campaign count under the 200-row listing cap). Needs `MOCK_AI` + `MOCK_PUPPETEER` + `MOCK_SOCIAL` and test-DB access. The scheduler cases drive `POST /api/test/scheduler-tick`.
 
 **New seams (all dormant in production):**
 
-- **`buildMockCaptionReply(topic, targets)`** (`src/lib/testHooks.ts`, returned by the `MOCK_AI` `CopyProvider`): a raw reply with a preamble, a `json`-fenced object holding only the requested keys, and a trailer, so **the real extractor parses it**. Captions are `Mock <Label> caption [<topic>]` (WhatsApp `Mock **WhatsApp** caption [<topic>]`, normalised to `*WhatsApp*`); the headline is `Mock headline <topic>`.
-- **`__DROP_CAPTION_INSTAGRAM__` / `__DROP_CAPTION_LINKEDIN__` / `__DROP_CAPTION_WHATSAPP__` / `__DROP_CAPTION_HEADLINE__`** in the brief topic omit that key, **only in a reply that requests every channel**. So a generation yields a `FAILED` row (or, for the headline, a `FAILED` draft), and a single-channel regenerate of that channel then succeeds, with no stored state.
+- **`buildMockCaptionReply(topic, targets)`** (`src/lib/testHooks.ts`, returned by the `MOCK_AI` `CopyProvider`): a raw reply with a preamble, a `json`-fenced object holding only the requested keys, and a trailer, so **the real extractor parses it**. Captions are `Mock <Label> caption [<topic>]` (WhatsApp was removed by 026); the headline is `Mock headline <topic>`.
+- **`__DROP_CAPTION_INSTAGRAM__` / `__DROP_CAPTION_LINKEDIN__` / `__DROP_CAPTION_HEADLINE__`** (the WhatsApp sentinel was removed by 026) in the brief topic omit that key, **only in a reply that requests every channel**. So a generation yields a `FAILED` row (or, for the headline, a `FAILED` draft), and a single-channel regenerate of that channel then succeeds, with no stored state.
 - **The hashed mock `platformId`:** `mockPlatformId(channel, caption)` = `mock-<channel>-<Date.now()>-<sha256(caption)[0:12]>`, used by the mock publishers, so a case can prove which text a channel received.
 - **Removed by 016:** `makeLegacyDraft` (`tests/helpers/db.ts`), the `captions:backfill` / `captions:report` script runs and the rollback scratch DB, with TC-CAP-11/12/13/19. The two bullets below are kept as history.
 - ~~**The scripts:**~~ (historical) TC-CAP-12 ran `npm run captions:backfill` / `captions:report` through `spawnSync` with `.env.test` **overriding** the runner env (`dotenv -o` semantics; the runner already has `MOCK_AI` and the dev `.env`'s `DESIGN_PROVIDER=cli`). `testDbUrl()` throws unless the DB name ends in `_test`.
@@ -533,26 +533,28 @@ Each case uses a unique topic, `waitForDraft` / `waitForAction` from `tests/help
 
 **Wave 1 (T10):**
 
-- **TC-CAP-01 — A generated draft (AC-12).** EXPORTED; `headline` = `Mock headline <topic>`; three READY captions in registry order, each with the topic and no `**` (WhatsApp `Mock *WhatsApp* caption [<topic>]`); no `copyText` key.
-- **TC-CAP-02 — Partial failure and a single-channel retry (AC-13, AC-16 a).** `__DROP_CAPTION_LINKEDIN__`: EXPORTED, LI `FAILED` (`missing`, empty text), IG and WA READY. `POST /api/posts {LINKEDIN}` → 422 `CAPTION_UNPUBLISHABLE`, the reason names LinkedIn, no Post row. `regenerate-copy {channel:'LINKEDIN'}` → 202 → LI READY; IG and WA `text` and `updatedAt` unchanged; headline and revision pointer unchanged.
-- **TC-CAP-03 — A missing headline fails the draft (AC-14).** `__DROP_CAPTION_HEADLINE__`: draft FAILED, `failureReason` mentions the headline, `headline` null, the three captions READY.
+- **TC-CAP-01 — A generated draft (AC-12).** EXPORTED; `headline` = `Mock headline <topic>`; two READY captions in registry order (Instagram, LinkedIn), each with the topic and no `**`; no `copyText` key (026: no WhatsApp caption).
+- **TC-CAP-02 — Partial failure and a single-channel retry (AC-13, AC-16 a).** `__DROP_CAPTION_LINKEDIN__`: EXPORTED, LI `FAILED` (`missing`, empty text), IG READY. `POST /api/posts {LINKEDIN}` → 422 `CAPTION_UNPUBLISHABLE`, the reason names LinkedIn, no Post row. `regenerate-copy {channel:'LINKEDIN'}` → 202 → LI READY; IG `text` and `updatedAt` unchanged; headline and revision pointer unchanged.
+- **TC-CAP-03 — A missing headline fails the draft (AC-14).** `__DROP_CAPTION_HEADLINE__`: draft FAILED, `failureReason` mentions the headline, `headline` null, the two captions READY.
 - **TC-CAP-04 — Each channel gets only its own caption (AC-15).** Publish LINKEDIN then INSTAGRAM immediately: each `platformId` suffix equals `sha256(own caption)[0:12]` and differs from the other's; each post's `draft.caption` is its own text.
 - **TC-CAP-05 — The scheduler refuses an emptied caption, terminally (AC-16 b).** Schedule IG on a READY caption, PATCH IG to `''`, make it due through the test DB, tick → FAILED, `errorReason` contains "caption is empty", `retryCount` 0, `nextRetryAt` null; a second tick leaves the row byte-identical.
-- **TC-CAP-06 — WhatsApp fails closed (AC-17).** `POST /api/posts {WHATSAPP}` → 400, no row. A due SCHEDULED WHATSAPP Post inserted through the test DB → tick → FAILED "WhatsApp publishing isn't available yet…", `retryCount` 0, `nextRetryAt` null, unchanged by a second tick.
+- **TC-CAP-06 — WhatsApp fails closed (AC-17).** `POST /api/posts {WHATSAPP}` → 400, no row; the draft's captions are Instagram and LinkedIn only (no READY WhatsApp caption). A due SCHEDULED WHATSAPP Post inserted through the test DB → tick → FAILED "WhatsApp publishing isn't available." (026 wording), `retryCount` 0, `nextRetryAt` null, unchanged by a second tick.
 - **TC-CAP-07 — WhatsApp is not an input (AC-18, API).** `POST /api/briefs {channels:['WHATSAPP']}` → 400; a queue create with WHATSAPP → 400.
 - **TC-CAP-08 — WhatsApp is in no picker (AC-18, UI).** The draft page's Publish dialog and the campaign's Plan a post modal (`QueueEntryModal`) each show exactly two "Channels" checkboxes, Instagram and LinkedIn. **010 changes this to 3.**
-- **TC-CAP-09 — Single-flight (AC-20).** With `pendingAction = REGENERATE_COPY` and the LI row PENDING seeded through the test DB: `regenerate-copy {channel:'WHATSAPP'}`, `{headline:true}`, `regenerate-design` and restore each 409 "Another action is already running on this draft"; a PATCH on the PENDING LI row 409s "This caption is being generated", while a PATCH on READY IG is 200.
+- **TC-CAP-09 — Single-flight (AC-20).** With `pendingAction = REGENERATE_COPY` and the LI row PENDING seeded through the test DB: `regenerate-copy {channel:'INSTAGRAM'}` (WHATSAPP is now a 400, TC-CAP-21), `{headline:true}`, `regenerate-design` and restore each 409 "Another action is already running on this draft"; a PATCH on the PENDING LI row 409s "This caption is being generated", while a PATCH on READY IG is 200.
 - **TC-CAP-10 — Restore never touches captions (AC-22).** Refine → revision 2, PATCH LI, restore revision 1: `captions` (every field, `updatedAt` included) and `headline` equal their pre-restore values.
 - ~~**TC-CAP-11 — Lazy migration on first read**~~, ~~**TC-CAP-12 — The backfill and report scripts**~~, ~~**TC-CAP-13 — The rollback down.sql**~~ **(AC-23): removed by 016 (2026-10-13)** with the legacy caption machinery and the 012 rollback.
-- **TC-CAP-14 — ACP outputs (AC-26, AC-17 ACP).** ACP `generate_post` output has `headline` and `captions` (3, registry order, READY). ACP `publish_post {channel:'WHATSAPP'}` → 400 (`channel must be INSTAGRAM or LINKEDIN`), no Post row.
+- **TC-CAP-14 — ACP outputs (AC-26, AC-17 ACP).** ACP `generate_post` output has `headline` and `captions` (2: INSTAGRAM, LINKEDIN, registry order, READY). ACP `publish_post {channel:'WHATSAPP'}` → 400 (`channel must be INSTAGRAM or LINKEDIN`), no Post row.
 - **AC-19** is the rewritten **TC-ASYNC-10** in `async-actions.test.ts` (§Q): PATCH `{channel:'INSTAGRAM', text}` then `text:''` keep the draft EXPORTED, in the library, regenerable and refinable, and the empty IG panel is an editable textarea with no skeleton.
 
 **Wave 2 (T13), the panels:**
 
-- **TC-CAP-15 — Regenerate all (AC-21 a).** A hand-set headline first; `regenerate-copy {}` → 202 → three READY captions with a strictly later `updatedAt`; the hand-set headline and `currentRevisionNumber` unchanged; `pendingActionError` null.
+- **TC-CAP-15 — Regenerate all (AC-21 a).** A hand-set headline first; `regenerate-copy {}` → 202 → two READY captions with a strictly later `updatedAt`; the hand-set headline and `currentRevisionNumber` unchanged; `pendingActionError` null.
 - **TC-CAP-16 — Regenerate the headline only (AC-21 b).** A generated draft whose headline is nulled directly through the test DB (`prisma.draft.update`, since 016); `{headline:true}` → 202 → `headline` = `Mock headline <topic>`; `captions` deep-equal the read before the regenerate; revision pointer unchanged.
-- **TC-CAP-17 — The caption desk structure and counters (AC-24 a–d).** Under the "Captions" h2 the h3s are exactly Headline, Instagram, LinkedIn, WhatsApp, and one textbox is named "Headline". Each caption textarea is named by its h3 and holds the GET text. Counters `n / 2,200 (Instagram)`, `n / 3,000 (LinkedIn)`, `n / 1,000 guide`. 1,001 WhatsApp characters show `1,001 / 1,000 guide` and "Longer than the 1,000-character guide" and still save; 2,201 Instagram characters show "Over the Instagram limit" and still save. Then the axe scan.
-- **TC-CAP-18 — Copy and per-panel Undo (AC-24 e, f).** Clipboard permission granted on the context. "Copy LinkedIn caption" → toast "Caption copied", clipboard = LI text. WhatsApp hand-edited, then "Regenerate WhatsApp caption" → "Undo WhatsApp caption" appears (no other Undo); Undo restores the hand-written text in the field and the GET; IG, LI and the headline untouched.
+- **TC-CAP-17 — The caption desk structure and counters (AC-24 a–d).** Under the "Captions" h2 the h3s are exactly Headline, Instagram, LinkedIn, and one textbox is named "Headline". Each caption textarea is named by its h3 and holds the GET text. Counters `n / 2,200 (Instagram)` and `n / 3,000 (LinkedIn)`; no WhatsApp text appears (026 removed the soft-guide counter). 2,201 Instagram characters show "Over the Instagram limit" and still save. Then the axe scan.
+- **TC-CAP-18 — Copy and per-panel Undo (AC-24 e, f).** Clipboard permission granted on the context. "Copy Instagram caption" → toast "Caption copied", clipboard = IG text. LinkedIn hand-edited, then "Regenerate LinkedIn caption" → "Undo LinkedIn caption" appears (no other Undo); Undo restores the hand-written text in the field and the GET; IG and the headline untouched.
+- **TC-CAP-21 — A legacy WhatsApp row stays hidden and unchanged (026 AC-05).** A READY WhatsApp `DraftCaption` row with text is inserted through Prisma. `GET /api/drafts/[id]` lists two captions (no WhatsApp), the page shows no WhatsApp panel or text, and `PATCH` and `regenerate-copy` with `{channel:'WHATSAPP'}` are each 400. The row's text, status and `updatedAt` are unchanged in the DB. MCP `get_draft` is covered by the unit test `mcpGetDraft`.
+- **TC-CAP-22 — The draft-page layout (026 AC-09).** At 1440 px the Refine Design card sits at or below the Preview card's bottom with the same left edge (±1 px), and Captions is in the right column. At 390 px the order is Preview, Refine Design, Captions (bounding boxes and `compareDocumentPosition`). Axe runs at both widths.
 - ~~**TC-CAP-19 — The review notice (AC-24 g).**~~ **Removed by 016 (2026-10-13)** with the notice and `makeLegacyDraft`.
 - **TC-CAP-20 — A FAILED row (AC-24 h).** `__DROP_CAPTION_LINKEDIN__`: the error notice "The LinkedIn caption failed to generate (<reason>)." starts the LI description; the field is empty and editable; the button is "Generate" (named "Generate LinkedIn caption"). Axe scan. Generate fills LI with `Mock LinkedIn caption [<topic>]` and the notice goes.
 
@@ -564,7 +566,7 @@ TC-CAP-17 and -20 (and TC-CAP-19 until 016) run 014's 12 AC-19 axe rules over th
 
 | AC                                                         | E2E                             |
 | ---------------------------------------------------------- | ------------------------------- |
-| AC-12 generated draft: headline + 3 READY, no `**`         | TC-CAP-01                       |
+| AC-12 generated draft: headline + 2 READY (026), no `**`   | TC-CAP-01                       |
 | AC-13 partial failure, single-channel retry                | TC-CAP-02                       |
 | AC-14 missing headline fails the draft                     | TC-CAP-03                       |
 | AC-15 each channel publishes its own caption               | TC-CAP-04                       |
@@ -605,7 +607,7 @@ Each case uses a unique topic and `waitForDraft` / `waitForAction`, with one kit
 **Cases:**
 
 - **TC-MODEL-01 — Path B on system defaults (AC-15).**
-  - The draft is EXPORTED. The three `captions[].model` and `headlineModel` are Haiku, `designModel` is Sonnet, and every `…SubstitutedFrom` is null.
+  - The draft is EXPORTED. The two `captions[].model` (three before 026) and `headlineModel` are Haiku, `designModel` is Sonnet, and every `…SubstitutedFrom` is null.
   - Revision 1's `model` is Sonnet, in the DB and in the revisions list.
   - Recorder: `CAPTION` → Haiku and `DESIGN_FREEFORM` → Sonnet, both `system`, mode `api`.
 - **TC-MODEL-02 — Path A (AC-15).** `designModel` and revision 1 are Haiku. The recorder has `DESIGN_TEMPLATE` → Haiku (`system`) and no `DESIGN_FREEFORM` record.
@@ -627,13 +629,13 @@ Each case uses a unique topic and `waitForDraft` / `waitForAction`, with one kit
 - **TC-MODEL-06 — A removal applies to stored stamps (AC-17, security BLOCK).**
   - **Setup:** a draft seeded with `designModel` = Opus and LinkedIn `model` = Opus, then PUT `allowed: ['HAIKU','SONNET']`.
   - `regenerate-design` → revision 2 and the draft are Sonnet, with `…SubstitutedFrom` = Opus.
-  - `regenerate-copy {channel:'LINKEDIN'}` → LinkedIn is Haiku, with `modelSubstitutedFrom` = Opus. The IG and WA rows deep-equal their seeded read.
+  - `regenerate-copy {channel:'LINKEDIN'}` → LinkedIn is Haiku, with `modelSubstitutedFrom` = Opus. The IG row deep-equals its seeded read (026: WA is no longer a row).
   - **Recorder:** no Opus record after the PUT. The two records are `[Sonnet, system, Opus]` and `[Haiku, system, Opus]`.
   - **Mutation-checked:** letting the stamp tier skip the effective set makes this case fail (Opus received).
 - **TC-MODEL-07 — Regenerate all is like for like (AC-18).**
-  - **(a)** Stamps `[S,S,S]`, then `{}` → three Sonnet rows; recorder `stamp`.
-  - **(b)** Mixed stamps `[S,O,S]` with a team `CAPTION: HAIKU` → three Haiku rows; `team`; `modelSubstitutedFrom` null.
-  - **(c)** Null stamps and no team default → three Haiku rows; `system`.
+  - **(a)** Stamps `[S,S]` (026: two rows), then `{}` → two Sonnet rows; recorder `stamp`.
+  - **(b)** Mixed stamps `[S,O]` with a team `CAPTION: HAIKU` → two Haiku rows; `team`; `modelSubstitutedFrom` null.
+  - **(c)** Null stamps and no team default → two Haiku rows; `system`.
   - The headline and `headlineModel` are never touched.
 - **TC-MODEL-08 — Refine and the verifier (AC-19).**
   - A Path B refine ("Include a human character") → revision 2 and `designModel` are Sonnet. Recorder: `REFINE` → Sonnet (`system`) and `INTERNAL_VERIFIER` → Haiku (label `verify`).
@@ -715,13 +717,13 @@ Picker names are matched with `exact: true`, because "Instagram caption model" c
   - Generate sends `captionModel: 'SONNET'` and `designModel: 'OPUS'`. `Brief` stores `{ captionModel: 'SONNET', designModel: 'OPUS' }`. The draft's `designModel` is Opus (recorder `DESIGN_FREEFORM` `request`), every caption is stamped `claude-sonnet-5-5`, and the recorder has a `CAPTION` → Sonnet `request` run. The unfinished brief is deleted.
 - **TC-MODEL-15 — Untouched wizard pickers (AC-28).** The POST body has neither field. `Brief` stores null for both, and the draft runs on the defaults (Sonnet design, Haiku captions, both `system`).
 - **TC-MODEL-16 — The draft page (AC-29, and AC-33's draft-page axe scan).** The LinkedIn row is seeded with a Sonnet stamp.
-  - **The pre-selections and hints:** LinkedIn Sonnet, Instagram and WhatsApp Haiku ("Same model as the current caption"); Headline Haiku ("…headline"); "All captions model" Haiku ("Default", mixed stamps); Design Sonnet ("…design"); Refine Sonnet ("Default").
+  - **The pre-selections and hints:** LinkedIn Sonnet, Instagram Haiku ("Same model as the current caption"; 026: no WhatsApp picker); Headline Haiku ("…headline"); "All captions model" Haiku ("Default", mixed stamps); Design Sonnet ("…design"); Refine Sonnet ("Default").
   - **"Generated with":** one per caption panel and the headline panel, by its stamp, plus the design line. The Versions cell carries the sentence in its `title`. Axe runs with the pickers present.
-  - **LinkedIn → Opus, then Regenerate:** the body is `{ channel: 'LINKEDIN', model: 'OPUS' }`. Only LinkedIn's row changes; the others deep-equal their seeded read.
+  - **LinkedIn → Opus, then Regenerate:** the body is `{ channel: 'LINKEDIN', model: 'OPUS' }`. Only LinkedIn's row changes; Instagram deep-equals its seeded read.
   - **Headline → Sonnet:** `{ headline: true, model: 'SONNET' }` → `headlineModel` is Sonnet, and no caption row changes.
   - **Refine → Haiku:** `{ instruction, model: 'HAIKU' }` → revision 2 and `designModel` are Haiku.
   - **The design picker** now pre-selects Haiku from the new stamp. Opus → `{ model: 'OPUS' }` → revision 3 is Opus.
-- **TC-MODEL-17 — Substitution and the hide rules (AC-29, reviews/T16.md).** The draft is seeded with design Opus, LinkedIn Haiku substituted from Opus, and a FAILED WhatsApp row, then `allowed: ['HAIKU','SONNET']`.
+- **TC-MODEL-17 — Substitution and the hide rules (AC-29, reviews/T16.md).** The draft is seeded with design Opus, LinkedIn Haiku substituted from Opus, and a FAILED Instagram row (026: was WhatsApp), then `allowed: ['HAIKU','SONNET']`.
   - The design picker reads Sonnet, with the hint "Opus 5.5 is no longer available on this team — using Sonnet 5.5", and offers no Opus.
   - LinkedIn's line reads "Generated with Haiku 4.5 (substituted)", titled "Substituted for Opus 5.5".
   - The FAILED row shows its failure and no "Generated with".
@@ -775,7 +777,7 @@ Each case mints an EXPORTED draft (`mintExportedDraft`) and acts on it in the br
 | 018 AC-05 the caption/headline Undo settles on state     | TC-RACE-03, TC-RACE-04 |
 | 018 AC-06 the revision list retries after a failed fetch | TC-RACE-05             |
 
-> **Update (2026-10-20, change 020):** `create-post-button.test.ts` (011 FR-01 to FR-03) now asserts the floating Create post button is absent on `/drafts/[id]` at 1440 and 375, and runs a check that the refine Send button is not covered at 1440. Its AC-01 case is narrowed to `/`, `/library` and `/campaigns`.
+> **Update (2026-10-20, change 020):** `create-post-button.test.ts` (011 FR-01 to FR-03) now asserts the floating Create post button is absent on `/drafts/[id]` at 1440 and 375, and runs a check that the refine Send button is not covered at 1440. Its AC-01 case is narrowed to `/`, `/library` and `/campaigns`. **Update (2026-10-23, change 026):** Refine design moved to the left column, so AC-02b now checks the control that sits in the bottom-right band, the LinkedIn caption's Regenerate button. TC-ASYNC-02 expects two captions.
 
 ### Z. Scheduler heartbeat (`scheduler-heartbeat.test.ts`, change 023 T2 — AC-05, AC-06, AC-08)
 

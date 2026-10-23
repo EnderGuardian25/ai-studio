@@ -127,7 +127,7 @@ Response codes: `400` invalid input, `401` bad/missing key, `422` tool-level fai
 
 ## 4. Captions and the headline (change 012)
 
-Since 012 every draft has an on-image **headline** and **one caption per channel** (`DraftCaption`: Instagram, LinkedIn, WhatsApp), each with a `status` of `PENDING`, `READY` or `FAILED`. Each channel is published its **own** caption; nothing sends one combined string any more. The field and route names below are unchanged from before 012 except where noted.
+Since 012 every draft has an on-image **headline** and **one caption per channel** (`DraftCaption`: Instagram and LinkedIn; the WhatsApp caption was dropped by change 026), each with a `status` of `PENDING`, `READY` or `FAILED`. Each channel is published its **own** caption; nothing sends one combined string any more. The field and route names below are unchanged from before 012 except where noted.
 
 ### Output fields
 
@@ -137,17 +137,17 @@ Since 012 every draft has an on-image **headline** and **one caption per channel
 | MCP / ACP `generate_post`               | `{ draftId, exportUrl, htmlContent, headline, captions }`               |
 | `POST /api/generate/copy` (session API) | `{ headline, captions }`, where `captions` also carries `failureReason` |
 
-- **`captions`** is `[{ channel, text, status }]`: always three entries, in registry order (`INSTAGRAM`, `LINKEDIN`, `WHATSAPP`), WhatsApp included. Read through the caption loader, which fills a missing channel with an empty `READY` entry.
+- **`captions`** is `[{ channel, text, status }]`: always two entries, in registry order (`INSTAGRAM`, `LINKEDIN`). Read through the caption loader, which fills a missing channel with an empty `READY` entry. Old WhatsApp rows from before 026 are hidden by the loader, not deleted.
 - **`headline`** is the text drawn on the image (at most 100 characters). It is null only while it has not been written yet (a generation still running, or one that failed before the headline was stored); a design made for such a draft falls back to the brief topic.
 - **There is no `copyText` field.** The pre-012 alias (the Instagram caption's text) was removed by change 016. Read the channel's entry in `captions`.
-- **The ACP manifest** (`src/acp/agent.ts`, version `1.1.0` since change 018) advertises `generate_post`'s full output: `draftId`, `exportUrl`, `htmlContent`, `headline` (`string | null`) and `captions` (an array of `{ channel, text, status }`, all three required; `channel` is one of the registry channels `INSTAGRAM`, `LINKEDIN`, `WHATSAPP`, and `status` one of `PENDING`, `READY`, `FAILED`). A unit test (`tests/unit/mcpGetDraft.test.ts`) fails if the advertised keys and the handler's keys ever differ. The MCP `generate_post` tool description lists the same fields. The **input** channel enums stay `['INSTAGRAM', 'LINKEDIN']` (publishable channels only).
+- **The ACP manifest** (`src/acp/agent.ts`, version `1.1.0` since change 018) advertises `generate_post`'s full output: `draftId`, `exportUrl`, `htmlContent`, `headline` (`string | null`) and `captions` (an array of `{ channel, text, status }`, all three required; `channel` is one of the registry channels `INSTAGRAM`, `LINKEDIN`, and `status` one of `PENDING`, `READY`, `FAILED`). A unit test (`tests/unit/mcpGetDraft.test.ts`) fails if the advertised keys and the handler's keys ever differ. The MCP `generate_post` tool description lists the same fields. The **input** channel enums stay `['INSTAGRAM', 'LINKEDIN']` (publishable channels only).
 
 ### `publish_post` (MCP and ACP)
 
-- **A non-publishable channel is rejected up front,** before any lookup or Post row. Today that is `WHATSAPP` (no publisher until change 010): MCP throws `channel must be INSTAGRAM or LINKEDIN`, and ACP answers `400` with the same message from its input validator.
+- **A non-publishable channel is rejected up front,** before any lookup or Post row. Today that is `WHATSAPP` (no publisher; change 010 was dropped on 2026-10-23): MCP throws `channel must be INSTAGRAM or LINKEDIN`, and ACP answers `400` with the same message from its input validator.
 - **A refused caption leaves a FAILED Post row** (FR-17, user decision 2026-10-11), keeping "every attempt leaves a row". The status, export and duplicate checks run first, as before. Then `createAndPublishPost` writes a PENDING row, and `publishToChannel` resolves that channel's caption **before** it signs the export. A failed, pending, empty or over-limit caption is refused terminally: the row becomes `FAILED` with `errorReason` = the resolver's reason, the export is never signed and the platform is never called. The caller gets `Publish failed (<reason>) — recorded as post <id> with status FAILED` (ACP: `422`), the same format as a platform failure.
 - **The resolver's reasons** (`src/lib/captions/resolve.ts`), first match wins:
-  1. "WhatsApp publishing isn't available yet. Copy the caption and post it by hand." (also for any channel with no publisher);
+  1. "WhatsApp publishing isn't available." (026 wording; also for any channel with no publisher);
   2. "This draft has no <Label> caption.";
   3. "The <Label> caption is being generated. Publish again when it finishes.";
   4. "The <Label> caption failed to generate (<failureReason>). Regenerate or edit it, then publish again.";
