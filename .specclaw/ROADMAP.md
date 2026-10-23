@@ -87,7 +87,7 @@ B4 scheduler fix (ops) ───────────────► 010 sche
 
 1. **024** caption credential route: VERIFIED PASS (17/17); small and self-contained, it can ride in the `v2` → `main` merge. It completes 005 item 2 (the COPY route), which waited on 008's resolver.
 2. **007** brand-kit design system: VERIFIED PASS (22/22, 2026-10-23); the biggest quality gain with no prod dependency; it extends `src/lib/designData/` (a separate `authoring/` part) before 025 does. Follow-up proposals: a typography dataset, and the campaign briefing editor as a second host of the review panel.
-3. **025** hero product screenshots: after OP-1 passes and a small real-model check shows a blank device screen is achievable.
+3. **025** hero product screenshots: OP-1 **passed** (2026-10-23, 6 of 6); next is its small real-model check that a blank device screen is achievable.
 4. **006** observability (the rest): the heaviest infrastructure; nothing depends on it. It needs a replay retention period first.
 
 010 is deferred. The stages below are kept as the earlier reasoning.
