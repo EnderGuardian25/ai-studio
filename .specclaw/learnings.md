@@ -464,3 +464,20 @@ src/lib/testHooks.ts is imported by generation code, so a MOCK seam there cannot
 When a seam serves a module behind a boundary, pass data into testHooks rather than importing the module there
 
 ---
+
+## [L28] best_practice — T2 ran only the three caption specs; the full clean run t...
+
+**When:** 2026-10-23 18:24 UTC
+**Category:** best_practice
+**Priority:** medium
+**Status:** pending
+
+### Detail
+
+T2 ran only the three caption specs; the full clean run then failed two specs elsewhere (async-actions TC-ASYNC-02 counted three captions; create-post-button AC-02b assumed the refine Send button sat bottom-right).
+
+### Action
+
+When a change alters a registry size or a page layout, grep all of tests/e2e for the old count and the moved control before the targeted run, not just the suites named in the task.
+
+---

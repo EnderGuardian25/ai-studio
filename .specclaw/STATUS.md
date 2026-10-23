@@ -1,7 +1,7 @@
 # 🦞 SpecClaw Dashboard
 
 **Project:** bistec-studio
-**Last Updated:** 2026-10-23 17:26 UTC
+**Last Updated:** 2026-10-23 19:52 UTC
 
 _1 unnumbered change · run `/specclaw:renumber` to order them_
 
@@ -30,7 +30,7 @@ _1 unnumbered change · run `/specclaw:renumber` to order them_
 - 🔍 **022-prod-data-and-deploy-restore** ▫ — verify PASS | 4/4 tasks (100%) | 0 failed | 5h22m
 - 🔍 **023-scheduler-heartbeat** ▫ — verify PASS | 3/3 tasks (100%) | 0 failed | PR #43 closed | 5h24m
 - 🔍 **024-caption-credential-route** ▣ — verify PASS | 4/4 tasks (100%) | 0 failed | PR #43 closed | 6h45m
-- 📝 **026-drop-whatsapp-caption-refine-under-preview** ▫ — tasks done | 0/3 tasks (0%) | 0 failed | 33m
+- 🔍 **026-drop-whatsapp-caption-refine-under-preview** ▫ — verify PASS | 3/3 tasks (100%) | 0 failed | PR #43 closed | 1h53m
 
 ## Pending Proposals
 
