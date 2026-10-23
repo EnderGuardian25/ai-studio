@@ -430,3 +430,37 @@ Root cause of the 2026-10-09..12 red fork CI (L21): client settles that fire onl
 Never settle async UI on an observed edge of polled state; arm after the awaited refetch and compare against a baseline captured at send. Force races in E2E by delaying the refetch with page.route.
 
 ---
+
+## [L26] pattern — A screenshot read by the orchestrator caught a UI semanti...
+
+**When:** 2026-10-23 01:48 UTC
+**Category:** pattern
+**Priority:** medium
+**Status:** pending
+
+### Detail
+
+A screenshot read by the orchestrator caught a UI semantics bug (an insert edit shown with its quote struck through) that the implementer's E2E had locked in as expected behaviour
+
+### Action
+
+Look at UI screenshots before review, and ask the reviewer to check rendered meaning, not just markup
+
+---
+
+## [L27] design_gap — src/lib/testHooks.ts is imported by generation code, so a...
+
+**When:** 2026-10-23 01:48 UTC
+**Category:** design_gap
+**Priority:** low
+**Status:** pending
+
+### Detail
+
+src/lib/testHooks.ts is imported by generation code, so a MOCK seam there cannot import an authoring-only module without leaking it into the generation bundle; T2 passed plain {id, mockReplacement} data instead
+
+### Action
+
+When a seam serves a module behind a boundary, pass data into testHooks rather than importing the module there
+
+---
