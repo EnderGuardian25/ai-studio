@@ -57,7 +57,7 @@ This change has **3 tasks in 3 waves**:
 
 ### Wave 2 — Layout and E2E
 
-- [ ] `T2` — Move Refine design under the Preview card; update the E2E suites
+- [x] `T2` — Move Refine design under the Preview card; update the E2E suites
   - Files: `src/app/(app)/drafts/[id]/page.tsx`, `tests/e2e/captions.test.ts`, `tests/e2e/model-selection.test.ts`, `tests/e2e/a11y.test.ts`
   - Estimate: medium
   - Kind: impl

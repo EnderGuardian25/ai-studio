@@ -11,18 +11,17 @@ import { ADMIN_EMAIL, ADMIN_PASSWORD, pageLogin } from '../helpers/ui'
 //
 // Contract (spec FR-08 → FR-17):
 //   GET /api/drafts/[id] → headline, captions[] (one per registry channel,
-//     INSTAGRAM, LINKEDIN, WHATSAPP, in that order).
+//     INSTAGRAM, LINKEDIN, in that order; a legacy WHATSAPP row is hidden, 026).
 //   POST regenerate-copy {} | {channel} | {headline:true} → 202; one
 //     draft-level REGENERATE_COPY claim, the target rows PENDING.
 //   PATCH {channel, text} | {headline}; never touches Draft.status.
 //   Publishing resolves the post channel's own caption, and refuses a FAILED,
-//     PENDING, empty, over-limit or WhatsApp one terminally (422
+//     PENDING, empty or over-limit one terminally; WhatsApp has no caption (026) (422
 //     CAPTION_UNPUBLISHABLE up front; FAILED with no retry in the scheduler).
 //
 // Deterministic seams (MOCK_AI + MOCK_PUPPETEER + MOCK_SOCIAL):
-//   - the mock caption reply is "Mock <Label> caption [<topic>]" (WhatsApp
-//     "Mock **WhatsApp** caption", normalised to *…*) and "Mock headline
-//     <topic>", parsed by the real extractor;
+//   - the mock caption reply is "Mock <Label> caption [<topic>]" and "Mock
+//     headline <topic>", parsed by the real extractor;
 //   - "__DROP_CAPTION_<X>__" in the topic drops that key, only in a reply that
 //     requests every channel;
 //   - the mock publishers' platformId ends in sha256(caption)[0:12].
@@ -31,7 +30,7 @@ const MOCKED = () => !!(process.env.MOCK_AI && process.env.MOCK_PUPPETEER)
 const SOCIAL = () => process.env.MOCK_SOCIAL === 'true'
 
 type Caption = {
-  channel: 'INSTAGRAM' | 'LINKEDIN' | 'WHATSAPP'
+  channel: 'INSTAGRAM' | 'LINKEDIN' | 'WHATSAPP' // WHATSAPP only as a hidden legacy row (026)
   text: string
   status: 'PENDING' | 'READY' | 'FAILED'
   failureReason: string | null
@@ -96,8 +95,8 @@ test.describe('§W — per-channel captions', () => {
     await api.dispose()
   })
 
-  // TC-CAP-01 — AC-12 (FR-10): three READY captions and a headline.
-  test('a generated draft has a headline and three READY captions, normalised', async () => {
+  // TC-CAP-01 — AC-12 (FR-10), AC-02 (026 FR-02): two READY captions and a headline.
+  test('a generated draft has a headline and two READY captions, normalised', async () => {
     if (!MOCKED()) { test.skip(); return }
     const topic = `Cap Gen ${Date.now()}`
     const draft = await exportedDraft(api, topic)
@@ -105,7 +104,7 @@ test.describe('§W — per-channel captions', () => {
     expect(draft.headline).toBe(`Mock headline ${topic}`)
 
     const captions = captionsOf(draft)
-    expect(captions.map((c) => c.channel)).toEqual(['INSTAGRAM', 'LINKEDIN', 'WHATSAPP'])
+    expect(captions.map((c) => c.channel)).toEqual(['INSTAGRAM', 'LINKEDIN'])
     for (const c of captions) {
       expect(c.status).toBe('READY')
       expect(c.failureReason).toBeNull()
@@ -114,7 +113,6 @@ test.describe('§W — per-channel captions', () => {
     }
     expect(captionOf(draft, 'INSTAGRAM').text).toBe(`Mock Instagram caption [${topic}]`)
     expect(captionOf(draft, 'LINKEDIN').text).toBe(`Mock LinkedIn caption [${topic}]`)
-    expect(captionOf(draft, 'WHATSAPP').text).toBe(`Mock *WhatsApp* caption [${topic}]`)
   })
 
   // TC-CAP-02 — AC-13 (FR-08, FR-11) and the first half of AC-16 (FR-15).
@@ -129,9 +127,7 @@ test.describe('§W — per-channel captions', () => {
     expect(li.text).toBe('')
     expect(li.failureReason).toContain('missing')
     const ig = captionOf(draft, 'INSTAGRAM')
-    const wa = captionOf(draft, 'WHATSAPP')
     expect(ig.status).toBe('READY')
-    expect(wa.status).toBe('READY')
 
     // AC-16: the refused caption is a 422 up front, and no Post row is made.
     const refused = await api.post('/api/posts', { draftId: draft.id, channel: 'LINKEDIN' })
@@ -152,8 +148,8 @@ test.describe('§W — per-channel captions', () => {
     expect(liAfter.status).toBe('READY')
     expect(liAfter.failureReason).toBeNull()
     expect(liAfter.text).toBe(`Mock LinkedIn caption [${topic}]`)
-    // The other two rows were never touched: same text, same updatedAt.
-    for (const before of [ig, wa]) {
+    // The other row was never touched: same text, same updatedAt.
+    for (const before of [ig]) {
       const after = captionOf(done, before.channel)
       expect(after.text).toBe(before.text)
       expect(after.updatedAt).toBe(before.updatedAt)
@@ -236,12 +232,12 @@ test.describe('§W — per-channel captions', () => {
     expect(again).toEqual(failed)
   })
 
-  // TC-CAP-06 — AC-17 (FR-14, FR-15): WhatsApp fails closed everywhere.
+  // TC-CAP-06 — AC-17 (FR-14, FR-15), AC-08 (026 FR-07): WhatsApp fails closed everywhere.
   test('WhatsApp is refused at POST /api/posts, and a due WhatsApp post fails terminally', async () => {
     if (!MOCKED() || !SOCIAL()) { test.skip(); return }
     test.skip(!dbAvailable, 'requires test DB access')
     const draft = await exportedDraft(api, `Cap WA ${Date.now()}`)
-    expect(captionOf(draft, 'WHATSAPP').status).toBe('READY') // READY text, still refused
+    expect(captionsOf(draft).map((c) => c.channel)).toEqual(['INSTAGRAM', 'LINKEDIN']) // no WhatsApp caption now
 
     const res = await api.post('/api/posts', { draftId: draft.id, channel: 'WHATSAPP' })
     expect(res.status()).toBe(400)
@@ -266,7 +262,7 @@ test.describe('§W — per-channel captions', () => {
     expect((await tick(api)).status()).toBe(200)
     const failed = await prisma!.post.findUniqueOrThrow({ where: { id: post.id } })
     expect(failed.status).toBe('FAILED')
-    expect(failed.errorReason).toContain("WhatsApp publishing isn't available yet")
+    expect(failed.errorReason).toContain("WhatsApp publishing isn't available.")
     expect(failed.retryCount).toBe(0)
     expect(failed.nextRetryAt).toBeNull()
 
@@ -342,7 +338,7 @@ test.describe('§W — per-channel captions', () => {
 
     const inFlight = 'Another action is already running on this draft'
     for (const [path, body] of [
-      ['regenerate-copy', { channel: 'WHATSAPP' }],
+      ['regenerate-copy', { channel: 'INSTAGRAM' }],
       ['regenerate-copy', { headline: true }],
       ['regenerate-design', {}],
       ['revisions/1/restore', {}],
@@ -415,7 +411,7 @@ test.describe('§W — captions on the ACP surface', () => {
   })
 
   // TC-CAP-14 — AC-26 (FR-17) and AC-17's ACP part (FR-15).
-  test('generate_post returns the headline and three captions; publish_post refuses WhatsApp with no row', async ({ request }) => {
+  test('generate_post returns the headline and two captions; publish_post refuses WhatsApp with no row', async ({ request }) => {
     if (!MOCKED()) { test.skip(); return }
     test.skip(!dbAvailable, 'requires test DB access')
     const topic = `Cap ACP ${Date.now()}`
@@ -430,8 +426,8 @@ test.describe('§W — captions on the ACP surface', () => {
     const output = (await gen.json()).output
     expect(output.draftId).toBeTruthy()
     expect(output.headline).toBe(`Mock headline ${topic}`)
-    expect(output.captions).toHaveLength(3)
-    expect(output.captions.map((c: { channel: string }) => c.channel)).toEqual(['INSTAGRAM', 'LINKEDIN', 'WHATSAPP'])
+    expect(output.captions).toHaveLength(2)
+    expect(output.captions.map((c: { channel: string }) => c.channel)).toEqual(['INSTAGRAM', 'LINKEDIN'])
     for (const c of output.captions as { text: string; status: string }[]) {
       expect(c.status).toBe('READY')
       expect(c.text).toContain(topic)
@@ -449,7 +445,8 @@ test.describe('§W — captions on the ACP surface', () => {
 
 // ── Wave 2 (T13): AC-21 (Regenerate all, the headline) and AC-24 (the panels) ─
 
-const LABELS = { INSTAGRAM: 'Instagram', LINKEDIN: 'LinkedIn', WHATSAPP: 'WhatsApp' } as const
+type ShownChannel = Exclude<Caption['channel'], 'WHATSAPP'>
+const LABELS = { INSTAGRAM: 'Instagram', LINKEDIN: 'LinkedIn' } as const
 const n = (x: number) => x.toLocaleString('en-US')
 const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 const startsWith = (s: string) => new RegExp(`^${escapeRe(s)}`)
@@ -474,13 +471,13 @@ test.describe('§W — wave 2: Regenerate all, the headline and the caption pane
     await page.goto(`/drafts/${id}`)
     await expect(page.getByRole('button', { name: 'View full screen', exact: true })).toBeVisible({ timeout: 20_000 })
   }
-  const field = (page: Page, channel: Caption['channel']) =>
+  const field = (page: Page, channel: ShownChannel) =>
     page.getByRole('textbox', { name: LABELS[channel], exact: true })
   const read = async (id: unknown) => (await api.get(`/api/drafts/${id}`)).json()
 
-  // TC-CAP-15 — AC-21 (FR-11): {} regenerates the three captions, never the
+  // TC-CAP-15 — AC-21 (FR-11), AC-03 (026): {} regenerates the two captions, never the
   // headline or the design.
-  test('Regenerate all rewrites the three captions and leaves the headline and the revision alone', async () => {
+  test('Regenerate all rewrites the two captions and leaves the headline and the revision alone', async () => {
     if (!MOCKED()) { test.skip(); return }
     const topic = `Cap Regen All ${Date.now()}`
     const draft = await exportedDraft(api, topic)
@@ -496,7 +493,7 @@ test.describe('§W — wave 2: Regenerate all, the headline and the caption pane
     expect(done.pendingActionError).toBeNull()
 
     const after = captionsOf(done)
-    expect(after.map((c) => c.channel)).toEqual(['INSTAGRAM', 'LINKEDIN', 'WHATSAPP'])
+    expect(after.map((c) => c.channel)).toEqual(['INSTAGRAM', 'LINKEDIN'])
     for (const c of after) {
       const was = before.find((b) => b.channel === c.channel)!
       expect(c.status, c.channel).toBe('READY')
@@ -531,7 +528,7 @@ test.describe('§W — wave 2: Regenerate all, the headline and the caption pane
 
   // TC-CAP-17 — AC-24 (FR-18, FR-19): the desk's structure, names, counters
   // and limit warnings; neither warning blocks the save.
-  test('the caption desk: headings, names, counters, the WhatsApp guide and the Instagram limit', async ({ page }) => {
+  test('the caption desk: headings, names, counters and the Instagram limit', async ({ page }) => {
     if (!MOCKED()) { test.skip(); return }
     const draft = await exportedDraft(api, `Cap Panels ${Date.now()}`)
     await openDraft(page, draft.id)
@@ -541,16 +538,15 @@ test.describe('§W — wave 2: Regenerate all, the headline and the caption pane
       .locator('section')
       .filter({ has: page.getByRole('heading', { name: 'Captions', level: 2, exact: true }) })
       .last()
-    await expect(desk.getByRole('heading', { level: 3 })).toHaveText(['Headline', 'Instagram', 'LinkedIn', 'WhatsApp'])
+    await expect(desk.getByRole('heading', { level: 3 })).toHaveText(['Headline', 'Instagram', 'LinkedIn'])
     await expect(desk.getByRole('textbox', { name: 'Headline', exact: true })).toHaveCount(1)
 
     // Each caption textarea is named by its own h3, and its counter is exact.
     const counters = {
       INSTAGRAM: (len: number) => `${n(len)} / 2,200 (Instagram)`,
       LINKEDIN: (len: number) => `${n(len)} / 3,000 (LinkedIn)`,
-      WHATSAPP: (len: number) => `${n(len)} / 1,000 guide`,
     }
-    for (const c of captionsOf(draft)) {
+    for (const c of captionsOf(draft) as (Caption & { channel: ShownChannel })[]) {
       const box = desk.getByRole('textbox', { name: LABELS[c.channel], exact: true })
       await expect(box).toHaveJSProperty('tagName', 'TEXTAREA')
       const heading = page.locator(`[id="${await box.getAttribute('aria-labelledby')}"]`)
@@ -560,13 +556,8 @@ test.describe('§W — wave 2: Regenerate all, the headline and the caption pane
       await expect(desk.getByText(counters[c.channel](c.text.length), { exact: true })).toBeVisible()
     }
 
-    // WhatsApp past the 1,000 guide: a warning, and the blur still saves.
-    const longWa = 'w'.repeat(1001)
-    await field(page, 'WHATSAPP').fill(longWa)
-    await expect(desk.getByText('1,001 / 1,000 guide', { exact: true })).toBeVisible()
-    await expect(desk.getByText('Longer than the 1,000-character guide', { exact: true })).toBeVisible()
-    await field(page, 'WHATSAPP').blur()
-    await expect.poll(async () => captionOf(await read(draft.id), 'WHATSAPP').text).toBe(longWa)
+    // No WhatsApp panel (026 FR-04, FR-09).
+    await expect(desk.getByText('WhatsApp')).toHaveCount(0)
 
     // Instagram past its hard 2,200: "Over the Instagram limit", still saved.
     const longIg = 'i'.repeat(2201)
@@ -578,50 +569,48 @@ test.describe('§W — wave 2: Regenerate all, the headline and the caption pane
     // Only the channel past its limit warns.
     await expect(desk.getByText(/^Over the .* limit$/)).toHaveCount(1)
 
-    await expectNoAxeViolations(page, '/drafts/[id] with the guide and limit warnings showing')
+    await expectNoAxeViolations(page, '/drafts/[id] with the limit warning showing')
   })
 
-  // TC-CAP-18 — AC-24 (FR-19): Copy caption, and a per-panel Undo.
-  test('Copy LinkedIn caption fills the clipboard, and Undo after a WhatsApp regenerate restores only WhatsApp', async ({ page }) => {
+  // TC-CAP-18 — AC-24 (FR-19): Copy caption, and a per-panel Undo (retargeted from WhatsApp to LinkedIn, 026).
+  test('Copy Instagram caption fills the clipboard, and Undo after a LinkedIn regenerate restores only LinkedIn', async ({ page }) => {
     if (!MOCKED()) { test.skip(); return }
     await page.context().grantPermissions(['clipboard-read', 'clipboard-write'])
     const topic = `Cap Copy Undo ${Date.now()}`
     const draft = await exportedDraft(api, topic)
     await openDraft(page, draft.id)
 
-    // Copy: the clipboard holds exactly the LinkedIn text.
-    const liText = captionOf(draft, 'LINKEDIN').text
-    await page.getByRole('button', { name: 'Copy LinkedIn caption', exact: true }).click()
+    // Copy: the clipboard holds exactly the Instagram text.
+    const igText = captionOf(draft, 'INSTAGRAM').text
+    await page.getByRole('button', { name: 'Copy Instagram caption', exact: true }).click()
     await expect(page.getByText('Caption copied', { exact: true })).toBeVisible()
-    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(liText)
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(igText)
 
     // A hand edit, so the regenerate (which writes the mock text) is visible.
-    const handWa = 'A hand-written WhatsApp caption.'
-    await field(page, 'WHATSAPP').fill(handWa)
-    await field(page, 'WHATSAPP').blur()
-    await expect.poll(async () => captionOf(await read(draft.id), 'WHATSAPP').text).toBe(handWa)
+    const handLi = 'A hand-written LinkedIn caption.'
+    await field(page, 'LINKEDIN').fill(handLi)
+    await field(page, 'LINKEDIN').blur()
+    await expect.poll(async () => captionOf(await read(draft.id), 'LINKEDIN').text).toBe(handLi)
     const beforeRegen = await read(draft.id)
 
-    await page.getByRole('button', { name: 'Regenerate WhatsApp caption', exact: true }).click()
-    await expect(field(page, 'WHATSAPP')).toHaveValue(`Mock *WhatsApp* caption [${topic}]`, { timeout: 20_000 })
-    const undo = page.getByRole('button', { name: 'Undo WhatsApp caption', exact: true })
+    await page.getByRole('button', { name: 'Regenerate LinkedIn caption', exact: true }).click()
+    await expect(field(page, 'LINKEDIN')).toHaveValue(`Mock LinkedIn caption [${topic}]`, { timeout: 20_000 })
+    const undo = page.getByRole('button', { name: 'Undo LinkedIn caption', exact: true })
     await expect(undo).toBeEnabled({ timeout: 20_000 })
     // Only the regenerated panel has an Undo.
-    await expect(page.getByRole('button', { name: /^Undo (Instagram|LinkedIn) caption$/ })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: /^Undo Instagram caption$/ })).toHaveCount(0)
     await expect(page.getByRole('button', { name: 'Undo headline', exact: true })).toHaveCount(0)
 
     await undo.click()
-    await expect(field(page, 'WHATSAPP')).toHaveValue(handWa)
+    await expect(field(page, 'LINKEDIN')).toHaveValue(handLi)
     await expect(undo).toHaveCount(0)
     const after = await read(draft.id)
-    expect(captionOf(after, 'WHATSAPP').text).toBe(handWa)
-    // Instagram and LinkedIn were never written: same text, same updatedAt.
-    for (const channel of ['INSTAGRAM', 'LINKEDIN'] as const) {
-      expect(captionOf(after, channel)).toEqual(captionOf(beforeRegen, channel))
-    }
+    expect(captionOf(after, 'LINKEDIN').text).toBe(handLi)
+    // Instagram was never written: same text, same updatedAt.
+    expect(captionOf(after, 'INSTAGRAM')).toEqual(captionOf(beforeRegen, 'INSTAGRAM'))
     expect(after.headline).toBe(beforeRegen.headline)
     await expect(field(page, 'INSTAGRAM')).toHaveValue(captionOf(beforeRegen, 'INSTAGRAM').text)
-    await expect(field(page, 'LINKEDIN')).toHaveValue(liText)
+    await expect(field(page, 'LINKEDIN')).toHaveValue(handLi)
   })
 
   // TC-CAP-20 — AC-24 (FR-19): a FAILED row shows its error notice and Generate.
@@ -649,5 +638,89 @@ test.describe('§W — wave 2: Regenerate all, the headline and the caption pane
     await expect(field(page, 'LINKEDIN')).toHaveValue(`Mock LinkedIn caption [${topic}]`, { timeout: 20_000 })
     await expect(page.getByText(failed, { exact: false })).toHaveCount(0)
     expect(captionOf(await read(draft.id), 'LINKEDIN').status).toBe('READY')
+  })
+
+  // TC-CAP-21 — AC-05 (026 FR-04, FR-05): a legacy WhatsApp row is hidden and kept.
+  test('a legacy WhatsApp caption row is hidden from the API and the page, and left unchanged', async ({ page }) => {
+    if (!MOCKED()) { test.skip(); return }
+    test.skip(!dbAvailable, 'requires test DB access')
+    const draft = await exportedDraft(api, `Cap Legacy WA ${Date.now()}`)
+    const id = draft.id as string
+    const legacyText = 'A legacy WhatsApp caption that must stay hidden.'
+    await prisma!.draftCaption.create({
+      data: { draftId: id, channel: 'WHATSAPP', text: legacyText, status: 'READY' },
+    })
+    const rowBefore = await prisma!.draftCaption.findUniqueOrThrow({
+      where: { draftId_channel: { draftId: id, channel: 'WHATSAPP' } },
+    })
+
+    const listed = await read(id)
+    expect(captionsOf(listed).map((c) => c.channel)).toEqual(['INSTAGRAM', 'LINKEDIN'])
+    expect(JSON.stringify(listed)).not.toContain(legacyText)
+
+    await openDraft(page, id)
+    const desk = page
+      .locator('section')
+      .filter({ has: page.getByRole('heading', { name: 'Captions', level: 2, exact: true }) })
+      .last()
+    await expect(desk.getByRole('heading', { level: 3 })).toHaveText(['Headline', 'Instagram', 'LinkedIn'])
+    await expect(page.getByText('WhatsApp')).toHaveCount(0)
+    await expect(page.getByText(legacyText)).toHaveCount(0)
+
+    // It cannot be edited or regenerated either (FR-02).
+    expect((await api.patch(`/api/drafts/${id}`, { channel: 'WHATSAPP', text: 'x' })).status()).toBe(400)
+    expect((await api.post(`/api/drafts/${id}/regenerate-copy`, { channel: 'WHATSAPP' })).status()).toBe(400)
+
+    const rowAfter = await prisma!.draftCaption.findUniqueOrThrow({
+      where: { draftId_channel: { draftId: id, channel: 'WHATSAPP' } },
+    })
+    expect(rowAfter.text).toBe(legacyText)
+    expect(rowAfter.status).toBe('READY')
+    expect(rowAfter.updatedAt.getTime()).toBe(rowBefore.updatedAt.getTime())
+  })
+
+  // TC-CAP-22 — AC-09 (026 FR-08): Refine design sits under the Preview card.
+  test('Refine design is under the Preview card from xl, and between Preview and Captions below it', async ({ page }) => {
+    if (!MOCKED()) { test.skip(); return }
+    const draft = await exportedDraft(api, `Cap Layout ${Date.now()}`)
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await openDraft(page, draft.id)
+
+    const preview = page.locator('section[aria-label="Preview"]')
+    const refine = page
+      .locator('section')
+      .filter({ has: page.getByRole('heading', { name: 'Refine Design', exact: true }) })
+      .last()
+    const captions = page
+      .locator('section')
+      .filter({ has: page.getByRole('heading', { name: 'Captions', level: 2, exact: true }) })
+      .last()
+    await expect(refine).toBeVisible()
+
+    const pb = (await preview.boundingBox())!
+    const rb = (await refine.boundingBox())!
+    expect(rb.y).toBeGreaterThanOrEqual(pb.y + pb.height - 1)
+    expect(Math.abs(rb.x - pb.x)).toBeLessThanOrEqual(1)
+    await expectNoAxeViolations(page, '/drafts/[id] at 1440 px, Refine design under Preview')
+
+    await page.setViewportSize({ width: 390, height: 900 })
+    const ys = {
+      preview: (await preview.boundingBox())!.y,
+      refine: (await refine.boundingBox())!.y,
+      captions: (await captions.boundingBox())!.y,
+    }
+    expect(ys.preview).toBeLessThan(ys.refine)
+    expect(ys.refine).toBeLessThan(ys.captions)
+    const order = await page.evaluate(() => {
+      const q = (el: Element | null) => el!
+      const p = document.querySelector('section[aria-label="Preview"]')
+      const headings = Array.from(document.querySelectorAll('h2'))
+      const rf = headings.find((h) => h.textContent?.trim() === 'Refine Design')!.closest('section')
+      const cp = headings.find((h) => h.textContent?.trim() === 'Captions')!.closest('section')
+      const before = (a: Element, b: Element) => !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING)
+      return before(q(p), q(rf)) && before(q(rf), q(cp))
+    })
+    expect(order).toBe(true)
+    await expectNoAxeViolations(page, '/drafts/[id] at 390 px, one column')
   })
 })

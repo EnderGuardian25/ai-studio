@@ -60,7 +60,7 @@ type Call = {
   label: string | null
 }
 type Caption = {
-  channel: 'INSTAGRAM' | 'LINKEDIN' | 'WHATSAPP'
+  channel: 'INSTAGRAM' | 'LINKEDIN'
   text: string
   status: string
   updatedAt: string
@@ -199,7 +199,7 @@ test.describe('§Y — model selection: stamps, policy and the recorder', () => 
     await clearCalls(api)
     const draft = await generate(api, 'B', `Models PathB ${Date.now()}`)
 
-    expect(captionsOf(draft)).toHaveLength(3)
+    expect(captionsOf(draft)).toHaveLength(2)
     for (const c of captionsOf(draft)) {
       expect(c.model, c.channel).toBe(HAIKU)
       expect(c.modelSubstitutedFrom, c.channel).toBeNull()
@@ -358,8 +358,8 @@ test.describe('§Y — model selection: stamps, policy and the recorder', () => 
 
     const recaptioned = await act(api, id, 'regenerate-copy', { channel: 'LINKEDIN' })
     expect(captionOf(recaptioned, 'LINKEDIN')).toMatchObject({ model: HAIKU, modelSubstitutedFrom: OPUS })
-    // The other rows were never written: same stamp, same updatedAt.
-    for (const channel of ['INSTAGRAM', 'WHATSAPP'] as const) {
+    // The other row was never written: same stamp, same updatedAt.
+    for (const channel of ['INSTAGRAM'] as const) {
       expect(captionOf(recaptioned, channel)).toEqual(captionOf(seeded, channel))
     }
     expect(recaptioned.designModel).toBe(SONNET) // a caption action leaves the design stamp
@@ -375,8 +375,8 @@ test.describe('§Y — model selection: stamps, policy and the recorder', () => 
     if (!MOCKED()) { test.skip(); return }
     const draft = await generate(api, 'B', `Models LikeForLike ${Date.now()}`)
     const id = draft.id as string
-    const setStamps = async (models: [string | null, string | null, string | null]) => {
-      const channels = ['INSTAGRAM', 'LINKEDIN', 'WHATSAPP'] as const
+    const setStamps = async (models: [string | null, string | null]) => {
+      const channels = ['INSTAGRAM', 'LINKEDIN'] as const
       for (const [i, channel] of channels.entries()) {
         await prisma!.draftCaption.update({
           where: { draftId_channel: { draftId: id, channel } },
@@ -386,30 +386,30 @@ test.describe('§Y — model selection: stamps, policy and the recorder', () => 
     }
     const stampsOf = (d: Draft) => captionsOf(d).map((c) => [c.model, c.modelSubstitutedFrom])
 
-    // (a) Three equal stamps: the stamp tier.
-    await setStamps([SONNET, SONNET, SONNET])
+    // (a) Two equal stamps: the stamp tier.
+    await setStamps([SONNET, SONNET])
     await clearCalls(api)
     let done = await act(api, id, 'regenerate-copy', {})
-    expect(stampsOf(done)).toEqual([[SONNET, null], [SONNET, null], [SONNET, null]])
+    expect(stampsOf(done)).toEqual([[SONNET, null], [SONNET, null]])
     expectRan(await readCalls(api), 'CAPTION', SONNET, 'stamp')
 
     // (b) Mixed stamps (Opus allowed) and a team CAPTION default of Haiku: no
     // stamp tier, the team default, and no substitution recorded.
     await putPolicy(api, policy({ defaults: { CAPTION: 'HAIKU' } }))
-    await setStamps([SONNET, OPUS, SONNET])
+    await setStamps([SONNET, OPUS])
     await clearCalls(api)
     done = await act(api, id, 'regenerate-copy', {})
-    expect(stampsOf(done)).toEqual([[HAIKU, null], [HAIKU, null], [HAIKU, null]])
+    expect(stampsOf(done)).toEqual([[HAIKU, null], [HAIKU, null]])
     let calls = await readCalls(api)
     expectRan(calls, 'CAPTION', HAIKU, 'team')
     expect(on(calls, 'CAPTION').every((c) => c.substitutedFrom === null)).toBe(true)
 
     // (c) Null stamps (a pre-008 draft) with no team default: the system default.
     await resetPolicy(teamId)
-    await setStamps([null, null, null])
+    await setStamps([null, null])
     await clearCalls(api)
     done = await act(api, id, 'regenerate-copy', {})
-    expect(stampsOf(done)).toEqual([[HAIKU, null], [HAIKU, null], [HAIKU, null]])
+    expect(stampsOf(done)).toEqual([[HAIKU, null], [HAIKU, null]])
     calls = await readCalls(api)
     expectRan(calls, 'CAPTION', HAIKU, 'system')
     expect(on(calls, 'CAPTION').every((c) => c.substitutedFrom === null)).toBe(true)
@@ -1082,7 +1082,6 @@ test.describe('§Y — the pickers (wave 2)', () => {
     const preselected: [string, string, string, string][] = [
       ['LinkedIn caption model', 'draft-caption-model-linkedin', 'SONNET', 'Same model as the current caption'],
       ['Instagram caption model', 'draft-caption-model-instagram', 'HAIKU', 'Same model as the current caption'],
-      ['WhatsApp caption model', 'draft-caption-model-whatsapp', 'HAIKU', 'Same model as the current caption'],
       ['Headline model', 'draft-headline-model', 'HAIKU', 'Same model as the current headline'],
       ['All captions model', 'draft-all-captions-model', 'HAIKU', 'Default'],
       ['Design model', 'draft-design-model', 'SONNET', 'Same model as the current design'],
@@ -1096,12 +1095,12 @@ test.describe('§Y — the pickers (wave 2)', () => {
     // "Generated with": each caption panel, the headline, the design, and the
     // Versions cell (the name, with the sentence in its title).
     await expect(generatedWithIn(panelOf(page, 'draft-caption-model-linkedin'))).toHaveText('Generated with Sonnet 5.5')
-    for (const channel of ['instagram', 'whatsapp']) {
+    for (const channel of ['instagram']) {
       await expect(generatedWithIn(panelOf(page, `draft-caption-model-${channel}`))).toHaveText('Generated with Haiku 4.5')
     }
     await expect(generatedWithIn(panelOf(page, 'draft-headline-model'))).toHaveText('Generated with Haiku 4.5')
     await expect(generatedWithLines(page, 'Sonnet 5.5')).toHaveCount(2) // the design and LinkedIn
-    await expect(generatedWithLines(page, 'Haiku 4.5')).toHaveCount(3) // Instagram, WhatsApp, the headline
+    await expect(generatedWithLines(page, 'Haiku 4.5')).toHaveCount(2) // Instagram, the headline
     await expect(page.locator('span[title="Generated with Sonnet 5.5"]')).toHaveText('Generated with Sonnet 5.5')
     await expectNoAxeViolations(page, '/drafts/[id] (with the model pickers)')
 
@@ -1112,7 +1111,7 @@ test.describe('§Y — the pickers (wave 2)', () => {
     await page.getByRole('button', { name: 'Regenerate LinkedIn caption', exact: true }).click()
     expect(bodyOf(await linkedInPost)).toEqual({ channel: 'LINKEDIN', model: 'OPUS' })
     let now = await until(api, id, (d) => captionOf(d, 'LINKEDIN').model === OPUS, 'LinkedIn rewritten on Opus')
-    for (const channel of ['INSTAGRAM', 'WHATSAPP'] as const) {
+    for (const channel of ['INSTAGRAM'] as const) {
       expect(captionOf(now, channel), channel).toEqual(captionOf(seeded, channel))
     }
     expect(now.headlineModel).toBe(HAIKU)
@@ -1176,7 +1175,7 @@ test.describe('§Y — the pickers (wave 2)', () => {
     })
     // A FAILED row may keep the stamp of text since cleared (reviews/T7.md).
     await prisma!.draftCaption.update({
-      where: { draftId_channel: { draftId: id, channel: 'WHATSAPP' } },
+      where: { draftId_channel: { draftId: id, channel: 'INSTAGRAM' } },
       data: { status: 'FAILED', text: '', failureReason: 'Seeded failure (008 T18)' },
     })
     await putPolicy(api, policy({ allowed: ['HAIKU', 'SONNET'] }))
@@ -1201,9 +1200,9 @@ test.describe('§Y — the pickers (wave 2)', () => {
     await expect(linkedIn.locator('span[title="Substituted for Opus 5.5"]')).toHaveText('(substituted)')
 
     // The FAILED row: its failure notice, and no "Generated with".
-    const whatsApp = panelOf(page, 'draft-caption-model-whatsapp')
-    await expect(whatsApp.getByText(/The WhatsApp caption failed to generate/)).toBeVisible()
-    await expect(generatedWithIn(whatsApp)).toHaveCount(0)
+    const instagram = panelOf(page, 'draft-caption-model-instagram')
+    await expect(instagram.getByText(/The Instagram caption failed to generate/)).toBeVisible()
+    await expect(generatedWithIn(instagram)).toHaveCount(0)
 
     // A failed design: no design line and no design picker; the caption and
     // headline lines stay.
@@ -1213,9 +1212,9 @@ test.describe('§Y — the pickers (wave 2)', () => {
     })
     await page.reload()
     await expect(page.getByText('Generation failed', { exact: true })).toBeVisible({ timeout: 20_000 })
-    await expect(generatedWithLines(page, 'Haiku 4.5')).toHaveCount(3) // Instagram, LinkedIn, the headline
+    await expect(generatedWithLines(page, 'Haiku 4.5')).toHaveCount(2) // LinkedIn and the headline (Instagram is the FAILED row)
     await expect(generatedWithLines(page, 'Opus 5.5')).toHaveCount(0)
-    await expect(page.locator('p').filter({ hasText: /^Generated with / })).toHaveCount(3)
+    await expect(page.locator('p').filter({ hasText: /^Generated with / })).toHaveCount(2)
     await expect(picker(page, 'Design model')).toHaveCount(0)
   })
 

@@ -55,12 +55,13 @@ interface Revision {
   modelSubstitutedFrom: string | null
 }
 
-const STATUS_TO_CHIP: Record<DraftDetail['status'], 'draft' | 'exported' | 'published' | 'failed'> = {
-  IN_PROGRESS: 'draft',
-  EXPORTED: 'exported',
-  PUBLISHED: 'published',
-  FAILED: 'failed',
-}
+const STATUS_TO_CHIP: Record<DraftDetail['status'], 'draft' | 'exported' | 'published' | 'failed'> =
+  {
+    IN_PROGRESS: 'draft',
+    EXPORTED: 'exported',
+    PUBLISHED: 'published',
+    FAILED: 'failed',
+  }
 
 // The revision list's retry backoff after a failed fetch (018 FR-06).
 const REVISION_RETRY_DELAYS_MS = [2000, 4000, 8000]
@@ -153,7 +154,10 @@ export default function DraftDetailPage() {
   // resets the guard and tries again after 2, 4 then 8 s (018 FR-06); a
   // success that still lacks the number is never retried.
   const requestedRevisionRef = useRef<number | null>(null)
-  const revisionRetryRef = useRef<{ revision: number | null; tries: number }>({ revision: null, tries: 0 })
+  const revisionRetryRef = useRef<{ revision: number | null; tries: number }>({
+    revision: null,
+    tries: 0,
+  })
   const revisionRetryTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [revisionRetryTick, setRevisionRetryTick] = useState(0)
   useEffect(() => {
@@ -179,7 +183,7 @@ export default function DraftDetailPage() {
     () => () => {
       if (revisionRetryTimer.current) clearTimeout(revisionRetryTimer.current)
     },
-    []
+    [],
   )
 
   function refreshAfterChange() {
@@ -305,9 +309,11 @@ export default function DraftDetailPage() {
   // Regenerate design's Undo — Path B only, like the button itself.
   const showUndo = isPathB && designUndo.snapshot !== null
   // The meta row (the study's .meta): channels, kit and size, split by 3 px dots.
-  const meta = [draft.brief.channels.map(channelLabel).join(' · '), draft.brandKitName, ratioShort].filter(
-    (m): m is string => Boolean(m)
-  )
+  const meta = [
+    draft.brief.channels.map(channelLabel).join(' · '),
+    draft.brandKitName,
+    ratioShort,
+  ].filter((m): m is string => Boolean(m))
 
   return (
     <>
@@ -332,7 +338,9 @@ export default function DraftDetailPage() {
             <StatusChip status={STATUS_TO_CHIP[draft.status]} />
             {meta.map((m, i) => (
               <React.Fragment key={i}>
-                {i > 0 && <span aria-hidden className="size-[3px] flex-shrink-0 rounded-full bg-fg-muted" />}
+                {i > 0 && (
+                  <span aria-hidden className="size-[3px] flex-shrink-0 rounded-full bg-fg-muted" />
+                )}
                 <span>{m}</span>
               </React.Fragment>
             ))}
@@ -408,232 +416,249 @@ export default function DraftDetailPage() {
         </p>
       )}
 
-      {/* The grid (021 FR-11): the stage left and the cards right from xl
-          (1280 px); one column below it, the stage first. */}
+      {/* The grid (021 FR-11, 026 FR-08): the stage and Refine design left, the
+          captions right from xl (1280 px); one column below it: Preview,
+          Refine design, Captions. */}
       <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[0.92fr_1.08fr]">
-        {/* ── The stage (§8.12): a bezel card holding the post ──────────── */}
-        <section aria-label="Preview" className="surface-bezel min-w-0 p-5 sm:p-7">
-          <div className="mb-[18px] flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
-            <span className={EYEBROW}>Preview</span>
-            <span className="font-mono text-ui-2xs text-fg-muted">
-              {width} × {height}
-              {currentRevision && ` · v${currentRevision.revisionNumber} of ${revisions.length}`}
-            </span>
-          </div>
+        <div className="flex min-w-0 flex-col gap-3.5">
+          {/* ── The stage (§8.12): a bezel card holding the post ──────────── */}
+          <section aria-label="Preview" className="surface-bezel min-w-0 p-5 sm:p-7">
+            <div className="mb-[18px] flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+              <span className={EYEBROW}>Preview</span>
+              <span className="font-mono text-ui-2xs text-fg-muted">
+                {width} × {height}
+                {currentRevision && ` · v${currentRevision.revisionNumber} of ${revisions.length}`}
+              </span>
+            </div>
 
-          {/* The post, at its own aspect ratio, never cropped, rounded or
+            {/* The post, at its own aspect ratio, never cropped, rounded or
               restyled (021 A3): its immediate wrapper is square too. */}
-          <div className={`relative mx-auto ${aspectClassFor(draft.brief.aspectRatio)} w-full max-w-[392px] bg-canvas`}>
-            {draft.exportUrl ? (
-              <button
-                onClick={() => setShowPreview(true)}
-                aria-label="View full screen"
-                title="View full screen"
-                className={`group relative block h-full w-full cursor-zoom-in ${FOCUS}`}
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={draft.exportUrl} alt={draft.brief.topic} className="block h-full w-full object-contain" />
-                <span aria-hidden className={EXPAND_BADGE}>
-                  <Maximize2 {...ICON_SM} />
-                </span>
-              </button>
-            ) : isGenerating ? (
-              <div
-                className="absolute inset-0 flex animate-pulse flex-col items-center justify-center gap-3 bg-canvas"
-                aria-label="Generating design"
-                role="status"
-              >
-                <Loader2 size={28} strokeWidth={1.4} className="animate-spin text-fg-muted" />
-                <span className="text-ui-xs text-fg-muted">Designing your post…</span>
-              </div>
-            ) : isFailed ? (
-              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-6 text-center">
-                <AlertTriangle size={28} strokeWidth={1.4} className="text-status-failed" />
-                <span className="text-ui-sm font-semibold text-fg">Generation failed</span>
-                <span className="line-clamp-3 text-ui-xs text-fg-muted">
-                  {draft.failureReason ?? 'Something went wrong while generating this post.'}
-                </span>
-                <Button variant="secondary" size="sm" onClick={handleRetry} disabled={retrying}>
-                  {retrying ? <Loader2 {...ICON} className="animate-spin" /> : <RotateCcw {...ICON} />}
-                  Retry
-                </Button>
-              </div>
-            ) : (
-              <div className="flex h-full w-full flex-col items-center justify-center gap-2">
-                <ImageIcon size={32} strokeWidth={1.4} className="text-fg-muted" />
-                <span className="text-ui-xs text-fg-muted">No preview available</span>
-              </div>
-            )}
-            {/* In-progress overlay for background design actions — the current
+            <div
+              className={`relative mx-auto ${aspectClassFor(draft.brief.aspectRatio)} w-full max-w-[392px] bg-canvas`}
+            >
+              {draft.exportUrl ? (
+                <button
+                  onClick={() => setShowPreview(true)}
+                  aria-label="View full screen"
+                  title="View full screen"
+                  className={`group relative block h-full w-full cursor-zoom-in ${FOCUS}`}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={draft.exportUrl}
+                    alt={draft.brief.topic}
+                    className="block h-full w-full object-contain"
+                  />
+                  <span aria-hidden className={EXPAND_BADGE}>
+                    <Maximize2 {...ICON_SM} />
+                  </span>
+                </button>
+              ) : isGenerating ? (
+                <div
+                  className="absolute inset-0 flex animate-pulse flex-col items-center justify-center gap-3 bg-canvas"
+                  aria-label="Generating design"
+                  role="status"
+                >
+                  <Loader2 size={28} strokeWidth={1.4} className="animate-spin text-fg-muted" />
+                  <span className="text-ui-xs text-fg-muted">Designing your post…</span>
+                </div>
+              ) : isFailed ? (
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-6 text-center">
+                  <AlertTriangle size={28} strokeWidth={1.4} className="text-status-failed" />
+                  <span className="text-ui-sm font-semibold text-fg">Generation failed</span>
+                  <span className="line-clamp-3 text-ui-xs text-fg-muted">
+                    {draft.failureReason ?? 'Something went wrong while generating this post.'}
+                  </span>
+                  <Button variant="secondary" size="sm" onClick={handleRetry} disabled={retrying}>
+                    {retrying ? (
+                      <Loader2 {...ICON} className="animate-spin" />
+                    ) : (
+                      <RotateCcw {...ICON} />
+                    )}
+                    Retry
+                  </Button>
+                </div>
+              ) : (
+                <div className="flex h-full w-full flex-col items-center justify-center gap-2">
+                  <ImageIcon size={32} strokeWidth={1.4} className="text-fg-muted" />
+                  <span className="text-ui-xs text-fg-muted">No preview available</span>
+                </div>
+              )}
+              {/* In-progress overlay for background design actions — the current
                 image stays visible underneath (NOT the generation skeleton).
                 The words sit on an opaque label, never on the scrim (§4.2). */}
-            {designActionPending && (
-              <div
-                className="absolute inset-0 flex flex-col items-center justify-center bg-scrim/40"
-                aria-label={draft.pendingAction === 'REFINE' ? 'Refining design' : 'Regenerating design'}
-                role="status"
-              >
-                <span className="surface-raised flex items-center gap-2 px-3 py-2 text-ui-xs font-semibold text-fg">
-                  <Loader2 {...ICON} className="animate-spin" />
-                  {draft.pendingAction === 'REFINE' ? 'Refining design…' : 'Regenerating design…'}
-                </span>
-              </div>
+              {designActionPending && (
+                <div
+                  className="absolute inset-0 flex flex-col items-center justify-center bg-scrim/40"
+                  aria-label={
+                    draft.pendingAction === 'REFINE' ? 'Refining design' : 'Regenerating design'
+                  }
+                  role="status"
+                >
+                  <span className="surface-raised flex items-center gap-2 px-3 py-2 text-ui-xs font-semibold text-fg">
+                    <Loader2 {...ICON} className="animate-spin" />
+                    {draft.pendingAction === 'REFINE' ? 'Refining design…' : 'Regenerating design…'}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* 008 FR-20: the model that made the current design. */}
+            {!isFailed && (
+              <GeneratedWith
+                stamp={draft.designModel}
+                substitutedFrom={draft.designModelSubstitutedFrom}
+                className="mt-4 text-center"
+              />
             )}
-          </div>
 
-          {/* 008 FR-20: the model that made the current design. */}
-          {!isFailed && (
-            <GeneratedWith
-              stamp={draft.designModel}
-              substitutedFrom={draft.designModelSubstitutedFrom}
-              className="mt-4 text-center"
-            />
-          )}
-
-          {/* 005 FR-07: why this design has no AI background, when that
+            {/* 005 FR-07: why this design has no AI background, when that
               was not the model's choice. Non-blocking. */}
-          {draft.backgroundSkipped && <BackgroundNotice skipped={draft.backgroundSkipped} />}
+            {draft.backgroundSkipped && <BackgroundNotice skipped={draft.backgroundSkipped} />}
 
-          {/* 009 FR-15: the image style asked for was not (fully) applied. */}
-          {draft.compositionNotice && <CompositionNotice notice={draft.compositionNotice} />}
+            {/* 009 FR-15: the image style asked for was not (fully) applied. */}
+            {draft.compositionNotice && <CompositionNotice notice={draft.compositionNotice} />}
 
-          {/* The versions (§8.13, the study's .v): a thumbnail at the post's
+            {/* The versions (§8.13, the study's .v): a thumbnail at the post's
               ratio, the number, the instruction. The current one is ringed in
               ink with a "Current" pill. No previous/next arrows (021 A5). */}
-          <h2 className="sr-only">Revision History</h2>
-          {revisions.length === 0 ? (
-            <p className="mt-5 text-ui-sm text-fg-muted">No revisions yet.</p>
-          ) : (
-            <ul aria-label="Versions" className="mt-5 grid grid-cols-4 gap-2">
-              {versions.map((r) => {
-                const isCurrent = r.revisionNumber === draft.currentRevisionNumber
-                // 008 FR-20: the model that made this version. The cell is too
-                // narrow for the sentence, so it shows the name and keeps the
-                // sentence for the tooltip and screen readers.
-                const madeWith = generatedWith(r.model, r.modelSubstitutedFrom)
-                const frame = (
-                  <>
-                    {/* A version's own render, shown as rendered (§8.12): square. */}
-                    <span className={`relative block w-11 flex-shrink-0 ${aspectClassFor(draft.brief.aspectRatio)} bg-canvas`}>
-                      {r.exportUrl && (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={r.exportUrl} alt="" className="block h-full w-full object-contain" />
-                      )}
-                    </span>
-                    <span className="block w-full min-w-0">
-                      <span className="flex flex-wrap items-center justify-center gap-x-1 gap-y-0.5 font-mono text-ui-xs font-semibold text-fg">
-                        v{r.revisionNumber}
-                        {isCurrent && <span className={`${PILL_BADGE} font-sans`}>Current</span>}
-                        {restoringRev === r.revisionNumber && (
-                          <Loader2 {...ICON_SM} className="animate-spin text-fg-muted" />
+            <h2 className="sr-only">Revision History</h2>
+            {revisions.length === 0 ? (
+              <p className="mt-5 text-ui-sm text-fg-muted">No revisions yet.</p>
+            ) : (
+              <ul aria-label="Versions" className="mt-5 grid grid-cols-4 gap-2">
+                {versions.map((r) => {
+                  const isCurrent = r.revisionNumber === draft.currentRevisionNumber
+                  // 008 FR-20: the model that made this version. The cell is too
+                  // narrow for the sentence, so it shows the name and keeps the
+                  // sentence for the tooltip and screen readers.
+                  const madeWith = generatedWith(r.model, r.modelSubstitutedFrom)
+                  const frame = (
+                    <>
+                      {/* A version's own render, shown as rendered (§8.12): square. */}
+                      <span
+                        className={`relative block w-11 flex-shrink-0 ${aspectClassFor(draft.brief.aspectRatio)} bg-canvas`}
+                      >
+                        {r.exportUrl && (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={r.exportUrl}
+                            alt=""
+                            className="block h-full w-full object-contain"
+                          />
                         )}
                       </span>
-                      <span className="mt-0.5 line-clamp-2 break-words text-ui-2xs leading-snug text-fg-muted">
-                        {r.instruction}
-                      </span>
-                      <span className="mt-0.5 block text-ui-2xs leading-snug text-fg-muted">
-                        {formatDateTime(r.createdAt)}
-                      </span>
-                      {madeWith && (
-                        <span
-                          className="mt-0.5 block break-words text-ui-2xs leading-snug text-fg-muted"
-                          title={madeWith.text}
-                        >
-                          <span className="sr-only">Generated with </span>
-                          {madeWith.name}
-                          {madeWith.substitutedTitle && (
-                            <>
-                              {' '}
-                              <span title={madeWith.substitutedTitle}>(substituted)</span>
-                              <span className="sr-only">: {madeWith.substitutedTitle}</span>
-                            </>
+                      <span className="block w-full min-w-0">
+                        <span className="flex flex-wrap items-center justify-center gap-x-1 gap-y-0.5 font-mono text-ui-xs font-semibold text-fg">
+                          v{r.revisionNumber}
+                          {isCurrent && <span className={`${PILL_BADGE} font-sans`}>Current</span>}
+                          {restoringRev === r.revisionNumber && (
+                            <Loader2 {...ICON_SM} className="animate-spin text-fg-muted" />
                           )}
                         </span>
-                      )}
-                    </span>
-                  </>
-                )
-                return (
-                  <li key={r.id} className="min-w-0">
-                    {/* Cells are narrow, so the clamped instruction is repeated in
+                        <span className="mt-0.5 line-clamp-2 break-words text-ui-2xs leading-snug text-fg-muted">
+                          {r.instruction}
+                        </span>
+                        <span className="mt-0.5 block text-ui-2xs leading-snug text-fg-muted">
+                          {formatDateTime(r.createdAt)}
+                        </span>
+                        {madeWith && (
+                          <span
+                            className="mt-0.5 block break-words text-ui-2xs leading-snug text-fg-muted"
+                            title={madeWith.text}
+                          >
+                            <span className="sr-only">Generated with </span>
+                            {madeWith.name}
+                            {madeWith.substitutedTitle && (
+                              <>
+                                {' '}
+                                <span title={madeWith.substitutedTitle}>(substituted)</span>
+                                <span className="sr-only">: {madeWith.substitutedTitle}</span>
+                              </>
+                            )}
+                          </span>
+                        )}
+                      </span>
+                    </>
+                  )
+                  return (
+                    <li key={r.id} className="min-w-0">
+                      {/* Cells are narrow, so the clamped instruction is repeated in
                         the tooltip; the accessible name stays "Switch to vN". */}
-                    {isCurrent ? (
-                      <div
-                        aria-current="true"
-                        title={r.instruction ?? undefined}
-                        className={`${VERSION_CELL} bg-surface-raised shadow-panel ring-[1.5px] ring-inset ring-fg`}
-                      >
-                        {frame}
-                      </div>
+                      {isCurrent ? (
+                        <div
+                          aria-current="true"
+                          title={r.instruction ?? undefined}
+                          className={`${VERSION_CELL} bg-surface-raised shadow-panel ring-[1.5px] ring-inset ring-fg`}
+                        >
+                          {frame}
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleRestore(r.revisionNumber)}
+                          disabled={restoringRev !== null || actionPending}
+                          aria-label={`Switch to v${r.revisionNumber}`}
+                          title={`Switch to v${r.revisionNumber}${r.instruction ? ` — ${r.instruction}` : ''}`}
+                          className={`${VERSION_CELL} enabled:hover:bg-surface-raised disabled:cursor-not-allowed disabled:opacity-50 ${FOCUS}`}
+                        >
+                          {frame}
+                        </button>
+                      )}
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
+
+            {/* The note and Undo (the study's .vnote). */}
+            {(versions.length > 1 || showUndo) && (
+              <div className="mt-3.5 flex flex-wrap items-center gap-x-2 gap-y-1 px-1 text-ui-xs text-fg-muted">
+                {versions.length > 1 && (
+                  <span className="flex min-w-0 items-center gap-2">
+                    <Clock {...ICON_SM} aria-hidden className="flex-shrink-0" />
+                    Switching is instant — each version keeps its own export.
+                  </span>
+                )}
+                {showUndo && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="ml-auto"
+                    onClick={designUndo.undo}
+                    disabled={regenDesign || designUndo.undoing || actionPending}
+                    title="Go back to the previous design"
+                  >
+                    {designUndo.undoing ? (
+                      <Loader2 {...ICON_SM} className="animate-spin" />
                     ) : (
-                      <button
-                        type="button"
-                        onClick={() => handleRestore(r.revisionNumber)}
-                        disabled={restoringRev !== null || actionPending}
-                        aria-label={`Switch to v${r.revisionNumber}`}
-                        title={`Switch to v${r.revisionNumber}${r.instruction ? ` — ${r.instruction}` : ''}`}
-                        className={`${VERSION_CELL} enabled:hover:bg-surface-raised disabled:cursor-not-allowed disabled:opacity-50 ${FOCUS}`}
-                      >
-                        {frame}
-                      </button>
+                      <Undo2 {...ICON_SM} />
                     )}
-                  </li>
-                )
-              })}
-            </ul>
-          )}
+                    Undo
+                  </Button>
+                )}
+              </div>
+            )}
 
-          {/* The note and Undo (the study's .vnote). */}
-          {(versions.length > 1 || showUndo) && (
-            <div className="mt-3.5 flex flex-wrap items-center gap-x-2 gap-y-1 px-1 text-ui-xs text-fg-muted">
-              {versions.length > 1 && (
-                <span className="flex min-w-0 items-center gap-2">
-                  <Clock {...ICON_SM} aria-hidden className="flex-shrink-0" />
-                  Switching is instant — each version keeps its own export.
-                </span>
-              )}
-              {showUndo && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="ml-auto"
-                  onClick={designUndo.undo}
-                  disabled={regenDesign || designUndo.undoing || actionPending}
-                  title="Go back to the previous design"
-                >
-                  {designUndo.undoing ? <Loader2 {...ICON_SM} className="animate-spin" /> : <Undo2 {...ICON_SM} />}
-                  Undo
-                </Button>
-              )}
-            </div>
-          )}
-
-          {/* The design regenerate's model (008 FR-20), pre-selected from the
+            {/* The design regenerate's model (008 FR-20), pre-selected from the
               current design's stamp (FR-09). Path B only, like the button. */}
-          {isPathB && ready && (
-            <div className="mt-5 border-t border-line-subtle pt-4">
-              <ModelPicker
-                id="draft-design-model"
-                surface="DESIGN_FREEFORM"
-                context={{ stamp: draft.designModel, designPath: 'B' }}
-                value={designModel}
-                onChange={pickDesignModel}
-                label="Design model"
-                disabled={regenDesign || designUndo.undoing || actionPending}
-                error={designModelError}
-                className="sm:max-w-xs"
-              />
-            </div>
-          )}
-        </section>
+            {isPathB && ready && (
+              <div className="mt-5 border-t border-line-subtle pt-4">
+                <ModelPicker
+                  id="draft-design-model"
+                  surface="DESIGN_FREEFORM"
+                  context={{ stamp: draft.designModel, designPath: 'B' }}
+                  value={designModel}
+                  onChange={pickDesignModel}
+                  label="Design model"
+                  disabled={regenDesign || designUndo.undoing || actionPending}
+                  error={designModelError}
+                  className="sm:max-w-xs"
+                />
+              </div>
+            )}
+          </section>
 
-        {/* ── The cards (§8.14): captions, then refine ──────────────────── */}
-        <div className="flex min-w-0 flex-col gap-3.5">
-          {/* Captions resolve independently of the image, each panel by its own
-              row: a skeleton only while that row is PENDING, so empty text on a
-              written row is always an editable field (TC-ASYNC-10). The
-              captions (012) and the refine panel (008) stay self-contained. */}
-          <CaptionPanels draft={draft} onSaved={() => fetchDraft()} onActionStarted={fetchDraft} />
           {/* Refinement only makes sense once there's a rendered design to refine. */}
           {ready && (
             <RefinementPanel
@@ -648,6 +673,14 @@ export default function DraftDetailPage() {
               onRefined={refreshAfterChange}
             />
           )}
+        </div>
+
+        {/* ── The cards (§8.14): the captions ───────────────────────────── */}
+        <div className="flex min-w-0 flex-col gap-3.5">
+          {/* Captions resolve independently of the image, each panel by its own
+              row: a skeleton only while that row is PENDING, so empty text on a
+              written row is always an editable field (TC-ASYNC-10). */}
+          <CaptionPanels draft={draft} onSaved={() => fetchDraft()} onActionStarted={fetchDraft} />
         </div>
       </div>
 

@@ -727,7 +727,7 @@ test.describe('Labels: draft page (T15)', () => {
     await expect(page.getByRole('button', { name: 'View full screen', exact: true })).toBeVisible({ timeout: 20_000 })
 
     // Row 26: each caption (012) is named by its channel's h3.
-    for (const label of ['Instagram', 'LinkedIn', 'WhatsApp']) {
+    for (const label of ['Instagram', 'LinkedIn']) {
       await expectNamedByHeading(page, label, {
         tag: 'TEXTAREA',
         placeholder: `Write the ${label} caption…`,
