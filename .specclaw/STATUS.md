@@ -1,7 +1,7 @@
 # 🦞 SpecClaw Dashboard
 
 **Project:** bistec-studio
-**Last Updated:** 2026-10-23 16:50 UTC
+**Last Updated:** 2026-10-23 17:17 UTC
 
 _1 unnumbered change · run `/specclaw:renumber` to order them_
 
