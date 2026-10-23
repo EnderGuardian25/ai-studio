@@ -4,7 +4,7 @@ This repo contains planning documents for **bistec-studio**, an internal marketi
 
 ## ✅ Outstanding work — START HERE (updated 2026-10-23)
 
-- **⏸️ 2026-10-23 — PICK UP HERE. This repo is `bistec-oss/studio`, and since 2026-10-18 it carries the fork's `v2`. 018, 022, 021 (Graphite), 019 (claim token), 020 (Create post button off the draft page), 023 (scheduler heartbeat) and 009 (hero imagery, Phase 1) are all VERIFIED PASS. The agreed build order 018 → 022 → 021 → 019 → 020 is complete, and 023 and 009 followed it at the user's request. 024 (caption credential route) is VERIFIED PASS (17/17). Nothing is mid-build.** **Next step for a new session: the user's order is 024 → 007 → 025 → 006 (010 is deferred, user 2026-10-22), so the next change is 007 (brand-kit design system). Ask the user before starting it; do not start any change unprompted.** The user's own pending steps are 009 OP-1 and the merge go-ahead, both below. Full detail: [`docs/handoff.md`](docs/handoff.md) top section and its **pre-merge prod checklist**.
+- **⏸️ 2026-10-23 — PICK UP HERE. This repo is `bistec-oss/studio`, and since 2026-10-18 it carries the fork's `v2`. 018, 022, 021 (Graphite), 019 (claim token), 020 (Create post button off the draft page), 023 (scheduler heartbeat) and 009 (hero imagery, Phase 1) are all VERIFIED PASS. The agreed build order 018 → 022 → 021 → 019 → 020 is complete, and 023 and 009 followed it at the user's request. 024 (caption credential route) is VERIFIED PASS (17/17). Nothing is mid-build.** **Next step for a new session: the user's order is 024 → 007 → 025 → 006 (010 is deferred, user 2026-10-22), so the next change is 007 (brand-kit design system). **007 is planned (2026-10-23): party panel run (CHANGES_REQUESTED, 25 upheld findings), the user's decisions recorded in its `proposal.md`, and `spec.md` (18 FR / 10 NFR / 22 AC), `design.md` and `tasks.md` (4 tasks in 4 waves) written at `adcc6eb`. Its build has not started; ask the user before building it.** The user's own pending steps are 009 OP-1 and the merge go-ahead, both below. Full detail: [`docs/handoff.md`](docs/handoff.md) top section and its **pre-merge prod checklist**.
   - **The fork era (2026-10-07 to 2026-10-14) is in [`docs/fork-history.md`](docs/fork-history.md).** It is superseded context, not instructions. That file also holds the procedure for importing code from the fork.
   - **Repo rules. This entry is authoritative; `docs/handoff.md` links here.**
     - This repo is **`bistec-oss/studio`**, and **`origin` points to it**.
@@ -75,7 +75,7 @@ This repo contains planning documents for **bistec-studio**, an internal marketi
     - **The `v2` → `main` merge,** after the checklist and only on the user's go-ahead.
   - **Remaining roadmap work (proposals only; the user's order is 024 → 007 → 025 → 006, and 010 is deferred):**
     - **006** product observability: the rest, after item 7 moved to 023.
-    - **007** brand-kit design system, **next: party panel, then plan**: it extends the `src/lib/designData/` module that 009 founded, with a `composition` section.
+    - **007** brand-kit design system, **planned 2026-10-23, build next on the user's go-ahead**: it extends the `src/lib/designData/` module that 009 founded, with a `composition` section.
     - **010** WhatsApp Channel posting: **deferred** (user, 2026-10-22). B4 must be fixed first; the 023 heartbeat dependency is now met.
     - **025** hero product screenshots (009 Phase 2): waits on OP-1.
     - **009 Phase 3** (full AI render): to be proposed later, if still wanted after 025.
