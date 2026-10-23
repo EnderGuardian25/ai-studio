@@ -1,7 +1,7 @@
 # 🦞 SpecClaw Dashboard
 
 **Project:** bistec-studio
-**Last Updated:** 2026-10-23 05:08 UTC
+**Last Updated:** 2026-10-23 15:32 UTC
 
 _1 unnumbered change · run `/specclaw:renumber` to order them_
 
@@ -32,7 +32,7 @@ _1 unnumbered change · run `/specclaw:renumber` to order them_
 
 ## Pending Proposals
 
-- 📋 **006-product-observability** — proposal ready, awaiting planning
+- 📋 **006-product-observability** ▣ — proposal ready, awaiting planning
 - 📋 **010-whatsapp-channel-posting** — proposal ready, awaiting planning
 - 📋 **025-hero-reference-images** — proposal ready, awaiting planning
 

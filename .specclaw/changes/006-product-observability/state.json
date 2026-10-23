@@ -1,0 +1,9 @@
+{
+  "change": "006-product-observability",
+  "phase": "proposal",
+  "branch": "",
+  "size": "architectural",
+  "phases": {
+    "proposal": { "status": "approved", "at": "2026-10-23T15:31:26Z" }
+  }
+}
