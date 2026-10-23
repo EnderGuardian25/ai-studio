@@ -1,6 +1,6 @@
 {
   "change": "024-caption-credential-route",
-  "phase": "build",
+  "phase": "verify",
   "branch": "v2",
   "size": "architectural",
   "phases": {
@@ -8,6 +8,11 @@
     "spec": { "status": "done", "at": "2026-10-22T18:17:34Z" },
     "design": { "status": "done", "at": "2026-10-22T18:17:35Z" },
     "tasks": { "status": "done", "at": "2026-10-22T18:17:36Z" },
-    "build": { "status": "in-progress", "at": "2026-10-22T18:18:12Z" }
+    "build": {
+      "status": "done",
+      "at": "2026-10-22T19:06:53Z",
+      "tasks": { "done": 4, "total": 4, "failed": 0 }
+    },
+    "verify": { "status": "passed", "at": "2026-10-23T00:22:04Z", "verdict": "PASS" }
   }
 }
