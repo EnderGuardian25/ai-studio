@@ -1,6 +1,6 @@
 {
   "change": "028-image-looks",
-  "phase": "build",
+  "phase": "verify",
   "branch": "v2",
   "size": "architectural",
   "phases": {
@@ -8,6 +8,7 @@
     "spec": { "status": "done", "at": "2026-10-24T18:54:50Z" },
     "design": { "status": "done", "at": "2026-10-24T18:54:51Z" },
     "tasks": { "status": "done", "at": "2026-10-24T18:54:52Z" },
-    "build": { "status": "in-progress", "at": "2026-10-24T18:57:14Z" }
+    "build": { "status": "in-progress", "at": "2026-10-24T18:57:14Z" },
+    "verify": { "status": "passed", "at": "2026-10-24T20:37:10Z", "verdict": "PASS" }
   }
 }
