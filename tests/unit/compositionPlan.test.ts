@@ -9,6 +9,14 @@ import {
   type HeroPlan,
 } from '@/lib/designData'
 
+// A fixture dataset whose looks declare SQUARE only (the unsupported-size cases).
+const squareOnly: ArchetypeMap = Object.fromEntries(
+  Object.entries(archetypes).map(([k, a]) => [
+    k,
+    { ...a, versions: { [a.current]: { ...a.versions[a.current], sizes: { SQUARE: a.versions[a.current].sizes.SQUARE } } } },
+  ])
+)
+
 const heroPlan = (key = 'product-showcase', size: 'SQUARE' | 'PORTRAIT' = 'SQUARE'): HeroPlan => {
   const plan = planComposition({ imageStyle: key, aspectRatio: size })
   if (plan.kind !== 'hero') throw new Error('expected a hero plan')
@@ -22,7 +30,8 @@ describe('planComposition (AC-03)', () => {
     const hero = plan as HeroPlan
     expect(hero.requestedArchetype).toBe('editorial-split')
     expect(hero.contractVersion).toBe(archetypes['editorial-split'].current)
-    expect(hero.sizeContract).toBe(archetypes['editorial-split'].versions[1].sizes.PORTRAIT)
+    expect(hero.sizeContract).toBe(archetypes['editorial-split'].versions[hero.contractVersion].sizes.PORTRAIT)
+    expect(hero.contractVersion).toBe(2)
     expect(hero.label).toBe('Editorial split')
   })
 
@@ -56,13 +65,21 @@ describe('planComposition (AC-03)', () => {
     })
   })
 
-  it('STORY is unsupported-size for both archetypes', () => {
+  it('a size the current contract does not declare is unsupported-size (fixture dataset)', () => {
     for (const imageStyle of ['product-showcase', 'editorial-split']) {
-      expect(planComposition({ imageStyle, aspectRatio: 'STORY' })).toEqual({
+      expect(planComposition({ imageStyle, aspectRatio: 'STORY' }, squareOnly)).toEqual({
         kind: 'classic',
         requestedArchetype: imageStyle,
         fallbackReason: 'unsupported-size',
       })
+    }
+  })
+
+  it('a kept plan version is read from archetypes[key].current, and STORY is a hero plan', () => {
+    for (const key of Object.keys(archetypes)) {
+      const plan = planComposition({ imageStyle: key, aspectRatio: 'STORY' }) as HeroPlan
+      expect(plan.kind).toBe('hero')
+      expect(plan.contractVersion).toBe(archetypes[key].current)
     }
   })
 
@@ -84,7 +101,7 @@ describe('settleComposition: every row of the fallback table (AC-06, AC-12)', ()
     expect(settleComposition(heroPlan(), { url: 'u', check: { ok: true } })).toEqual({
       requestedArchetype: 'product-showcase',
       appliedArchetype: 'product-showcase',
-      contractVersion: 1,
+      contractVersion: archetypes['product-showcase'].current,
       imageQuality: 'default',
     })
   })
@@ -137,7 +154,7 @@ describe('settleComposition: every row of the fallback table (AC-06, AC-12)', ()
   })
 
   it('row 6: classic plan from an unsupported size -> classic, unsupported-size', () => {
-    const plan = planComposition({ imageStyle: 'product-showcase', aspectRatio: 'STORY' })
+    const plan = planComposition({ imageStyle: 'product-showcase', aspectRatio: 'STORY' }, squareOnly)
     expect(settleComposition(plan, null)).toMatchObject({
       requestedArchetype: 'product-showcase',
       appliedArchetype: 'classic',

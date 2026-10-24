@@ -155,7 +155,7 @@ describe('AC-16: no composition in the dataset', () => {
   const archetypeKeys = Object.keys(archetypes)
 
   it('knows the archetype keys it guards', () => {
-    expect(archetypeKeys.sort()).toEqual(['editorial-split', 'product-showcase'])
+    expect(archetypeKeys.sort()).toEqual(['editorial-split', 'full-bleed-scene', 'product-showcase', 'spotlight'])
   })
 
   it('no template, default or mockReplacement has a placement word or an archetype key', () => {

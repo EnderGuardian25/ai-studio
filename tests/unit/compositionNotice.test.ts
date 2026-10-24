@@ -79,6 +79,22 @@ describe('compositionNoticeFor', () => {
     )
   })
 
+  it('a kept Spotlight or Full-bleed stamp with layout-violation names the look (028)', () => {
+    for (const [key, label] of [['spotlight', 'Spotlight'], ['full-bleed-scene', 'Full-bleed scene']] as const) {
+      const stamp = parseCompositionStamp({
+        requestedArchetype: key,
+        appliedArchetype: key,
+        contractVersion: 1,
+        observations: ['layout-violation'],
+        imageQuality: 'default',
+      })
+      expect(compositionNoticeFor(stamp)!.message).toBe(
+        `Some text or the logo sits outside the area ${label} reserves for it. The post is unchanged; check it before publishing.`,
+      )
+      expect(compositionNoticeFor(fallback('busy', key))!.message.startsWith(label)).toBe(true)
+    }
+  })
+
   it('a kept archetype with the layout-violation observation says so, and that the post is unchanged', () => {
     const stamp = parseCompositionStamp({
       requestedArchetype: 'product-showcase',

@@ -17,6 +17,7 @@ import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest'
 import type { Brief } from '@prisma/client'
 import type { ResolvedBrandKit } from '@/lib/brandkit/resolve'
 import {
+  archetypes,
   evaluateLayout,
   evaluateRegions,
   planComposition,
@@ -183,7 +184,7 @@ describe('the hero background step: one image call, the check, the fallback (FR-
     expect(settleComposition(heroPlanFor(brief), result)).toMatchObject({
       requestedArchetype: 'product-showcase',
       appliedArchetype: 'product-showcase',
-      contractVersion: 1,
+      contractVersion: 2,
     })
   })
 
@@ -219,6 +220,23 @@ describe('the hero background step: one image call, the check, the fallback (FR-
       fallbackReason: reason,
       imageQuality: 'default',
     })
+  })
+
+  it('a band look (Spotlight, STORY) makes exactly one image call and samples both bands, on a pass and on a fallback', async () => {
+    for (const [samples, check] of [
+      [() => [calm(22), calm(22)], { ok: true }],
+      [() => [calm(22), busy(22)], { ok: false, reason: 'busy' }],
+    ] as const) {
+      const p = provider()
+      h.resolveImageProvider.mockResolvedValue(p)
+      h.anthropicCreate.mockResolvedValue(decisionReply({ needed: true, prompt: 'a lit emblem' }))
+      h.sample.mockResolvedValue(samples())
+      const brief = mkBrief({ imageStyle: 'spotlight', aspectRatio: 'STORY' })
+      const result = await run(brief)
+      expect(result).toEqual({ url: 'https://minio.example.com/bg.png', check })
+      expect(p.generateImage).toHaveBeenCalledTimes(1)
+      expect(h.sample.mock.calls.at(-1)![1]).toHaveLength(2)
+    }
   })
 
   it('fails closed: a sampler error, a timeout, or garbage from the sampler is check-error, never a pass', async () => {
@@ -407,6 +425,37 @@ describe('the __MOCK_HERO_* seams drive the real planner and evaluators', () => 
     }
   })
 
+  it('AC-09: for every (key, version, size) one box lies outside every text region and one inside the first', async () => {
+    const { hooks } = await loadFresh({ MOCK_AI: 'true' })
+    for (const a of Object.values(archetypes)) {
+      for (const [v, contract] of Object.entries(a.versions)) {
+        for (const [size, sc] of Object.entries(contract.sizes)) {
+          const regions = [...sc!.regions].filter((r) => r.purpose === 'text')
+          const where = `${a.key}@${v}:${size}`
+          const inside = hooks.mockLayoutBoxes('x', regions)!
+          expect(evaluateLayout(inside, regions), where).toEqual({ ok: true })
+          const first = regions[0].rect
+          expect(inside[0].x, where).toBeGreaterThanOrEqual(first.x)
+          expect(inside[0].x + inside[0].w, where).toBeLessThanOrEqual(first.x + first.w)
+          expect(inside[0].y, where).toBeGreaterThanOrEqual(first.y)
+          expect(inside[0].y + inside[0].h, where).toBeLessThanOrEqual(first.y + first.h)
+          const both = hooks.mockLayoutBoxes('x __MOCK_HERO_LAYOUT__', regions)!
+          expect(both.length, where).toBe(2)
+          expect(evaluateLayout(both, regions), where).toEqual({ ok: false, outside: 1 })
+        }
+      }
+    }
+  })
+
+  it('mockRegionSamples returns one sample per region for Spotlight', async () => {
+    const { hooks } = await loadFresh({ MOCK_AI: 'true' })
+    for (const size of ['SQUARE', 'PORTRAIT', 'STORY'] as const) {
+      const regions = [...archetypes.spotlight.versions[1].sizes[size]!.regions]
+      expect(regions).toHaveLength(2)
+      expect(hooks.mockRegionSamples('x __MOCK_BG__', regions, 'light')).toHaveLength(2)
+    }
+  })
+
   it('every seam is dormant with MOCK_AI off: no samples, no boxes, no throw even on a sentinel', async () => {
     const { hooks } = await loadFresh({ MOCK_AI: 'false' })
     const regions = regionsOf(mkBrief())
@@ -480,7 +529,7 @@ describe('runPathBDesign wiring', () => {
     expect(result.composition).toEqual({
       requestedArchetype: 'product-showcase',
       appliedArchetype: 'product-showcase',
-      contractVersion: 1,
+      contractVersion: 2,
       imageQuality: 'high',
     })
   })
@@ -548,7 +597,8 @@ describe('runPathBDesign wiring', () => {
 
   it.each([
     ['an unknown key', { imageStyle: 'no-such-style' }, 'unknown-archetype'],
-    ['an unsupported size', { aspectRatio: 'STORY' }, 'unsupported-size'],
+    // The unsupported-size cases moved to compositionPlan.test.ts (a fixture
+    // dataset declaring SQUARE only): every shipped look declares STORY (028).
   ])('%s: classic with its reason, no hero plan', async (_n, over, reason) => {
     const { runPathBDesign } = await load()
     h.background.mockResolvedValue({ url: 'https://minio.example.com/bg.png' })

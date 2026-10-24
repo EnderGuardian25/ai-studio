@@ -21,6 +21,8 @@ import type { VerifyResult } from '@/lib/drafts/refineVerify'
 import type { ImageProvider } from '@/providers/interfaces/ImageProvider'
 // Type-only (erased): the module stays free of a runtime import of designData.
 import type { Rect, Region, RegionSample, TextTone } from '@/lib/designData'
+// layout.ts is pure (type-only imports), so this does not pull the dataset in.
+import { LAYOUT_TOLERANCE_PCT } from '@/lib/designData/layout'
 import { CAPTION_CHANNELS, type CaptionTarget } from '@/lib/channels'
 import { HEADLINE_MAX } from '@/lib/captions/headline'
 
@@ -460,11 +462,26 @@ export function mockRegionSamples(
   return regions.map((r) => samplesOf(r, (i) => calm + (i % 2 === 0 ? 0.001 : -0.001)))
 }
 
+// First cell of a fixed 6 x 6 grid (2% start, 8% step, left to right, top to
+// bottom) that lies outside every text region plus the layout tolerance.
+function mockOutsideBox(textRegions: ReadonlyArray<Region>): Rect {
+  const tol = LAYOUT_TOLERANCE_PCT
+  const outside = (b: Rect, r: Rect) =>
+    b.x + b.w < r.x - tol || b.x > r.x + r.w + tol || b.y + b.h < r.y - tol || b.y > r.y + r.h + tol
+  for (let row = 0; row < 6; row++) {
+    for (let col = 0; col < 6; col++) {
+      const c: Rect = { x: 2 + col * 8, y: 2 + row * 8, w: 6, h: 6 }
+      if (textRegions.every((r) => outside(c, r.rect))) return c
+    }
+  }
+  return { x: 92, y: 92, w: 6, h: 6 }
+}
+
 /**
  * Synthetic canvas-percent boxes for the layout observation (MOCK_PUPPETEER
  * measures nothing): one box inside the first text region, plus one in the
- * bottom-right corner for __MOCK_HERO_LAYOUT__, which lies outside every text
- * region of both archetypes at both sizes. null when MOCK_AI is off.
+ * bottom-right corner for __MOCK_HERO_LAYOUT__, the first grid cell outside every text
+ * region of the contract. null when MOCK_AI is off.
  */
 export function mockLayoutBoxes(seamText: string, textRegions: ReadonlyArray<Region>): Rect[] | null {
   if (!MOCK_AI) return null
@@ -472,7 +489,7 @@ export function mockLayoutBoxes(seamText: string, textRegions: ReadonlyArray<Reg
   const boxes: Rect[] = first
     ? [{ x: first.x + first.w * 0.1, y: first.y + first.h * 0.1, w: first.w * 0.5, h: Math.min(10, first.h * 0.2) }]
     : []
-  if (seamText.includes(HERO_MOCK_SENTINELS.layout)) boxes.push({ x: 92, y: 92, w: 6, h: 6 })
+  if (seamText.includes(HERO_MOCK_SENTINELS.layout)) boxes.push(mockOutsideBox(textRegions))
   return boxes
 }
 

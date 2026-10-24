@@ -50,9 +50,9 @@ describe('resolveWizardStyle', () => {
     expect(classic.imageStyle).toBe('classic')
   })
 
-  it('Path A and 9:16 show classic whatever the style says', () => {
+  it('Path A shows classic whatever the style says; 9:16 now keeps the style default (028)', () => {
     expect(resolveWizardStyle({ ...base, postStyle: 'launch', designMode: 'TEMPLATE' }).imageStyle).toBe('classic')
-    expect(resolveWizardStyle({ ...base, postStyle: 'launch', aspectRatio: 'STORY' }).imageStyle).toBe('classic')
+    expect(resolveWizardStyle({ ...base, postStyle: 'launch', aspectRatio: 'STORY' }).imageStyle).toBe('product-showcase')
   })
 
   it('the campaign tone beats the style tone while untouched', () => {

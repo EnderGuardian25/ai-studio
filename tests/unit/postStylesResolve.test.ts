@@ -168,10 +168,12 @@ describe('resolvePostStyle: image style', () => {
     expect(r.notes).toContain('path-a-classic')
   })
 
-  it('STORY is classic with a note', () => {
+  it('STORY keeps a look the current contract declares at 9:16 (028)', () => {
+    // The size-classic note is unreachable on the shipped dataset; T2 covers it
+    // with a fixture look dataset.
     const r = ok(base({ aspectRatio: 'STORY', explicit: { imageStyle: 'editorial-split' } }))
-    expect(r.imageStyle).toBe('classic')
-    expect(r.notes).toContain('size-classic')
+    expect(r.imageStyle).toBe('editorial-split')
+    expect(r.notes).not.toContain('size-classic')
   })
 
   it('a look that is not an active archetype is classic with default-unavailable', () => {

@@ -26,7 +26,8 @@ export function describeRegionPx(r: Rect, canvas: { width: number; height: numbe
 }
 
 // The area the text sits on: a dark calm area for light text, and the reverse.
-const calmArea = (tone: TextTone) => (tone === 'light' ? 'an empty, calm, dark area' : 'an empty, calm, light area')
+const calmArea = (tone: TextTone) =>
+  tone === 'light' ? 'an empty, calm, dark area' : 'an empty, calm, light area'
 
 function capitalise(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1)
@@ -40,7 +41,7 @@ export function imageContractText(contract: Contract, size: SizeContract): strin
     lines.push(
       region.purpose === 'text'
         ? `${where} must be ${calmArea(contract.textTone)} with no detail.`
-        : `${where} must be kept clear of the subject and of detail.`
+        : `${where} must be kept clear of the subject and of detail.`,
     )
   }
   return lines.join('\n')
@@ -53,7 +54,7 @@ export function designContractText(
   contract: Contract,
   size: SizeContract,
   canvas: { width: number; height: number },
-  imageUrl: string
+  imageUrl: string,
 ): string {
   const text = size.regions.filter((r) => r.purpose === 'text')
   const tone = contract.textTone === 'light' ? 'white' : 'near-black #111111'
@@ -61,16 +62,27 @@ export function designContractText(
     `Background image: ${imageUrl}`,
     'Paint it as the full-canvas background with `background-size: cover; background-position: center`.',
     'Headline, body text and the logo go only inside these regions:',
-    ...text.map((r) => `- ${describeRegion(r.rect)} (${describeRegionPx(r.rect, canvas)})`),
+    ...text.map(
+      (r) =>
+        `- ${describeRegion(r.rect)} (${describeRegionPx(r.rect, canvas)})${r.use ? `: ${r.use}` : ''}`,
+    ),
     `Text colour: ${tone}.`,
     'No scrim or overlay: that is for the classic style only.',
   ].join('\n')
 }
 
 // The refine prompt's contract sentence, from the stamped version's regions.
-export function refineContractText(opts: { label: string; version: number; size: SizeContract }): string {
-  const text = opts.size.regions.filter((r) => r.purpose === 'text').map((r) => describeRegion(r.rect))
-  const clear = opts.size.regions.filter((r) => r.purpose === 'clear').map((r) => describeRegion(r.rect))
+export function refineContractText(opts: {
+  label: string
+  version: number
+  size: SizeContract
+}): string {
+  const text = opts.size.regions
+    .filter((r) => r.purpose === 'text')
+    .map((r) => describeRegion(r.rect) + (r.use ? ` (${r.use})` : ''))
+  const clear = opts.size.regions
+    .filter((r) => r.purpose === 'clear')
+    .map((r) => describeRegion(r.rect))
   let out = `This post uses the ${opts.label} layout (contract v${opts.version}). Keep headline, body text and the logo inside: ${text.join('; ')}.`
   if (clear.length > 0) out += ` Keep these regions of the background clear: ${clear.join('; ')}.`
   return out

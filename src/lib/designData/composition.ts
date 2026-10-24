@@ -5,6 +5,18 @@
 // observation, the refine prompt and the stamp) reads this one copy. Nothing a
 // model returns can supply or move a region (NFR-02).
 //
+// THE LOOK KEY RULE (permanent):
+//  - a look key is never renamed and never reused for a different meaning;
+//  - a retired look (`status: 'retired'`) stays in this dataset and stays
+//    resolvable for stamps, labels and refine; it is hidden from the picker;
+//  - a variant is marked by `variantOf: { key, version }`, never parsed from
+//    the hyphens in its key (validate.ts);
+//  - a post-style version that names a retired look resolves to classic with
+//    the note `retired-classic` (postStyles/resolve.ts).
+// THE VERSION RULE: a released version is never edited. A change adds
+// versions[n+1] and moves `current`. "Released" = the change that adds it is
+// VERIFIED PASS. tests/unit/lookDataset.test.ts pins a hash per (key, version).
+//
 // Pure and client-safe: no prisma, minio, env, fs or puppeteer import (a guard
 // test enforces it). `AspectRatio` is a type-only import, as in aspectRatio.ts.
 import type { AspectRatio } from '@prisma/client'
@@ -12,7 +24,7 @@ import type { AspectRatio } from '@prisma/client'
 export type TextTone = 'light' | 'dark'
 // 'composite' arrives with Phase 2 as a new literal here: no schema change.
 export type Purpose = 'text' | 'clear'
-export type ArchetypeKey = 'product-showcase' | 'editorial-split'
+export type ArchetypeKey = 'product-showcase' | 'editorial-split' | 'full-bleed-scene' | 'spotlight'
 
 // Canvas percent, 0 to 100.
 export interface Rect {
@@ -25,6 +37,8 @@ export interface Region {
   rect: Rect
   purpose: Purpose
   minAreaPct: number
+  // What goes in this region, for the design and refine prompts (Spotlight only).
+  use?: string
 }
 export interface SizeContract {
   // What the image model is asked to draw at this size (the image prompt).
@@ -37,6 +51,8 @@ export interface Contract {
   textTone: TextTone
   // An archetype declares only the sizes it supports.
   sizes: Partial<Record<AspectRatio, SizeContract>>
+  // A variant pins its base version; validation only (validate.ts).
+  variantOf?: { key: string; version: number }
 }
 export interface Archetype {
   key: ArchetypeKey
@@ -64,16 +80,21 @@ const textRegion = (x: number, y: number, w: number, h: number): Region => ({
   minAreaPct: 20,
 })
 
-// Both archetypes are dark-area, light-text at version 1; a light-area variant
-// is a later contract version. STORY is absent from both (unsupported). The
-// PORTRAIT rows are stacked layouts written on their own, not scaled copies.
+const band = (x: number, y: number, w: number, h: number, use: string): Region => ({
+  ...textRegion(x, y, w, h),
+  use,
+})
+
+// Every look is light text over an intended dark backdrop. Version 1 of the two
+// original looks has no STORY; version 2 adds it. The PORTRAIT rows are stacked
+// layouts written on their own, not scaled copies.
 export const archetypes: ArchetypeMap = deepFreeze({
   'product-showcase': {
     key: 'product-showcase',
     label: 'Product showcase',
     summary: 'A device or object as the hero, text on a calm dark area beside it.',
     status: 'active',
-    current: 1,
+    current: 2,
     versions: {
       1: {
         role: 'hero',
@@ -89,6 +110,24 @@ export const archetypes: ArchetypeMap = deepFreeze({
           },
         },
       },
+      2: {
+        role: 'hero',
+        textTone: 'light',
+        sizes: {
+          SQUARE: {
+            subject: 'a device or object as the hero subject in the right 55%, lit with depth',
+            regions: [textRegion(0, 0, 45, 100)],
+          },
+          PORTRAIT: {
+            subject: 'the same subject in the lower 62%',
+            regions: [textRegion(0, 0, 100, 38)],
+          },
+          STORY: {
+            subject: 'a device or object as the hero subject in the lower 64%, lit with depth',
+            regions: [textRegion(0, 0, 100, 36)],
+          },
+        },
+      },
     },
   },
   'editorial-split': {
@@ -96,7 +135,7 @@ export const archetypes: ArchetypeMap = deepFreeze({
     label: 'Editorial split',
     summary: 'A photographic scene on one side, fading softly into a flat area for the text.',
     status: 'active',
-    current: 1,
+    current: 2,
     versions: {
       1: {
         role: 'hero',
@@ -108,8 +147,101 @@ export const archetypes: ArchetypeMap = deepFreeze({
             regions: [textRegion(0, 0, 50, 100)],
           },
           PORTRAIT: {
-            subject: 'a photographic scene confined to the bottom 40%, fading across the 50 to 60% strip',
+            subject:
+              'a photographic scene confined to the bottom 40%, fading across the 50 to 60% strip',
             regions: [textRegion(0, 0, 100, 50)],
+          },
+        },
+      },
+      2: {
+        role: 'hero',
+        textTone: 'light',
+        sizes: {
+          SQUARE: {
+            subject:
+              'a photographic scene confined to the right 40%, fading softly into the flat area across the 50 to 60% strip',
+            regions: [textRegion(0, 0, 50, 100)],
+          },
+          PORTRAIT: {
+            subject:
+              'a photographic scene confined to the bottom 40%, fading across the 50 to 60% strip',
+            regions: [textRegion(0, 0, 100, 50)],
+          },
+          STORY: {
+            subject:
+              'a photographic scene confined to the bottom 42%, fading softly into the flat area across the 48 to 58% strip',
+            regions: [textRegion(0, 0, 100, 48)],
+          },
+        },
+      },
+    },
+  },
+  'full-bleed-scene': {
+    key: 'full-bleed-scene',
+    label: 'Full-bleed scene',
+    summary:
+      'A photographic scene across the whole post, with the text on a calm, dark band along the bottom.',
+    status: 'active',
+    current: 1,
+    versions: {
+      1: {
+        role: 'hero',
+        textTone: 'light',
+        sizes: {
+          SQUARE: {
+            subject:
+              'a wide photographic scene filling the top 62% of the frame, its lower part falling into a plain, dark foreground (shadow, still water, a dark floor or a night sky) across the bottom 38%',
+            regions: [textRegion(0, 62, 100, 38)],
+          },
+          PORTRAIT: {
+            subject:
+              'a wide photographic scene filling the top 62% of the frame, its lower part falling into a plain, dark foreground (shadow, still water, a dark floor or a night sky) across the bottom 38%',
+            regions: [textRegion(0, 62, 100, 38)],
+          },
+          STORY: {
+            subject:
+              'a wide photographic scene filling the top 65% of the frame, its lower part falling into a plain, dark foreground (shadow, still water, a dark floor or a night sky) across the bottom 35%',
+            regions: [textRegion(0, 65, 100, 35)],
+          },
+        },
+      },
+    },
+  },
+  spotlight: {
+    key: 'spotlight',
+    label: 'Spotlight',
+    summary:
+      'One subject lit in the centre, the headline above it and the call to action below, on a plain dark background.',
+    status: 'active',
+    current: 1,
+    versions: {
+      1: {
+        role: 'hero',
+        textTone: 'light',
+        sizes: {
+          SQUARE: {
+            subject:
+              'a single subject (an object, a product or an emblem) centred in the middle 52% of the frame, lit by one spotlight against a plain, dark background that stays dark at the top and bottom',
+            regions: [
+              band(0, 0, 100, 24, 'the headline'),
+              band(0, 76, 100, 24, 'the call to action and the logo'),
+            ],
+          },
+          PORTRAIT: {
+            subject:
+              'a single subject (an object, a product or an emblem) centred in the middle 52% of the frame, lit by one spotlight against a plain, dark background that stays dark at the top and bottom',
+            regions: [
+              band(0, 0, 100, 24, 'the headline'),
+              band(0, 76, 100, 24, 'the call to action and the logo'),
+            ],
+          },
+          STORY: {
+            subject:
+              'a single subject (an object, a product or an emblem) centred in the middle 56% of the frame, lit by one spotlight against a plain, dark background that stays dark at the top and bottom',
+            regions: [
+              band(0, 0, 100, 22, 'the headline'),
+              band(0, 78, 100, 22, 'the call to action and the logo'),
+            ],
           },
         },
       },
@@ -135,7 +267,7 @@ export function contractAt(
   key: string,
   version: number,
   size: AspectRatio,
-  source: ArchetypeMap = archetypes
+  source: ArchetypeMap = archetypes,
 ): SizeContract | null {
   const archetype = getArchetype(key, source)
   if (!archetype || !has(archetype.versions, String(version))) return null
@@ -147,7 +279,7 @@ export function contractAt(
 export function contractVersionOf(
   key: string,
   version: number,
-  source: ArchetypeMap = archetypes
+  source: ArchetypeMap = archetypes,
 ): Contract | null {
   const archetype = getArchetype(key, source)
   return archetype && has(archetype.versions, String(version)) ? archetype.versions[version] : null
@@ -177,10 +309,22 @@ export const IMAGE_STYLES: readonly ImageStyleOption[] = deepFreeze([
 // Each style with whether the chosen size supports it (classic always does).
 export function imageStyleOptions(
   aspectRatio: AspectRatio,
-  source: ArchetypeMap = archetypes
+  source: ArchetypeMap = archetypes,
 ): Array<ImageStyleOption & { supported: boolean }> {
   return IMAGE_STYLES.map((s) => {
     const current = getArchetype(s.key, source)?.current ?? 0
-    return { ...s, supported: s.key === 'classic' || contractAt(s.key, current, aspectRatio, source) !== null }
+    return {
+      ...s,
+      supported: s.key === 'classic' || contractAt(s.key, current, aspectRatio, source) !== null,
+    }
   })
+}
+
+// True when the look's current contract declares the size (classic always).
+export function supportsSize(
+  key: string,
+  size: AspectRatio,
+  source: ArchetypeMap = archetypes,
+): boolean {
+  return imageStyleOptions(size, source).find((o) => o.key === key)?.supported ?? false
 }

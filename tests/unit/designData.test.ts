@@ -23,8 +23,13 @@ import {
 const ASPECTS = Object.keys(ASPECT_DIMENSIONS) as Array<keyof typeof ASPECT_DIMENSIONS>
 
 describe('designData: dataset invariants (AC-02)', () => {
-  it('exposes the composition section with both archetypes', () => {
-    expect(Object.keys(designData.composition.archetypes).sort()).toEqual(['editorial-split', 'product-showcase'])
+  it('exposes the composition section with the four looks', () => {
+    expect(Object.keys(designData.composition.archetypes).sort()).toEqual([
+      'editorial-split',
+      'full-bleed-scene',
+      'product-showcase',
+      'spotlight',
+    ])
     expect(PRECEDENCE_LINE).toContain('outranks')
   })
 
@@ -52,7 +57,8 @@ describe('designData: dataset invariants (AC-02)', () => {
         expect(['light', 'dark']).toContain(contract.textTone)
         for (const size of Object.values(contract.sizes)) {
           for (const region of size!.regions) {
-            expect(Object.keys(region).sort()).toEqual(['minAreaPct', 'purpose', 'rect'])
+            expect(Object.keys(region).filter((k) => k !== 'use').sort()).toEqual(['minAreaPct', 'purpose', 'rect'])
+            if ('use' in region) expect(typeof (region as { use?: unknown }).use).toBe('string')
           }
         }
       }
@@ -60,10 +66,8 @@ describe('designData: dataset invariants (AC-02)', () => {
   })
 
   it('every active archetype gives each aspect ratio a contract or declares it unsupported', () => {
-    const declaredUnsupported: Record<string, string[]> = {
-      'product-showcase': ['STORY'],
-      'editorial-split': ['STORY'],
-    }
+    // Every current contract declares all three sizes (028 FR-02).
+    const declaredUnsupported: Record<string, string[]> = {}
     for (const a of Object.values(archetypes).filter((x) => x.status === 'active')) {
       for (const ratio of ASPECTS) {
         const has = contractAt(a.key, a.current, ratio) !== null
@@ -125,8 +129,10 @@ describe('designData: lookups and picker', () => {
 
   it('contractAt resolves the exact version and size, null otherwise', () => {
     expect(contractAt('editorial-split', 1, 'PORTRAIT')?.regions[0].rect.h).toBe(50)
-    expect(contractAt('editorial-split', 2, 'PORTRAIT')).toBeNull()
+    expect(contractAt('editorial-split', 2, 'PORTRAIT')?.regions[0].rect.h).toBe(50)
+    expect(contractAt('editorial-split', 3, 'PORTRAIT')).toBeNull()
     expect(contractAt('editorial-split', 1, 'STORY')).toBeNull()
+    expect(contractAt('editorial-split', 2, 'STORY')?.regions[0].rect.h).toBe(48)
     expect(contractAt('classic', 1, 'SQUARE')).toBeNull()
   })
 
@@ -137,16 +143,19 @@ describe('designData: lookups and picker', () => {
     expect(styleLabel('gone')).toBe('that image style')
   })
 
-  it('the picker lists classic first and active archetypes only; STORY disables the non-classic ones', () => {
-    expect(IMAGE_STYLES.map((s) => s.key)).toEqual(['classic', 'product-showcase', 'editorial-split'])
+  it('the picker lists classic first and the active looks; every card is supported at every size', () => {
+    expect(IMAGE_STYLES.map((s) => s.key)).toEqual([
+      'classic',
+      'product-showcase',
+      'editorial-split',
+      'full-bleed-scene',
+      'spotlight',
+    ])
     expect(Object.isFrozen(IMAGE_STYLES)).toBe(true)
     expect(IMAGE_STYLES.every((s) => Object.isFrozen(s))).toBe(true)
     expect(imageStyleOptions('SQUARE').every((o) => o.supported)).toBe(true)
-    expect(imageStyleOptions('STORY').map((o) => [o.key, o.supported])).toEqual([
-      ['classic', true],
-      ['product-showcase', false],
-      ['editorial-split', false],
-    ])
+    expect(imageStyleOptions('STORY').every((o) => o.supported)).toBe(true)
+    expect(imageStyleOptions('PORTRAIT').every((o) => o.supported)).toBe(true)
   })
 })
 
@@ -175,9 +184,9 @@ describe('designData: purity guard (AC-02)', () => {
   const dir = join(process.cwd(), 'src', 'lib', 'designData')
   const files = readdirSync(dir).filter((f) => f.endsWith('.ts'))
 
-  it('finds the eight module files', () => {
+  it('finds the nine module files', () => {
     expect(files.sort()).toEqual(
-      ['composition', 'evaluate', 'index', 'layout', 'plan', 'promptText', 'regions', 'stamp'].map((n) => `${n}.ts`)
+      ['composition', 'evaluate', 'index', 'layout', 'plan', 'promptText', 'regions', 'stamp', 'validate'].map((n) => `${n}.ts`)
     )
   })
 

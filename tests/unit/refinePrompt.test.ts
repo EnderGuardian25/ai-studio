@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import type { ResolvedBrandKit } from '@/lib/brandkit/resolve'
 import { buildRefineSystemPrompt, buildRefineUserMessage, buildRefineRetryNote } from '@/lib/agent/prompts/refine'
+import { contractAt } from '@/lib/designData'
 import { INSTRUCTION_CLASSES, renderClassSemantics } from '@/lib/agent/instructionClasses'
 import { renderEnvelopeProtocol } from '@/lib/agent/refineEnvelope'
 import { SCRIPT_SUPPORT_NOTE } from '@/lib/agent/prompts/shared'
@@ -119,6 +120,18 @@ describe('buildRefineSystemPrompt: compositionContract (009)', () => {
     expect(p).toContain(sentence)
     expect(p.indexOf('New background image:')).toBeLessThan(p.indexOf(sentence))
     expect(p.indexOf(sentence)).toBeLessThan(p.indexOf('Text & language fidelity'))
+  })
+
+  it.each(['api', 'cli'] as const)('%s: a v1 stamp resolves the v1 regions (028)', (mode) => {
+    const v1 = contractAt('product-showcase', 1, 'PORTRAIT')!
+    const p = buildRefineSystemPrompt({
+      ...base,
+      mode,
+      compositionContract: { label: 'Product showcase', version: 1, size: v1 },
+    })
+    expect(p).toContain(
+      'This post uses the Product showcase layout (contract v1). Keep headline, body text and the logo inside: the top 38% of the frame, full width.',
+    )
   })
 
   it.each(['api', 'cli'] as const)('%s: absent for a classic draft (byte-identical)', (mode) => {

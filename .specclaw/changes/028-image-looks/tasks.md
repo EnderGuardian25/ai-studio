@@ -38,7 +38,7 @@ This change has **7 tasks in 5 waves**:
 
 ### Wave 1: The dataset
 
-- [~] `T1` — Version 2 of the two looks, the two new looks, the validator, the key rule, the prompt `use` text and the mock layout box
+- [x] `T1` — Version 2 of the two looks, the two new looks, the validator, the key rule, the prompt `use` text and the mock layout box
   - Files: `src/lib/designData/{composition,validate,index,promptText}.ts` (`validate.ts` new), `src/lib/testHooks.ts` (`mockLayoutBoxes` only), `tests/unit/lookDataset.test.ts` (new), `tests/unit/{designData,designDataBoundary,heroPrompts,designRegions,compositionPlan,heroSeams,compositionNotice,refinePrompt,background}.test.ts` (adapt and extend)
   - Estimate: large
   - Kind: impl

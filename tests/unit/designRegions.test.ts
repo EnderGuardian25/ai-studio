@@ -69,3 +69,23 @@ describe('mapRegionToImage (AC-09)', () => {
     expect(mapRegionToImage({ x: 120, y: 0, w: 10, h: 100 }, sq, { w: 1024, h: 1024 })).toBeNull()
   })
 })
+
+describe('STORY worked case (028 design section 3)', () => {
+  const story = { w: 1080, h: 1920 }
+  it('1024x1536 on 1080x1920: scale 1.25, scaled 1280x1920, offset x -100', () => {
+    const f = coverFit(story, { w: 1024, h: 1536 })
+    expect(f.scale).toBeCloseTo(1.25, 9)
+    expect(f.scaled.w).toBeCloseTo(1280, 6)
+    expect(f.scaled.h).toBeCloseTo(1920, 6)
+    expect(f.offset.x).toBeCloseTo(-100, 6)
+    expect(f.offset.y).toBeCloseTo(0, 6)
+  })
+
+  it('the full-width band {0, 65, 100, 35} maps to image x 80..944, y 998.4..1536', () => {
+    const m = mapRegionToImage({ x: 0, y: 65, w: 100, h: 35 }, story, { w: 1024, h: 1536 })!
+    expect(m.px.x).toBeCloseTo(80, 4)
+    expect(m.px.w).toBeCloseTo(864, 4)
+    expect(m.px.y).toBeCloseTo(998.4, 4)
+    expect(m.px.h).toBeCloseTo(537.6, 4)
+  })
+})
