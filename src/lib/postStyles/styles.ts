@@ -15,7 +15,7 @@
 //
 // "Stated in the brief" in a rule means the value appears in the topic, the
 // description, the campaign briefing or the brand voice text.
-import { archetypes } from '@/lib/designData'
+import { getArchetype, type ArchetypeMap } from '@/lib/designData'
 import type { PostStyle, PostStyleKey } from './types'
 
 function deepFreeze<T>(value: T): T {
@@ -332,17 +332,21 @@ export function isStyleKey(raw: unknown): raw is PostStyleKey {
   return getStyle(raw) !== undefined
 }
 
-// Every default image style names a real key: `classic`, or an active archetype.
+// Every default image style names a real key: `classic`, or any look in the
+// dataset (a retired look still counts, so a released version stays valid).
 // A module-load assertion throws in non-production so a bad edit fails at import
 // (the unit test asserts the same thing through this function).
-export function defaultImageStyleProblems(dataset: Readonly<Record<string, PostStyle>>): string[] {
+export function defaultImageStyleProblems(
+  dataset: Readonly<Record<string, PostStyle>>,
+  looks?: ArchetypeMap, // tests only: a fixture look dataset
+): string[] {
   const problems: string[] = []
   for (const s of Object.values(dataset)) {
     for (const [n, v] of Object.entries(s.versions)) {
       const k = v.defaultImageStyle
-      if (k !== 'classic' && archetypes[k]?.status !== 'active')
+      if (k !== 'classic' && !getArchetype(k, looks))
         problems.push(
-          `${s.key}@${n}: defaultImageStyle '${k}' is not classic or an active archetype`,
+          `${s.key}@${n}: defaultImageStyle '${k}' is not classic or a look in the dataset`,
         )
     }
   }

@@ -110,7 +110,8 @@ export const POST = withTeamAuth(async (req: NextRequest, _ctx, user) => {
     return NextResponse.json({ error: 'aspectRatio must be SQUARE, PORTRAIT, or STORY' }, { status: 400 })
   }
   // 009 FR-03: the image style (absent = classic). Checked against the design
-  // mode now; the size is resolved at call time (STORY records unsupported-size).
+  // mode now; the size is resolved at call time (a look that does not declare the size
+  // records unsupported-size).
   const style = validateImageStyle(body.imageStyle, designMode)
   if (!style.ok) {
     return NextResponse.json({ error: style.error }, { status: 400 })
@@ -240,8 +241,8 @@ export const POST = withTeamAuth(async (req: NextRequest, _ctx, user) => {
   if (!resolved.ok) {
     return NextResponse.json({ error: resolved.message, code: resolved.code }, { status: 400 })
   }
-  // An explicitly sent image style is stored as given (009 FR-03: STORY is
-  // accepted and recorded); an absent one comes from the style's default.
+  // An explicitly sent image style is stored as given (009 FR-03: the size is
+  // not checked here); an absent one comes from the style's default.
   const imageStyle = body.imageStyle == null ? resolved.imageStyle : style.value
 
   // Each pick is checked against the caller's effective set for its surface

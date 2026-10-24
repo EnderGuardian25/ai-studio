@@ -5,6 +5,7 @@
 // never overwritten.
 import type { AspectRatio } from '@prisma/client'
 import { resolvePostStyle, getStyle } from '@/lib/postStyles'
+import { imageStyleOptions, type ArchetypeMap } from '@/lib/designData'
 
 export const DEFAULT_POST_STYLE = 'general'
 
@@ -125,4 +126,17 @@ export function resumeWizardStyle(
     imageStyleTouched: storedImage !== base.imageStyle,
     imageStyle: storedImage,
   }
+}
+
+/**
+ * The image style to keep after a size change: the current pick if the new size
+ * supports it, else classic (and the pick is dropped, untouched).
+ */
+export function styleAfterSizeChange(
+  imageStyle: string,
+  size: AspectRatio,
+  looks?: ArchetypeMap,
+): { imageStyle: string; reset: boolean } {
+  const supported = imageStyleOptions(size, looks).find((o) => o.key === imageStyle)?.supported
+  return supported ? { imageStyle, reset: false } : { imageStyle: 'classic', reset: true }
 }

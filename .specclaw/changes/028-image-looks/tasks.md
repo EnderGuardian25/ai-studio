@@ -58,7 +58,7 @@ This change has **7 tasks in 5 waves**:
 
 ### Wave 2: Resolver and wizard, fixtures, runner (one at a time)
 
-- [ ] `T2` — `retired-classic`, post-style defaults may name any look key, and the wizard's STORY literals
+- [x] `T2` — `retired-classic`, post-style defaults may name any look key, and the wizard's STORY literals
   - Files: `src/lib/postStyles/{resolve,styles}.ts`, `src/lib/brief/{wizardStyleState,imageStyle}.ts`, `src/components/brief/{useBriefWizard.ts,ReviewStep.tsx}`, `src/app/api/briefs/route.ts` (comments only), `tests/unit/{postStylesResolve,postStylesDataset,postStylesWizard,briefImageStyle}.test.ts` (adapt and extend)
   - Estimate: medium
   - Kind: impl

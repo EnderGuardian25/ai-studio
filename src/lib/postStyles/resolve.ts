@@ -1,7 +1,7 @@
 // The post-style resolver (027 FR-04). Pure. The only place the style -> goal,
 // tone, image style and checklist mapping lives. Never throws.
 import type { AspectRatio } from '@prisma/client'
-import { imageStyleOptions } from '@/lib/designData'
+import { getArchetype, imageStyleOptions, type ArchetypeMap } from '@/lib/designData'
 import { getStyle } from './styles'
 import { stampFor, type PostStyleStamp } from './stamp'
 import { matchToneOption, type PostStyle, type Rule } from './types'
@@ -13,6 +13,7 @@ export type ResolveNote =
   | 'path-a-classic'
   | 'size-classic'
   | 'campaign-tone-ignored'
+  | 'retired-classic'
 
 export interface ResolveInput {
   style: string | null | undefined // an explicit key, or absent
@@ -57,6 +58,7 @@ export function legacyGoalStyle(raw: string | null | undefined): string | undefi
 export function resolvePostStyle(
   input: ResolveInput,
   source?: Readonly<Record<string, PostStyle>>,
+  looks?: ArchetypeMap, // tests only: a fixture look dataset
 ): ResolveResult {
   // explicit key -> legacy goal mapping -> campaign default -> general. A blank
   // style is absent, like a blank tone or image style; a non-blank unknown key is not.
@@ -89,13 +91,16 @@ export function resolvePostStyle(
   // image style: explicit -> style default -> classic; classic wherever it cannot run
   let imageStyle = input.explicit?.imageStyle || v.defaultImageStyle
   if (imageStyle !== 'classic') {
-    const option = imageStyleOptions(input.aspectRatio).find((o) => o.key === imageStyle)
+    const option = imageStyleOptions(input.aspectRatio, looks).find((o) => o.key === imageStyle)
     if (UNATTENDED.has(input.surface)) {
       imageStyle = 'classic'
       notes.push('unattended-classic')
     } else if (input.path === 'A') {
       imageStyle = 'classic'
       notes.push('path-a-classic')
+    } else if (getArchetype(imageStyle, looks)?.status === 'retired') {
+      imageStyle = 'classic'
+      notes.push('retired-classic')
     } else if (!option) {
       imageStyle = 'classic'
       notes.push('default-unavailable')

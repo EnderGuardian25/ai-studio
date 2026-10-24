@@ -35,7 +35,7 @@ describe('validateImageStyle', () => {
     },
   )
 
-  it('takes no size: a style on STORY is accepted here, and the pipeline records unsupported-size', () => {
+  it('takes no size: a look is accepted here at any size, and the pipeline records unsupported-size for a size it does not declare', () => {
     expect(validateImageStyle.length).toBe(2)
     expect(validateImageStyle('editorial-split', 'GENERATE').ok).toBe(true)
   })

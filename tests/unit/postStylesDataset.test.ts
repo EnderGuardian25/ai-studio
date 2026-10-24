@@ -115,7 +115,7 @@ describe('AC-02: the dataset', () => {
       }
   })
 
-  it('the default image style guard catches an unknown or retired look', () => {
+  it('the default image style guard catches an unknown look and accepts a retired one (028)', () => {
     const bad = (k: string) =>
       ({
         x: {
@@ -125,6 +125,10 @@ describe('AC-02: the dataset', () => {
       }) as unknown as Record<string, PostStyle>
     expect(defaultImageStyleProblems(bad('nope'))).toHaveLength(1)
     expect(defaultImageStyleProblems(bad('classic'))).toEqual([])
+    const retired = structuredClone(archetypes) as Record<string, (typeof archetypes)[string]>
+    retired['editorial-split'].status = 'retired'
+    expect(defaultImageStyleProblems(bad('editorial-split'), retired)).toEqual([])
+    expect(defaultImageStyleProblems(bad('gone-look'), retired)).toHaveLength(1)
   })
 
   it('every rule has a unique id of the form <key>.<slug>, a scope and non-empty text', () => {

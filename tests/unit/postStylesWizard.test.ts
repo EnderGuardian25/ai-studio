@@ -6,9 +6,11 @@ import {
   knownStyleKey,
   resolveWizardStyle,
   resumeWizardStyle,
+  styleAfterSizeChange,
   styleRequestFields,
   type WizardStyleInput,
 } from '@/lib/brief/wizardStyleState'
+import { archetypes } from '@/lib/designData'
 
 const base: WizardStyleInput = {
   postStyle: 'general',
@@ -135,5 +137,21 @@ describe('resumeWizardStyle', () => {
   })
   it('an unknown stored style opens as general', () => {
     expect(resumeWizardStyle({ postStyle: 'ghost', tone: 'professional' }, ctx).postStyle).toBe('general')
+  })
+})
+
+describe('styleAfterSizeChange (028)', () => {
+  it('keeps every shipped look at every size', () => {
+    for (const size of ['SQUARE', 'PORTRAIT', 'STORY'] as const)
+      for (const k of ['classic', 'product-showcase', 'editorial-split', 'full-bleed-scene', 'spotlight'])
+        expect(styleAfterSizeChange(k, size)).toEqual({ imageStyle: k, reset: false })
+  })
+
+  it('resets a look the new size does not declare (fixture dataset)', () => {
+    const looks = structuredClone(archetypes) as Record<string, (typeof archetypes)[string]>
+    delete looks.spotlight.versions[looks.spotlight.current].sizes.STORY
+    expect(styleAfterSizeChange('spotlight', 'STORY', looks)).toEqual({ imageStyle: 'classic', reset: true })
+    expect(styleAfterSizeChange('spotlight', 'SQUARE', looks)).toEqual({ imageStyle: 'spotlight', reset: false })
+    expect(styleAfterSizeChange('classic', 'STORY', looks).reset).toBe(false)
   })
 })

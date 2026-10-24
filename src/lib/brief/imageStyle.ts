@@ -6,7 +6,8 @@ import { isActiveKey } from '@/lib/designData'
 // name a style that no longer exists (an existing brief whose style is later
 // retired is handled at call time, as `unknown-archetype`). A non-classic
 // style needs the freeform path (the template path never has a hero image).
-// A style on STORY is accepted: the pipeline records `unsupported-size`.
+// The size is resolved at call time: a look that does not declare the size
+// records `unsupported-size`.
 
 export const CLASSIC_STYLE = 'classic'
 

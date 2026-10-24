@@ -26,9 +26,11 @@ import {
   knownStyleKey,
   resolveWizardStyle,
   resumeWizardStyle,
+  styleAfterSizeChange,
   styleRequestFields,
   DEFAULT_POST_STYLE,
 } from '@/lib/brief/wizardStyleState'
+import { supportsSize } from '@/lib/designData'
 import { DEFAULT_CHANNELS } from './constants'
 import type { DesignMode, ResolvedKit, UploadedImage } from './types'
 import {
@@ -191,11 +193,12 @@ export function useBriefWizard(): UseBriefWizardResult {
     setModelErrors(({ designModel: _refused, ...rest }) => rest)
   }, [])
 
-  // 009 FR-03: a size an archetype does not support (STORY) resets the style
-  // (the pick is dropped, so the field follows the style again).
+  // 009 FR-03: a size the picked look does not support resets the style (the
+  // pick is dropped, so the field follows the style again). Every shipped look
+  // declares every size, so on today's dataset this never resets.
   function setAspectRatio(ratio: AspectRatio) {
     setAspectRatioState(ratio)
-    if (ratio === 'STORY') resetImageStyle()
+    if (styleAfterSizeChange(imageStyleValue, ratio).reset) resetImageStyle()
   }
 
   function resetImageStyle() {
@@ -395,8 +398,11 @@ export function useBriefWizard(): UseBriefWizardResult {
         setDesignModelState(p.designModel)
         // An unknown or retired stored value resumes as classic; so does a style
         // the stored size or path can't run.
+        const resumedImageStyle = resumeImageStyle(p.imageStyle)
         const storedImageStyle =
-          p.aspectRatio === 'STORY' || p.designMode === 'TEMPLATE' ? CLASSIC_STYLE : resumeImageStyle(p.imageStyle)
+          p.designMode === 'TEMPLATE' || !supportsSize(resumedImageStyle, p.aspectRatio)
+            ? CLASSIC_STYLE
+            : resumedImageStyle
         // 027 FR-07: an unknown stored style opens as General; a stored tone or
         // image style is the user's own only if it differs from what the style
         // would give (so an untouched field keeps following the style).

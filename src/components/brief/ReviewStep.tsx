@@ -97,7 +97,7 @@ export function ReviewStep({
     { label: 'Brand kit', value: selectedBrandKit?.name ?? '—' },
     { label: 'Size', value: `${ASPECT_LABELS[aspectRatio]} · ${dimensionsLabel(aspectRatio)} px` },
     { label: 'Path', value: `Path ${designMode === 'TEMPLATE' ? 'A — Template fill' : 'B — Freeform design'}` },
-    // Always shown (027 FR-07): Path A and 9:16 read Classic, whatever the style says.
+    // Always shown (027 FR-07): Path A, and a size the look does not support, read Classic, whatever the style says.
     {
       label: 'Image style',
       value:

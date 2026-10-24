@@ -10,6 +10,7 @@ import {
 } from '@/lib/postStyles'
 import { styles } from '@/lib/postStyles/styles'
 import type { PostStyle } from '@/lib/postStyles/types'
+import { archetypes, type ArchetypeMap } from '@/lib/designData'
 import { TONE_OPTIONS } from '@/components/brief/constants'
 
 const SURFACES: Surface[] = ['wizard', 'briefs-api', 'queue', 'mcp', 'acp', 'regenerate']
@@ -180,6 +181,76 @@ describe('resolvePostStyle: image style', () => {
     const r = ok(base({ explicit: { imageStyle: 'no-such-look' } }))
     expect(r.imageStyle).toBe('classic')
     expect(r.notes).toContain('default-unavailable')
+  })
+})
+
+// 028 FR-04 / FR-05: both notes are unreachable on the shipped dataset (every
+// look is active and declares every size), so they run on fixture look datasets.
+describe('resolvePostStyle: look fixtures (size-classic, retired-classic)', () => {
+  const fixture = (edit: (m: Record<string, (typeof archetypes)[string]>) => void): ArchetypeMap => {
+    const m = structuredClone(archetypes) as Record<string, (typeof archetypes)[string]>
+    edit(m)
+    return m
+  }
+  const run = (input: ResolveInput, looks: ArchetypeMap) => {
+    const r = resolvePostStyle(input, undefined, looks)
+    if (!r.ok) throw new Error(r.message)
+    return r
+  }
+  // spotlight whose current version declares no 9:16
+  const noStory = fixture((m) => {
+    delete m.spotlight.versions[m.spotlight.current].sizes.STORY
+  })
+  const retired = fixture((m) => {
+    m['editorial-split'].status = 'retired'
+    m['product-showcase'].status = 'retired'
+  })
+
+  it('size-classic: a look that does not declare the size is classic with the note', () => {
+    const r = run(base({ aspectRatio: 'STORY', explicit: { imageStyle: 'spotlight' } }), noStory)
+    expect(r.imageStyle).toBe('classic')
+    expect(r.notes).toContain('size-classic')
+  })
+
+  it('size-classic: the same look keeps its style at a size it declares', () => {
+    const r = run(base({ aspectRatio: 'SQUARE', explicit: { imageStyle: 'spotlight' } }), noStory)
+    expect(r.imageStyle).toBe('spotlight')
+    expect(r.notes).not.toContain('size-classic')
+  })
+
+  it('retired-classic: an explicit retired look is classic with the note', () => {
+    const r = run(base({ explicit: { imageStyle: 'editorial-split' } }), retired)
+    expect(r.imageStyle).toBe('classic')
+    expect(r.notes).toContain('retired-classic')
+    expect(r.notes).not.toContain('default-unavailable')
+  })
+
+  it('retired-classic: a post-style default that names a retired look is classic with the note', () => {
+    expect(styles.launch.versions[styles.launch.current].defaultImageStyle).toBe('product-showcase')
+    const r = run(base({ style: 'launch' }), retired)
+    expect(r.imageStyle).toBe('classic')
+    expect(r.notes).toContain('retired-classic')
+  })
+
+  it('retired-classic comes after the unattended and Path A checks', () => {
+    const q = run(base({ surface: 'queue', explicit: { imageStyle: 'editorial-split' } }), retired)
+    expect(q.notes).toContain('unattended-classic')
+    expect(q.notes).not.toContain('retired-classic')
+    const a = run(base({ path: 'A', explicit: { imageStyle: 'editorial-split' } }), retired)
+    expect(a.notes).toContain('path-a-classic')
+    expect(a.notes).not.toContain('retired-classic')
+  })
+
+  it('an unknown key is still default-unavailable, not retired-classic', () => {
+    const r = run(base({ explicit: { imageStyle: 'no-such-look' } }), retired)
+    expect(r.notes).toContain('default-unavailable')
+    expect(r.notes).not.toContain('retired-classic')
+  })
+
+  it('an active look at a declared size is unchanged', () => {
+    const r = run(base({ explicit: { imageStyle: 'spotlight' } }), retired)
+    expect(r.imageStyle).toBe('spotlight')
+    expect(r.notes).toEqual([])
   })
 })
 
