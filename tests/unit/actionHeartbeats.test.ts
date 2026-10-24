@@ -143,7 +143,7 @@ vi.mock('@/lib/authz/visibility', () => ({ canAccessContent: () => true }))
 vi.mock('@/lib/storage/minio', () => ({ resolveExportUrl: async (k: string | null) => k }))
 vi.mock('@/lib/agent/userToken', () => ({ resolveClaudeAuth: async () => null }))
 vi.mock('@/lib/agent/claudeAuth', () => ({ runWithClaudeAuth: (_auth: unknown, fn: () => unknown) => fn() }))
-vi.mock('@/lib/drafts/refineVerify', () => ({ verifyRefine: vi.fn() }))
+vi.mock('@/lib/drafts/refineVerify', () => ({ verifyRefine: vi.fn(), VERIFIER_PROMPT_VERSION: 'test-verifier' }))
 vi.mock('@/lib/renderer/domFacts', () => ({ extractDomFacts: async () => ({ elements: [] }) }))
 // One attempt through the route's real runRefine (so its attempt heartbeat is
 // in the log), then the scripted outcome; settleRefine is the real one.
@@ -180,7 +180,7 @@ const { runGenerationForDraft, generateDraftForBrief } = await import('@/lib/age
 const { POST: regenerateDesign } = await import('@/app/api/drafts/[id]/regenerate-design/route')
 const { POST: refine } = await import('@/app/api/drafts/[id]/refine/route')
 
-const actor = { userId: 'u1', teamId: 'team1' }
+const actor = { userId: 'u1', teamId: 'team1', source: 'web' as const }
 const ctx = { params: { id: 'd1' } } as never
 
 function brief(designMode: 'GENERATE' | 'TEMPLATE' = 'GENERATE') {
@@ -259,7 +259,7 @@ describe('async generation (runGenerationForDraft)', () => {
 
 describe('sync generation (generateDraftForBrief: the scheduler, MCP, ACP)', () => {
   it("runs the caller's onBeforeDesign after the background step, right before the design", async () => {
-    await generateDraftForBrief(brief() as never, { userId: null, teamId: 'team1' }, {
+    await generateDraftForBrief(brief() as never, { userId: null, teamId: 'team1', source: 'scheduler' }, {
       onBeforeDesign: async () => {
         h.log.push('hook')
       },
@@ -268,7 +268,7 @@ describe('sync generation (generateDraftForBrief: the scheduler, MCP, ACP)', () 
   })
 
   it('without a hook, behaves as before', async () => {
-    await generateDraftForBrief(brief() as never, { userId: null, teamId: 'team1' })
+    await generateDraftForBrief(brief() as never, { userId: null, teamId: 'team1', source: 'scheduler' })
     expect(h.log).toEqual(['background', 'design', 'draft created', 'revision'])
   })
 })
@@ -297,7 +297,7 @@ describe('refine', () => {
 
   it('an accepted refine touches the claim again before the commit render', async () => {
     h.state.draft = existingDraft()
-    h.state.refineResult = { kind: 'accepted', html: '<html>refined</html>', refineCalls: 1, verifierCalls: 0 }
+    h.state.refineResult = { kind: 'accepted', html: '<html>refined</html>', refineCalls: 1, verifierCalls: 0, attempts: [] }
     expect((await post()).status).toBe(202)
     await settled()
     expect(h.log).toEqual(['claim', 'background', 'touch:REFINE', 'refine', 'touch:REFINE', 'commit', 'release'])

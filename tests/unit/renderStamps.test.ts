@@ -168,7 +168,7 @@ beforeEach(() => {
 
 describe('generation v1 "Original design" revision', () => {
   it('sync path (MCP/ACP, scheduler): the v1 row and the draft carry the same stamp', async () => {
-    await generateDraftForBrief(brief, { userId: null, teamId: 'team1' })
+    await generateDraftForBrief(brief, { userId: null, teamId: 'team1', source: 'scheduler' })
     expect(db.revisionCreates).toHaveLength(1)
     expect(db.revisionCreates[0]).toMatchObject({ revisionNumber: 1, instruction: 'Original design', ...STAMP, ...FREEFORM })
     expect(db.draftWrites.find((w) => w.op === 'create')!.data).toMatchObject({ ...STAMP, ...DRAFT_FREEFORM })
@@ -180,7 +180,7 @@ describe('generation v1 "Original design" revision', () => {
 
   it('async path (brief wizard): finalizeDraftV1 stamps the v1 row and the draft', async () => {
     db.draft = { id: 'd1', templateId: null, brief }
-    await runGenerationForDraft('d1', { userId: 'u1', teamId: 'team1' })
+    await runGenerationForDraft('d1', { userId: 'u1', teamId: 'team1', source: 'web' })
     expect(db.revisionCreates).toHaveLength(1)
     expect(db.revisionCreates[0]).toMatchObject({ revisionNumber: 1, instruction: 'Original design', ...STAMP, ...FREEFORM })
     const finalize = db.draftWrites.find((w) => w.data.status === 'EXPORTED')!
@@ -191,7 +191,7 @@ describe('generation v1 "Original design" revision', () => {
 
   it('a TEMPLATE brief stamps the DESIGN_TEMPLATE model (Haiku by default)', async () => {
     db.draft = { id: 'd1', templateId: 't1', brief: { ...(brief as object), designMode: 'TEMPLATE' } }
-    await runGenerationForDraft('d1', { userId: 'u1', teamId: 'team1' })
+    await runGenerationForDraft('d1', { userId: 'u1', teamId: 'team1', source: 'web' })
     expect(db.revisionCreates[0]).toMatchObject({ model: 'claude-haiku-4-5', modelSubstitutedFrom: null })
     // 009: a Path A draft is classic (the evidence's denominator), never null.
     const classic = { requestedArchetype: 'classic', appliedArchetype: 'classic', contractVersion: null, imageQuality: 'default' }

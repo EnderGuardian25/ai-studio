@@ -12,6 +12,7 @@ import { modelError, parseRegenerateDesignBody } from '@/lib/models/requests'
 import { claimWhere, DraftClaimLostError } from '@/lib/drafts/claim'
 import { claimDraftAction, startDraftAction, touchDraftAction } from '@/lib/drafts/draftActions'
 import { generationSkipFields } from '@/lib/drafts/backgroundNotice'
+import { newActionTrace } from '@/lib/analytics/trace'
 import { designHeadline, headlineFallbackMessage } from '@/lib/captions/headline'
 
 // Regenerates the freeform (Path B) design for a draft: produces a brand-new
@@ -96,6 +97,8 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
   // (the team token otherwise) — startDraftAction resolves it before the
   // request unwinds and pins it onto the background run. A throw below is
   // recorded on Draft.pendingActionError; the draft itself is left untouched.
+  const trace = newActionTrace()
+  trace.fields.model = { model: model.key, modelId: model.arg, substitutedFrom: model.substitutedFrom }
   await startDraftAction(draft.id, user.userId, user.teamId, claim, async () => {
     if (headline.fallback) console.info(headlineFallbackMessage(draft.id))
     // Run the new design first — if it fails, the draft is left untouched.
@@ -158,7 +161,7 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
       if (count !== 1) throw new DraftClaimLostError()
       return revisionNumber
     })
-  })
+  }, undefined, trace)
 
   return NextResponse.json({ ok: true }, { status: 202 })
 })

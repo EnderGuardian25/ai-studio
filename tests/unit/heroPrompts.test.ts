@@ -299,6 +299,12 @@ describe('PROMPT_VERSION (009 FR-18, AC-08)', () => {
     }
     for (const root of ['src/lib/agent/prompts', 'src/lib/drafts', 'src/app/api/drafts']) walk(root)
     // caption.ts owns CAPTION_PROMPT_VERSION, a different stamp (012); PROMPT_VERSION lives in shared.ts only.
-    expect(hits).toEqual(['src/lib/agent/prompts/caption.ts', 'src/lib/agent/prompts/shared.ts'])
+    // refineVerify.ts owns VERIFIER_PROMPT_VERSION (006 FR-05), the verifier's own stamp: it is recorded on
+    // refine analytics events, never on a draft, so it is not a PROMPT_VERSION.
+    expect(hits).toEqual([
+      'src/lib/agent/prompts/caption.ts',
+      'src/lib/agent/prompts/shared.ts',
+      'src/lib/drafts/refineVerify.ts',
+    ])
   })
 })

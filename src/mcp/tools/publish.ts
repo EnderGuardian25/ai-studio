@@ -42,6 +42,7 @@ export async function publishPost(args: { draftId: string; channel: string; team
     draftId: args.draftId,
     channel: args.channel,
     userId: await getSystemUserId(args.teamId),
+    source: 'mcp',
   })
 
   // The FAILED row is recorded either way; surface the failure to the caller.

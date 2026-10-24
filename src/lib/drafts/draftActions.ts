@@ -4,6 +4,8 @@ import { resolveClaudeAuth } from '@/lib/agent/userToken'
 import { runWithClaudeAuth } from '@/lib/agent/claudeAuth'
 import { NOT_APPLIED_CLEARED, discardNotAppliedRender } from '@/lib/drafts/revisions'
 import { CLAIM_RELEASED, claimData, claimWhere, logLostClaim, newClaimId, type DraftClaim } from '@/lib/drafts/claim'
+import { track } from '@/lib/analytics/track'
+import type { ActionTrace } from '@/lib/analytics/trace'
 
 // Lifecycle of an async draft action (regenerate copy/design, refine) — the
 // F1 background pattern applied to actions on an existing draft. A route
@@ -69,17 +71,19 @@ export async function touchGeneration(draftId: string): Promise<void> {
 // updateMany (not update) so a draft deleted mid-action is a silent no-op.
 // Guarded on the claim this run took: when it is no longer ours (swept, then
 // re-claimed) 0 rows match. That is logged, never thrown. The token is nulled
-// with the action.
+// with the action. Returns whether the write landed (006: a settle that lost
+// its claim emits no analytics event, the swept event covered it).
 export async function releaseDraftAction(
   draftId: string,
   claim: DraftClaim,
   error?: string,
-): Promise<void> {
+): Promise<boolean> {
   const { count } = await prisma.draft.updateMany({
     where: { id: draftId, ...claimWhere(claim) },
     data: { ...CLAIM_RELEASED, pendingActionError: error ?? null },
   })
   if (count === 0) logLostClaim(draftId, claim)
+  return count !== 0
 }
 
 // Release the action slot after a SUCCESSFUL run. A success also clears the
@@ -91,7 +95,8 @@ export async function releaseDraftAction(
 // no held connection, since this runs on every action completion.
 // Both statements are guarded on the claim, so a late settle from a
 // swept run neither stamps nor clears a newer action's not-applied outcome.
-export async function completeDraftAction(draftId: string, claim: DraftClaim): Promise<void> {
+// Returns whether the claim write landed (see releaseDraftAction).
+export async function completeDraftAction(draftId: string, claim: DraftClaim): Promise<boolean> {
   const [, draft] = await prisma.$transaction([
     discardNotAppliedRender(prisma, draftId, claim),
     prisma.draft.updateMany({
@@ -100,6 +105,7 @@ export async function completeDraftAction(draftId: string, claim: DraftClaim): P
     }),
   ])
   if (draft.count === 0) logLostClaim(draftId, claim)
+  return draft.count !== 0
 }
 
 // What a work closure may return. 'not-applied' = the refine completed
@@ -124,6 +130,12 @@ export type DraftActionCompletion = 'not-applied'
 // `onError` (optional) runs on a throw BEFORE the release, while the claim is
 // still held — a caption action uses it to settle the rows it marked PENDING
 // (012 design §5). Its own failure is logged and never skips the release.
+//
+// `trace` (optional, 006): the carrier for the action's analytics fields. When
+// given, ONE `draft_action.settled` event is emitted after the settle write
+// landed (a settle that lost its claim emits nothing). The emission sits
+// outside the settle's try, so it can never turn a success into a release with
+// an error, and track never throws in production.
 export async function startDraftAction(
   draftId: string,
   userId: string,
@@ -131,11 +143,24 @@ export async function startDraftAction(
   claim: DraftClaim,
   work: () => Promise<void | DraftActionCompletion>,
   onError?: (err: unknown) => Promise<void>,
+  trace?: ActionTrace,
 ): Promise<void> {
   const auth = await resolveClaudeAuth(userId, teamId)
-  void runWithClaudeAuth(auth, work)
-    .then((completion) => (completion === 'not-applied' ? releaseDraftAction(draftId, claim) : completeDraftAction(draftId, claim)))
-    .catch(async (err) => {
+  if (trace) trace.startedAt = Date.now()
+  const run = async () => {
+    let settled: boolean
+    let outcome: 'ok' | 'not-applied' | 'conflict' | 'failed'
+    let failureReason: string | undefined
+    try {
+      const completion = await runWithClaudeAuth(auth, work)
+      if (completion === 'not-applied') {
+        settled = await releaseDraftAction(draftId, claim)
+        outcome = 'not-applied'
+      } else {
+        settled = await completeDraftAction(draftId, claim)
+        outcome = trace?.outcome === 'conflict' ? 'conflict' : 'ok'
+      }
+    } catch (err) {
       // Logged as well as recorded: the next run to settle overwrites
       // pendingActionError, so without this a crashed run can vanish without
       // trace.
@@ -143,11 +168,25 @@ export async function startDraftAction(
       if (onError) {
         await onError(err).catch((e) => console.error(`[draft-action] onError for draft ${draftId} failed:`, e))
       }
-      return releaseDraftAction(draftId, claim, err instanceof Error ? err.message : String(err))
-    })
-    // Belt-and-braces: a release failure (e.g. DB down) must not become an
-    // unhandled rejection.
-    .catch((e) => {
-      console.error(`[draft-action] release for draft ${draftId} failed:`, e)
-    })
+      failureReason = err instanceof Error ? err.message : String(err)
+      settled = await releaseDraftAction(draftId, claim, failureReason)
+      outcome = 'failed'
+    }
+    if (trace && settled) {
+      await track('draft_action.settled', {
+        source: 'web',
+        teamId,
+        userId,
+        draftId,
+        durationMs: Date.now() - trace.startedAt,
+        outcome,
+        payload: { ...trace.fields, action: claim.action, ...(failureReason ? { failureReason } : {}) },
+      })
+    }
+  }
+  // Belt-and-braces: a release failure (e.g. DB down) must not become an
+  // unhandled rejection.
+  void run().catch((e) => {
+    console.error(`[draft-action] release for draft ${draftId} failed:`, e)
+  })
 }

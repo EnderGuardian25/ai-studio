@@ -14,6 +14,7 @@ import { releaseDraftAction, startDraftAction } from '@/lib/drafts/draftActions'
 import { resolveModel } from '@/lib/models/policy'
 import { regenerateStampTier, type ResolvedModel } from '@/lib/models/resolve'
 import { captionProviderNotClaudeError, modelError } from '@/lib/models/requests'
+import { newActionTrace } from '@/lib/analytics/trace'
 
 // Regenerates captions for a draft (012 FR-11; the route name is a kept
 // contract): body {} → the three captions ("Regenerate all"), { channel } →
@@ -118,6 +119,8 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
     // target row as failed (onError) and is recorded on pendingActionError.
     // 008 FR-08: the reply's stamp goes on the fields that validated only; the
     // failure settles pass none, so a row keeps the stamp of the text it keeps.
+    const trace = newActionTrace()
+    trace.fields.model = { model: model.key, modelId: model.arg, substitutedFrom: model.substitutedFrom }
     await startDraftAction(
       draft.id,
       user.userId,
@@ -139,6 +142,7 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
         }
       },
       (err) => settleCaptionAction(draft.id, claim, targets, failedCaptionFields(targets, errorMessage(err))),
+      trace,
     )
   } catch (err) {
     // The run never started (e.g. the credential lookup threw): settle the rows

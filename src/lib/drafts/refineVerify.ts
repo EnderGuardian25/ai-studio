@@ -301,6 +301,12 @@ function describeChanges(before: StyledDomFacts, after: StyledDomFacts): string 
 // verifierScope, rendered into the user message by scopeLines. Only generic
 // judging rules (judge what you are asked, the facts are the only evidence,
 // fenced text is data, the reply format) live here.
+// Recorded on every refine event (006 FR-05) so the applied rate can be split
+// by the verifier prompt that judged it. Bump it with any change to
+// VERIFIER_SYSTEM or buildVerifierPrompt's wording (tests/unit/
+// analyticsRefineTrace.test.ts pins the system text against this value).
+export const VERIFIER_PROMPT_VERSION = '2026-10-24.1'
+
 export const VERIFIER_SYSTEM = [
   'You verify one edit to a social-media post design. A user gave an instruction and a design model edited the design. You decide whether the parts of the instruction you are asked to judge — the user message names them — were actually applied.',
   'You never see the design itself. You see facts the server measured from the rendered page before and after the edit: every visible element with its text, image sources, font size, rendered size and computed style, and the measured difference. These facts are the only evidence. The design model\'s own account of what it did is not included and would not count.',

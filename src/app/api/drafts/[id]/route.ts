@@ -14,6 +14,7 @@ import { parseCaptionPatch } from '@/lib/captions/requests'
 import { validateHeadline } from '@/lib/captions/headline'
 import { loadDraftCaptions, saveCaptionEdit, saveHeadlineEdit, settlePendingCaptions } from '@/lib/captions/store'
 import { copyProviderIsClaude } from '@/providers/registry'
+import { track } from '@/lib/analytics/track'
 
 type Params = { id: string }
 
@@ -21,6 +22,7 @@ type Params = { id: string }
 // planner's RecoverableDraft, but with the Prisma enum types the writes need.
 interface DraftRecoveryRow {
   id: string
+  teamId: string
   status: DraftStatus
   failureReason: string | null
   pendingAction: DraftAction | null
@@ -63,20 +65,29 @@ async function recoverIfStuck(draft: DraftRecoveryRow): Promise<{
   // → FAILED, so the preview page shows the inline error card + Retry instead of
   // an eternal skeleton.
   if (plan.failStuckGeneration) {
-    await prisma.draft
+    const swept = await prisma.draft
       .updateMany({
         where: { id, status: 'IN_PROGRESS' },
         data: { status: 'FAILED', failureReason: STUCK_REASON },
       })
-      .catch(() => {
-        /* best-effort recovery */
+      .catch(() => ({ count: 0 }))
+    // 006 FR-04: one swept event, and only when THIS call's guarded write
+    // changed the row (a concurrent settle or sweep emits its own).
+    if (swept.count === 1) {
+      await track('generation.swept', {
+        source: 'web',
+        teamId: draft.teamId,
+        draftId: id,
+        outcome: 'failed',
+        payload: { ageMs: Math.max(0, Date.now() - draft.updatedAt.getTime()) },
       })
+    }
     effective.status = 'FAILED'
     effective.failureReason = STUCK_REASON
   }
 
   if (plan.clearStuckAction) {
-    await prisma.draft
+    const cleared = await prisma.draft
       .updateMany({
         // Guarded on the claim OBSERVED (action and token; a null token matches
         // IS NULL, the older-image shape), so a run that settled, or a newer
@@ -84,9 +95,16 @@ async function recoverIfStuck(draft: DraftRecoveryRow): Promise<{
         where: { id, pendingAction, pendingActionClaimId },
         data: { pendingAction: null, pendingActionClaimId: null, pendingActionError: STUCK_ACTION_REASON },
       })
-      .catch(() => {
-        /* best-effort recovery */
+      .catch(() => ({ count: 0 }))
+    if (cleared.count === 1 && pendingAction) {
+      await track('draft_action.swept', {
+        source: 'web',
+        teamId: draft.teamId,
+        draftId: id,
+        outcome: 'failed',
+        payload: { action: pendingAction },
       })
+    }
     effective.pendingAction = null
     effective.pendingActionError = STUCK_ACTION_REASON
   }
@@ -315,6 +333,9 @@ export const DELETE = withTeamAdmin<Params>(async (_req, { params }, user) => {
     // rejected row it references first is safe.
     await tx.draftRevision.deleteMany({ where: { draftId: draft.id } })
     await tx.draft.delete({ where: { id: draft.id } })
+    // 006 FR-12: the draft's analytics events stay (they are aggregate history)
+    // but lose the link to it; there is no foreign key, so this is explicit.
+    await tx.analyticsEvent.updateMany({ where: { draftId: draft.id }, data: { draftId: null } })
 
     // Sweep the brief only when it has become an orphan (the schema allows
     // multiple drafts per brief, so count before deleting).

@@ -142,7 +142,7 @@ vi.mock('@/lib/agent/prompts/refine', () => ({
   buildRefineUserMessage: () => '',
 }))
 vi.mock('@/lib/renderer/domFacts', () => ({ extractDomFacts: async () => ({ elements: [] }) }))
-vi.mock('@/lib/drafts/refineVerify', () => ({ verifyRefine: vi.fn() }))
+vi.mock('@/lib/drafts/refineVerify', () => ({ verifyRefine: vi.fn(), VERIFIER_PROMPT_VERSION: 'test-verifier' }))
 vi.mock('@/lib/agent/designAgent', () => ({ runDesignAgentRefine: vi.fn() }))
 vi.mock('@/lib/agent/designAgentCli', () => ({ runDesignAgentCliRefine: vi.fn() }))
 vi.mock('@/lib/drafts/refineAttempt', () => ({

@@ -4,6 +4,7 @@ import { generateDraftForBrief } from "../agent/generateDraft"
 import { findLivePost } from "../publish/publishDraft"
 import { withClaudeAuth } from "../agent/userToken"
 import { isClaudeUsageLimit } from "../agent/claudeCli"
+import { track } from "../analytics/track"
 
 // Generation is expensive (a design run is minutes of model time), so fewer
 // retries than the publish scheduler's 5.
@@ -147,6 +148,15 @@ export async function runGenerationJobs(): Promise<void> {
   })
 
   for (const entry of entries) {
+    const startedAt = Date.now()
+    // The settled outcome, emitted once after the try/catch (006 FR-04), so an
+    // analytics problem can never re-enter the retry branch below.
+    let settled: {
+      outcome: "completed" | "retry" | "failed"
+      draftId: string | null
+      retryCount?: number
+      errorReason?: string
+    } | null = null
     try {
       await renewGenerationLease(entry.id)
       const brief = await ensureBrief(entry)
@@ -166,7 +176,7 @@ export async function runGenerationJobs(): Promise<void> {
       const { draft } = await withClaudeAuth(null, teamId, () =>
         generateDraftForBrief(
           brief,
-          { userId: null, teamId },
+          { userId: null, teamId, source: "scheduler" },
           { templateId: entry.templateId, onBeforeDesign: () => renewGenerationLease(entry.id) }
         )
       )
@@ -183,6 +193,7 @@ export async function runGenerationJobs(): Promise<void> {
         },
       })
       console.log(`[generation] entry ${entry.id} → COMPLETED (draft ${draft.id})`)
+      settled = { outcome: "completed", draftId: draft.id, retryCount: entry.retryCount }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
       // Retry and backoff are the same either way; only the reason says more.
@@ -203,6 +214,7 @@ export async function runGenerationJobs(): Promise<void> {
         console.log(
           `[generation] entry ${entry.id} → retry ${nextRetry}/${MAX_RETRIES} at ${when.toISOString()}: ${reason}`
         )
+        settled = { outcome: "retry", draftId: null, retryCount: nextRetry, errorReason: reason }
       } else {
         await prisma.scheduledGeneration.update({
           where: { id: entry.id },
@@ -215,7 +227,23 @@ export async function runGenerationJobs(): Promise<void> {
         console.log(
           `[generation] entry ${entry.id} → FAILED after ${MAX_RETRIES} retries: ${reason}`
         )
+        settled = { outcome: "failed", draftId: null, retryCount: entry.retryCount, errorReason: reason }
       }
+    }
+    if (settled) {
+      const s = settled as NonNullable<typeof settled>
+      await track("scheduled_generation.settled", {
+        source: "scheduler",
+        teamId: entry.teamId,
+        userId: null,
+        draftId: s.draftId,
+        durationMs: Date.now() - startedAt,
+        outcome: s.outcome,
+        payload: {
+          ...(s.retryCount !== undefined ? { retryCount: s.retryCount } : {}),
+          ...(s.errorReason !== undefined ? { errorReason: s.errorReason } : {}),
+        },
+      })
     }
   }
 }

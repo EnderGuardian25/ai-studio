@@ -10,10 +10,11 @@ import { currentRenderStamp, draftStampFields, revisionStampFields, type RenderS
 import { classicStamp } from '@/lib/designData'
 import { humanizeGenerationError } from '@/lib/agent/generationErrors'
 import { generationSkipFields, type BackgroundSkipFields } from '@/lib/drafts/backgroundNotice'
-import type { GenerationActor } from '@/lib/agent/types'
+import type { GenerationActor, GenerationRunActor } from '@/lib/agent/types'
+import { track } from '@/lib/analytics/track'
 import { CAPTION_CHANNELS } from '@/lib/channels'
 import { GENERATION_TARGETS, requireHeadline, writeCaptions } from '@/lib/captions/generate'
-import { captionRowsFromFields, headlineStampFields, saveGenerationCaptions } from '@/lib/captions/store'
+import { captionRowsFromFields, headlineStampFields, saveGenerationCaptions, type CaptionStamp } from '@/lib/captions/store'
 import { resolveModel } from '@/lib/models/policy'
 import type { ResolvedModel } from '@/lib/models/resolve'
 import { touchGeneration } from '@/lib/drafts/draftActions'
@@ -206,6 +207,68 @@ async function finalizeDraftV1(
   })
 }
 
+// ── Analytics (006 FR-04): the one emitter of `generation.finished` ──────────
+// Both lifecycles collect what they know as they go (the fields are absent when
+// a throw comes first) and emit once, after their outcome is written.
+interface GenerationTrace {
+  t0: number
+  models?: GenerationModels
+  captionStamp?: CaptionStamp
+  design?: ProducedDesign
+}
+
+const ROUTE_STAMPS = ['CLI', 'API_KEY', 'SERVER_KEY', 'OTHER'] as const
+type RouteStamp = (typeof ROUTE_STAMPS)[number]
+
+async function emitGenerationFinished(
+  brief: Pick<Brief, 'designMode' | 'aspectRatio' | 'imageStyle'>,
+  actor: GenerationRunActor,
+  draftId: string | null,
+  trace: GenerationTrace,
+  outcome: 'ok' | 'failed',
+  failure?: unknown,
+): Promise<void> {
+  const composition = trace.design?.stamp.composition ?? null
+  const route = trace.captionStamp?.route
+  await track('generation.finished', {
+    source: actor.source,
+    teamId: actor.teamId,
+    userId: actor.userId,
+    draftId,
+    durationMs: Date.now() - trace.t0,
+    outcome,
+    payload: {
+      path: brief.designMode === 'TEMPLATE' ? 'A' : 'B',
+      aspectRatio: brief.aspectRatio,
+      ...(trace.models
+        ? {
+            captionModel: {
+              model: trace.models.caption.key,
+              modelId: trace.captionStamp?.model ?? null,
+              substitutedFrom: trace.captionStamp?.substitutedFrom ?? trace.models.caption.substitutedFrom,
+            },
+            designModel: {
+              model: trace.models.design.key,
+              modelId: trace.design?.stamp.model ?? null,
+              substitutedFrom: trace.design?.stamp.modelSubstitutedFrom ?? trace.models.design.substitutedFrom,
+            },
+          }
+        : {}),
+      captionRoute: route && (ROUTE_STAMPS as readonly string[]).includes(route) ? (route as RouteStamp) : null,
+      ...(trace.design?.stamp.promptVersion ? { promptVersion: trace.design.stamp.promptVersion } : {}),
+      requestedArchetype: brief.imageStyle,
+      ...(composition
+        ? {
+            appliedArchetype: composition.appliedArchetype as 'classic',
+            ...(composition.fallbackReason ? { fallbackReason: composition.fallbackReason } : {}),
+          }
+        : {}),
+      ...(trace.design ? { backgroundSkipped: trace.design.backgroundSkip.backgroundSkipReason !== null } : {}),
+      ...(failure !== undefined ? { failureReason: humanizeGenerationError(failure) } : {}),
+    },
+  })
+}
+
 // SYNCHRONOUS brief→draft orchestrator: captions → design → render, then create
 // the draft (EXPORTED, with its caption rows and v1) at the END on success. Used
 // by the NON-interactive callers — MCP/ACP surface and the scheduled-generation
@@ -221,13 +284,32 @@ export async function generateDraftForBrief(
   // territory) — callers there must pass an explicit { userId: null, teamId }
   // rather than let this default to the brief's owner, which would incorrectly
   // consult the OWNER's personal OpenAI key for a machine-triggered run.
-  actor: GenerationActor,
+  actor: GenerationRunActor,
   // onBeforeDesign: the scheduler renews its lease here (008 FR-12).
   opts?: { templateId?: string | null; onBeforeDesign?: () => Promise<void> },
+): Promise<GenerateDraftResult> {
+  const trace: GenerationTrace = { t0: Date.now() }
+  let result: GenerateDraftResult
+  try {
+    result = await generateDraftForBriefInner(brief, actor, opts, trace)
+  } catch (err) {
+    await emitGenerationFinished(brief, actor, null, trace, 'failed', err)
+    throw err
+  }
+  await emitGenerationFinished(brief, actor, result.draft.id, trace, 'ok')
+  return result
+}
+
+async function generateDraftForBriefInner(
+  brief: Brief,
+  actor: GenerationRunActor,
+  opts: { templateId?: string | null; onBeforeDesign?: () => Promise<void> } | undefined,
+  trace: GenerationTrace,
 ): Promise<GenerateDraftResult> {
   // 008: resolved first, so a team with no allowed model throws before any
   // model call is paid for (a sync failure creates no draft).
   const models = await resolveGenerationModels(brief, actor)
+  trace.models = models
   const inputs = await resolveGenerationInputs(brief, opts?.templateId)
 
   const copyProvider = await resolveCopyProvider(brief.teamId, brief.copyProviderKey ?? undefined)
@@ -237,9 +319,11 @@ export async function generateDraftForBrief(
     GENERATION_TARGETS,
     models.caption,
   )
+  trace.captionStamp = captionStamp
   const headline = requireHeadline(fields)
 
   const design = await produceDesign(brief, inputs, headline, actor, models.design, opts?.onBeforeDesign)
+  trace.design = design
 
   const draft = await prisma.$transaction(async (tx) => {
     const created = await tx.draft.create({
@@ -312,14 +396,20 @@ export async function createPendingDraft(
 // captions that validated. On any failure the draft is marked FAILED with the
 // reason for the inline error card. Designed to be fire-and-forget from the
 // route; also reused by the retry route, which resets the rows to PENDING.
-export async function runGenerationForDraft(draftId: string, actor: GenerationActor): Promise<void> {
+export async function runGenerationForDraft(draftId: string, actor: GenerationRunActor): Promise<void> {
   const draft = await prisma.draft.findUnique({ where: { id: draftId }, include: { brief: true } })
   if (!draft) return
+  const trace: GenerationTrace = { t0: Date.now() }
+  // Emitted after the try/catch, once the outcome is written, so an analytics
+  // problem (which only throws under the test seams) can never flip a finished
+  // draft to FAILED (006 NFR-01).
+  let finished: { outcome: 'ok' } | { outcome: 'failed'; err: unknown } | null = null
   try {
     // 008 design §3: the one resolution that runs in the background — retry
     // re-enters here — so it reads stored values only (Brief → team → system),
     // never an explicit request. NO_ALLOWED_MODEL fails the draft with its message.
     const models = await resolveGenerationModels(draft.brief, actor)
+    trace.models = models
     const inputs = await resolveGenerationInputs(draft.brief, draft.templateId)
 
     const copyProvider = await resolveCopyProvider(draft.brief.teamId, draft.brief.copyProviderKey ?? undefined)
@@ -329,6 +419,7 @@ export async function runGenerationForDraft(draftId: string, actor: GenerationAc
       GENERATION_TARGETS,
       models.caption,
     )
+    trace.captionStamp = captionStamp
     await saveGenerationCaptions(draftId, fields, captionStamp)
     const headline = requireHeadline(fields)
 
@@ -338,7 +429,9 @@ export async function runGenerationForDraft(draftId: string, actor: GenerationAc
     const design = await produceDesign(draft.brief, inputs, headline, actor, models.design, () =>
       touchGeneration(draftId),
     )
+    trace.design = design
     await finalizeDraftV1(draftId, design)
+    finished = { outcome: 'ok' }
   } catch (err) {
     const reason = humanizeGenerationError(err)
     await prisma.draft
@@ -359,8 +452,22 @@ export async function runGenerationForDraft(draftId: string, actor: GenerationAc
           },
         },
       })
+      .then(() => {
+        finished = { outcome: 'failed', err }
+      })
       .catch(() => {
         /* draft deleted mid-flight — nothing to record */
       })
+  }
+  if (finished) {
+    const done = finished as { outcome: 'ok' } | { outcome: 'failed'; err: unknown }
+    await emitGenerationFinished(
+      draft.brief,
+      actor,
+      draftId,
+      trace,
+      done.outcome,
+      done.outcome === 'failed' ? done.err : undefined,
+    )
   }
 }

@@ -12,6 +12,9 @@ import { extractInlineAssets, restoreInlineAssets } from '@/lib/agent/inlineAsse
 import { dimensionsFor } from '@/lib/aspectRatio'
 import { pathForDesignMode, pipelineMode } from '@/lib/agent/config'
 import { resolveModel } from '@/lib/models/policy'
+import { internalModel } from '@/lib/models/resolve'
+import { track } from '@/lib/analytics/track'
+import { newActionTrace } from '@/lib/analytics/trace'
 import { modelError, parseModelField } from '@/lib/models/requests'
 import { buildRefineSystemPrompt, buildRefineUserMessage } from '@/lib/agent/prompts/refine'
 import { generateBackgroundForRefine } from '@/lib/agent/background'
@@ -20,8 +23,8 @@ import { commitDraftRevision, draftCompositionStamp, recordRejectedRender, type 
 import { contractAt, refineReplacedStamp, styleLabel, type CompositionStamp, type SizeContract } from '@/lib/designData'
 import { claimWhere, logLostClaim } from '@/lib/drafts/claim'
 import { claimDraftAction, startDraftAction, touchDraftAction } from '@/lib/drafts/draftActions'
-import { runRefineAttempts, settleRefine } from '@/lib/drafts/refineAttempt'
-import { verifyRefine } from '@/lib/drafts/refineVerify'
+import { runRefineAttempts, settleRefine, summariseAttempt } from '@/lib/drafts/refineAttempt'
+import { VERIFIER_PROMPT_VERSION, verifyRefine } from '@/lib/drafts/refineVerify'
 import { extractDomFacts } from '@/lib/renderer/domFacts'
 
 interface PendingConflict {
@@ -126,6 +129,7 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
       height,
       { model: pending.model, modelSubstitutedFrom: pending.modelSubstitutedFrom },
       draftCompositionStamp(draft),
+      { teamId: user.teamId, userId: user.userId },
     )
   }
 
@@ -178,7 +182,15 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
   // actor is the acting teammate (NOT the brief owner) — image-provider
   // resolution must follow whoever is running this refine.
   const actor = { userId: user.userId, teamId: user.teamId }
+  // 006 FR-05: the analytics fields of this refine, filled as the run learns
+  // them (a crash keeps whatever was known) and emitted by startDraftAction
+  // once the claim is settled.
+  const trace = newActionTrace()
   await startDraftAction(draft.id, user.userId, user.teamId, claim, async () => {
+    trace.fields.instruction = instruction
+    trace.fields.model = { model: model.key, modelId: model.arg, substitutedFrom: model.substitutedFrom }
+    trace.fields.verifierModelId = internalModel('INTERNAL_VERIFIER', mode).arg
+    trace.fields.verifierPromptVersion = VERIFIER_PROMPT_VERSION
     // Background pre-step: generates a new background ONLY when the instruction
     // asks for one (e.g. "change the background to a city skyline"); a skip
     // with its reason otherwise. See agent/background.ts: it resolves the
@@ -296,6 +308,17 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
       },
     )
 
+    if (result.kind === 'not-applied') {
+      trace.fields.refineCalls = result.diagnostics.refineCalls
+      trace.fields.verifierCalls = result.diagnostics.verifierCalls
+      trace.fields.attempts = result.diagnostics.attempts.map(summariseAttempt)
+    } else {
+      trace.fields.refineCalls = result.refineCalls
+      trace.fields.verifierCalls = result.verifierCalls
+      if (result.kind === 'accepted') trace.fields.attempts = result.attempts
+      else trace.outcome = 'conflict'
+    }
+
     // 'not-applied' tells startDraftAction to keep the outcome recorded below.
     return settleRefine(result, {
       commit: async (html) => {
@@ -369,7 +392,7 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
         })
       },
     })
-  })
+  }, undefined, trace)
 
   return NextResponse.json({ ok: true }, { status: 202 })
 })
@@ -383,6 +406,7 @@ async function commitRevision(
   height: number,
   model: ModelStamp,
   composition: CompositionStamp | null,
+  who: { teamId: string; userId: string },
 ) {
   const { revisionId, exportKey } = await commitDraftRevision({
     draftId,
@@ -393,6 +417,8 @@ async function commitRevision(
     model,
     composition,
   })
+  // 006 FR-06: the override is a revision with its own event, after the write.
+  await track('revision.override', { source: 'web', teamId: who.teamId, userId: who.userId, draftId, outcome: 'ok', payload: {} })
 
   return NextResponse.json({
     reply: 'Design updated',

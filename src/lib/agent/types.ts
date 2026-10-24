@@ -1,3 +1,5 @@
+import type { AnalyticsSource } from '@prisma/client'
+
 // The identity ON WHOSE BEHALF a generation/refine call runs — NOT necessarily
 // the brief's owner. Teammate B refining/regenerating teammate A's shared
 // brief must resolve B's personal OpenAI key (or the team default), never
@@ -8,6 +10,15 @@
 export interface GenerationActor {
   userId: string | null
   teamId: string
+}
+
+// A GenerationActor that also says WHERE the generation was started (006
+// FR-04). Required by the two generation lifecycles (generateDraftForBrief,
+// runGenerationForDraft), so every caller states its source and an analytics
+// event can never default it; the design pipeline below them only needs the
+// identity, so it keeps taking GenerationActor.
+export interface GenerationRunActor extends GenerationActor {
+  source: AnalyticsSource
 }
 
 export interface BrandKitContext {

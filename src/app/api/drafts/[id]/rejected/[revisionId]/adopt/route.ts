@@ -6,6 +6,7 @@ import { dimensionsFor } from '@/lib/aspectRatio'
 import { resolveExportUrl } from '@/lib/storage/minio'
 import { commitDraftRevision, AdoptConflictError } from '@/lib/drafts/revisions'
 import { inlineEditBlockReason } from '@/lib/drafts/inlineEdit'
+import { track } from '@/lib/analytics/track'
 
 // "Use anyway" (change 004 Phase 2, T19, FR-14a): adopts a twice-failed
 // refine's retained rejected render as a normal, committed chain revision.
@@ -106,6 +107,14 @@ export const POST = withTeamAuth<{ id: string; revisionId: string }>(async (_req
       // 009: an adopt carries the rejected row's own composition stamp
       // (rejectedRenderStamp reads it); this value is ignored.
       composition: null,
+    })
+    await track('revision.adopted', {
+      source: 'web',
+      teamId: user.teamId,
+      userId: user.userId,
+      draftId: draft.id,
+      outcome: 'ok',
+      payload: {},
     })
     return NextResponse.json({
       reply: 'Design updated',

@@ -5,6 +5,7 @@ import { withTeamAuth, parseBody, type TeamAuthedUser } from '@/lib/api/handler'
 import { canAccessContent } from '@/lib/authz/visibility'
 import { dimensionsFor } from '@/lib/aspectRatio'
 import { resolveExportUrl } from '@/lib/storage/minio'
+import { track } from '@/lib/analytics/track'
 import { commitDraftRevision, draftCompositionStamp, draftModelStamp, RevisionConflictError } from '@/lib/drafts/revisions'
 import {
   sanitizeInlineHtml,
@@ -82,6 +83,14 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
     model: draftModelStamp(draft),
     // 009: the HTML is still the render its composition stamp describes.
     composition: draftCompositionStamp(draft),
+  })
+  await track('revision.edited', {
+    source: 'web',
+    teamId: user.teamId,
+    userId: user.userId,
+    draftId: draft.id,
+    outcome: 'ok',
+    payload: { mode: 'document' },
   })
 
   return NextResponse.json({
@@ -199,6 +208,14 @@ async function handleElementEdit(raw: unknown, draftId: string, user: TeamAuthed
     }
     throw err
   }
+  await track('revision.edited', {
+    source: 'web',
+    teamId: user.teamId,
+    userId: user.userId,
+    draftId: draft.id,
+    outcome: 'ok',
+    payload: { mode: 'element' },
+  })
 
   return NextResponse.json({
     reply: 'Design updated',

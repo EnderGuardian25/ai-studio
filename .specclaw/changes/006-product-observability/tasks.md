@@ -50,7 +50,7 @@ Waves 4 and 5 are the user's staged scope (2026-10-23): each is independently sh
 
 ### Wave 2 — Server emitters
 
-- [ ] `T2` — Generation, draft-action (with the refine trace), swept, revision, publish and scheduled-generation events; delete rules; the test seam
+- [x] `T2` — Generation, draft-action (with the refine trace), swept, revision, publish and scheduled-generation events; delete rules; the test seam
   - Files: `src/lib/agent/{generateDraft,backgroundGeneration}.ts`, `src/lib/scheduler/{generationRunner,jobRunner}.ts`, `src/mcp/tools/{generate,publish}.ts`, `src/lib/drafts/{draftActions,refineAttempt,refineVerify}.ts`, `src/app/api/drafts/[id]/{route,refine/route,regenerate-design/route,regenerate-copy/route,inline-edit/route}.ts`, `src/app/api/drafts/[id]/rejected/[revisionId]/adopt/route.ts`, `src/app/api/drafts/[id]/revisions/[rev]/restore/route.ts`, `src/lib/publish/{publishDraft,trackPublish}.ts`, `src/app/api/posts/route.ts`, `src/app/api/posts/[id]/publish/route.ts`, `src/app/api/admin/teams/[id]/route.ts`, `src/app/api/test/analytics-events/route.ts` (new), `tests/unit/{analyticsEmitters,analyticsRefineTrace,analyticsDeletes}.test.ts` (new); existing unit tests whose prisma fakes need `analyticsEvent` (adapt, never delete)
   - Estimate: large
   - Kind: impl

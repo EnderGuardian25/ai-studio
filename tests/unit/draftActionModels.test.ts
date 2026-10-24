@@ -52,7 +52,7 @@ vi.mock('@/lib/agent/background', () => ({
   generateBackgroundForRefine: async () =>
     h.bgUrl ? { url: h.bgUrl, skip: null, detail: null } : { url: null, skip: 'NOT_NEEDED', detail: null },
 }))
-vi.mock('@/lib/drafts/refineVerify', () => ({ verifyRefine: vi.fn() }))
+vi.mock('@/lib/drafts/refineVerify', () => ({ verifyRefine: vi.fn(), VERIFIER_PROMPT_VERSION: 'test-verifier' }))
 vi.mock('@/lib/agent/backgroundGeneration', () => ({ startBackgroundGeneration: async () => {} }))
 vi.mock('@/lib/renderer/domFacts', () => ({ extractDomFacts: async () => ({ elements: [] }) }))
 vi.mock('@/lib/drafts/draftActions', () => ({
@@ -119,7 +119,7 @@ beforeEach(() => {
   h.draft = draft()
   h.policy = null
   h.bgUrl = null
-  h.result = { kind: 'accepted', html: '<html>refined</html>', refineCalls: 1, verifierCalls: 0 }
+  h.result = { kind: 'accepted', html: '<html>refined</html>', refineCalls: 1, verifierCalls: 0, attempts: [] }
   for (const fn of [h.draftUpdate, h.claim, h.commit, h.reject, h.runRefineAttempts, h.refineApi]) fn.mockReset()
   h.claim.mockResolvedValue({ action: 'REFINE', claimId: 'c1' })
   h.draftUpdate.mockResolvedValue({ count: 1 })

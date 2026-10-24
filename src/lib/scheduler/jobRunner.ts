@@ -1,6 +1,7 @@
 import { prisma } from "../prisma"
 import { PublishError } from "../social/types"
 import { publishToChannel } from "../publish/publishDraft"
+import { trackPublish, type PublishOutcome } from "../publish/trackPublish"
 
 // A transient failure is retried up to MAX_RETRIES times with exponential
 // backoff before the post is marked terminally FAILED. A terminal PublishError
@@ -67,6 +68,10 @@ export async function runScheduledJobs(): Promise<void> {
   })
 
   for (const post of posts) {
+    const startedAt = Date.now()
+    // The decided outcome, emitted once after the try/catch (006 FR-04), so an
+    // analytics problem can never re-enter the failure branches below.
+    let decided: Pick<PublishOutcome, "outcome" | "terminal" | "retryCount" | "errorReason"> | null = null
     try {
       // Shared resolve+sign+publish. The caption is decided now, so an edit made
       // after scheduling counts (012 FR-16). Throws a terminal PublishError on a
@@ -94,6 +99,7 @@ export async function runScheduledJobs(): Promise<void> {
       console.log(
         `[scheduler] post ${post.id} → PUBLISHED (${post.channel}, platformId: ${platformId})`
       )
+      decided = { outcome: "published", terminal: true, retryCount: post.retryCount }
     } catch (err) {
       const reason = err instanceof PublishError ? err.reason : String(err)
       const nextRetry = post.retryCount + 1
@@ -111,6 +117,7 @@ export async function runScheduledJobs(): Promise<void> {
         console.log(
           `[scheduler] post ${post.id} → FAILED (terminal) (${post.channel}): ${reason}`
         )
+        decided = { outcome: "failed", terminal: true, retryCount: post.retryCount, errorReason: reason }
       } else if (nextRetry <= MAX_RETRIES) {
         const when = new Date(Date.now() + backoffMs(nextRetry))
         await prisma.post.update({
@@ -125,6 +132,7 @@ export async function runScheduledJobs(): Promise<void> {
         console.log(
           `[scheduler] post ${post.id} → retry ${nextRetry}/${MAX_RETRIES} at ${when.toISOString()} (${post.channel}): ${reason}`
         )
+        decided = { outcome: "retry-scheduled", terminal: false, retryCount: nextRetry, errorReason: reason }
       } else {
         await prisma.post.update({
           where: { id: post.id },
@@ -137,7 +145,19 @@ export async function runScheduledJobs(): Promise<void> {
         console.log(
           `[scheduler] post ${post.id} → FAILED after ${MAX_RETRIES} retries (${post.channel}): ${reason}`
         )
+        decided = { outcome: "failed", terminal: true, retryCount: post.retryCount, errorReason: reason }
       }
+    }
+    if (decided) {
+      await trackPublish({
+        source: "scheduler",
+        teamId: post.teamId,
+        userId: null,
+        draftId: post.draftId,
+        channel: post.channel,
+        startedAt,
+        ...(decided as Pick<PublishOutcome, "outcome" | "terminal" | "retryCount" | "errorReason">),
+      })
     }
   }
 }

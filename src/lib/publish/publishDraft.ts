@@ -5,7 +5,8 @@ import * as instagramPublisher from '@/lib/social/instagram'
 import * as linkedinPublisher from '@/lib/social/linkedin'
 import { PublishError } from '@/lib/social/types'
 import { resolveExportUrl } from '@/lib/storage/minio'
-import type { Channel, Post } from '@prisma/client'
+import type { AnalyticsSource, Channel, Post } from '@prisma/client'
+import { trackPublish } from '@/lib/publish/trackPublish'
 
 // The one channel → publisher map. Every publish surface (immediate API path,
 // FAILED-retry, scheduler tick, ACP tool) goes through this module so a new
@@ -67,7 +68,10 @@ export async function createAndPublishPost(opts: {
   channel: Channel
   userId: string
   scheduledAt?: Date | null
+  // 006: where the publish was started; every caller states it.
+  source: AnalyticsSource
 }): Promise<{ post: Post; error?: PublishError }> {
+  const startedAt = Date.now()
   // Loaded once, before the PENDING row, so the Post can be stamped with the
   // draft's team at creation (draft.teamId is the source of truth here).
   const draft = await prisma.draft.findUniqueOrThrow({
@@ -86,20 +90,37 @@ export async function createAndPublishPost(opts: {
     },
   })
 
+  const base = {
+    source: opts.source,
+    teamId: draft.teamId,
+    userId: opts.userId,
+    draftId: opts.draftId,
+    channel: opts.channel,
+    retryCount: 0,
+    startedAt,
+  }
+  let published: Post
   try {
     // draft.teamId is NOT NULL as of Task 15 (Migration B) — no more
     // pre-tenancy null rows to coerce.
     const { platformId } = await publishToChannel(opts.channel, draft.exportUrl, opts.draftId, draft.teamId)
-    const updated = await prisma.post.update({
+    published = await prisma.post.update({
       where: { id: post.id },
       data: { status: 'PUBLISHED', publishedAt: new Date(), platformId },
     })
-    return { post: updated }
   } catch (err) {
     const reason = err instanceof PublishError ? err.reason : 'Unexpected publish error'
     const updated = await prisma.post.update({
       where: { id: post.id },
       data: { status: 'FAILED', errorReason: reason },
+    })
+    // The event follows the FAILED write and sits outside the success path's
+    // try, so it can never change what this function returns (006 NFR-01).
+    await trackPublish({
+      ...base,
+      outcome: 'failed',
+      terminal: err instanceof PublishError ? err.terminal : true,
+      errorReason: reason,
     })
     // Known publish failures are an expected outcome (FAILED row returned);
     // anything else is a real fault — rethrow after the row is safely terminal.
@@ -108,4 +129,6 @@ export async function createAndPublishPost(opts: {
     }
     throw err
   }
+  await trackPublish({ ...base, outcome: 'published', terminal: true })
+  return { post: published }
 }

@@ -86,7 +86,7 @@ export async function generatePost(args: GeneratePostArgs) {
   const teamId = args.teamId ?? ''
   try {
     const { draft } = await withClaudeAuth(null, teamId, () =>
-      generateDraftForBrief(brief, { userId: null, teamId })
+      generateDraftForBrief(brief, { userId: null, teamId, source: 'mcp' })
     )
     return {
       draftId: draft.id,

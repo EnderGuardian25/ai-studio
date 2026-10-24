@@ -4,6 +4,7 @@ import { withTeamAdmin } from '@/lib/api/handler'
 import { PublishError } from '@/lib/social/types'
 import { resolveExportUrl } from '@/lib/storage/minio'
 import { publishToChannel } from '@/lib/publish/publishDraft'
+import { trackPublish } from '@/lib/publish/trackPublish'
 
 export const POST = withTeamAdmin<{ id: string }>(async (_req, { params }, user) => {
   const post = await prisma.post.findUnique({
@@ -29,6 +30,15 @@ export const POST = withTeamAdmin<{ id: string }>(async (_req, { params }, user)
     return NextResponse.json({ error: 'Draft has no export' }, { status: 422 })
   }
 
+  const startedAt = Date.now()
+  const trackFields = {
+    source: 'web' as const,
+    teamId: user.teamId,
+    userId: user.userId,
+    draftId: post.draftId,
+    channel: post.channel,
+    startedAt,
+  }
   try {
     // A refused caption (012 FR-14) is a terminal PublishError: the post
     // stays FAILED with the new reason, as below.
@@ -44,12 +54,20 @@ export const POST = withTeamAdmin<{ id: string }>(async (_req, { params }, user)
         nextRetryAt: null,
       },
     })
+    await trackPublish({ ...trackFields, outcome: 'published', terminal: true, retryCount: 0 })
     return NextResponse.json({ postId: updated.id, status: updated.status })
   } catch (err) {
     if (err instanceof PublishError) {
       const updated = await prisma.post.update({
         where: { id: post.id },
         data: { status: 'FAILED', errorReason: err.reason, nextRetryAt: null },
+      })
+      await trackPublish({
+        ...trackFields,
+        outcome: 'failed',
+        terminal: err.terminal,
+        retryCount: post.retryCount,
+        errorReason: err.reason,
       })
       // A retry that fails again is an error, in the immediate path's shape
       // (017 FR-02). The row stays FAILED with the new reason.

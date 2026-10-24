@@ -6,6 +6,7 @@ import { canAccessContent } from '@/lib/authz/visibility'
 import { renderHtmlToPng } from '@/lib/renderer/puppeteer'
 import { uploadObject, resolveExportUrl, exportKey, BUCKET_EXPORTS } from '@/lib/storage/minio'
 import { dimensionsFor } from '@/lib/aspectRatio'
+import { track } from '@/lib/analytics/track'
 import {
   findCommittedRevision,
   restoreDraftToRevision,
@@ -32,7 +33,7 @@ export const POST = withTeamAuth<Params>(async (_req, { params }, user) => {
   // itself — restoring concurrently would race it.
   const draftState = await prisma.draft.findUnique({
     where: { id: params.id },
-    select: { pendingAction: true },
+    select: { pendingAction: true, currentRevisionNumber: true },
   })
   if (draftState?.pendingAction) {
     return NextResponse.json(
@@ -81,6 +82,14 @@ export const POST = withTeamAuth<Params>(async (_req, { params }, user) => {
     }
     throw err
   }
+  await track('revision.restored', {
+    source: 'web',
+    teamId: user.teamId,
+    userId: user.userId,
+    draftId: params.id,
+    outcome: 'ok',
+    payload: { from: draftState?.currentRevisionNumber ?? 0, to: revisionNumber },
+  })
 
   return NextResponse.json({ exportUrl: await resolveExportUrl(key) })
 })

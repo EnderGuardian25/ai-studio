@@ -92,6 +92,7 @@ export const POST = withTeamAdmin(async (req: NextRequest, _ctx, auth) => {
     channel,
     userId: auth.userId,
     scheduledAt: scheduledAtDate,
+    source: 'web',
   })
   // A publish the platform refused is an error, not a 201 (017 FR-01). The
   // FAILED row is still the record; its id and status ride along.

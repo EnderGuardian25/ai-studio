@@ -211,6 +211,7 @@ describe('generatePost', () => {
     expect(h.generateDraftForBrief).toHaveBeenCalledWith(expect.objectContaining({ id: 'b1' }), {
       userId: null,
       teamId: 'team1',
+      source: 'mcp',
     })
     expect(out).not.toHaveProperty('copyText')
     expect(out).toEqual({

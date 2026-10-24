@@ -87,7 +87,7 @@ describe('runGenerationJobs — per-job team credentials (Task 14)', () => {
     expect(h.withClaudeAuth).toHaveBeenCalledWith(null, 'team-1', expect.any(Function))
     expect(h.generateDraftForBrief).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'brief-1' }),
-      { userId: null, teamId: 'team-1' },
+      { userId: null, teamId: 'team-1', source: 'scheduler' },
       { templateId: null, onBeforeDesign: expect.any(Function) }
     )
     expect(h.update).toHaveBeenCalledWith({

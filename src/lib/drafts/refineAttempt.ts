@@ -101,8 +101,27 @@ export interface RefineAttemptInput {
   inlineAssets: Record<string, string>
 }
 
+// What the analytics event keeps of one attempt (006 FR-05): classes, the
+// verdict and the NUMBER of reasons, never their text.
+export interface AttemptSummary {
+  classes: InstructionClass[]
+  effectiveClasses: InstructionClass[]
+  verdict: string
+  reasons: number
+}
+
+export function summariseAttempt(d: RefineAttemptDiagnostics): AttemptSummary {
+  return {
+    classes: d.classes.slice(0, 4),
+    effectiveClasses: d.effectiveClasses.slice(0, 4),
+    verdict: d.verdict,
+    reasons: d.reasons.length,
+  }
+}
+
 export type RefineAttemptResult<C> =
-  | { kind: 'accepted'; html: string; refineCalls: number; verifierCalls: number }
+  // `attempts`: every attempt this refine made, the accepted one last (006).
+  | { kind: 'accepted'; html: string; refineCalls: number; verifierCalls: number; attempts: AttemptSummary[] }
   | { kind: 'conflict'; conflict: C; refineCalls: number; verifierCalls: number }
   | {
       kind: 'not-applied'
@@ -308,7 +327,13 @@ export async function runRefineAttempts<C>(
       a.diag.verdict = outcome.result.kind
       a.diag.reasons = missReasons(outcome.result)
       if (isAccepted(outcome.result)) {
-        return { kind: 'accepted', html: restoreInlineAssets(a.modelHtml!, input.inlineAssets), refineCalls, verifierCalls }
+        return {
+          kind: 'accepted',
+          html: restoreInlineAssets(a.modelHtml!, input.inlineAssets),
+          refineCalls,
+          verifierCalls,
+          attempts: [...attempts, a.diag].map(summariseAttempt),
+        }
       }
     }
     attempts.push(a.diag)
