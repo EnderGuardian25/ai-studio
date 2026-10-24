@@ -822,11 +822,11 @@ Mock mode (`MOCK_AI` + `MOCK_PUPPETEER`). Every generation case runs in its **ow
 - **TC-HERO-06 — `__MOCK_HERO_CHECK_ERROR__` (AC-12).** Applied `classic`, reason `check-error`: the check fails closed.
 - **TC-HERO-07 — `__MOCK_BG_FAIL__`.** `no-image`; the composition notice and the background notice both show, each with its own cause.
 - **TC-HERO-08 — `__MOCK_BG_NOT_NEEDED__` (an empty prompt) with a hero style.** `no-image`.
-- **TC-HERO-09 — `STORY` with a style through the API.** Accepted and recorded as `unsupported-size`, on the classic image path.
+- **TC-HERO-09 — a look at 9:16 through the API.** Since 028 it is kept with contract version 2 and no notice (it was recorded as `unsupported-size` on the classic path).
 - **TC-HERO-10 — A retired key, then regenerate design (AC-18).** The test DB is written with a retired key; the new revision is `unknown-archetype`, and v1 keeps its stamp.
 - **TC-HERO-11 — Refine (AC-17).** A refine on a kept draft carries the stamp; a refine whose instruction carries `__MOCK_BG__` re-stamps `refine-replaced-image`; a refine on a classic draft is unchanged.
 - **TC-HERO-12 — `POST /api/briefs` validation (AC-04).** An unknown key, a `TEMPLATE` brief with a style and a non-string are 400; absent stores `classic`.
-- **TC-HERO-13 — The wizard (AC-05).** The picker appears on Path B only; the `STORY` disabled state with its reason, and the reset; the Review row; the request body; autosave and resume.
+- **TC-HERO-13 — The wizard (AC-05).** The picker appears on Path B only; at 9:16 every look card is enabled and a chosen look stays pressed (since 028; it was disabled with a reason and reset); the Review row; the request body; autosave and resume.
 - **TC-HERO-14 — Restore (AC-16).** Restore to v1 copies v1's stamp; a legacy null stamp stays null.
 - **TC-HERO-15 — `__MOCK_HERO_LAYOUT__` (AC-14).** The archetype is **kept**, `observations: ['layout-violation']`, the notice shows. The observation is never a fallback.
 - **TC-HERO-16 — The payload and the notice on the page (AC-19).** `GET /api/drafts/[id]` exposes `composition` and `compositionNotice`; the page shows the notice with no axe violation.
@@ -1054,6 +1054,57 @@ Serial. Needs `MOCK_AI`, `MOCK_PUPPETEER` and `MOCK_SOCIAL` and test-DB access; 
 The mock suite proves the mechanism with mock replies; it records no real model call.
 
 ---
+
+### AF. Image looks (`image-looks.test.ts`, change 028 T4 — AC-07, AC-10 to AC-14, AC-18)
+
+Mock mode (`MOCK_AI` + `MOCK_PUPPETEER`). Every case runs on the existing hero seams, so no model or image call is made. `KEPT` reads the current version from the dataset (`archetypes[key].current`), so a future version bump changes no expectation. The cases use the seeded team, except TC-LOOK-12 (a v1 stamp is written through `tests/helpers/db` and the case skips without DB access) and TC-LOOK-11 (the generation tick, `POST /api/test/generation-tick`). Listeners are created before the action that triggers the request. Run alone three times against a fresh `:3001` server, the suite passed 12 of 12 each time with no flake (T4 report).
+
+**The seams** (`src/lib/testHooks.ts`, under `MOCK_AI`, dormant in prod). No new sentinel. `__MOCK_HERO_BUSY__`, `__MOCK_HERO_CONTRAST__` and `__MOCK_HERO_LAYOUT__` apply to any contract. `mockLayoutBoxes` (FR-09) now takes its outside box from a fixed 6 by 6 grid, the first cell that lies outside every text region with tolerance, so the box is outside the bands of `full-bleed-scene` and `spotlight` too (before 028 it was a fixed box that sat inside the Spotlight bottom band).
+
+| Case       | What it checks                                                                                                                                                                                                                                                  |
+| ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| TC-LOOK-01 | `product-showcase` at 9:16 is kept with contract version 2, the image set, no notice; the same stamp on the draft and its first revision                                                                                                                        |
+| TC-LOOK-02 | `editorial-split` at 9:16 is kept with contract version 2                                                                                                                                                                                                       |
+| TC-LOOK-03 | `full-bleed-scene` at SQUARE, PORTRAIT and 9:16 is kept with contract version 1                                                                                                                                                                                 |
+| TC-LOOK-04 | `spotlight` at SQUARE, PORTRAIT and 9:16 is kept with contract version 1                                                                                                                                                                                        |
+| TC-LOOK-05 | `full-bleed-scene` with `__MOCK_HERO_BUSY__`: classic, reason `busy`, the notice names "Full-bleed scene", `imageUrl` still set (the hero image is reused)                                                                                                      |
+| TC-LOOK-06 | `spotlight` with `__MOCK_HERO_CONTRAST__`: classic, reason `contrast`, the notice names "Spotlight"                                                                                                                                                             |
+| TC-LOOK-07 | `spotlight` with `__MOCK_HERO_LAYOUT__`: kept, `observations: ['layout-violation']`, the composition notice shows it                                                                                                                                            |
+| TC-LOOK-08 | `full-bleed-scene` at 9:16 with `__MOCK_HERO_LAYOUT__`: the same                                                                                                                                                                                                |
+| TC-LOOK-09 | `POST /api/briefs` accepts both new keys on GENERATE at every size; a new key on TEMPLATE is 400; an unknown key is 400                                                                                                                                         |
+| TC-LOOK-10 | the wizard: five cards, none disabled at SQUARE, PORTRAIT or 9:16; Launch at 9:16 pre-fills Product showcase with the hint; Announcement at 9:16 pre-fills Editorial split; Spotlight at 9:16 is sent and shown on Review; resume keeps the look; axe on step 1 |
+| TC-LOOK-11 | the unattended surfaces: a queue entry with `postStyle: 'launch'` at 9:16, through the generation tick, stores `imageStyle: 'classic'` and a classic stamp                                                                                                      |
+| TC-LOOK-12 | a draft with a v1 stamp written in the test DB: refine carries it with no warning; regenerate design records version 2; restore copies the v1 stamp back                                                                                                        |
+
+**AC-to-case table.** Unit and render tests cover the rest of the mechanism; the cases above cover the end-to-end behaviour.
+
+| AC                                            | Where it is checked                                                                                                                                                              |
+| --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| AC-01 the dataset (FR-01, FR-02, NFR-04)      | unit `lookDataset.test.ts`, `designData.test.ts`                                                                                                                                 |
+| AC-02 validation (FR-03)                      | unit `lookDataset.test.ts` (one fixture per rule; a valid `-light` fixture passes)                                                                                               |
+| AC-03 the key rule (FR-04)                    | unit `lookDataset.test.ts`, `postStylesResolve.test.ts` (a retired look resolves to classic with `retired-classic`; the picker omits it)                                         |
+| AC-04 the resolver (FR-05)                    | unit `postStylesResolve.test.ts` (six surfaces, four looks, three sizes); TC-LOOK-09, TC-LOOK-10                                                                                 |
+| AC-05 STORY literals (FR-06)                  | unit `styleAfterSizeChange` and the resume rule (fixture look dataset); TC-LOOK-10                                                                                               |
+| AC-06 prompts (FR-07, NFR-05)                 | unit `heroPrompts.test.ts`, `designData.test.ts` (goldens for the eight new contracts; every v1 and classic golden unchanged)                                                    |
+| AC-07 the fixtures discriminate (FR-08)       | render `look-fixtures.test.ts` (36 cases in real Chromium; the render total is 84, at least 83)                                                                                  |
+| AC-08 completeness and tone (FR-08)           | unit `lookFixtureCompleteness.test.ts`                                                                                                                                           |
+| AC-09 the mock layout box (FR-09)             | unit `heroSeams.test.ts`                                                                                                                                                         |
+| AC-10 the pipeline (FR-10)                    | TC-LOOK-01 to TC-LOOK-06; unit `background.test.ts` (one image call, including on fallback)                                                                                      |
+| AC-11 the notice for band looks (FR-11)       | TC-LOOK-07, TC-LOOK-08; unit `compositionNotice.test.ts`                                                                                                                         |
+| AC-12 the wizard (FR-12)                      | TC-LOOK-09, TC-LOOK-10                                                                                                                                                           |
+| AC-13 unattended unchanged (FR-05, NFR-06)    | TC-LOOK-11; the NFR-06 `git diff` lists nothing                                                                                                                                  |
+| AC-14 old drafts (FR-13)                      | TC-LOOK-12; unit `refinePrompt.test.ts` (a v1 stamp gives the v1 regions)                                                                                                        |
+| AC-15 the runner's logic (FR-14)              | unit `lookCheck.test.ts` (imports `scripts/look-check/lookCheck.mjs`)                                                                                                            |
+| AC-16 the pass rule (FR-15)                   | unit `lookCheck.test.ts` (`lookVerdicts`)                                                                                                                                        |
+| AC-17 nothing extra (NFR-01, NFR-03, NFR-06)  | the `git grep -c` counts against the base and the `git diff` commands; the runner was run only by its unit tests and with `--dry-run`                                            |
+| AC-18 the design system (NFR-10)              | unit `uiTokenGuard.test.ts` (no new `// ui-exception`); the step 1 screenshots at 390 px and 1440 px, light and dark, in `ui-captures/028/` (gitignored)                         |
+| AC-19 the gate (NFR-01 to NFR-11)             | the full clean mock run (529/3/0/0), unit 3894/3894, render 84/84, lint 0 errors / 7 warnings, tsc, build (passes), `test:upgrade` (passes), CI green at `CI_SHA` (run `CI_RUN`) |
+| AC-20 the default moves (FR-16, after OP-028) | T7: unit `postStylesDataset.test.ts`, `lookCheckResults.test.ts`; the wizard pre-fill case in `image-looks.test.ts`. Deferred                                                    |
+| AC-21 closed (after OP-028)                   | the committed `results.json` and `ledger.jsonl`; the handoff 028 section; CI after T7. Deferred                                                                                  |
+
+**Changes to other sections (028 T4).** §AA `hero-image.test.ts`: `KEPT` reads the current version; TC-HERO-09 and TC-HERO-13 now assert the 9:16 behaviour above. §AE `post-styles.test.ts`: TC-PS-31 and TC-PS-32 (the 9:16 Review row now reads "Product showcase (from the post style)", where it read "Classic"). `unsupported-size` stays covered by unit tests with a fixture dataset, and the notice still names "9:16" (L3).
+
+The mock suite proves the mechanism with mock replies; it records no real model call. The real-image check is OP-028, outside this suite (NFR-11).
 
 ---
 

@@ -120,7 +120,7 @@ This change has **7 tasks in 5 waves**:
 
 ### Wave 4: Docs and the gate
 
-- [ ] `T6` — The docs, the full gate and CI
+- [x] `T6` — The docs, the full gate and CI
   - Files: `docs/handoff.md`, `docs/e2e-test-plan.md`, `CLAUDE.md`, `.specclaw/ROADMAP.md`
   - Estimate: small
   - Kind: docs
