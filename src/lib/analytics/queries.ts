@@ -14,6 +14,10 @@
 //                    (the union of `classes` over its attempts).
 //   failure rate   = failed / total over generation.finished and
 //                    draft_action.settled (not-applied and conflict are not failures).
+//   funnel         = wizard.step events per step (each visit reports a step once),
+//                    brief.submitted (fresh and resumed apart: a resumed visit has
+//                    no step 0), and brief.abandoned by reason. "Of start" is a
+//                    step's count over step 0's.
 //   durations      = successful (`ok`) events only, p50 and p90 by surface.
 import { prisma } from '@/lib/prisma'
 import { OFFLINE_THRESHOLD_MS } from '@/lib/scheduler/heartbeatStatus'
@@ -116,6 +120,26 @@ export function shapeStyles(rows: StyleRow[], fallbacks: FallbackRow[]) {
     appliedRate: ratio(r.applied, r.okGenerations),
     fallbacks: fallbacks.filter((f) => f.style === r.style).map((f) => ({ reason: f.reason, n: f.n })),
   }))
+}
+
+export const WIZARD_STEPS = [0, 1, 2, 3, 4] as const
+
+export function shapeFunnel(
+  stepRows: { step: number; n: number }[],
+  submittedRows: { resumed: boolean; n: number }[],
+  abandonedRows: { reason: string; n: number }[],
+) {
+  const at = (step: number) => stepRows.find((r) => r.step === step)?.n ?? 0
+  const start = at(0)
+  const reasonCount = (reason: string) => abandonedRows.find((r) => r.reason === reason)?.n ?? 0
+  const submitted = (resumed: boolean) => submittedRows.find((r) => r.resumed === resumed)?.n ?? 0
+  return {
+    reached: WIZARD_STEPS.map((step) => ({ step, n: at(step), ofStart: ratio(at(step), start) })),
+    // A resumed visit sends no step 0, so only fresh submissions are rated against it.
+    submitted: { n: submitted(false), ofStart: ratio(submitted(false), start) },
+    submittedResumed: { n: submitted(true) },
+    abandoned: { expired: reasonCount('expired'), discarded: reasonCount('discarded') },
+  }
 }
 
 export type RetentionLoopState = 'online' | 'stale' | 'never'
@@ -302,6 +326,28 @@ async function durations({ from, to }: DateRange) {
     ORDER BY 1, 2, 3`
 }
 
+async function funnel({ from, to }: DateRange) {
+  const [stepRows, submittedRows, abandonedRows] = await Promise.all([
+    prisma.$queryRaw<{ step: number; n: number }[]>`
+      SELECT (payload->>'step')::int AS step, count(*)::int AS n
+      FROM "AnalyticsEvent"
+      WHERE name = 'wizard.step' AND "at" >= ${from} AND "at" < ${to}
+      GROUP BY 1
+      ORDER BY 1`,
+    prisma.$queryRaw<{ resumed: boolean; n: number }[]>`
+      SELECT COALESCE((payload->>'resumed')::boolean, false) AS resumed, count(*)::int AS n
+      FROM "AnalyticsEvent"
+      WHERE name = 'brief.submitted' AND "at" >= ${from} AND "at" < ${to}
+      GROUP BY 1`,
+    prisma.$queryRaw<{ reason: string; n: number }[]>`
+      SELECT payload->>'reason' AS reason, count(*)::int AS n
+      FROM "AnalyticsEvent"
+      WHERE name = 'brief.abandoned' AND "at" >= ${from} AND "at" < ${to}
+      GROUP BY 1`,
+  ])
+  return shapeFunnel(stepRows, submittedRows, abandonedRows)
+}
+
 async function teamActivity({ from, to }: DateRange) {
   return prisma.$queryRaw<{ teamId: string; teamName: string | null; events: number; generations: number }[]>`
     SELECT e."teamId" AS "teamId", t.name AS "teamName",
@@ -344,11 +390,12 @@ async function retentionHealth(now: Date) {
 
 export async function insights(range: InsightsRange, now: Date = new Date()) {
   const window = rangeFor(range, now)
-  const [refineSection, failureSection, styles, durationRows, teams, lost, retention] = await Promise.all([
+  const [refineSection, failureSection, styles, durationRows, funnelSection, teams, lost, retention] = await Promise.all([
     refine(window),
     failures(window),
     imageStyles(window),
     durations(window),
+    funnel(window),
     teamActivity(window),
     lostEvents(),
     retentionHealth(now),
@@ -361,6 +408,7 @@ export async function insights(range: InsightsRange, now: Date = new Date()) {
     failures: failureSection,
     styles,
     durations: durationRows,
+    funnel: funnelSection,
     teams,
     lost,
     retention,

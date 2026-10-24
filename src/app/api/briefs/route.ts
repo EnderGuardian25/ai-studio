@@ -20,6 +20,8 @@ import {
 import { copyProviderIsClaude } from '@/providers/registry'
 import { loadCaptionRoute } from '@/providers/captionRoute'
 import type { ModelKey, UserSurface } from '@/lib/models/catalogue'
+import { track } from '@/lib/analytics/track'
+import type { EventPayloadInput } from '@/lib/analytics/catalogue'
 
 // Permissive schema: only guards the JSON parse. The thorough hand-rolled
 // validation below (exact error messages + channel normalization) is kept as-is.
@@ -48,6 +50,7 @@ export const POST = withTeamAuth(async (req: NextRequest, _ctx, user) => {
     captionModel?: unknown
     designModel?: unknown
     imageStyle?: unknown
+    resumed?: unknown
   }
 
   const {
@@ -258,6 +261,20 @@ export const POST = withTeamAuth(async (req: NextRequest, _ctx, user) => {
       referenceTemplateId: referenceTemplateId ?? null,
       captionModel: captionPick.value ?? null,
       designModel: designPick.value ?? null,
+    },
+  })
+
+  // 006 FR-08: the funnel's "submitted" step. Counts and enums only: no topic,
+  // description or any other brief text.
+  await track('brief.submitted', {
+    source: 'web',
+    teamId: user.teamId,
+    userId: user.userId,
+    payload: {
+      path: designMode === 'TEMPLATE' ? 'A' : 'B',
+      aspectRatio: brief.aspectRatio,
+      imageStyle: style.value as EventPayloadInput<'brief.submitted'>['imageStyle'],
+      resumed: body.resumed === true,
     },
   })
 

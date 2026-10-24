@@ -1,11 +1,11 @@
 import { test, expect, type Page } from '@playwright/test'
-import { loginAs, waitForDraft, waitForAction, findTeamIdByName, type ApiClient } from '../helpers/api'
+import { loginAs, waitForDraft, waitForAction, findTeamIdByName, addTeamMember, type ApiClient } from '../helpers/api'
 import { prisma, dbAvailable } from '../helpers/db'
 import { expectNoAxeViolations } from '../helpers/axe'
 import { ADMIN_EMAIL, expectNoHorizontalScroll, pageLogin } from '../helpers/ui'
 
-// §AD — Product observability (change 006, wave 1: TC-OBS-01 onward; the wizard
-// cases arrive with wave 2). The event store is written by the server's own
+// §AD — Product observability (change 006: TC-OBS-01 onward; the wizard
+// cases, TC-OBS-23 to TC-OBS-29, come before the privacy check, which stays last). The event store is written by the server's own
 // settle points and read by one super-admin page, so the cases below drive the
 // real flows under MOCK_AI and read the events back through the test seam
 // GET/DELETE/POST /api/test/analytics-events (404 in prod, 404 without MOCK_AI,
@@ -349,9 +349,15 @@ test.describe('§AD — product observability', () => {
 
   test('TC-OBS-10: with the store failing, a generation, a refine and a publish still finish the same, and the loss is counted', async () => {
     if (!MOCKED()) { test.skip(); return }
-    // generation
+    // generation. The brief is created first: POST /api/briefs now writes its own
+    // brief.submitted event, which would take the one failure meant for the generation.
+    const brief = await createBrief(admin, `Obs FailNext ${Date.now()}`)
     expect((await admin.post('/api/test/analytics-events', { failNext: 1 })).status()).toBe(200)
-    const draft = await exportedDraft(admin, `Obs FailNext ${Date.now()}`)
+    const assemble = await admin.post('/api/generate/assemble-b', { briefId: brief.id })
+    expect(assemble.status()).toBe(202)
+    const draft = (await waitForDraft(admin, (await assemble.json()).draftId)) as { id: string } & Record<string, unknown>
+    expect(draft.status).toBe('EXPORTED')
+    rememberText(draft)
     await waitDrop(admin, 'generation.finished', 1)
     expect(byName(await events(admin, { draftId: draft.id }), 'generation.finished')).toHaveLength(0)
 
@@ -685,6 +691,270 @@ test.describe('§AD — product observability', () => {
     await page.getByRole('tab', { name: '7 days' }).click()
     await expect(page.getByRole('tab', { name: '7 days' })).toHaveAttribute('aria-selected', 'true')
     await expect(page.getByTestId('insights-body')).toBeVisible()
+  })
+
+  // ── The brief wizard (wave 2: AC-09, and the funnel figures of AC-11) ─────
+
+  const WIZ_TOPIC = 'Obs wizard topic marker'
+  const WIZ_PROMPT = `${DESC_MARKER} announce the wizard events with a short call to action.`
+
+  // A throwaway team member, so the per-user rate window starts empty on every
+  // run (the window lives for a minute inside the server process) and so a
+  // foreign user exists for the ownership check.
+  async function freshEditor(request: Parameters<typeof loginAs>[0]): Promise<{ api: ApiClient; userId: string }> {
+    const username = `obswiz${Date.now()}${Math.floor(Math.random() * 1000)}`
+    const created = await admin.post('/api/admin/users', { name: 'Obs Wizard', username, role: 'editor', password: 'ObsWizPass1!' })
+    expect(created.status()).toBe(201)
+    const user = await created.json()
+    await addTeamMember(admin, await findTeamIdByName(admin, 'Bistec'), user.id, 'EDITOR')
+    const api = await loginAs(request, `${username}@users.bistec.internal`, 'ObsWizPass1!')
+    return { api, userId: user.id }
+  }
+
+  const stepsOf = (list: AEvent[]) => byName(list, 'wizard.step').map((e) => e.payload.step)
+
+  async function walkWizardTo(page: Page, last: number) {
+    const cont = page.getByRole('button', { name: /continue/i })
+    await expect(page.getByRole('heading', { name: 'Select Campaign' })).toBeVisible({ timeout: 20_000 })
+    if (last >= 1) {
+      await cont.click()
+      await expect(page.getByRole('heading', { name: 'Size & Design' })).toBeVisible()
+      const kit = page.getByRole('combobox', { name: 'Brand Kit' })
+      await expect.poll(() => kit.locator('option').count()).toBeGreaterThan(1)
+      await kit.selectOption({ index: 1 })
+      await page.getByRole('button', { name: /Path B — Freeform/ }).click()
+      await expect(page.getByRole('button', { name: 'No reference' })).toBeVisible()
+    }
+    if (last >= 2) {
+      await cont.click()
+      await expect(page.getByRole('heading', { name: 'Brief & Caption Direction' })).toBeVisible()
+      await page.getByPlaceholder('e.g. Q3 product launch').fill(WIZ_TOPIC)
+      await page.locator('textarea').fill(WIZ_PROMPT)
+    }
+    if (last >= 3) {
+      await cont.click()
+      await expect(page.getByRole('heading', { name: /Images/ })).toBeVisible()
+    }
+    if (last >= 4) {
+      await cont.click()
+      await expect(page.getByRole('heading', { name: 'Review & Generate' })).toBeVisible()
+    }
+  }
+
+  test('TC-OBS-23: walking the wizard writes one wizard.step per step; going back and forward again adds none; Generate writes brief.submitted', async ({ page }) => {
+    if (!MOCKED()) { test.skip(); return }
+    forbiddenText.add(WIZ_TOPIC)
+    await pageLogin(page)
+    await page.goto('/brief')
+    await walkWizardTo(page, 4)
+    // Back twice and forward twice: the steps were already reported.
+    await page.getByRole('button', { name: 'Back' }).click()
+    await page.getByRole('button', { name: 'Back' }).click()
+    await expect(page.getByRole('heading', { name: 'Brief & Caption Direction' })).toBeVisible()
+    await page.getByRole('button', { name: /continue/i }).click()
+    await page.getByRole('button', { name: /continue/i }).click()
+    await expect(page.getByRole('heading', { name: 'Review & Generate' })).toBeVisible()
+
+    await waitEvents(admin, {}, 'wizard.step', 5)
+    const steps = byName(await events(admin), 'wizard.step')
+    expect(steps.map((e) => e.payload.step)).toEqual([0, 1, 2, 3, 4])
+    for (const e of steps) expect(e).toMatchObject({ source: 'web', outcome: null })
+    expect(steps.every((e) => e.userId && e.teamId)).toBe(true)
+
+    await page.getByRole('button', { name: 'Generate Post' }).click()
+    await page.waitForURL(/\/drafts\/[^/]+$/, { timeout: 30_000 })
+    const draftId = new URL(page.url()).pathname.split('/').pop()!
+    expect((await waitForDraft(admin, draftId)).status).toBe('EXPORTED')
+
+    const submitted = await waitEvents(admin, {}, 'brief.submitted', 1)
+    expect(submitted).toHaveLength(1)
+    expect(submitted[0].payload).toEqual({ path: 'B', aspectRatio: 'SQUARE', imageStyle: 'classic', resumed: false })
+    // Generate deletes the brief draft keeping its images: that is not an abandonment.
+    const all = await events(admin)
+    expect(byName(all, 'brief.abandoned')).toHaveLength(0)
+    expect(stepsOf(all)).toEqual([0, 1, 2, 3, 4])
+    expect(JSON.stringify(all)).not.toContain(WIZ_TOPIC)
+    expect(JSON.stringify(all)).not.toContain(DESC_MARKER)
+  })
+
+  test('TC-OBS-24: resuming a brief draft reports no steps up to where it stopped, then the next forward step with its draft id; Generate then writes brief.submitted resumed', async ({ page }) => {
+    if (!MOCKED()) { test.skip(); return }
+    const put = await admin.put('/api/brief-drafts', {
+      payload: { step: 3, campaignId: '', aspectRatio: 'SQUARE', brandKitId: '', designMode: 'GENERATE', templateId: '', referenceTemplateId: '', topic: WIZ_TOPIC, prompt: WIZ_PROMPT, goal: 'awareness', tone: 'professional', images: [] },
+    })
+    expect(put.status()).toBe(200)
+    const draftId = (await put.json()).id as string
+    await pageLogin(page)
+    await page.goto(`/brief?resume=${draftId}`)
+    await expect(page.getByRole('heading', { name: /Images/ })).toBeVisible({ timeout: 20_000 })
+    await new Promise((r) => setTimeout(r, 1500))
+    expect(await events(admin)).toHaveLength(0)
+
+    await page.getByRole('button', { name: /continue/i }).click()
+    await expect(page.getByRole('heading', { name: 'Review & Generate' })).toBeVisible()
+    const steps = await waitEvents(admin, {}, 'wizard.step', 1)
+    expect(steps).toHaveLength(1)
+    expect(steps[0].payload).toEqual({ step: 4, briefDraftId: draftId })
+
+    await page.getByRole('button', { name: 'Generate Post' }).click()
+    await page.waitForURL(/\/drafts\/[^/]+$/, { timeout: 30_000 })
+    expect((await waitForDraft(admin, new URL(page.url()).pathname.split('/').pop()!)).status).toBe('EXPORTED')
+    const submitted = await waitEvents(admin, {}, 'brief.submitted', 1)
+    expect(submitted[0].payload).toMatchObject({ path: 'B', resumed: true })
+    expect(byName(await events(admin), 'brief.abandoned')).toHaveLength(0)
+    await admin.del(`/api/brief-drafts/${draftId}`) // already gone after Generate: 404 is fine
+  })
+
+  test('TC-OBS-25: discarding a brief draft writes brief.abandoned discarded with its last step; a foreign id and the Generate-success delete write nothing', async ({ request }) => {
+    if (!MOCKED()) { test.skip(); return }
+    const draft = (step: number) => ({
+      payload: { step, campaignId: '', aspectRatio: 'SQUARE', brandKitId: '', designMode: 'GENERATE', templateId: '', referenceTemplateId: '', topic: WIZ_TOPIC, prompt: WIZ_PROMPT, goal: 'awareness', tone: 'professional', images: [] },
+    })
+    const id = (await (await admin.put('/api/brief-drafts', draft(3))).json()).id as string
+    const keep = (await (await admin.put('/api/brief-drafts', draft(2))).json()).id as string
+    expect((await admin.del(`/api/brief-drafts/${keep}?keepImages=true`)).status()).toBe(200)
+    expect(await events(admin)).toHaveLength(0)
+
+    const other = await freshEditor(request)
+    try {
+      expect((await other.api.del(`/api/brief-drafts/${id}`)).status()).toBe(404)
+      expect(await events(admin)).toHaveLength(0)
+    } finally {
+      await other.api.dispose()
+    }
+
+    expect((await admin.del(`/api/brief-drafts/${id}`)).status()).toBe(200)
+    const abandoned = byName(await events(admin), 'brief.abandoned')
+    expect(abandoned).toHaveLength(1)
+    expect(abandoned[0]).toMatchObject({ source: 'web', outcome: null, payload: { reason: 'discarded', step: 3 } })
+    expect(JSON.stringify(abandoned)).not.toContain(WIZ_TOPIC)
+  })
+
+  test('TC-OBS-26: a brief draft idle for 8 days is swept by the dashboard read and writes brief.abandoned expired', async ({ page }) => {
+    if (!MOCKED() || !dbAvailable) { test.skip(); return }
+    const put = await admin.put('/api/brief-drafts', {
+      payload: { step: 2, campaignId: '', aspectRatio: 'SQUARE', brandKitId: '', designMode: 'GENERATE', templateId: '', referenceTemplateId: '', topic: WIZ_TOPIC, prompt: WIZ_PROMPT, goal: 'awareness', tone: 'professional', images: [] },
+    })
+    const id = (await put.json()).id as string
+    await prisma!.briefDraft.update({ where: { id }, data: { updatedAt: new Date(Date.now() - 8 * 86_400_000) } })
+    expect(await events(admin)).toHaveLength(0)
+
+    await pageLogin(page)
+    await page.goto('/')
+    await expect(page.getByText('Recent Drafts').first()).toBeVisible()
+    expect(await prisma!.briefDraft.findUnique({ where: { id } })).toBeNull()
+    const abandoned = byName(await events(admin), 'brief.abandoned')
+    expect(abandoned).toHaveLength(1)
+    expect(abandoned[0]).toMatchObject({ source: 'web', outcome: null, payload: { reason: 'expired', step: 2 } })
+    expect(abandoned[0].userId).toBeTruthy()
+  })
+
+  test('TC-OBS-27: POST /api/events takes team, user and source from the session, and refuses a foreign draft id, an unknown name, a bad payload, an oversized body and no session', async ({ request, playwright }) => {
+    if (!MOCKED()) { test.skip(); return }
+    const bistec = await findTeamIdByName(admin, 'Bistec')
+    const clientx = await findTeamIdByName(admin, 'ClientX')
+    const me = await (await admin.get('/api/me')).json()
+
+    const ok = await admin.post('/api/events', { name: 'wizard.step', teamId: clientx, userId: 'someone-else', source: 'mcp', draftId: 'x', payload: { step: 2, teamId: clientx } })
+    expect(ok.status()).toBe(204)
+    const [stored] = await waitEvents(admin, {}, 'wizard.step', 1)
+    expect(stored).toMatchObject({ teamId: bistec, userId: me.userId, source: 'web', draftId: null, payload: { step: 2 } })
+
+    // A server event name, a missing name, a bad step, a bad payload: 400, nothing stored.
+    for (const body of [{ name: 'brief.submitted', payload: {} }, { name: 'generation.finished', payload: {} }, { payload: { step: 1 } }, { name: 'wizard.step', payload: { step: 9 } }, { name: 'wizard.step', payload: { step: 'two' } }]) {
+      expect((await admin.post('/api/events', body)).status()).toBe(400)
+    }
+    // Over 2 KB: 413.
+    expect((await admin.post('/api/events', { name: 'wizard.step', payload: { step: 1 }, pad: 'x'.repeat(2500) })).status()).toBe(413)
+
+    // A foreign brief draft id: 404 and no event. The owner's own id is kept.
+    const other = await freshEditor(request)
+    try {
+      const theirs = (await (await other.api.put('/api/brief-drafts', {
+        payload: { step: 1, campaignId: '', aspectRatio: 'SQUARE', brandKitId: '', designMode: 'GENERATE', templateId: '', referenceTemplateId: '', topic: 'theirs', prompt: 'their private prompt text', goal: 'awareness', tone: 'professional', images: [] },
+      })).json()).id as string
+      expect((await admin.post('/api/events', { name: 'wizard.step', payload: { step: 1, briefDraftId: theirs } })).status()).toBe(404)
+      expect((await other.api.post('/api/events', { name: 'wizard.step', payload: { step: 1, briefDraftId: theirs } })).status()).toBe(204)
+      await other.api.del(`/api/brief-drafts/${theirs}?keepImages=true`)
+    } finally {
+      await other.api.dispose()
+    }
+    await new Promise((r) => setTimeout(r, 400))
+    const list = byName(await events(admin), 'wizard.step')
+    expect(list).toHaveLength(2) // the first call and the owner's own id; nothing for the refusals
+    expect(list.filter((e) => e.payload.briefDraftId).map((e) => e.payload.step)).toEqual([1])
+
+    // No valid session: 401 (a bogus cookie reaches the route's own check).
+    const anon = await playwright.request.newContext({ baseURL: process.env.TEST_BASE_URL, extraHTTPHeaders: { cookie: 'better-auth.session_token=not-a-real-session' } })
+    try {
+      expect((await anon.post('/api/events', { data: { name: 'wizard.step', payload: { step: 1 } } })).status()).toBe(401)
+    } finally {
+      await anon.dispose()
+    }
+  })
+
+  test('TC-OBS-28: the 61st event in a minute is dropped and counted, and the first 60 are stored', async ({ request }) => {
+    if (!MOCKED()) { test.skip(); return }
+    const user = await freshEditor(request)
+    try {
+      for (let i = 0; i < 63; i++) {
+        expect((await user.api.post('/api/events', { name: 'wizard.step', payload: { step: i % 5 } })).status()).toBe(204)
+      }
+      await expect
+        .poll(async () => (await events(admin)).filter((e) => e.userId === user.userId).length, { timeout: 15_000 })
+        .toBe(60)
+      await new Promise((r) => setTimeout(r, 400))
+      expect((await events(admin)).filter((e) => e.userId === user.userId)).toHaveLength(60)
+      await waitDrop(admin, 'wizard.step', 3)
+      const drop = (await seamGet(admin)).drops.find((d) => d.name === 'wizard.step')
+      expect(drop).toMatchObject({ dropped: 3, rejected: 0, lastReason: 'rate-limit' })
+      // The loss is on the page too.
+      const lost = (await (await admin.get('/api/admin/insights?range=7d')).json()).lost
+      expect(lost.find((l: { name: string }) => l.name === 'wizard.step')).toMatchObject({ dropped: 3 })
+    } finally {
+      await user.api.dispose()
+    }
+  })
+
+  test('TC-OBS-29: the funnel figures on the API and the page equal a hand count over a seeded set', async ({ page }) => {
+    if (!MOCKED()) { test.skip(); return }
+    const team = await findTeamIdByName(admin, 'Bistec')
+    const at = (hoursAgo: number) => new Date(Date.now() - hoursAgo * 3600_000).toISOString()
+    const step = (n: number, s: number, hoursAgo = 2) => Array.from({ length: n }, () => ({ name: 'wizard.step', source: 'web', teamId: team, userId: 'u1', outcome: null, at: at(hoursAgo), payload: { step: s } }))
+    const rows = [
+      ...step(10, 0), ...step(8, 1), ...step(6, 2), ...step(3, 3), ...step(2, 4),
+      ...Array.from({ length: 2 }, () => ({ name: 'brief.submitted', source: 'web', teamId: team, userId: 'u1', outcome: null, at: at(2), payload: { path: 'B', aspectRatio: 'SQUARE', imageStyle: 'classic', resumed: false } })),
+      ...Array.from({ length: 4 }, () => ({ name: 'brief.submitted', source: 'web', teamId: team, userId: 'u1', outcome: null, at: at(2), payload: { path: 'B', aspectRatio: 'SQUARE', imageStyle: 'classic', resumed: true } })),
+      ...Array.from({ length: 3 }, () => ({ name: 'brief.abandoned', source: 'web', teamId: team, userId: 'u1', outcome: null, at: at(3), payload: { reason: 'expired', step: 2 } })),
+      { name: 'brief.abandoned', source: 'web', teamId: team, userId: 'u1', outcome: null, at: at(3), payload: { reason: 'discarded', step: 1 } },
+      // outside the 30-day range: counted by nothing
+      ...step(7, 0, 24 * 40),
+    ]
+    await seed(admin, rows)
+
+    const funnel = (await (await admin.get('/api/admin/insights?range=30d')).json()).funnel
+    expect(funnel.reached.map((r: { n: number }) => r.n)).toEqual([10, 8, 6, 3, 2])
+    expect(funnel.reached.map((r: { ofStart: number }) => r.ofStart)).toEqual([1, 0.8, 0.6, 0.3, 0.2])
+    // 2 fresh submissions are rated against step 0; the 4 resumed ones have no step 0 and no rate
+    expect(funnel.submitted).toEqual({ n: 2, ofStart: 0.2 })
+    expect(funnel.submittedResumed).toEqual({ n: 4 })
+    expect(funnel.abandoned).toEqual({ expired: 3, discarded: 1 })
+    const wide = (await (await admin.get('/api/admin/insights?range=90d')).json()).funnel
+    expect(wide.reached[0].n).toBe(17)
+
+    await pageLogin(page)
+    await page.goto('/admin/insights')
+    await expect(page.getByTestId('insights-body')).toBeVisible()
+    await expect(page.getByTestId('funnel-step-0')).toContainText('10')
+    await expect(page.getByTestId('funnel-step-4')).toContainText('2')
+    await expect(page.getByTestId('funnel-rate-step-1')).toHaveText('80%')
+    await expect(page.getByTestId('funnel-rate-step-3')).toHaveText('30%')
+    await expect(page.getByTestId('funnel-rate-submitted')).toHaveText('20%')
+    await expect(page.getByTestId('funnel-submitted')).toContainText('2')
+    await expect(page.getByTestId('funnel-submitted-resumed')).toContainText('4')
+    await expect(page.getByTestId('funnel-rate-submitted-resumed')).toHaveText('–')
+    await expect(page.getByTestId('funnel-abandoned-expired')).toHaveText('3')
+    await expect(page.getByTestId('funnel-abandoned-discarded')).toHaveText('1')
   })
 
   // ── Privacy (AC-04) ──────────────────────────────────────────────────────

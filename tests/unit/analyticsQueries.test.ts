@@ -30,6 +30,7 @@ import {
   ratio,
   rangeFor,
   retentionLoopState,
+  shapeFunnel,
   shapeRefine,
   shapeStyles,
   withFailureRate,
@@ -102,6 +103,30 @@ describe('pure shaping helpers', () => {
     const now = new Date('2026-10-24T12:00:00Z')
     expect(ageDays(now, null)).toBeNull()
     expect(ageDays(now, new Date('2026-04-27T11:00:00Z'))).toBe(180)
+  })
+})
+
+describe('shapeFunnel (FR-10)', () => {
+  it('fills every step, rates each against step 0 and splits abandoned by reason', () => {
+    const out = shapeFunnel(
+      [{ step: 0, n: 10 }, { step: 1, n: 8 }, { step: 3, n: 2 }],
+      [{ resumed: false, n: 3 }, { resumed: true, n: 5 }],
+      [{ reason: 'expired', n: 4 }, { reason: 'discarded', n: 1 }],
+    )
+    expect(out.reached.map((r) => r.n)).toEqual([10, 8, 0, 2, 0])
+    expect(out.reached[1].ofStart).toBe(0.8)
+    expect(out.reached[2].ofStart).toBe(0)
+    expect(out.submitted).toEqual({ n: 3, ofStart: 0.3 })
+    expect(out.submittedResumed).toEqual({ n: 5 })
+    expect(out.abandoned).toEqual({ expired: 4, discarded: 1 })
+  })
+
+  it('an empty store has zeros and null rates, never NaN', () => {
+    const out = shapeFunnel([], [], [])
+    expect(out.reached.every((r) => r.n === 0 && r.ofStart === null)).toBe(true)
+    expect(out.submitted).toEqual({ n: 0, ofStart: null })
+    expect(out.submittedResumed).toEqual({ n: 0 })
+    expect(out.abandoned).toEqual({ expired: 0, discarded: 0 })
   })
 })
 

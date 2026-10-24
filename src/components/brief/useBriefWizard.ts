@@ -7,6 +7,7 @@ import { ApiError, apiFetch } from '@/lib/apiFetch'
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser'
 import { canSubmitBrief } from '@/lib/brief/copyProvider'
 import { useCaptionRoute } from '@/lib/hooks/useCaptionRoute'
+import { sendWizardStep } from '@/lib/analytics/client'
 import { CLASSIC_STYLE, resumeImageStyle } from '@/lib/brief/imageStyle'
 import { designPickForPath, refusedModelField, type BriefModelField } from '@/lib/brief/modelPicks'
 import { MODEL_NOT_ALLOWED } from '@/lib/models/requests'
@@ -200,6 +201,11 @@ export function useBriefWizard(): UseBriefWizardResult {
   // Latest payload, refreshed by the debounce effect below, so the trailing
   // save after an in-flight PUT never writes a stale closure's state.
   const latestPayloadRef = useRef<BriefDraftPayload | null>(null)
+  // 006 FR-08: the furthest step reported so far, so each step is reported once
+  // per visit however often the user goes back and forward. High until the
+  // mount effect below knows whether this is a fresh wizard or a resume.
+  const maxStepReportedRef = useRef(99)
+  const resumedRef = useRef(false)
 
   async function persistBriefDraft() {
     if (autosaveStoppedRef.current) return
@@ -285,15 +291,30 @@ export function useBriefWizard(): UseBriefWizardResult {
   // cleared by the existing consistency effect once data loads (FR-6/AC-8).
   useEffect(() => {
     const resumeId = new URLSearchParams(window.location.search).get('resume')
-    if (!resumeId) return
+    if (!resumeId) {
+      // Strict Mode runs this twice in dev; the ref keeps it to one report.
+      if (maxStepReportedRef.current === 99) {
+        maxStepReportedRef.current = 0
+        sendWizardStep(0, null)
+      }
+      return
+    }
     let cancelled = false
     apiFetch<{ id: string; payload: unknown }>(`/api/brief-drafts/${resumeId}`)
       .then((row) => {
         if (cancelled) return
         const parsed = briefDraftPayloadSchema.safeParse(row.payload)
-        if (!parsed.success) return
+        if (!parsed.success) {
+          // An unreadable row opens a fresh wizard: report its start.
+          maxStepReportedRef.current = 0
+          sendWizardStep(0, null)
+          return
+        }
         const p = parsed.data
         draftIdRef.current = row.id
+        resumedRef.current = true
+        // A resume restores a position; only moving past it is a step reached.
+        maxStepReportedRef.current = p.step
         setStep(p.step)
         setCampaignId(p.campaignId)
         setAspectRatioState(p.aspectRatio)
@@ -316,11 +337,22 @@ export function useBriefWizard(): UseBriefWizardResult {
       })
       .catch(() => {
         /* deleted/expired/foreign id → fresh wizard */
+        if (cancelled || maxStepReportedRef.current !== 99) return
+        maxStepReportedRef.current = 0
+        sendWizardStep(0, null)
       })
     return () => {
       cancelled = true
     }
   }, [])
+
+  // 006 FR-08: one wizard.step per forward step reached (fire-and-forget).
+  useEffect(() => {
+    if (step > maxStepReportedRef.current) {
+      maxStepReportedRef.current = step
+      sendWizardStep(step, draftIdRef.current)
+    }
+  }, [step])
 
   // ── Initial loads ──────────────────────────────────────────────────────
   const { data: templates = [] } = useQuery({
@@ -524,6 +556,9 @@ export function useBriefWizard(): UseBriefWizardResult {
         designModel,
         // 009 FR-03: sent only when a style was chosen; absent means classic.
         imageStyle: designMode === 'GENERATE' && imageStyle !== CLASSIC_STYLE ? imageStyle : undefined,
+        // 006 FR-08: whether the brief came from a resumed brief draft (read by
+        // the route for brief.submitted only; not stored).
+        resumed: resumedRef.current || undefined,
       }
 
       const brief = await apiFetch<{ id: string }>('/api/briefs', {

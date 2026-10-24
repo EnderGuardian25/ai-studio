@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma'
+import { track } from '@/lib/analytics/track'
 import { BUCKET_IMAGES, deleteObject } from '@/lib/storage/minio'
 import {
   BRIEF_DRAFT_CAP,
@@ -50,6 +51,23 @@ function parsePayload(raw: unknown): BriefDraftPayload | null {
   return result.success ? result.data : null
 }
 
+// 006 FR-08: a brief draft that ends without a Generate. Only the TTL sweep
+// ('expired') and a Discard ('discarded') call this; eviction past the cap and
+// the Generate-success delete do not. `step` is the last step in the stored
+// payload (null when it no longer parses). No brief text is ever sent.
+async function trackAbandoned(
+  row: { userId: string; teamId: string; payload: unknown },
+  reason: 'expired' | 'discarded',
+): Promise<void> {
+  const step = parsePayload(row.payload)?.step
+  await track('brief.abandoned', {
+    source: 'web',
+    teamId: row.teamId,
+    userId: row.userId,
+    payload: { reason, step: typeof step === 'number' && step >= 0 && step <= 4 ? step : null },
+  })
+}
+
 async function deleteRowWithImages(row: { id: string; userId: string; payload: unknown }) {
   const payload = parsePayload(row.payload)
   if (payload) await deleteBriefDraftImages(row.userId, payload)
@@ -64,7 +82,10 @@ export async function sweepExpiredBriefDrafts(userId: string): Promise<void> {
   const expired = await prisma.briefDraft.findMany({
     where: { userId, updatedAt: { lt: cutoff } },
   })
-  for (const row of expired) await deleteRowWithImages(row)
+  for (const row of expired) {
+    await deleteRowWithImages(row)
+    await trackAbandoned(row, 'expired')
+  }
 }
 
 // Newest-first list for the dashboard. Sweeps first; silently drops (and
@@ -159,6 +180,7 @@ export async function deleteBriefDraft(
     await prisma.briefDraft.deleteMany({ where: { id: row.id } })
   } else {
     await deleteRowWithImages(row)
+    await trackAbandoned(row, 'discarded')
   }
   return true
 }

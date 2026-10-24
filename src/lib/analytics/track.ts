@@ -68,7 +68,7 @@ function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
   return Promise.race([p, timeout]).finally(() => clearTimeout(timer))
 }
 
-async function count(kind: 'dropped' | 'rejected', name: string, reason: string): Promise<void> {
+export async function count(kind: 'dropped' | 'rejected', name: string, reason: string): Promise<void> {
   const lastReason = reason.slice(0, REASON_MAX)
   logOnce(kind, name, lastReason)
   try {

@@ -13,6 +13,7 @@ import { RANGE_OPTIONS } from '@/components/admin/insights/format'
 import {
   DurationsSection,
   FailuresSection,
+  FunnelSection,
   HealthSection,
   RefineSection,
   StylesSection,
@@ -65,6 +66,7 @@ export default function AdminInsightsPage() {
           <FailuresSection data={data.failures} />
           <StylesSection data={data.styles} />
           <DurationsSection data={data.durations} />
+          <FunnelSection data={data.funnel} />
           <TeamsSection data={data.teams} />
           <HealthSection lost={data.lost} retention={data.retention} />
         </div>

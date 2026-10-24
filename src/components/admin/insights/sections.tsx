@@ -158,6 +158,37 @@ export function DurationsSection({ data }: { data: Insights['durations'] }) {
   )
 }
 
+// ── The wizard funnel ──────────────────────────────────────────────────────
+
+const STEP_LABELS = ['Started', 'Size and design', 'Content', 'Images', 'Review']
+
+export function FunnelSection({ data }: { data: Insights['funnel'] }) {
+  type Row = { key: string; label: string; n: number; ofStart: number | null }
+  const rows: Row[] = [
+    ...data.reached.map((r) => ({ key: `step-${r.step}`, label: `Reached: ${STEP_LABELS[r.step] ?? r.step}`, n: r.n, ofStart: r.ofStart })),
+    { key: 'submitted', label: 'Submitted (Generate)', n: data.submitted.n, ofStart: data.submitted.ofStart },
+    { key: 'submitted-resumed', label: 'Submitted from a resumed brief', n: data.submittedResumed.n, ofStart: null },
+  ]
+  const cols: Column<Row>[] = [
+    { key: 'l', header: 'Stage', cell: (r) => r.label },
+    { key: 'n', header: 'Visits', align: 'right', cell: (r) => r.n },
+    { key: 'p', header: 'Of started', align: 'right', cell: (r) => <RateBar rate={r.ofStart} testId={`funnel-rate-${r.key}`} /> },
+  ]
+  return (
+    <InsightSection
+      id="funnel"
+      title="Brief wizard funnel"
+      question="Where briefs stop: each step reached once per visit, how many were submitted, and how many were abandoned. A brief draft that expires after 7 days or is discarded without Generate counts as abandoned."
+    >
+      <DataTable label="Brief wizard funnel" columns={cols} rows={rows} rowKey={(r) => r.key} rowTestId={(r) => `funnel-${r.key}`} minWidth={420} />
+      <div className="grid grid-cols-2 gap-4">
+        <Stat label="Abandoned: expired" value={data.abandoned.expired} testId="funnel-abandoned-expired" />
+        <Stat label="Abandoned: discarded" value={data.abandoned.discarded} testId="funnel-abandoned-discarded" />
+      </div>
+    </InsightSection>
+  )
+}
+
 // ── Always: activity, events lost, retention health ────────────────────────
 
 export function TeamsSection({ data }: { data: Insights['teams'] }) {

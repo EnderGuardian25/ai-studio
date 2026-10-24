@@ -82,7 +82,7 @@ Waves 4 and 5 are the user's staged scope (2026-10-23): each is independently sh
 
 ### Wave 4 — Wizard events
 
-- [ ] `T4` — `POST /api/events`, wizard step events, `brief.submitted`, `brief.abandoned` and the funnel section
+- [x] `T4` — `POST /api/events`, wizard step events, `brief.submitted`, `brief.abandoned` and the funnel section
   - Files: `src/app/api/events/route.ts` (new), `src/lib/analytics/rateLimit.ts` (new), `src/components/brief/useBriefWizard.ts`, `src/app/api/briefs/route.ts`, `src/lib/brief/briefDrafts.ts`, `src/lib/analytics/queries.ts` (`funnel`), `src/components/admin/insights/*` (funnel section), `tests/unit/{analyticsEventsRoute,analyticsRateLimit}.test.ts` (new), `tests/e2e/analytics.test.ts` (wizard cases)
   - Estimate: medium
   - Kind: impl
