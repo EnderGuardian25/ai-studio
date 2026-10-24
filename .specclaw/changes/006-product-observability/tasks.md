@@ -65,7 +65,7 @@ Waves 4 and 5 are the user's staged scope (2026-10-23): each is independently sh
 
 ### Wave 3 — Retention, purge, the page and E2E
 
-- [ ] `T3` — Retention loop, purge script, `queries.ts`, the insights API and page, nav, and E2E section AD
+- [x] `T3` — Retention loop, purge script, `queries.ts`, the insights API and page, nav, and E2E section AD
   - Files: `src/lib/analytics/{queries,retention}.ts` (new), `src/scheduler/worker.ts`, `scripts/purge-analytics.mjs` (new), `src/app/api/test/analytics-events/route.ts` (wire `sweep`), `src/app/api/admin/insights/route.ts` (new), `src/app/(app)/admin/insights/page.tsx` (new), `src/components/admin/insights/*` (new), `src/components/layout/AppShell.tsx`, `tests/unit/analyticsQueries.test.ts` (new), `tests/e2e/analytics.test.ts` (new)
   - Estimate: large
   - Kind: impl

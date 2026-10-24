@@ -8,6 +8,7 @@ import {
   BookOpen,
   Building2,
   FolderOpen,
+  LineChart,
   LayoutDashboard,
   LogOut,
   Megaphone,
@@ -65,6 +66,7 @@ const NAV_SECTIONS: NavSection[] = [
       { label: 'Team Settings', href: '/team',            icon: Building2, adminOnly: true },
       { label: 'Users',         href: '/admin/users',     icon: Users,     superAdminOnly: true },
       { label: 'Teams',         href: '/admin/teams',     icon: Building2, superAdminOnly: true },
+      { label: 'Insights',      href: '/admin/insights',  icon: LineChart, superAdminOnly: true },
     ],
   },
 ]

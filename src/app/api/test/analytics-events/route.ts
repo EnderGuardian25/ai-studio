@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma'
 import { requireRole } from '@/lib/auth'
 import { MOCK_AI } from '@/lib/testHooks'
 import { setFailNext } from '@/lib/analytics/track'
+import { sweepAnalytics } from '@/lib/analytics/retention'
 
 /**
  * Test-only seam (006 design "Test seam"): the analytics event store, so the
@@ -15,7 +16,7 @@ import { setFailNext } from '@/lib/analytics/track'
  *   DELETE                                            → clears events and the drop counters
  *   POST { seed: [ { name, source, teamId, at, … } ] } → inserts rows verbatim (explicit `at`)
  *   POST { failNext: n }                              → the next n track() inserts reject (AC-08)
- *   POST { sweep: true }                              → runs the retention sweep once (wired in T3; 501 until then)
+ *   POST { sweep: true }                              → runs the retention sweep once 
  *
  * Dormant in production, gated like /api/test/model-calls: a hard 404 when
  * NODE_ENV is production, a 404 unless MOCK_AI (never set in prod), and
@@ -106,6 +107,6 @@ export async function POST(req: NextRequest) {
     setFailNext(data.failNext)
     return NextResponse.json({ failNext: data.failNext })
   }
-  // The retention sweep arrives with wave 3 (T3).
-  return NextResponse.json({ error: 'sweep is not wired yet' }, { status: 501 })
+  // { sweep: true }: one retention tick, exactly what the worker loop runs.
+  return NextResponse.json({ deleted: await sweepAnalytics() })
 }

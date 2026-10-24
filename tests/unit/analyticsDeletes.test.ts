@@ -22,9 +22,11 @@ const h = vi.hoisted(() => ({
   revisionDeleteMany: vi.fn(),
   briefDelete: vi.fn(),
   requireRole: vi.fn(),
+  sweep: vi.fn(),
   txLog: [] as string[],
 }))
 
+vi.mock('@/lib/analytics/retention', () => ({ sweepAnalytics: h.sweep }))
 vi.mock('@/lib/prisma', () => {
   const client = {
     team: { findUnique: h.teamFindUnique, update: h.teamUpdate },
@@ -145,7 +147,7 @@ describe('the test seam gate', () => {
     expect(h.requireRole).not.toHaveBeenCalled()
   })
 
-  it('with MOCK_AI it is admin-only; POST seeds rows verbatim and sweep is 501 until T3', async () => {
+  it('with MOCK_AI it is admin-only; POST seeds rows verbatim and sweep runs one retention tick', async () => {
     env.MOCK_AI = 'true'
     env.NODE_ENV = 'test'
     const route = await load()
@@ -160,8 +162,10 @@ describe('the test seam gate', () => {
     expect(res.status).toBe(200)
     expect(h.eventCreateMany.mock.calls[0][0].data[0]).toMatchObject({ name: 'generation.finished', at: new Date('2026-01-01T00:00:00.000Z'), schemaVersion: 1 })
 
+    h.sweep.mockResolvedValue(7)
     const sweep = await route.POST(new Request('http://x', { method: 'POST', body: JSON.stringify({ sweep: true }) }) as never)
-    expect(sweep.status).toBe(501)
+    expect(sweep.status).toBe(200)
+    expect(await sweep.json()).toEqual({ deleted: 7 })
 
     const bad = await route.POST(new Request('http://x', { method: 'POST', body: JSON.stringify({ nope: 1 }) }) as never)
     expect(bad.status).toBe(400)
