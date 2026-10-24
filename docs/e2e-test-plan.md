@@ -7,7 +7,7 @@ Last full run on `main` (2026-07-13, post brief-draft-recovery §P): **132 passe
 
 > **Update (2026-10-13, change 017 publish API fixes):** a publish the platform refuses is no longer a 2xx. `POST /api/posts` (immediate) and `POST /api/posts/[id]/publish` (retry) answer **502** `{error, code:'PUBLISH_FAILED', postId, status:'FAILED'}`; the FAILED row is still written. **TC-PUB-03** now expects the 502 (and a failing retry's 502), and new **TC-PUB-10** drives the publish dialog: the failed channel shows "✕ failed" with its reason and the dialog stays open.
 
-> **Update (2026-10-24, change 027 post styles and the facts check):** new suite **`post-styles.test.ts` (§AE, TC-PS-01 to TC-PS-40)**, driven by the mock fact sentinels `__MOCK_FACT_PRICE__`, `__MOCK_FACT_PCT__`, `__MOCK_FACT_DATE__`, `__MOCK_FACT_NUM__`, `__MOCK_FACT_HEADLINE__` and `__MOCK_FACT_ERROR__` and the existing `POST /api/test/generation-tick` (see §AE); §AD gains TC-OBS-31. Gate: 517/3/0/0 (unit 3737/3737, render 47/47, CI green at pending (the T8 push)).
+> **Update (2026-10-24, change 027 post styles and the facts check):** new suite **`post-styles.test.ts` (§AE, TC-PS-01 to TC-PS-40)**, driven by the mock fact sentinels `__MOCK_FACT_PRICE__`, `__MOCK_FACT_PCT__`, `__MOCK_FACT_DATE__`, `__MOCK_FACT_NUM__`, `__MOCK_FACT_HEADLINE__` and `__MOCK_FACT_ERROR__` and the existing `POST /api/test/generation-tick` (see §AE); §AD gains TC-OBS-31. Gate: 517/3/0/0 (unit 3737/3737, render 47/47, CI green at `c199270` (run 40111923100)).
 >
 > **Update (2026-10-24, change 006 product observability):** new suite **`analytics.test.ts` (§AD, 30 cases, TC-OBS-01…30)**, driven by the seam `GET`/`DELETE`/`POST /api/test/analytics-events` (see §AD). Gate: 473/3/0/1 (the one flaky was a Playwright worker-process crash in `regression.test.ts` H7, not an assertion; that suite then re-ran clean 3 of 3) (unit 3283/3283, render 47/47, CI green at `851f224` (run 40084041397)).
 
@@ -1026,30 +1026,30 @@ Serial. Needs `MOCK_AI`, `MOCK_PUPPETEER` and `MOCK_SOCIAL` and test-DB access; 
 - **"Chosen" counts wizard briefs.** Queued entries have no `brief.submitted` event, so they show under generations and held only.
 - **Layout follow-ups, not gates.** The eight-card picker is about 900 px tall at 390 px, and the held line wraps to five or six lines.
 
-| AC                                       | E2E / unit                                                                                                                                           |
-| ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 027 AC-01 the migration                  | the `test:upgrade` run and `prisma migrate diff --exit-code` (`reports/T1.md`)                                                                       |
-| 027 AC-02 the dataset                    | unit `postStylesDataset` (the hash table pins released versions)                                                                                     |
-| 027 AC-03 the resolver                   | unit `postStylesResolve`; TC-PS-01 to TC-PS-04, TC-PS-07, TC-PS-24                                                                                   |
-| 027 AC-04 the stamp and derived versions | unit `postStylesStamp`                                                                                                                               |
-| 027 AC-05 the inputs                     | TC-PS-01 to TC-PS-04, TC-PS-07 to TC-PS-09, TC-PS-25 to TC-PS-28; unit `postStylesApi`, `postStylesQueueRoutes`                                      |
-| 027 AC-06 the wizard                     | TC-PS-30 to TC-PS-34; unit `postStylesWizard`                                                                                                        |
-| 027 AC-07 the campaign default           | TC-PS-05, TC-PS-06, TC-PS-35 to TC-PS-37                                                                                                             |
-| 027 AC-08 the prompts                    | unit `postStylesPrompts` (exact text, golden for an unstyled brief)                                                                                  |
-| 027 AC-09 the extractor                  | unit `factsCheckExtract`, `domFacts`                                                                                                                 |
-| 027 AC-10 the seeded acceptance bar      | unit `factsCheckCorpus` (24 or more cases, flagged set equals expected); TC-PS-11                                                                    |
-| 027 AC-11 sources, write points, storage | TC-PS-10, TC-PS-12 to TC-PS-16; unit `factsCheckRefresh`, `postStylesWriters`                                                                        |
-| 027 AC-12 the hold                       | TC-PS-17 to TC-PS-22, TC-PS-38; unit `postStylesHold`                                                                                                |
-| 027 AC-13 the notice and readers         | TC-PS-39, TC-PS-10, TC-PS-25, TC-PS-29; unit `factsCheckNotice`                                                                                      |
-| 027 AC-14 analytics and the page         | TC-PS-40, TC-OBS-31, TC-OBS-22; unit `postStylesAnalytics`                                                                                           |
-| 027 AC-15 the seams                      | TC-PS-11, TC-PS-13, TC-PS-14                                                                                                                         |
-| 027 AC-16 legacy behaviour               | TC-PS-02, TC-PS-03, TC-PS-16, TC-PS-23, TC-PS-34                                                                                                     |
-| 027 AC-17 no new calls                   | the `git grep -c "createMessage\|runClaudeCli\|recordModelCall" -- src` count against the base commit; the `model-selection` suite unchanged         |
-| 027 AC-18 one resolver and purity        | unit `postStylesBoundary`, `designDataBoundary`                                                                                                      |
-| 027 AC-19 the check is fast              | unit `factsCheckCorpus` (the maximum-input timing)                                                                                                   |
-| 027 AC-20 the design system              | unit `uiTokenGuard`; the axe and no-horizontal-scroll checks in the UI cases                                                                         |
-| 027 AC-21 nothing regressed              | the full clean mock run (517/3/0/0), unit (3737/3737), render (47/47), lint 0 errors / 7 warnings, build, `test:upgrade`, CI (pending (the T8 push)) |
-| 027 AC-22 the mock-only acceptance bar   | AC-10 and §AE (a), AC-12 (b), TC-PS-40 (c)                                                                                                           |
+| AC                                       | E2E / unit                                                                                                                                                          |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 027 AC-01 the migration                  | the `test:upgrade` run and `prisma migrate diff --exit-code` (`reports/T1.md`)                                                                                      |
+| 027 AC-02 the dataset                    | unit `postStylesDataset` (the hash table pins released versions)                                                                                                    |
+| 027 AC-03 the resolver                   | unit `postStylesResolve`; TC-PS-01 to TC-PS-04, TC-PS-07, TC-PS-24                                                                                                  |
+| 027 AC-04 the stamp and derived versions | unit `postStylesStamp`                                                                                                                                              |
+| 027 AC-05 the inputs                     | TC-PS-01 to TC-PS-04, TC-PS-07 to TC-PS-09, TC-PS-25 to TC-PS-28; unit `postStylesApi`, `postStylesQueueRoutes`                                                     |
+| 027 AC-06 the wizard                     | TC-PS-30 to TC-PS-34; unit `postStylesWizard`                                                                                                                       |
+| 027 AC-07 the campaign default           | TC-PS-05, TC-PS-06, TC-PS-35 to TC-PS-37                                                                                                                            |
+| 027 AC-08 the prompts                    | unit `postStylesPrompts` (exact text, golden for an unstyled brief)                                                                                                 |
+| 027 AC-09 the extractor                  | unit `factsCheckExtract`, `domFacts`                                                                                                                                |
+| 027 AC-10 the seeded acceptance bar      | unit `factsCheckCorpus` (24 or more cases, flagged set equals expected); TC-PS-11                                                                                   |
+| 027 AC-11 sources, write points, storage | TC-PS-10, TC-PS-12 to TC-PS-16; unit `factsCheckRefresh`, `postStylesWriters`                                                                                       |
+| 027 AC-12 the hold                       | TC-PS-17 to TC-PS-22, TC-PS-38; unit `postStylesHold`                                                                                                               |
+| 027 AC-13 the notice and readers         | TC-PS-39, TC-PS-10, TC-PS-25, TC-PS-29; unit `factsCheckNotice`                                                                                                     |
+| 027 AC-14 analytics and the page         | TC-PS-40, TC-OBS-31, TC-OBS-22; unit `postStylesAnalytics`                                                                                                          |
+| 027 AC-15 the seams                      | TC-PS-11, TC-PS-13, TC-PS-14                                                                                                                                        |
+| 027 AC-16 legacy behaviour               | TC-PS-02, TC-PS-03, TC-PS-16, TC-PS-23, TC-PS-34                                                                                                                    |
+| 027 AC-17 no new calls                   | the `git grep -c "createMessage\|runClaudeCli\|recordModelCall" -- src` count against the base commit; the `model-selection` suite unchanged                        |
+| 027 AC-18 one resolver and purity        | unit `postStylesBoundary`, `designDataBoundary`                                                                                                                     |
+| 027 AC-19 the check is fast              | unit `factsCheckCorpus` (the maximum-input timing)                                                                                                                  |
+| 027 AC-20 the design system              | unit `uiTokenGuard`; the axe and no-horizontal-scroll checks in the UI cases                                                                                        |
+| 027 AC-21 nothing regressed              | the full clean mock run (517/3/0/0), unit (3737/3737), render (47/47), lint 0 errors / 7 warnings, build, `test:upgrade`, CI (green at `c199270` (run 40111923100)) |
+| 027 AC-22 the mock-only acceptance bar   | AC-10 and §AE (a), AC-12 (b), TC-PS-40 (c)                                                                                                                          |
 
 The mock suite proves the mechanism with mock replies; it records no real model call.
 
