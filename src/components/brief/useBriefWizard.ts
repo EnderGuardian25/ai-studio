@@ -21,7 +21,8 @@ import type {
   ProviderInfo,
   ResolvedBrandKitResponse,
 } from '@/lib/api-types'
-import { DEFAULT_CHANNELS, TONE_OPTIONS } from './constants'
+import { matchToneOption } from '@/lib/postStyles'
+import { DEFAULT_CHANNELS } from './constants'
 import type { DesignMode, ResolvedKit, UploadedImage } from './types'
 import {
   briefDraftPayloadSchema,
@@ -444,8 +445,8 @@ export function useBriefWizard(): UseBriefWizardResult {
     const c = campaigns.find(x => x.id === id)
     // Pre-fill tone from the campaign default when it matches a known option.
     if (c?.defaultTone) {
-      const match = TONE_OPTIONS.find(t => c.defaultTone!.toLowerCase().includes(t.value))
-      if (match) setTone(match.value)
+      const match = matchToneOption(c.defaultTone)
+      if (match) setTone(match)
     }
   }
 

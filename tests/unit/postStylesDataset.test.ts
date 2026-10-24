@@ -250,26 +250,38 @@ describe('FR-02: lookups', () => {
     }
   })
 
-  it('a retired style stays resolvable but is hidden from pickers', () => {
-    // The real dataset has none, so the behaviour is shown on a fixture of the
-    // same rule: activeStyles filters on status, getStyle does not.
-    const retired = { ...styles.tip, status: 'retired' as const }
-    const dataset = { ...styles, tip: retired }
-    const active = Object.values(dataset).filter((s) => s.status === 'active')
-    expect(active.map((s) => s.key)).not.toContain('tip')
-    expect(Object.hasOwn(dataset, 'tip')).toBe(true)
+  it('a retired style stays resolvable but is hidden from pickers (real lookups on a fixture dataset)', () => {
+    // The real dataset has none, so the real activeStyles and getStyle run on a
+    // fixture of the same shape (the resolver's retired-key case is in
+    // postStylesResolve.test.ts).
+    const dataset = { ...styles, tip: { ...styles.tip, status: 'retired' as const } }
+    expect(activeStyles(dataset).map((s) => s.key)).not.toContain('tip')
+    expect(activeStyles(dataset)).toHaveLength(7)
+    expect(getStyle('tip', dataset)?.key).toBe('tip')
+    expect(getStyle('tip', dataset)?.status).toBe('retired')
+    // and a key that is not in the fixture still does not resolve
+    expect(getStyle('constructor', dataset)).toBeUndefined()
   })
 
   it('the public index does not export the raw styles record', () => {
     expect('styles' in publicApi).toBe(false)
     expect(Object.keys(publicApi).sort()).toEqual(
       [
+        'CHECKLIST_PREAMBLE',
         'POST_STYLES_REVISION',
         'POST_STYLE_KEYS',
         'TONE_KEYS',
         'activeStyles',
+        'checklistPromptText',
         'getStyle',
         'isStyleKey',
+        'legacyGoalStyle',
+        'matchToneOption',
+        'parsePostStyleStamp',
+        'postStyleStampSchema',
+        'resolvePostStyle',
+        'rulesAtStamp',
+        'stampFor',
       ].sort(),
     )
   })

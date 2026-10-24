@@ -56,7 +56,7 @@ This is phase a. Phase b (STORY layouts, the five new looks, pixel-check changes
 
 ### Wave 2: Resolver, stamp, prompt text
 
-- [ ] `T2` — `resolvePostStyle`, the stamp schema and the checklist prompt text
+- [x] `T2` — `resolvePostStyle`, the stamp schema and the checklist prompt text
   - Files: `src/lib/postStyles/{resolve,stamp,promptText}.ts` (new), `src/lib/postStyles/{types,index}.ts` (`matchToneOption`, exports), `src/components/brief/constants.ts` (`TONE_OPTIONS` built from `TONE_KEYS`; labels unchanged), `tests/unit/{postStylesResolve,postStylesStamp,postStylesPrompts}.test.ts` (new; `postStylesBoundary` extended with the one-resolver guard)
   - Estimate: medium
   - Kind: impl

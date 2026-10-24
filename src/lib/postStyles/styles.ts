@@ -16,7 +16,7 @@
 // "Stated in the brief" in a rule means the value appears in the topic, the
 // description, the campaign briefing or the brand voice text.
 import { archetypes } from '@/lib/designData'
-import { POST_STYLE_KEYS, type PostStyle, type PostStyleKey } from './types'
+import type { PostStyle, PostStyleKey } from './types'
 
 function deepFreeze<T>(value: T): T {
   if (value !== null && typeof value === 'object' && !Object.isFrozen(value)) {
@@ -311,16 +311,20 @@ export function revisionOf(dataset: Readonly<Record<string, PostStyle>>): number
 export const POST_STYLES_REVISION = revisionOf(styles)
 
 // The active styles, in table order (the pickers).
-export function activeStyles(): readonly PostStyle[] {
-  return POST_STYLE_KEYS.map((k) => styles[k]).filter((s) => s.status === 'active')
+// `source` exists so a test can run the real filter on a fixture dataset.
+export function activeStyles(
+  source: Readonly<Record<string, PostStyle>> = styles,
+): readonly PostStyle[] {
+  return Object.values(source).filter((s) => s.status === 'active')
 }
 
 // An active or retired style, else undefined. Own-property lookup, so
 // 'constructor' and '__proto__' never resolve.
-export function getStyle(key: unknown): PostStyle | undefined {
-  return typeof key === 'string' && Object.hasOwn(styles, key)
-    ? styles[key as PostStyleKey]
-    : undefined
+export function getStyle(
+  key: unknown,
+  source: Readonly<Record<string, PostStyle>> = styles,
+): PostStyle | undefined {
+  return typeof key === 'string' && Object.hasOwn(source, key) ? source[key] : undefined
 }
 
 // True for any key in the dataset, retired included.

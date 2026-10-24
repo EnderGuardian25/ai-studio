@@ -5,6 +5,7 @@ import { Square, RectangleVertical, Smartphone } from 'lucide-react'
 import type { AspectRatio } from '@prisma/client'
 import { dimensionsLabel } from '@/lib/aspectRatio'
 import { CHANNEL_VALUES } from '@/lib/channels'
+import { TONE_KEYS, type ToneKey } from '@/lib/postStyles'
 
 // Channels are no longer chosen at brief time — the publish step picks them. Every
 // brief targets both feeds by default; the brief now captures the post SIZE instead.
@@ -30,12 +31,14 @@ export const GOAL_OPTIONS = [
   { value: 'announcement', label: 'Announcement' },
 ]
 
-export const TONE_OPTIONS = [
-  { value: 'professional', label: 'Professional' },
-  { value: 'casual', label: 'Casual' },
-  { value: 'bold', label: 'Bold' },
-  { value: 'empathetic', label: 'Empathetic' },
-]
+const TONE_LABELS: Record<ToneKey, string> = {
+  professional: 'Professional',
+  casual: 'Casual',
+  bold: 'Bold',
+  empathetic: 'Empathetic',
+}
+
+export const TONE_OPTIONS = TONE_KEYS.map((value) => ({ value, label: TONE_LABELS[value] }))
 
 export const SOURCE_LABEL: Record<string, string> = {
   explicit: 'Selected for this post',

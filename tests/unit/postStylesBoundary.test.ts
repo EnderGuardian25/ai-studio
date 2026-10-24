@@ -1,5 +1,5 @@
 // 027 NFR-02 / NFR-10 / AC-18 (T1 half): purity, the one-way edge and the
-// column shape. The one-resolver key-literal guard arrives with the resolver (T2).
+// column shape, and (T2) the one-resolver key-literal guard.
 import { describe, it, expect } from 'vitest'
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative, sep } from 'node:path'
@@ -173,5 +173,55 @@ describe('AC-01: the seven columns are optional with no default', () => {
       'postStyle'
     > satisfies Prisma.DraftRevisionUncheckedCreateInput
     expect([brief, entry, campaign, draft, revision]).toHaveLength(5)
+  })
+})
+
+// 027 NFR-02 / AC-18 (T2): no style key literal outside src/lib/postStyles as an
+// object key or a case label. The mapping lives in the resolver and the dataset.
+const KEYS = [
+  'general',
+  'launch',
+  'promotion',
+  'event',
+  'hiring',
+  'announcement',
+  'tip',
+  'milestone',
+]
+function keyLiteralViolations(source: string): string[] {
+  const src = stripComments(source)
+  const alt = KEYS.join('|')
+  const found: string[] = []
+  // case 'launch':
+  for (const m of src.matchAll(new RegExp(`\\bcase\\s*(['"\`])(${alt})\\1\\s*:`, 'g')))
+    found.push(`case label ${m[2]}`)
+  // { 'launch': ..., "tip": ... }  (a quoted key)
+  for (const m of src.matchAll(new RegExp(`(^|[{,\\s])(['"])(${alt})\\2\\s*:`, 'g')))
+    found.push(`quoted key ${m[3]}`)
+  // { launch: ..., hiring: ... } (a bare key written as a property in a literal that
+  // also lists another style key: a lookup table keyed by styles)
+  const bare = KEYS.filter((k) => new RegExp(`(^|[{,\\n])\\s*${k}\\s*:\\s*\\S`, 'm').test(src))
+  if (bare.length >= 2) found.push(`bare keys ${bare.join(',')}`)
+  return found
+}
+
+describe('AC-18: the one-resolver guard (no style key literals outside postStyles)', () => {
+  it('no file under src outside src/lib/postStyles names a style key as a key or case label', () => {
+    const outside = walk('src').filter((f) => !f.startsWith('src/lib/postStyles/'))
+    expect(outside.length).toBeGreaterThan(100)
+    for (const f of outside)
+      expect(keyLiteralViolations(readFileSync(join(ROOT, f), 'utf8')), f).toEqual([])
+  })
+
+  it('the matcher flags a planted lookup table and a case label, and passes plain prose', () => {
+    expect(keyLiteralViolations(`switch (x) { case 'launch': return 1 }`)).not.toEqual([])
+    expect(keyLiteralViolations(`const t = { 'tip': 1 }`)).not.toEqual([])
+    expect(keyLiteralViolations(`const t = { hiring: 'a', launch: 'b' }`)).not.toEqual([])
+    expect(keyLiteralViolations(`const style = 'general'; const e = { event: 1 }`)).toEqual([])
+  })
+
+  it('the import guard flags a planted import of postStyles/styles', () => {
+    const planted = `import { styles } from '@/lib/postStyles/styles'`
+    expect(specifiers(planted).some((x) => /postStyles\/styles(\.ts)?$/.test(x))).toBe(true)
   })
 })
