@@ -86,7 +86,7 @@ This change has **7 tasks in 5 waves**:
     - Record in `reports/T3.md` the measured margins for one contract per look (the L\* standard deviation and the pass fraction), as 009 T3 did.
     - **Gate:** tsc, lint, unit, `npm run test:render` (at least 83, all passing, run twice).
 
-- [ ] `T5` — The real-image check runner in `scripts/look-check/`
+- [x] `T5` — The real-image check runner in `scripts/look-check/`
   - Files: `scripts/look-check/{lookCheck,run-look-check}.mjs` (new), `tests/unit/lookCheck.test.ts` (new), `.specclaw/changes/028-image-looks/look-check/.gitignore` (new: `renders/`)
   - Estimate: medium
   - Kind: impl
