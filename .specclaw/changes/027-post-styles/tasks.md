@@ -153,7 +153,7 @@ This is phase a. Phase b (STORY layouts, the five new looks, pixel-check changes
 
 ### Wave 8: Docs and the gate
 
-- [ ] `T8` — The docs, the full gate and CI
+- [x] `T8` — The docs, the full gate and CI
   - Files: `docs/handoff.md`, `docs/e2e-test-plan.md`, `CLAUDE.md`, `.specclaw/ROADMAP.md`
   - Estimate: small
   - Kind: docs

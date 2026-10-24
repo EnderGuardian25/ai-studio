@@ -7,6 +7,8 @@ Last full run on `main` (2026-07-13, post brief-draft-recovery §P): **132 passe
 
 > **Update (2026-10-13, change 017 publish API fixes):** a publish the platform refuses is no longer a 2xx. `POST /api/posts` (immediate) and `POST /api/posts/[id]/publish` (retry) answer **502** `{error, code:'PUBLISH_FAILED', postId, status:'FAILED'}`; the FAILED row is still written. **TC-PUB-03** now expects the 502 (and a failing retry's 502), and new **TC-PUB-10** drives the publish dialog: the failed channel shows "✕ failed" with its reason and the dialog stays open.
 
+> **Update (2026-10-24, change 027 post styles and the facts check):** new suite **`post-styles.test.ts` (§AE, TC-PS-01 to TC-PS-40)**, driven by the mock fact sentinels `__MOCK_FACT_PRICE__`, `__MOCK_FACT_PCT__`, `__MOCK_FACT_DATE__`, `__MOCK_FACT_NUM__`, `__MOCK_FACT_HEADLINE__` and `__MOCK_FACT_ERROR__` and the existing `POST /api/test/generation-tick` (see §AE); §AD gains TC-OBS-31. Gate: 517/3/0/0 (unit 3737/3737, render 47/47, CI green at pending (the T8 push)).
+>
 > **Update (2026-10-24, change 006 product observability):** new suite **`analytics.test.ts` (§AD, 30 cases, TC-OBS-01…30)**, driven by the seam `GET`/`DELETE`/`POST /api/test/analytics-events` (see §AD). Gate: 473/3/0/1 (the one flaky was a Playwright worker-process crash in `regression.test.ts` H7, not an assertion; that suite then re-ran clean 3 of 3) (unit 3283/3283, render 47/47, CI green at `851f224` (run 40084041397)).
 
 > **Update (2026-10-21, change 009 hero imagery):** new suite **`hero-image.test.ts` (§AA, 16 cases, TC-HERO-01…16)**, plus one `a11y.test.ts` case (the draft page with the composition notice shown, and `/brief` step 2 with the image-style picker). The Review-step term count in `model-selection.test.ts` and `surfaces.test.ts` went 12 to 13, because a Path B brief now has an Image style row. New seams: the four `__MOCK_HERO_*__` sentinels (see §AA). Gate: 422 passed / 3 skipped / 0 failed / 0 flaky.
@@ -989,6 +991,65 @@ Serial (`test.describe.configure({ mode: 'serial' })`). Needs `MOCK_AI`, `MOCK_P
 | 006 AC-15 generation untouched                   | the `git diff` checks in the reports; the existing `model-selection` and refine suites                                                                                                                                                                          |
 | 006 AC-16 the design system                      | TC-OBS-21; unit `uiTokenGuard`                                                                                                                                                                                                                                  |
 | 006 AC-17 nothing regressed                      | the full clean mock run (473/3/0/1 (the one flaky was a Playwright worker-process crash in `regression.test.ts` H7, not an assertion; that suite then re-ran clean 3 of 3)), unit (3283/3283), render (47/47), build, CI (green at `851f224` (run 40084041397)) |
+
+The mock suite proves the mechanism with mock replies; it records no real model call.
+
+### AE. Post styles and the facts check (`post-styles.test.ts`, change 027 T4 to T7 — AC-05 to AC-07, AC-10 to AC-16, AC-22)
+
+Serial. Needs `MOCK_AI`, `MOCK_PUPPETEER` and `MOCK_SOCIAL` and test-DB access; it skips without them. The suite runs under the mocks only: no model call, and the check itself is code. The server cases are TC-PS-01 to TC-PS-29, the UI cases TC-PS-30 to TC-PS-39, and the insights section TC-PS-40. The section also adds **TC-OBS-31** to §AD (the three new event fields).
+
+**The seams** (`src/lib/testHooks.ts`, consulted only under `MOCK_AI`, dormant in prod). A sentinel in the brief **topic** makes the mock caption and headline carry one invented value, and carries no digit itself:
+
+- `__MOCK_FACT_PRICE__` adds `$49`, `__MOCK_FACT_PCT__` adds `35% off`, `__MOCK_FACT_DATE__` adds `30 March 2027`, `__MOCK_FACT_NUM__` adds `1,250 customers`. Each lands in the headline and both captions, so two values give six flags.
+- `__MOCK_FACT_HEADLINE__` puts `$49` in the headline only.
+- `__MOCK_FACT_ERROR__` forces the check to fail, so the stored status is `error`.
+- Because the mock caption embeds the topic, a value written in the topic, the description, the campaign briefing, the kit voice text or a campaign document is a **stated** value and is not flagged. That is the seeded negative case. A topic with no sentinel gives the same mock reply as before 027.
+- The scheduler cases drive the existing `POST /api/test/generation-tick` (404 in production, 404 unless `MOCK_AI`, admin only). The one case the API refuses, a stored key that no longer resolves, is seeded straight into the database.
+
+- **TC-PS-01 to TC-PS-04 — `POST /api/briefs` (AC-05).** A style stores the style's goal, the resolved tone and `classic`, and a body `goal` is ignored. With no style, a legacy `hiring` or `announcement` picks its style and anything else is `general`. A pre-027 body (goal and tone, no style) is 201 and keeps its tone. An unknown key is 400 `UNKNOWN_POST_STYLE` and creates nothing; a non-string is 400; a blank key is absent.
+- **TC-PS-05, TC-PS-06 — The campaign default (AC-07).** An admin sets it, a brief on that campaign uses it, another campaign is unaffected, and an editor gets 403. Create takes a default, refuses an unknown one, and null clears it.
+- **TC-PS-07 to TC-PS-09 — The queue (AC-05).** Create resolves the style (explicit, legacy goal, campaign default, `general`). Edit takes a style, refuses an unknown one and leaves the entry unchanged, and an edit that sends no style keeps the stored style, goal and tone (a legacy null stays null). Batch names the failing entry, writes nothing on an error and resolves defaults on success.
+- **TC-PS-10 to TC-PS-16 — The facts check (AC-10, AC-11, AC-16).** The draft carries the stamp and a check, and `GET /api/drafts/[id]` returns `{ key, label, version }`. Each invented value is flagged exactly, with where, and nothing else is. A value stated in any of the five sources is not flagged, the same value elsewhere is. An ordinary brief (`24/7`, a list marker, a step count) is clear. A check that cannot run is stored as `error` and the draft still finishes. A manual caption edit and a regenerate recompute it. A brief with no style gets no stamp but still gets a check.
+- **TC-PS-17 to TC-PS-21 — The hold (AC-12).** A flagged check holds `SCHEDULE_PUBLISH` and `PUBLISH_NOW`: `COMPLETED` with a draft, no `Post` row, `postAction` unchanged, `heldReason` set. A clear check runs the post action exactly as before. A `HOLD` entry is unaffected. A check forced to `error` holds with the "could not run" reason. A held entry re-runs through the route: `heldReason` is cleared and a new draft is made.
+- **TC-PS-22 to TC-PS-24 — Run-time keys (AC-12, AC-16).** A stored key that no longer resolves fails the entry with the named reason: no brief, no draft, no `Post`. A pre-027 entry (null key) runs with its own goal and tone, no style, and is still gated. A styled entry writes its key, the style goal and the entry tone to the brief, and the image stays `classic`.
+- **TC-PS-25 to TC-PS-29 — ACP (AC-05).** `goal` and `tone` are optional and the result names the style and carries the check. An explicit `postStyle` wins over a legacy goal, and a legacy goal alone picks `hiring` or `announcement`. An invented value comes back as a flagged check. An unknown key is the named 422 error and a non-string a 400. The manifest is `1.2.0`, lists `postStyle` and no longer requires `goal` or `tone`. MCP is stdio, so it has no E2E: the unit tests and the shared `generatePost` cover it.
+- **TC-PS-30 to TC-PS-34 — The wizard (AC-06, AC-16).** The picker sits above the size choices with General selected, moves by arrow keys, and the Content step has no Goal select. The image style on step 1 is pre-filled from the style, a look picked by hand is kept, and 9:16 and Path A fall to Classic. The style pre-fills Tone, a Tone changed by hand is kept, and the Review shows the resolved rows. The request carries `postStyle` always, and `tone` and `imageStyle` only when touched. A stored style resumes; an unknown key and an old row open as General.
+- **TC-PS-35 to TC-PS-37 — The campaign default in the UI (AC-07).** The wizard opens with the default selected, and a campaign with none gives General. An admin sets and clears it on the detail page, the list shows it, and an editor sees text only. The create form takes a default.
+- **TC-PS-38 — The queue modal (AC-12).** The modal sends `postStyle` and no goal, and a held entry shows its line with the values in its title.
+- **TC-PS-39 — The draft notice (AC-13).** A flagged draft shows `facts-check-notice` naming each value and where; a clear one does not; the check that could not run says so; Publish stays enabled.
+- **TC-PS-40 — The insights section (AC-14).** The "Post styles" section equals a hand count over a seeded set, an unchosen style shows zeros, and an editor is refused.
+- **TC-OBS-31 (§AD) — The new event fields (AC-14).** The three events carry `postStyle`, `factsStatus`, `factsFlagCount` and `held`; held is true and false in the right cases; and no flagged value is in any payload (TC-OBS-22 also forbids the four mock fact values).
+
+**Notes.**
+
+- **The dark theme of the "Post styles" section is not visually verified.** TC-PS-40's screenshots use `page.emulateMedia({ colorScheme })`, which does not switch the app's theme, so the "dark" captures show the light theme. The axe pass covers it. The captures are review aids, not a gate.
+- **"Chosen" counts wizard briefs.** Queued entries have no `brief.submitted` event, so they show under generations and held only.
+- **Layout follow-ups, not gates.** The eight-card picker is about 900 px tall at 390 px, and the held line wraps to five or six lines.
+
+| AC                                       | E2E / unit                                                                                                                                           |
+| ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 027 AC-01 the migration                  | the `test:upgrade` run and `prisma migrate diff --exit-code` (`reports/T1.md`)                                                                       |
+| 027 AC-02 the dataset                    | unit `postStylesDataset` (the hash table pins released versions)                                                                                     |
+| 027 AC-03 the resolver                   | unit `postStylesResolve`; TC-PS-01 to TC-PS-04, TC-PS-07, TC-PS-24                                                                                   |
+| 027 AC-04 the stamp and derived versions | unit `postStylesStamp`                                                                                                                               |
+| 027 AC-05 the inputs                     | TC-PS-01 to TC-PS-04, TC-PS-07 to TC-PS-09, TC-PS-25 to TC-PS-28; unit `postStylesApi`, `postStylesQueueRoutes`                                      |
+| 027 AC-06 the wizard                     | TC-PS-30 to TC-PS-34; unit `postStylesWizard`                                                                                                        |
+| 027 AC-07 the campaign default           | TC-PS-05, TC-PS-06, TC-PS-35 to TC-PS-37                                                                                                             |
+| 027 AC-08 the prompts                    | unit `postStylesPrompts` (exact text, golden for an unstyled brief)                                                                                  |
+| 027 AC-09 the extractor                  | unit `factsCheckExtract`, `domFacts`                                                                                                                 |
+| 027 AC-10 the seeded acceptance bar      | unit `factsCheckCorpus` (24 or more cases, flagged set equals expected); TC-PS-11                                                                    |
+| 027 AC-11 sources, write points, storage | TC-PS-10, TC-PS-12 to TC-PS-16; unit `factsCheckRefresh`, `postStylesWriters`                                                                        |
+| 027 AC-12 the hold                       | TC-PS-17 to TC-PS-22, TC-PS-38; unit `postStylesHold`                                                                                                |
+| 027 AC-13 the notice and readers         | TC-PS-39, TC-PS-10, TC-PS-25, TC-PS-29; unit `factsCheckNotice`                                                                                      |
+| 027 AC-14 analytics and the page         | TC-PS-40, TC-OBS-31, TC-OBS-22; unit `postStylesAnalytics`                                                                                           |
+| 027 AC-15 the seams                      | TC-PS-11, TC-PS-13, TC-PS-14                                                                                                                         |
+| 027 AC-16 legacy behaviour               | TC-PS-02, TC-PS-03, TC-PS-16, TC-PS-23, TC-PS-34                                                                                                     |
+| 027 AC-17 no new calls                   | the `git grep -c "createMessage\|runClaudeCli\|recordModelCall" -- src` count against the base commit; the `model-selection` suite unchanged         |
+| 027 AC-18 one resolver and purity        | unit `postStylesBoundary`, `designDataBoundary`                                                                                                      |
+| 027 AC-19 the check is fast              | unit `factsCheckCorpus` (the maximum-input timing)                                                                                                   |
+| 027 AC-20 the design system              | unit `uiTokenGuard`; the axe and no-horizontal-scroll checks in the UI cases                                                                         |
+| 027 AC-21 nothing regressed              | the full clean mock run (517/3/0/0), unit (3737/3737), render (47/47), lint 0 errors / 7 warnings, build, `test:upgrade`, CI (pending (the T8 push)) |
+| 027 AC-22 the mock-only acceptance bar   | AC-10 and §AE (a), AC-12 (b), TC-PS-40 (c)                                                                                                           |
 
 The mock suite proves the mechanism with mock replies; it records no real model call.
 
