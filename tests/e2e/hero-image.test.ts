@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client'
 import { loginAs, waitForAction, waitForDraft, type ApiClient } from '../helpers/api'
 import { prisma, dbAvailable } from '../helpers/db'
 import { expectNoAxeViolations } from '../helpers/axe'
+import { archetypes } from '../../src/lib/designData/composition'
 import { ADMIN_EMAIL, ADMIN_PASSWORD, briefDraftIds, mintExportedDraft, pageLogin } from '../helpers/ui'
 
 // §AA — hero imagery: the image-style choice, the fail-closed check, the
@@ -132,7 +133,9 @@ const stamp = (over: Partial<Stamp> & Pick<Stamp, 'requestedArchetype' | 'applie
   imageQuality: 'default',
   ...over,
 })
-const KEPT = (key: string): Stamp => stamp({ requestedArchetype: key, appliedArchetype: key, contractVersion: 1 })
+// 028: the kept version is the look's current one, read from the dataset.
+const KEPT = (key: string): Stamp =>
+  stamp({ requestedArchetype: key, appliedArchetype: key, contractVersion: archetypes[key].current })
 const FELL_BACK = (key: string, reason: string): Stamp =>
   stamp({ requestedArchetype: key, appliedArchetype: 'classic', fallbackReason: reason })
 
@@ -269,16 +272,16 @@ test.describe('§AA — hero imagery, generation and the stamp', () => {
     expect(draft.backgroundSkipped).toBeNull()
   })
 
-  // TC-HERO-09 — STORY is accepted at the API and recorded, never refused.
-  test('TC-HERO-09: a style on 9:16 is accepted and recorded as unsupported-size, on the classic image path', async () => {
+  // TC-HERO-09 — STORY is accepted at the API; since 028 the two looks support it.
+  test('TC-HERO-09: a look on 9:16 is accepted and kept with the v2 contract, on the hero image path', async () => {
     const { draft } = await generate(t, `Hero story __MOCK_BG__ ${Date.now()}`, {
       imageStyle: 'product-showcase',
       aspectRatio: 'STORY',
     })
-    expect(draft.composition).toEqual(FELL_BACK('product-showcase', 'unsupported-size'))
+    expect(draft.composition).toEqual(KEPT('product-showcase'))
+    expect(draft.composition!.contractVersion).toBe(2)
     expect(draft.imageUrl).toMatch(/^https?:\/\/.+\/background-.+\.png$/)
-    expect(draft.compositionNotice).toMatchObject({ reason: 'unsupported-size' })
-    expect(draft.compositionNotice!.message).toContain('9:16')
+    expect(draft.compositionNotice).toBeNull()
   })
 
   // TC-HERO-10 — AC-18: regenerate re-resolves from the brief's style.
@@ -436,7 +439,7 @@ test.describe('§AA — the wizard picker', () => {
     await api.dispose()
   })
 
-  test('TC-HERO-13: Path B only, STORY disabled with its reason, the resets, the Review row, the request body, autosave and resume', async ({
+  test('TC-HERO-13: Path B only, every look enabled at 9:16, the resets, the Review row, the request body, autosave and resume', async ({
     page,
   }) => {
     await pageLogin(page)
@@ -460,16 +463,18 @@ test.describe('§AA — the wizard picker', () => {
     await expect(option('product-showcase')).toBeEnabled()
     await expect(option('editorial-split')).toBeEnabled()
 
-    // 9:16: both hero styles are disabled with the reason, and a chosen one resets.
+    // 9:16 (028): every look is available, and a chosen one stays chosen.
     await option('editorial-split').click()
     await expect(option('editorial-split')).toHaveAttribute('aria-pressed', 'true')
     await page.getByRole('button', { name: /9:16 Story/ }).click()
-    await expect(option('product-showcase')).toBeDisabled()
-    await expect(option('editorial-split')).toBeDisabled()
-    await expect(option('editorial-split')).toContainText('Not available for the 9:16 Story size')
+    await expect(option('product-showcase')).toBeEnabled()
+    await expect(option('editorial-split')).toBeEnabled()
+    await expect(option('editorial-split')).not.toContainText('Not available')
     await expect(option('classic')).toBeEnabled()
-    await expect(option('classic')).toHaveAttribute('aria-pressed', 'true')
-    await expect(option('editorial-split')).toHaveAttribute('aria-pressed', 'false')
+    await expect(option('editorial-split')).toHaveAttribute('aria-pressed', 'true')
+    await expect(option('classic')).toHaveAttribute('aria-pressed', 'false')
+    await option('product-showcase').click()
+    await expect(option('product-showcase')).toHaveAttribute('aria-pressed', 'true')
 
     // Back to 1:1; a Path A switch hides the picker and resets the choice.
     await page.getByRole('button', { name: /1:1 Square/ }).click()

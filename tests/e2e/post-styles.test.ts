@@ -777,7 +777,7 @@ test.describe('The wizard: the post style picker on step 1', () => {
     await expect(page.getByRole('combobox', { name: 'Goal' })).toHaveCount(0)
   })
 
-  test('TC-PS-31: the image style on step 1 is pre-filled from the style, a look picked by hand is kept, 9:16 and Path A fall to Classic', async ({ page }) => {
+  test('TC-PS-31: the image style on step 1 is pre-filled from the style, a look picked by hand is kept (also across 9:16), Path A has none', async ({ page }) => {
     await openStepOne(page)
     await page.getByRole('button', { name: /Path B — Freeform/ }).click()
     await expect(lookCard(page, 'classic')).toHaveAttribute('aria-pressed', 'true')
@@ -799,14 +799,16 @@ test.describe('The wizard: the post style picker on step 1', () => {
     await styleCard(page, 'launch').click()
     await expect(lookCard(page, 'classic')).toHaveAttribute('aria-pressed', 'true')
 
-    // 9:16: the hero looks are not available, so the field reads Classic.
+    // 9:16 (028): the looks are available there too, so a hand-picked Classic
+    // stays Classic across the size change, both ways.
     await lookCard(page, 'classic').click()
     await styleCard(page, 'announcement').click()
     await page.getByRole('button', { name: /9:16 Story/ }).click()
     await expect(lookCard(page, 'classic')).toHaveAttribute('aria-pressed', 'true')
+    await expect(lookCard(page, 'editorial-split')).toBeEnabled()
     await page.getByRole('button', { name: /1:1 Square/ }).click()
-    // The 9:16 reset dropped the hand-pick: the field follows the style again.
-    await expect(lookCard(page, 'editorial-split')).toHaveAttribute('aria-pressed', 'true')
+    // The size change dropped nothing: the hand-pick is still Classic.
+    await expect(lookCard(page, 'classic')).toHaveAttribute('aria-pressed', 'true')
 
     // Path A has no image style at all.
     await page.getByRole('button', { name: /Path A — Template/ }).click()
@@ -838,13 +840,13 @@ test.describe('The wizard: the post style picker on step 1', () => {
     await expect(summary(page, 'Image style')).toHaveText('Product showcase (from the post style)')
     await expect(page.getByRole('term').filter({ hasText: /^Goal$/ })).toHaveCount(0)
 
-    // 9:16 reads Classic on the Review (Path A has no image-style field to read: TC-PS-31).
+    // 9:16 (028): the Launch style still pre-fills its look on the Review (Path A has no image-style field to read: TC-PS-31).
     for (let i = 0; i < 3; i++) await page.getByRole('button', { name: /back/i }).click()
     await expect(page.getByRole('heading', { name: 'Size & Design' })).toBeVisible()
     await page.getByRole('button', { name: /9:16 Story/ }).click()
     for (let i = 0; i < 3; i++) await page.getByRole('button', { name: /continue/i }).click()
     await expect(page.getByRole('heading', { name: 'Review & Generate' })).toBeVisible()
-    await expect(summary(page, 'Image style')).toHaveText('Classic')
+    await expect(summary(page, 'Image style')).toHaveText('Product showcase (from the post style)')
   })
 
   test('TC-PS-33: the request carries postStyle always, and tone and imageStyle only when touched', async ({ page }) => {

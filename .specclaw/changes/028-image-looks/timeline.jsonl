@@ -12,3 +12,7 @@
 {"ev":"start","span":"T3","kind":"task","label":"fixtures","parent":"W2","model":"sonnet","attempt":"1","at":"2026-10-24T19:14:41Z","ts":1792869281}
 {"ev":"stop","span":"T3","at":"2026-10-24T19:22:17Z","ts":1792869737,"status":"ok"}
 {"ev":"start","span":"T5","kind":"task","label":"runner","parent":"W2","model":"sonnet","attempt":"1","at":"2026-10-24T19:22:23Z","ts":1792869743}
+{"ev":"stop","span":"T5","at":"2026-10-24T19:28:24Z","ts":1792870104,"status":"ok"}
+{"ev":"stop","span":"W2","at":"2026-10-24T19:28:24Z","ts":1792870104,"status":"ok"}
+{"ev":"start","span":"W3","kind":"wave","label":"wave 3","at":"2026-10-24T19:28:24Z","ts":1792870104}
+{"ev":"start","span":"T4","kind":"task","label":"e2e","parent":"W3","model":"sonnet","attempt":"1","at":"2026-10-24T19:28:24Z","ts":1792870104}

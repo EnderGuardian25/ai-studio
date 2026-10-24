@@ -103,7 +103,7 @@ This change has **7 tasks in 5 waves**:
 
 ### Wave 3: E2E
 
-- [ ] `T4` — E2E §AF and the existing suites that encoded "STORY unsupported"
+- [x] `T4` — E2E §AF and the existing suites that encoded "STORY unsupported"
   - Files: `tests/e2e/image-looks.test.ts` (new), `tests/e2e/{hero-image,post-styles}.test.ts` (adapt)
   - Estimate: medium
   - Kind: test
