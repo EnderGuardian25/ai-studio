@@ -283,6 +283,7 @@ describe('FR-02: lookups', () => {
         'resolvePostStyle',
         'rulesAtStamp',
         'stampFor',
+        'styleSummary',
       ].sort(),
     )
   })

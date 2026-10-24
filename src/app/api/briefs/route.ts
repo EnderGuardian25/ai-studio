@@ -20,6 +20,7 @@ import {
 import { copyProviderIsClaude } from '@/providers/registry'
 import { loadCaptionRoute } from '@/providers/captionRoute'
 import type { ModelKey, UserSurface } from '@/lib/models/catalogue'
+import { resolvePostStyle } from '@/lib/postStyles'
 import { track } from '@/lib/analytics/track'
 import type { EventPayloadInput } from '@/lib/analytics/catalogue'
 
@@ -50,6 +51,7 @@ export const POST = withTeamAuth(async (req: NextRequest, _ctx, user) => {
     captionModel?: unknown
     designModel?: unknown
     imageStyle?: unknown
+    postStyle?: unknown
     resumed?: unknown
   }
 
@@ -74,11 +76,16 @@ export const POST = withTeamAuth(async (req: NextRequest, _ctx, user) => {
   if (!topic?.trim()) {
     return NextResponse.json({ error: 'topic is required' }, { status: 400 })
   }
-  if (!goal?.trim()) {
-    return NextResponse.json({ error: 'goal is required' }, { status: 400 })
+  // 027 FR-06: goal and tone are optional. A body goal is only a legacy hint to
+  // the resolver (it picks a style when no postStyle is sent) and is never stored.
+  if (body.postStyle != null && typeof body.postStyle !== 'string') {
+    return NextResponse.json({ error: 'postStyle must be a string' }, { status: 400 })
   }
-  if (!tone?.trim()) {
-    return NextResponse.json({ error: 'tone is required' }, { status: 400 })
+  if (goal != null && typeof goal !== 'string') {
+    return NextResponse.json({ error: 'goal must be a string' }, { status: 400 })
+  }
+  if (tone != null && typeof tone !== 'string') {
+    return NextResponse.json({ error: 'tone must be a string' }, { status: 400 })
   }
   if (!Array.isArray(channels) || channels.length === 0) {
     return NextResponse.json({ error: 'channels must be a non-empty array' }, { status: 400 })
@@ -218,6 +225,25 @@ export const POST = withTeamAuth(async (req: NextRequest, _ctx, user) => {
     return NextResponse.json({ error: 'Brand kit not found' }, { status: 404 })
   }
 
+  // 027 FR-06: the one resolution of the post style (explicit key, else the
+  // legacy goal, else the campaign default, else General). An unknown key is a
+  // 400 and never degrades to "no style".
+  const resolved = resolvePostStyle({
+    style: body.postStyle as string | null | undefined,
+    legacyGoal: goal,
+    campaign: campaign ? { defaultPostStyle: campaign.defaultPostStyle, defaultTone: campaign.defaultTone } : null,
+    explicit: { tone, imageStyle: body.imageStyle == null ? null : style.value },
+    path: designMode === 'TEMPLATE' ? 'A' : 'B',
+    aspectRatio: aspectRatio ?? 'SQUARE',
+    surface: 'briefs-api',
+  })
+  if (!resolved.ok) {
+    return NextResponse.json({ error: resolved.message, code: resolved.code }, { status: 400 })
+  }
+  // An explicitly sent image style is stored as given (009 FR-03: STORY is
+  // accepted and recorded); an absent one comes from the style's default.
+  const imageStyle = body.imageStyle == null ? resolved.imageStyle : style.value
+
   // Each pick is checked against the caller's effective set for its surface
   // now (tier 1: a refusal is FR-17's 400), so only an allowed model is
   // stored. Once stored it is history: a later policy change makes the
@@ -244,12 +270,13 @@ export const POST = withTeamAuth(async (req: NextRequest, _ctx, user) => {
       userId: user.userId,
       topic: topic.trim(),
       description: description?.trim() ?? null,
-      goal: goal.trim(),
-      tone: tone.trim(),
+      postStyle: resolved.key,
+      goal: resolved.goal,
+      tone: resolved.tone,
       channels: normalizedChannels,
       aspectRatio: aspectRatio ?? 'SQUARE',
       designMode: designMode as DesignMode,
-      imageStyle: style.value,
+      imageStyle,
       campaignId: campaignId ?? null,
       brandKitId: brandKitId ?? null,
       copyProviderKey: resolvedCopyKey,
@@ -273,7 +300,7 @@ export const POST = withTeamAuth(async (req: NextRequest, _ctx, user) => {
     payload: {
       path: designMode === 'TEMPLATE' ? 'A' : 'B',
       aspectRatio: brief.aspectRatio,
-      imageStyle: style.value as EventPayloadInput<'brief.submitted'>['imageStyle'],
+      imageStyle: imageStyle as EventPayloadInput<'brief.submitted'>['imageStyle'],
       resumed: body.resumed === true,
     },
   })

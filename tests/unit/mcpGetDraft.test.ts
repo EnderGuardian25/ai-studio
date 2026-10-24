@@ -162,6 +162,9 @@ describe('getDraft', () => {
       imageUrl: 'https://minio.test/bg.png',
       exportUrl: 'https://minio.test/signed.png',
       status: 'EXPORTED',
+      // 027 FR-13: a draft with no stamp and no stored check reads null.
+      postStyle: null,
+      factsCheck: null,
     })
   })
 
@@ -223,6 +226,10 @@ describe('generatePost', () => {
         { channel: 'INSTAGRAM', text: IG_TEXT, status: 'READY' },
         { channel: 'LINKEDIN', text: LI_TEXT, status: 'READY' },
       ],
+      // 027 FR-13: the style the brief resolved to (goal 'awareness' maps to nothing) and
+      // the stored check; this draft has none.
+      postStyle: 'general',
+      factsCheck: null,
     })
   })
 
@@ -252,6 +259,71 @@ describe('generatePost', () => {
     h.generateDraftForBrief.mockRejectedValue(new Error(noCredential))
     await expect(generatePost(args)).rejects.toThrow(noCredential)
     expect(h.withClaudeAuth).toHaveBeenCalledWith(null, 'team1', expect.any(Function))
+  })
+})
+
+// ── post styles (027 FR-06, FR-13) ──────────────────────────────────────────
+
+describe('generatePost — post styles', () => {
+  const noStyleArgs = { topic: 'Launch', channels: ['INSTAGRAM'], designMode: 'GENERATE' as const, teamId: 'team1' }
+  const stored = { v: 1, status: 'flagged', checkedAt: '2026-10-25T00:00:00.000Z', flagged: [{ kind: 'cur', value: '$49', where: 'INSTAGRAM' }] }
+
+  beforeEach(() => {
+    h.briefCreate.mockResolvedValue({ id: 'b1', teamId: 'team1' })
+    h.generateDraftForBrief.mockResolvedValue({ draft: { ...draftRow(), factsCheck: stored }, backgroundImageUrl: null })
+  })
+
+  const created = () => h.briefCreate.mock.calls[0][0].data
+
+  it('goal and tone are optional; no style resolves to general and is returned', async () => {
+    const out = await generatePost(noStyleArgs)
+    expect(created()).toMatchObject({ postStyle: 'general', imageStyle: 'classic' })
+    expect(out.postStyle).toBe('general')
+  })
+
+  it('an explicit postStyle is stored with the style goal; the goal sent is ignored', async () => {
+    const out = await generatePost({ ...noStyleArgs, postStyle: 'promotion', goal: 'hiring', tone: 'casual' })
+    expect(created()).toMatchObject({ postStyle: 'promotion', tone: 'casual' })
+    expect(created().goal).not.toBe('hiring')
+    expect(out.postStyle).toBe('promotion')
+  })
+
+  it('a legacy goal of hiring picks the hiring style only when no postStyle is given', async () => {
+    await generatePost({ ...noStyleArgs, goal: 'hiring', tone: 'bold' })
+    expect(created().postStyle).toBe('hiring')
+  })
+
+  it('an unknown key is a named error: no brief and no generation', async () => {
+    await expect(generatePost({ ...noStyleArgs, postStyle: 'nope' })).rejects.toThrow("Unknown post style 'nope'")
+    expect(h.briefCreate).not.toHaveBeenCalled()
+    expect(h.generateDraftForBrief).not.toHaveBeenCalled()
+  })
+
+  it('returns the stored facts check as { status, flagged } and getDraft returns the same two fields', async () => {
+    const out = await generatePost(noStyleArgs, 'acp')
+    expect(out.factsCheck).toEqual({ status: 'flagged', flagged: stored.flagged })
+    h.draftFindUnique.mockImplementation(async (args) => ({
+      ...selected(args),
+      postStyle: { key: 'event', version: 1, revision: 1 },
+      factsCheck: stored,
+    }))
+    const read = await getDraft({ id: 'd1', teamId: 'team1' })
+    expect(read.postStyle).toBe('event')
+    expect(read.factsCheck).toEqual({ status: 'flagged', flagged: stored.flagged })
+  })
+
+  it('an unreadable stored check reads null, never throws', async () => {
+    h.generateDraftForBrief.mockResolvedValue({ draft: { ...draftRow(), factsCheck: { nonsense: true } }, backgroundImageUrl: null })
+    expect((await generatePost(noStyleArgs)).factsCheck).toBeNull()
+  })
+
+  it('the manifest is version 1.2.0 and drops goal and tone from required', () => {
+    expect(AGENT_MANIFEST.version).toBe('1.2.0')
+    const cap = AGENT_MANIFEST.capabilities.find((c) => c.name === 'generate_post')!
+    const input = cap.input as unknown as { required: string[]; properties: Record<string, { enum?: string[] }> }
+    expect(input.required).toEqual(['topic', 'channels', 'designMode'])
+    expect(input.properties.postStyle.enum).toContain('general')
+    expect(input.properties).toHaveProperty('goal')
   })
 })
 

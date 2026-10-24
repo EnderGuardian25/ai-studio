@@ -53,3 +53,15 @@ export function rulesAtStamp(
   if (!version) return null
   return scope ? version.checklist.filter((r) => r.scope === scope) : version.checklist
 }
+
+// What a reader of a draft sees of its stamp (027 FR-13): the key, the label
+// and the version. The label falls back to the key when the style is no longer
+// in the dataset. Null when the stamp is null or unreadable.
+export function styleSummary(
+  stamp: unknown,
+  source?: Readonly<Record<string, PostStyle>>,
+): { key: string; label: string; version: number } | null {
+  const s = parsePostStyleStamp(stamp)
+  if (!s) return null
+  return { key: s.key, label: getStyle(s.key, source)?.label ?? s.key, version: s.version }
+}

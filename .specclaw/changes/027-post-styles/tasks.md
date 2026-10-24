@@ -105,7 +105,7 @@ This is phase a. Phase b (STORY layouts, the five new looks, pixel-check changes
 
 ### Wave 5: Surfaces and scheduler
 
-- [ ] `T5` — Briefs, queue, campaign, MCP and ACP inputs; the HOLD downgrade; the draft and tool readers; E2E §AE (server cases)
+- [x] `T5` — Briefs, queue, campaign, MCP and ACP inputs; the HOLD downgrade; the draft and tool readers; E2E §AE (server cases)
   - Files: `src/app/api/briefs/route.ts`, `src/app/api/campaigns/{route,[id]/route}.ts`, `src/app/api/campaigns/[id]/queue/{route,[gid]/route,batch/route,[gid]/rerun/route}.ts`, `src/lib/campaign/queue.ts`, `src/lib/scheduler/generationRunner.ts`, `src/mcp/{server.ts,tools/generate.ts}`, `src/acp/agent.ts`, `src/app/api/acp/run/route.ts`, `src/app/api/drafts/[id]/route.ts`, `src/lib/api-types.ts`, `tests/unit/{postStylesApi,postStylesHold,mcpGetDraft}.test.ts`, `tests/e2e/post-styles.test.ts` (new)
   - Estimate: large
   - Kind: impl

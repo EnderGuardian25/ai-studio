@@ -9,6 +9,7 @@ import type { AspectRatio, Channel, DesignMode, TeamRole } from '@prisma/client'
 import type { Role } from '@/lib/auth'
 import type { BackgroundSkipped } from '@/lib/drafts/backgroundNotice'
 import type { CompositionNotice } from '@/lib/drafts/compositionNotice'
+import type { FactsCheck } from '@/lib/factsCheck/types'
 import type { CompositionStamp } from '@/lib/designData'
 import type { ModelKey, ModelSpeed, ModelTier, UserSurface } from '@/lib/models/catalogue'
 import type { CredentialTier, PipelineMode } from '@/lib/models/resolve'
@@ -108,6 +109,8 @@ export interface Campaign {
   id: string
   name: string
   defaultTone: string | null
+  // 027 FR-08: a post style key, or null (the wizard then falls to General).
+  defaultPostStyle: string | null
   isDeleted: boolean
   brandKit: BrandKitRef | null
   projects: Array<{ project: ProjectRef }>
@@ -137,6 +140,8 @@ export interface ScheduledGeneration {
   description: string | null
   goal: string
   tone: string
+  // 027 FR-06: the resolved key (null = a pre-027 entry).
+  postStyle: string | null
   channels: Channel[]
   aspectRatio: AspectRatio
   designMode: DesignMode
@@ -147,6 +152,8 @@ export interface ScheduledGeneration {
   publishAt: string | null
   status: GenerationStatus
   errorReason: string | null
+  // 027 FR-12: why an auto-publish action was not run (null = nothing held).
+  heldReason: string | null
   retryCount: number
   nextRetryAt: string | null
   briefId: string | null
@@ -378,6 +385,10 @@ export interface DraftDetail {
   // and the plain-language notice derived from it (null = nothing to say).
   composition: CompositionStamp | null
   compositionNotice: CompositionNotice | null
+  // 027 FR-13: the stored facts check (null = never checked) and the post
+  // style the draft was made with (null = before 027).
+  factsCheck: FactsCheck | null
+  postStyle: { key: string; label: string; version: number } | null
   createdAt: string
   revisionCount: number
   currentRevisionNumber: number | null

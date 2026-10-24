@@ -16,6 +16,7 @@ export {
   parsePostStyleStamp,
   stampFor,
   rulesAtStamp,
+  styleSummary,
   derivedPromptVersion,
   type PostStyleStamp,
 } from './stamp'

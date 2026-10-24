@@ -5,6 +5,9 @@ import { findLivePost } from "../publish/publishDraft"
 import { withClaudeAuth } from "../agent/userToken"
 import { isClaudeUsageLimit } from "../agent/claudeCli"
 import { track } from "../analytics/track"
+import { resolvePostStyle } from "../postStyles"
+import { parseFactsCheck } from "../factsCheck/types"
+import { checkHoldsPublish, heldReasonFor } from "./heldReason"
 
 // Generation is expensive (a design run is minutes of model time), so fewer
 // retries than the publish scheduler's 5.
@@ -71,6 +74,36 @@ async function ensureBrief(entry: ScheduledGeneration) {
     const existing = await prisma.brief.findUnique({ where: { id: entry.briefId } })
     if (existing) return existing
   }
+  // 027 FR-12: a stored key is resolved again now, at the latest version, and a
+  // key that no longer resolves fails the entry with a named reason (never "no
+  // style", never a post action). A null key is a pre-027 entry: its own goal
+  // and tone stand and it gets no checklist (FR-16).
+  let style: { postStyle: string | null; goal: string; tone: string; imageStyle: string } = {
+    postStyle: null,
+    goal: entry.goal,
+    tone: entry.tone,
+    imageStyle: "classic",
+  }
+  if (entry.postStyle != null) {
+    // The campaign's tone default matters only when the entry stored no tone.
+    const campaign =
+      entry.campaignId && !entry.tone?.trim()
+        ? await prisma.campaign.findUnique({
+            where: { id: entry.campaignId },
+            select: { defaultPostStyle: true, defaultTone: true },
+          })
+        : null
+    const resolved = resolvePostStyle({
+      style: entry.postStyle,
+      campaign,
+      explicit: { tone: entry.tone },
+      path: entry.designMode === "TEMPLATE" ? "A" : "B",
+      aspectRatio: entry.aspectRatio,
+      surface: "queue",
+    })
+    if (!resolved.ok) throw new Error(`Post style "${entry.postStyle}" is not available`)
+    style = { postStyle: resolved.key, goal: resolved.goal, tone: resolved.tone, imageStyle: resolved.imageStyle }
+  }
   const brief = await prisma.brief.create({
     data: {
       teamId: entry.teamId,
@@ -78,8 +111,10 @@ async function ensureBrief(entry: ScheduledGeneration) {
       campaignId: entry.campaignId,
       topic: entry.topic,
       description: entry.description,
-      goal: entry.goal,
-      tone: entry.tone,
+      postStyle: style.postStyle,
+      goal: style.goal,
+      tone: style.tone,
+      imageStyle: style.imageStyle,
       channels: entry.channels,
       aspectRatio: entry.aspectRatio,
       designMode: entry.designMode,
@@ -181,7 +216,15 @@ export async function runGenerationJobs(): Promise<void> {
         )
       )
 
-      await executePostAction(entry, draft)
+      // 027 FR-12: an unattended post action runs only on a clear facts check.
+      // A flagged or errored check (or a missing one: fail closed) holds the
+      // post for a person; the entry still completes, since the generation worked.
+      let heldReason: string | null = null
+      if (entry.postAction !== "HOLD") {
+        const check = parseFactsCheck((draft as { factsCheck?: unknown }).factsCheck)
+        if (checkHoldsPublish(check)) heldReason = heldReasonFor(check)
+      }
+      if (heldReason === null) await executePostAction(entry, draft)
 
       await prisma.scheduledGeneration.update({
         where: { id: entry.id },
@@ -190,6 +233,7 @@ export async function runGenerationJobs(): Promise<void> {
           draftId: draft.id,
           errorReason: null,
           nextRetryAt: null,
+          heldReason,
         },
       })
       console.log(`[generation] entry ${entry.id} → COMPLETED (draft ${draft.id})`)

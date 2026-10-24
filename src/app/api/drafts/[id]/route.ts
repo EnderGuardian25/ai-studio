@@ -10,6 +10,8 @@ import { planDraftRecovery, STUCK_ACTION_REASON, STUCK_REASON } from '@/lib/draf
 import { COMMITTED_REVISION, draftCompositionStamp, resolveNotAppliedOutcome } from '@/lib/drafts/revisions'
 import { backgroundSkippedFor } from '@/lib/drafts/backgroundNotice'
 import { compositionNoticeFor } from '@/lib/drafts/compositionNotice'
+import { styleSummary } from '@/lib/postStyles'
+import { parseFactsCheck } from '@/lib/factsCheck/types'
 import { parseCaptionPatch } from '@/lib/captions/requests'
 import { validateHeadline } from '@/lib/captions/headline'
 import { loadDraftCaptions, saveCaptionEdit, saveHeadlineEdit, settlePendingCaptions } from '@/lib/captions/store'
@@ -199,6 +201,10 @@ async function loadDraft(id: string) {
     // 009 FR-15: the tolerant parse (null on anything unreadable) and its notice.
     composition,
     compositionNotice: compositionNoticeFor(composition),
+    // 027 FR-13: the stored facts check (tolerant parse, null on anything
+    // unreadable) and the post-style stamp as { key, label, version } or null.
+    factsCheck: parseFactsCheck(draft.factsCheck),
+    postStyle: styleSummary(draft.postStyle),
     createdAt: draft.createdAt,
     revisionCount: draft._count.revisions,
     currentRevisionNumber: draft.currentRevisionNumber,

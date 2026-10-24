@@ -97,6 +97,7 @@ describe('runGenerationJobs — per-job team credentials (Task 14)', () => {
         draftId: 'draft-1',
         errorReason: null,
         nextRetryAt: null,
+        heldReason: null,
       },
     })
   })

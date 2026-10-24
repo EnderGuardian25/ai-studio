@@ -5,11 +5,16 @@ import { resolveExportUrl } from '@/lib/storage/minio'
 import { getSystemUserId } from '@/mcp/systemUser'
 import { withClaudeAuth } from '@/lib/agent/userToken'
 import { loadDraftCaptions } from '@/lib/captions/store'
+import { resolvePostStyle, styleSummary } from '@/lib/postStyles'
+import { parseFactsCheck } from '@/lib/factsCheck/types'
 
 interface GeneratePostArgs {
   topic: string
-  goal: string
-  tone: string
+  /** Legacy (027): picks a style only when no postStyle is given; ignored otherwise. */
+  goal?: string
+  tone?: string
+  /** 027: a post style key (see the tool schema). An unknown key is an error. */
+  postStyle?: string
   channels: string[]
   designMode: 'TEMPLATE' | 'GENERATE'
   copyProviderKey?: string
@@ -24,7 +29,7 @@ interface GeneratePostArgs {
 // precedence, the team's model policy and system defaults (src/lib/models),
 // and CLI/API dispatch can never drift from the app. TEMPLATE mode needs a
 // template selection this surface doesn't have.
-export async function generatePost(args: GeneratePostArgs) {
+export async function generatePost(args: GeneratePostArgs, surface: 'mcp' | 'acp' = 'mcp') {
   // Channel enum values are uppercase; tolerate lowercase from older callers.
   // Only publishable channels are accepted (010, WhatsApp posting, was dropped on 2026-10-23).
   const channels = args.channels.map((c: string) => c.toUpperCase())
@@ -42,15 +47,30 @@ export async function generatePost(args: GeneratePostArgs) {
   // campaign lookup. An explicit campaignId still must belong to that same
   // team — otherwise the new Brief would reference a campaign (and inherit
   // its brand-kit precedence) the caller has no claim to.
+  let campaign: { teamId: string; defaultPostStyle: string | null; defaultTone: string | null } | null = null
   if (args.campaignId) {
-    const campaign = await prisma.campaign.findFirst({
+    campaign = await prisma.campaign.findFirst({
       where: { id: args.campaignId, isDeleted: false },
-      select: { teamId: true },
+      select: { teamId: true, defaultPostStyle: true, defaultTone: true },
     })
     if (!campaign || campaign.teamId !== args.teamId) {
       throw new Error(`Campaign ${args.campaignId} not found`)
     }
   }
+
+  // 027 FR-06: the one resolution (explicit key, else the legacy goal, else the
+  // campaign default, else General). An unknown key is a named error; it never
+  // degrades to "no style". Unattended, so any image style resolves to classic.
+  const resolved = resolvePostStyle({
+    style: args.postStyle,
+    legacyGoal: args.goal,
+    campaign,
+    explicit: { tone: args.tone },
+    path: 'B',
+    aspectRatio: 'SQUARE',
+    surface: surface,
+  })
+  if (!resolved.ok) throw new Error(resolved.message)
 
   // Create the Brief row first so copy + design run off the same record the
   // web pipeline would use.
@@ -60,8 +80,10 @@ export async function generatePost(args: GeneratePostArgs) {
       userId: await getSystemUserId(args.teamId),
       topic: args.topic,
       description: args.description,
-      goal: args.goal,
-      tone: args.tone,
+      postStyle: resolved.key,
+      goal: resolved.goal,
+      tone: resolved.tone,
+      imageStyle: resolved.imageStyle,
       channels,
       designMode: args.designMode,
       copyProviderKey: args.copyProviderKey ?? 'env-default',
@@ -94,6 +116,8 @@ export async function generatePost(args: GeneratePostArgs) {
       htmlContent: draft.htmlContent,
       headline: draft.headline,
       captions: await captionList(draft.id),
+      postStyle: resolved.key,
+      factsCheck: factsCheckResult(draft.factsCheck),
     }
   } catch (err) {
     if (err instanceof NoBrandKitError) {
@@ -103,6 +127,13 @@ export async function generatePost(args: GeneratePostArgs) {
     }
     throw err
   }
+}
+
+// The facts check as a machine caller sees it (027 FR-13): the status and the
+// flagged values with where they are, never any text. Null = never checked.
+function factsCheckResult(raw: unknown) {
+  const check = parseFactsCheck(raw)
+  return check ? { status: check.status, flagged: check.flagged } : null
 }
 
 // The external caption list (012 FR-17): one `{channel, text, status}` per
@@ -116,7 +147,15 @@ async function captionList(draftId: string) {
 export async function getDraft(args: { id: string; teamId: string }) {
   const draft = await prisma.draft.findUnique({
     where: { id: args.id },
-    select: { headline: true, imageUrl: true, exportUrl: true, status: true, teamId: true },
+    select: {
+      headline: true,
+      imageUrl: true,
+      exportUrl: true,
+      status: true,
+      teamId: true,
+      postStyle: true,
+      factsCheck: true,
+    },
   })
   // Task 13 (reviewer follow-up): same team-bound guard as publishPost — a
   // draft belonging to a different team (or the pre-tenancy null) reads as
@@ -124,9 +163,11 @@ export async function getDraft(args: { id: string; teamId: string }) {
   if (!draft || draft.teamId !== args.teamId) throw new Error(`Draft ${args.id} not found`)
   const captions = await captionList(args.id)
   // exportUrl is stored as an EXPORTS object key — sign it for the caller.
-  const { teamId: _teamId, ...rest } = draft
+  const { teamId: _teamId, postStyle, factsCheck, ...rest } = draft
   return {
     ...rest,
+    postStyle: styleSummary(postStyle)?.key ?? null,
+    factsCheck: factsCheckResult(factsCheck),
     captions,
     exportUrl: await resolveExportUrl(draft.exportUrl),
   }

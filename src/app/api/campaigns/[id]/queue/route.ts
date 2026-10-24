@@ -1,7 +1,14 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { withTeamAuth, parseBody } from '@/lib/api/handler'
-import { queueEntrySchema, requiresAdmin, validateTemplateSelection, toEntryCreateData } from '@/lib/campaign/queue'
+import {
+  queueEntrySchema,
+  requiresAdmin,
+  validateTemplateSelection,
+  toEntryCreateData,
+  loadCampaignStyleDefaults,
+  resolveEntryStyle,
+} from '@/lib/campaign/queue'
 
 type Params = { id: string }
 
@@ -59,8 +66,12 @@ export const POST = withTeamAuth<Params>(async (req, { params }, user) => {
   const templateError = await validateTemplateSelection(params.id, entry, campaign.teamId)
   if (templateError) return templateError
 
+  // 027 FR-06: resolve the style (an unknown key is a 400, never "no style").
+  const style = resolveEntryStyle(await loadCampaignStyleDefaults(params.id), entry)
+  if (!style.ok) return style.response
+
   const created = await prisma.scheduledGeneration.create({
-    data: toEntryCreateData(params.id, user.userId, entry, campaign.teamId),
+    data: toEntryCreateData(params.id, user.userId, entry, campaign.teamId, style.style),
     include: ENTRY_INCLUDE,
   })
 
