@@ -5,7 +5,7 @@ import { runWithClaudeAuth } from '@/lib/agent/claudeAuth'
 import { NOT_APPLIED_CLEARED, discardNotAppliedRender } from '@/lib/drafts/revisions'
 import { CLAIM_RELEASED, claimData, claimWhere, logLostClaim, newClaimId, type DraftClaim } from '@/lib/drafts/claim'
 import { track } from '@/lib/analytics/track'
-import type { ActionTrace } from '@/lib/analytics/trace'
+import { newUsage, usageFields, withUsage, type ActionTrace } from '@/lib/analytics/trace'
 
 // Lifecycle of an async draft action (regenerate copy/design, refine) — the
 // F1 background pattern applied to actions on an existing draft. A route
@@ -148,11 +148,12 @@ export async function startDraftAction(
   const auth = await resolveClaudeAuth(userId, teamId)
   if (trace) trace.startedAt = Date.now()
   const run = async () => {
+    const usage = newUsage()
     let settled: boolean
     let outcome: 'ok' | 'not-applied' | 'conflict' | 'failed'
     let failureReason: string | undefined
     try {
-      const completion = await runWithClaudeAuth(auth, work)
+      const completion = await runWithClaudeAuth(auth, () => withUsage(usage, work))
       if (completion === 'not-applied') {
         settled = await releaseDraftAction(draftId, claim)
         outcome = 'not-applied'
@@ -180,7 +181,7 @@ export async function startDraftAction(
         draftId,
         durationMs: Date.now() - trace.startedAt,
         outcome,
-        payload: { ...trace.fields, action: claim.action, ...(failureReason ? { failureReason } : {}) },
+        payload: { ...trace.fields, ...usageFields(usage), action: claim.action, ...(failureReason ? { failureReason } : {}) },
       })
     }
   }

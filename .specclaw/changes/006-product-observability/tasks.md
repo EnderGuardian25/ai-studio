@@ -95,7 +95,7 @@ Waves 4 and 5 are the user's staged scope (2026-10-23): each is independently sh
 
 ### Wave 5 — Token counts
 
-- [ ] `T5` — The usage accumulator, API-mode token counts and the token section
+- [x] `T5` — The usage accumulator, API-mode token counts and the token section
   - Files: `src/lib/analytics/trace.ts` (`withUsage`, `addUsage`), `src/lib/models/anthropicCall.ts`, `src/lib/agent/generateDraft.ts`, `src/lib/drafts/draftActions.ts`, `src/lib/analytics/queries.ts` (`durations` tokens), `src/components/admin/insights/*` (token columns), `tests/unit/analyticsUsage.test.ts` (new), `tests/e2e/analytics.test.ts` (token case)
   - Estimate: small
   - Kind: impl

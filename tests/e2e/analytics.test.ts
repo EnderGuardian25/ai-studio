@@ -5,7 +5,7 @@ import { expectNoAxeViolations } from '../helpers/axe'
 import { ADMIN_EMAIL, expectNoHorizontalScroll, pageLogin } from '../helpers/ui'
 
 // §AD — Product observability (change 006: TC-OBS-01 onward; the wizard
-// cases, TC-OBS-23 to TC-OBS-29, come before the privacy check, which stays last). The event store is written by the server's own
+// cases, TC-OBS-23 to TC-OBS-30, come before the privacy check, which stays last). The event store is written by the server's own
 // settle points and read by one super-admin page, so the cases below drive the
 // real flows under MOCK_AI and read the events back through the test seam
 // GET/DELETE/POST /api/test/analytics-events (404 in prod, 404 without MOCK_AI,
@@ -955,6 +955,38 @@ test.describe('§AD — product observability', () => {
     await expect(page.getByTestId('funnel-rate-submitted-resumed')).toHaveText('–')
     await expect(page.getByTestId('funnel-abandoned-expired')).toHaveText('3')
     await expect(page.getByTestId('funnel-abandoned-discarded')).toHaveText('1')
+  })
+
+  test('TC-OBS-30: token totals count reported events only, and the page shows the not-reported share', async ({ page }) => {
+    if (!MOCKED()) { test.skip(); return }
+    // The MOCK_AI seam bypasses createMessage, so the events are seeded; the
+    // summing itself is proven by tests/unit/analyticsUsage.test.ts.
+    await clearStore(admin)
+    const team = await findTeamIdByName(admin, 'Bistec')
+    const gen = (hoursAgo: number, route: string, tokens: [number, number] | null) => ({
+      name: 'generation.finished', source: 'web', teamId: team, userId: 'u1', draftId: null, outcome: 'ok', durationMs: 10000,
+      at: new Date(Date.now() - hoursAgo * 3600_000).toISOString(),
+      payload: { designModel: { model: 'SONNET' }, captionRoute: route, inputTokens: tokens ? tokens[0] : null, outputTokens: tokens ? tokens[1] : null },
+    })
+    await seed(admin, [
+      gen(1, 'API_KEY', [1000, 200]), gen(2, 'API_KEY', [500, 100]), gen(3, 'API_KEY', null),
+      gen(4, 'CLI', null), gen(5, 'CLI', null),
+    ])
+    const rows = (await (await admin.get('/api/admin/insights?range=7d')).json()).durations
+    const api = rows.find((d: { route: string }) => d.route === 'API_KEY')
+    const cli = rows.find((d: { route: string }) => d.route === 'CLI')
+    expect(api).toMatchObject({ n: 3, inputTokens: 1500, outputTokens: 300, notReported: 1 })
+    expect(cli).toMatchObject({ n: 2, inputTokens: 0, outputTokens: 0, notReported: 2 })
+
+    await pageLogin(page)
+    await page.goto('/admin/insights')
+    await expect(page.getByTestId('insights-body')).toBeVisible()
+    const apiRow = page.getByTestId('duration-generation-SONNET-API_KEY')
+    await expect(apiRow).toContainText('1,500')
+    await expect(apiRow).toContainText('300')
+    await expect(apiRow).toContainText('33%')
+    const cliRow = page.getByTestId('duration-generation-SONNET-CLI')
+    await expect(cliRow).toContainText('100%')
   })
 
   // ── Privacy (AC-04) ──────────────────────────────────────────────────────

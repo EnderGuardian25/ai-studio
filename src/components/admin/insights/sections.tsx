@@ -146,14 +146,17 @@ export function DurationsSection({ data }: { data: Insights['durations'] }) {
     { key: 'n', header: 'Runs', align: 'right', cell: (r) => r.n },
     { key: 'p50', header: 'p50', align: 'right', cell: (r) => ms(r.p50) },
     { key: 'p90', header: 'p90', align: 'right', cell: (r) => ms(r.p90) },
+    { key: 'tin', header: 'Input tokens', align: 'right', cell: (r) => (r.notReported >= r.n ? '–' : r.inputTokens.toLocaleString('en-US')) },
+    { key: 'tout', header: 'Output tokens', align: 'right', cell: (r) => (r.notReported >= r.n ? '–' : r.outputTokens.toLocaleString('en-US')) },
+    { key: 'nr', header: 'Not reported', align: 'right', cell: (r) => `${Math.round((r.notReported / r.n) * 100)}%` },
   ]
   return (
     <InsightSection
       id="durations"
       title="Model and route choices"
-      question="How long each surface takes by model and caption route (successful runs only)."
+      question="How long each surface takes by model and caption route, and the tokens it used (successful runs only). Token totals count only runs that reported usage; the Claude CLI route reports none, so its share shows under Not reported."
     >
-      <DataTable label="Duration by surface, model and route" columns={cols} rows={data} rowKey={(r) => `${r.surface}|${r.model}|${r.route}`} rowTestId={(r) => `duration-${r.surface}-${r.model ?? 'none'}-${r.route ?? 'none'}`} minWidth={560} />
+      <DataTable label="Duration by surface, model and route" columns={cols} rows={data} rowKey={(r) => `${r.surface}|${r.model}|${r.route}`} rowTestId={(r) => `duration-${r.surface}-${r.model ?? 'none'}-${r.route ?? 'none'}`} minWidth={760} />
     </InsightSection>
   )
 }

@@ -11,3 +11,6 @@
 {"ev":"stop","span":"T3","at":"2026-10-24T09:14:32Z","ts":1792833272,"status":"ok"}
 {"ev":"stop","span":"W3","at":"2026-10-24T09:14:32Z","ts":1792833272,"status":"ok"}
 {"ev":"start","span":"W4","kind":"wave","label":"wave 4","at":"2026-10-24T09:14:59Z","ts":1792833299}
+{"ev":"stop","span":"T4","at":"2026-10-24T09:34:26Z","ts":1792834466,"status":"ok"}
+{"ev":"stop","span":"W4","at":"2026-10-24T09:34:27Z","ts":1792834467,"status":"ok"}
+{"ev":"start","span":"W5","kind":"wave","label":"wave 5","at":"2026-10-24T09:34:27Z","ts":1792834467}

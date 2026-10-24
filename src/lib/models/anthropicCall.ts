@@ -15,6 +15,7 @@ import type {
 } from '@anthropic-ai/sdk/resources/messages'
 import type { ResolvedModel } from './resolve'
 import { modelCallFor, recordModelCall } from './modelCalls'
+import { addUsage } from '@/lib/analytics/trace'
 
 /**
  * The model declined the request (stop_reason "refusal"). There is no
@@ -90,6 +91,8 @@ export async function createMessage(
       .stop_details?.category
     throw new ModelRefusalError(typeof category === 'string' && category ? category : null)
   }
+  // 006 FR-09: counted only inside an emitter's accumulator; a no-op otherwise.
+  addUsage(message.usage)
   return message
 }
 

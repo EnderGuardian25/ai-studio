@@ -298,6 +298,11 @@ export interface DurationRow {
   n: number
   p50: number
   p90: number
+  /** Totals over events that reported tokens only (006 FR-09). */
+  inputTokens: number
+  outputTokens: number
+  /** Events of this row with no usage reported (CLI runs). */
+  notReported: number
 }
 
 async function durations({ from, to }: DateRange) {
@@ -307,7 +312,10 @@ async function durations({ from, to }: DateRange) {
            payload->>'captionRoute' AS route,
            count(*)::int AS n,
            (percentile_cont(0.5) WITHIN GROUP (ORDER BY "durationMs"))::float8 AS p50,
-           (percentile_cont(0.9) WITHIN GROUP (ORDER BY "durationMs"))::float8 AS p90
+           (percentile_cont(0.9) WITHIN GROUP (ORDER BY "durationMs"))::float8 AS p90,
+           COALESCE(sum((payload->>'inputTokens')::bigint), 0)::float8 AS "inputTokens",
+           COALESCE(sum((payload->>'outputTokens')::bigint), 0)::float8 AS "outputTokens",
+           (count(*) FILTER (WHERE payload->>'inputTokens' IS NULL))::int AS "notReported"
     FROM "AnalyticsEvent"
     WHERE name = 'generation.finished' AND outcome = 'ok' AND "durationMs" IS NOT NULL
       AND "at" >= ${from} AND "at" < ${to}
@@ -318,7 +326,10 @@ async function durations({ from, to }: DateRange) {
            NULL::text AS route,
            count(*)::int AS n,
            (percentile_cont(0.5) WITHIN GROUP (ORDER BY "durationMs"))::float8 AS p50,
-           (percentile_cont(0.9) WITHIN GROUP (ORDER BY "durationMs"))::float8 AS p90
+           (percentile_cont(0.9) WITHIN GROUP (ORDER BY "durationMs"))::float8 AS p90,
+           COALESCE(sum((payload->>'inputTokens')::bigint), 0)::float8 AS "inputTokens",
+           COALESCE(sum((payload->>'outputTokens')::bigint), 0)::float8 AS "outputTokens",
+           (count(*) FILTER (WHERE payload->>'inputTokens' IS NULL))::int AS "notReported"
     FROM "AnalyticsEvent"
     WHERE name = 'draft_action.settled' AND outcome = 'ok' AND "durationMs" IS NOT NULL
       AND "at" >= ${from} AND "at" < ${to}

@@ -12,6 +12,7 @@ import { humanizeGenerationError } from '@/lib/agent/generationErrors'
 import { generationSkipFields, type BackgroundSkipFields } from '@/lib/drafts/backgroundNotice'
 import type { GenerationActor, GenerationRunActor } from '@/lib/agent/types'
 import { track } from '@/lib/analytics/track'
+import { newUsage, usageFields, withUsage, type UsageStore } from '@/lib/analytics/trace'
 import { CAPTION_CHANNELS } from '@/lib/channels'
 import { GENERATION_TARGETS, requireHeadline, writeCaptions } from '@/lib/captions/generate'
 import { captionRowsFromFields, headlineStampFields, saveGenerationCaptions, type CaptionStamp } from '@/lib/captions/store'
@@ -212,6 +213,7 @@ async function finalizeDraftV1(
 // a throw comes first) and emit once, after their outcome is written.
 interface GenerationTrace {
   t0: number
+  usage: UsageStore
   models?: GenerationModels
   captionStamp?: CaptionStamp
   design?: ProducedDesign
@@ -254,6 +256,7 @@ async function emitGenerationFinished(
             },
           }
         : {}),
+      ...usageFields(trace.usage),
       captionRoute: route && (ROUTE_STAMPS as readonly string[]).includes(route) ? (route as RouteStamp) : null,
       ...(trace.design?.stamp.promptVersion ? { promptVersion: trace.design.stamp.promptVersion } : {}),
       requestedArchetype: brief.imageStyle,
@@ -288,10 +291,10 @@ export async function generateDraftForBrief(
   // onBeforeDesign: the scheduler renews its lease here (008 FR-12).
   opts?: { templateId?: string | null; onBeforeDesign?: () => Promise<void> },
 ): Promise<GenerateDraftResult> {
-  const trace: GenerationTrace = { t0: Date.now() }
+  const trace: GenerationTrace = { t0: Date.now(), usage: newUsage() }
   let result: GenerateDraftResult
   try {
-    result = await generateDraftForBriefInner(brief, actor, opts, trace)
+    result = await withUsage(trace.usage, () => generateDraftForBriefInner(brief, actor, opts, trace))
   } catch (err) {
     await emitGenerationFinished(brief, actor, null, trace, 'failed', err)
     throw err
@@ -397,9 +400,14 @@ export async function createPendingDraft(
 // reason for the inline error card. Designed to be fire-and-forget from the
 // route; also reused by the retry route, which resets the rows to PENDING.
 export async function runGenerationForDraft(draftId: string, actor: GenerationRunActor): Promise<void> {
+  const usage = newUsage()
+  return withUsage(usage, () => runGenerationForDraftInner(draftId, actor, usage))
+}
+
+async function runGenerationForDraftInner(draftId: string, actor: GenerationRunActor, usage: UsageStore): Promise<void> {
   const draft = await prisma.draft.findUnique({ where: { id: draftId }, include: { brief: true } })
   if (!draft) return
-  const trace: GenerationTrace = { t0: Date.now() }
+  const trace: GenerationTrace = { t0: Date.now(), usage }
   // Emitted after the try/catch, once the outcome is written, so an analytics
   // problem (which only throws under the test seams) can never flip a finished
   // draft to FAILED (006 NFR-01).
