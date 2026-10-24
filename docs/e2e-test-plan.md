@@ -1,11 +1,13 @@
 # bistec-studio — E2E Test Plan
 
 **Created:** 2026-06-23
-**Status:** ✅ Full §6 catalog implemented **and green**. **Latest full clean mock gate (change 009 T6, 2026-10-21): 422 passed / 3 skipped / 0 failed / 0 flaky** (the 023 gate before it was 405 / 3 / 0 / 0; the 016 gate was 386 / 3 / 0 / 0). The older counts below are history. **Unit as of 2026-07-27 (PR #40): 322/322.** The CI gate (`.github/workflows/e2e.yml`) passed on PRs #38, #39 and #40. Last full _local_ run with recorded counts (2026-07-22, `feature/team-tenancy` branch, post TC-REG-H7a de-flake): **171 passed, 4 skipped, 0 failed** (175 tests total; 0 flaky — TC-REG-H7a's parallel-fire assertion was rewritten to a timing-robust integrity invariant, see below), unit **264/264** at that time.
+**Status:** ✅ Full §6 catalog implemented **and green**. **Latest full clean mock gate (change 006 T6, 2026-10-24): 473/3/0/1 (the one flaky was a Playwright worker-process crash in `regression.test.ts` H7, not an assertion; that suite then re-ran clean 3 of 3)** (the 026 gate before it was 444 / 3 / 0 / 0; the 009 gate, 2026-10-21, was 422 passed / 3 skipped / 0 failed / 0 flaky) (the 023 gate before it was 405 / 3 / 0 / 0; the 016 gate was 386 / 3 / 0 / 0). The older counts below are history. **Unit as of 2026-07-27 (PR #40): 322/322.** The CI gate (`.github/workflows/e2e.yml`) passed on PRs #38, #39 and #40. Last full _local_ run with recorded counts (2026-07-22, `feature/team-tenancy` branch, post TC-REG-H7a de-flake): **171 passed, 4 skipped, 0 failed** (175 tests total; 0 flaky — TC-REG-H7a's parallel-fire assertion was rewritten to a timing-robust integrity invariant, see below), unit **264/264** at that time.
 
 Last full run on `main` (2026-07-13, post brief-draft-recovery §P): **132 passed, 0 failed, 7 skipped** (`npm run test:e2e:mock`; the machine lacked `BISTEC_API_KEYS` in `.env.test`, so 3 §J ACP-auth cases skipped on top of the 4 intentional skips below — CI sets the keys as job env and runs them). The 2026-07-13 feature batch added `async-generation.test.ts` (F1 async + retry), a version back/forward-jump case (F2), F4 auto-scheduling cases in `campaign-scheduling.test.ts`, `brandkit-assistant.test.ts` (F5), and `image-to-template.test.ts` (F6); generation-dependent suites now poll via the `waitForDraft` helper (generation is async). A GitHub Actions gate (`.github/workflows/e2e.yml`) runs the whole suite — including the §K security-fix regressions — on every PR and push to `main`, and is **green as of 2026-07-13** (it had been red for weeks on a bad CI `TOKEN_ENCRYPTION_KEY` — it MUST be a valid 64-char hex string, else `crypto.ts` throws and the credential-encrypting routes 500). Runs on GitHub-hosted `ubuntu-latest` with the actions on the Node 24 runtime.
 
 > **Update (2026-10-13, change 017 publish API fixes):** a publish the platform refuses is no longer a 2xx. `POST /api/posts` (immediate) and `POST /api/posts/[id]/publish` (retry) answer **502** `{error, code:'PUBLISH_FAILED', postId, status:'FAILED'}`; the FAILED row is still written. **TC-PUB-03** now expects the 502 (and a failing retry's 502), and new **TC-PUB-10** drives the publish dialog: the failed channel shows "✕ failed" with its reason and the dialog stays open.
+
+> **Update (2026-10-24, change 006 product observability):** new suite **`analytics.test.ts` (§AD, 30 cases, TC-OBS-01…30)**, driven by the seam `GET`/`DELETE`/`POST /api/test/analytics-events` (see §AD). Gate: 473/3/0/1 (the one flaky was a Playwright worker-process crash in `regression.test.ts` H7, not an assertion; that suite then re-ran clean 3 of 3) (unit 3283/3283, render 47/47, CI pending (the T6 push)).
 
 > **Update (2026-10-21, change 009 hero imagery):** new suite **`hero-image.test.ts` (§AA, 16 cases, TC-HERO-01…16)**, plus one `a11y.test.ts` case (the draft page with the composition notice shown, and `/brief` step 2 with the image-style picker). The Review-step term count in `model-selection.test.ts` and `surfaces.test.ts` went 12 to 13, because a Path B brief now has an Image style row. New seams: the four `__MOCK_HERO_*__` sentinels (see §AA). Gate: 422 passed / 3 skipped / 0 failed / 0 flaky.
 
@@ -924,6 +926,73 @@ Serial (`test.describe.configure({ mode: 'serial' })`). Needs `MOCK_AI` and test
 | 007 AC-22 nothing regressed                   | the full clean mock run, unit, render, build, CI                     |
 
 The pure parts (the dataset, detector, measurable check, validator, review reducer, prompt builder and route) are unit-tested without a server. The mock suite proves the mechanism with mock replies, not the real model's wording.
+
+### AD. Product observability (`analytics.test.ts`, change 006 T2 to T5 — AC-04 to AC-14, AC-16)
+
+Serial (`test.describe.configure({ mode: 'serial' })`). Needs `MOCK_AI`, `MOCK_PUPPETEER` and `MOCK_SOCIAL` and test-DB access; it skips without them. Each case clears the store first (`DELETE /api/test/analytics-events`), drives a real flow under the mocks and reads the events back through the seam.
+
+**The seam** (`/api/test/analytics-events`, FR-07): 404 in production, 404 unless `MOCK_AI`, admin only, like `model-calls`. `GET` returns recent events (optional `name` and `draftId` filters); `DELETE` clears them; `POST` takes one of three bodies: `{ seed: [...] }` inserts rows with an explicit `at` (retention and range cases), `{ failNext: n }` makes the next `n` event inserts reject (failure isolation, AC-08), and `{ sweep: true }` runs the retention sweep once. The cases reuse these existing sentinels and seams: `__FAIL_GEN_ALWAYS__` (a generation that always fails), `__VERIFY_PASS__` and `__VERIFY_FAIL_ALWAYS__` (the mock verifier), `conflict_test` (a brand-kit conflict on refine), `__FAIL_ALWAYS__` in the topic (a publish that always fails) and `POST /api/test/generation-tick`.
+
+- **TC-OBS-01 — A web generation (AC-05, AC-07).** One `generation.finished` `ok`, `source: web`, with `durationMs > 0`.
+- **TC-OBS-02 — A failing generation (AC-05).** One `failed` event holding a redacted reason.
+- **TC-OBS-03 — An applied refine (AC-05, AC-06, AC-07).** One `draft_action.settled` `ok` holding the instruction, at least one attempt with classes and verdict `pass`, the verifier model id and `VERIFIER_PROMPT_VERSION`.
+- **TC-OBS-04 — A not-applied refine and Use anyway (AC-05, AC-06).** A refine the verifier rejects twice writes one `not-applied` event whose attempts hold the `miss` verdicts. Adopting it writes `revision.adopted`.
+- **TC-OBS-05 — A conflict (AC-05).** One `conflict` settle; the Override writes its own `revision.override`.
+- **TC-OBS-06 — Regenerate design and regenerate caption (AC-05).** One settled event each.
+- **TC-OBS-07 — Inline edit and restore (AC-05).** `revision.edited` and `revision.restored` (from and to numbers), one each.
+- **TC-OBS-08 — Publish (AC-05).** One `publish.settled` per attempt: `published`, then `failed`.
+- **TC-OBS-09 — A scheduled generation (AC-05).** `generation.finished` with `source: scheduler` and `scheduled_generation.settled`.
+- **TC-OBS-10 — The store failing (AC-08).** With `failNext` set, a generation, a refine and a publish end in the same status and rows, and `AnalyticsDrop.dropped` grew.
+- **TC-OBS-11 — The page equals a hand count (AC-11, AC-12).** A known set is seeded through the seam; every figure on `/admin/insights` equals the hand count. The applied rate is `ok ÷ (ok + not-applied)` (see the notes below), and two seeded verifier ids give two lines.
+- **TC-OBS-12 — The range (AC-11).** The range limits every section; an event 100 days old shows only in retention health.
+- **TC-OBS-13 — Events lost and an empty store (AC-11).** Dropped and rejected counts show beside the figures; an empty store reads as zeros, not errors.
+- **TC-OBS-14 — The sweep (AC-13).** Rows at 181 days go; rows at 179 days stay.
+- **TC-OBS-15 — The batch cap (AC-13).** A sweep deletes at most 5 000 events; a backlog drains over ticks.
+- **TC-OBS-16 — The scheduler banner (AC-13).** The retention loop does not disturb the "Scheduler offline" banner, and its own health shows on the page.
+- **TC-OBS-17 — Draft delete (AC-14).** Deleting a draft keeps its events with `draftId` null.
+- **TC-OBS-18 — Team delete (AC-14).** Soft-deleting a team removes its events and no other team's.
+- **TC-OBS-19 — API access (AC-11).** `/api/admin/insights` answers 401 to a bogus session cookie and 403 to an editor and a team admin. A request with no cookie at all is redirected to `/login` by the proxy, so the case sends a bogus cookie (the TC-HB-06 pattern).
+- **TC-OBS-20 — Page access (AC-11).** An editor and a team admin see the gate and no nav item.
+- **TC-OBS-21 — Layout and axe (AC-16).** The super admin has the nav item; the page has no horizontal scroll at 390 px and passes the axe rules.
+- **TC-OBS-22 — Privacy (AC-04).** No event the suite collected holds the brief text, a caption, the headline or HTML. It runs last, so it covers every event the suite wrote.
+- **TC-OBS-23 — Wizard steps (AC-09).** Walking the wizard writes one `wizard.step` per step reached; going back and forward again adds none; Generate writes `brief.submitted`.
+- **TC-OBS-24 — Resume (AC-09).** Resuming a brief draft reports no steps up to where it stopped, then the next forward step with its draft id; Generate writes `brief.submitted` with `resumed`.
+- **TC-OBS-25 — Discard (AC-09).** Discarding a brief draft writes `brief.abandoned` `discarded` with its last step; a foreign id and the Generate-success delete write nothing.
+- **TC-OBS-26 — Expiry (AC-09).** A brief draft idle for 8 days is swept by the dashboard read and writes `brief.abandoned` `expired`.
+- **TC-OBS-27 — `POST /api/events` (AC-09).** Team, user and source come from the session and a body value is ignored; a foreign draft id, an unknown name, a bad payload, an oversized body (2 KB cap, enforced while streaming) and no session are refused.
+- **TC-OBS-28 — The rate limit (AC-09).** The 61st event in a minute is dropped and counted (`AnalyticsDrop` reason `rate-limit`); the first 60 are stored. The client still gets 204.
+- **TC-OBS-29 — The funnel (AC-09, AC-11).** The funnel on the API and the page equals a hand count over a seeded set.
+- **TC-OBS-30 — Tokens (AC-10).** Token totals count reported events only, and the page shows the not-reported share. The `MOCK_AI` seam bypasses `createMessage`, so the case seeds events; the summing itself is proven by the unit test `analyticsUsage.test.ts`.
+
+**Notes.**
+
+- **The applied rate.** The page and the cases use AC-12's formula, `ok ÷ (ok + not-applied)`. FR-10's wording, "`ok` ÷ settled REFINE", would also count `conflict` and `failed` settles; the page caption states the formula it uses.
+- **Mean refines per draft** counts every REFINE settle on the draft, with no date bound.
+- **`GET /api/campaigns` caps at 200.** A suite must not create a campaign per test, or the cap makes later lookups miss.
+
+| AC                                               | E2E / unit                                                                                                                                                                                                                                       |
+| ------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 006 AC-01 the migration                          | the `test:upgrade` run and `prisma migrate diff --exit-code` (`reports/T1.md`)                                                                                                                                                                   |
+| 006 AC-02 the wrapper                            | unit `analyticsTrack`                                                                                                                                                                                                                            |
+| 006 AC-03 vocabularies are imported              | unit `analyticsCoverage`                                                                                                                                                                                                                         |
+| 006 AC-04 caps and redaction                     | TC-OBS-22; unit `analyticsCatalogue`, `redactText`                                                                                                                                                                                               |
+| 006 AC-05 one event per operation, every outcome | TC-OBS-01 to TC-OBS-09                                                                                                                                                                                                                           |
+| 006 AC-06 the refine trace                       | TC-OBS-03, TC-OBS-04; the unit golden test of the verifier prompt                                                                                                                                                                                |
+| 006 AC-07 durations                              | TC-OBS-01, TC-OBS-03                                                                                                                                                                                                                             |
+| 006 AC-08 failure isolation                      | TC-OBS-10; unit `analyticsTrack`                                                                                                                                                                                                                 |
+| 006 AC-09 wizard events and the client route     | TC-OBS-23 to TC-OBS-28                                                                                                                                                                                                                           |
+| 006 AC-10 tokens                                 | TC-OBS-30; unit `analyticsUsage`                                                                                                                                                                                                                 |
+| 006 AC-11 the page and its access                | TC-OBS-11, TC-OBS-12, TC-OBS-13, TC-OBS-19, TC-OBS-20, TC-OBS-29                                                                                                                                                                                 |
+| 006 AC-12 the applied rate is checkable          | TC-OBS-11                                                                                                                                                                                                                                        |
+| 006 AC-13 retention                              | TC-OBS-14, TC-OBS-15, TC-OBS-16                                                                                                                                                                                                                  |
+| 006 AC-14 deletes and purge                      | TC-OBS-17, TC-OBS-18; the purge script is run by hand in `reports/T3.md`                                                                                                                                                                         |
+| 006 AC-15 generation untouched                   | the `git diff` checks in the reports; the existing `model-selection` and refine suites                                                                                                                                                           |
+| 006 AC-16 the design system                      | TC-OBS-21; unit `uiTokenGuard`                                                                                                                                                                                                                   |
+| 006 AC-17 nothing regressed                      | the full clean mock run (473/3/0/1 (the one flaky was a Playwright worker-process crash in `regression.test.ts` H7, not an assertion; that suite then re-ran clean 3 of 3)), unit (3283/3283), render (47/47), build, CI (pending (the T6 push)) |
+
+The mock suite proves the mechanism with mock replies; it records no real model call.
+
+---
 
 ---
 

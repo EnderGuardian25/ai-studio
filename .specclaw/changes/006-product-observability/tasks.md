@@ -108,7 +108,7 @@ Waves 4 and 5 are the user's staged scope (2026-10-23): each is independently sh
 
 ### Wave 6 — Docs and the gate
 
-- [ ] `T6` — The docs, the full gate and CI
+- [x] `T6` — The docs, the full gate and CI
   - Files: `docs/handoff.md`, `docs/e2e-test-plan.md`, `CLAUDE.md`, `.specclaw/ROADMAP.md`
   - Estimate: small
   - Kind: docs
