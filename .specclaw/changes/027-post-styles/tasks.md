@@ -72,7 +72,7 @@ This is phase a. Phase b (STORY layouts, the five new looks, pixel-check changes
 
 ### Wave 3: The facts check
 
-- [ ] `T3` — The extractor, the comparison, the sources loader, the refresh writer and the seeded corpus
+- [x] `T3` — The extractor, the comparison, the sources loader, the refresh writer and the seeded corpus
   - Files: `src/lib/factsCheck/{types,normalize,extract,compare,sources,refresh,index}.ts` (new), `tests/unit/fixtures/factsCorpus.ts` (new), `tests/unit/{factsCheckExtract,factsCheckCompare,factsCheckCorpus,factsCheckRefresh}.test.ts` (new), `tests/unit/postStylesBoundary.test.ts` (the purity walk covers `src/lib/factsCheck` except `sources.ts` and `refresh.ts`)
   - Estimate: large
   - Kind: impl

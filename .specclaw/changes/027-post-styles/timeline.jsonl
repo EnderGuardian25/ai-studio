@@ -4,3 +4,4 @@
 {"ev":"stop","span":"plan","at":"2026-10-24T13:41:23Z","ts":1792849283,"status":"ok"}
 {"ev":"start","span":"W1","kind":"wave","label":"wave 1","at":"2026-10-24T13:46:18Z","ts":1792849578}
 {"ev":"stop","span":"T1","at":"2026-10-24T13:52:45Z","ts":1792849965,"status":"ok"}
+{"ev":"stop","span":"T2","at":"2026-10-24T13:58:17Z","ts":1792850297,"status":"ok"}

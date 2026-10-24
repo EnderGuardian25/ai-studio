@@ -225,3 +225,21 @@ describe('AC-18: the one-resolver guard (no style key literals outside postStyle
     expect(specifiers(planted).some((x) => /postStyles\/styles(\.ts)?$/.test(x))).toBe(true)
   })
 })
+
+// 027 T3 (AC-18): the facts check never reaches the authoring dataset, and its
+// index stays pure by not re-exporting the two database files. The purity walk
+// itself lives once, in designDataBoundary.test.ts.
+describe('AC-18: the factsCheck edges', () => {
+  it('factsCheck never imports designData/authoring', () => {
+    const files = walk('src/lib/factsCheck')
+    expect(files.length).toBeGreaterThanOrEqual(7)
+    for (const f of files)
+      for (const spec of specifiers(readFileSync(join(ROOT, f), 'utf8')))
+        expect(spec, f).not.toMatch(/designData\/authoring|(^|\/)authoring(\/|$)/)
+  })
+
+  it('the index does not re-export sources or refresh', () => {
+    for (const spec of specifiers(readFileSync(join(ROOT, 'src/lib/factsCheck/index.ts'), 'utf8')))
+      expect(spec).not.toMatch(/(^|\/)(sources|refresh)$/)
+  })
+})
