@@ -172,3 +172,49 @@ describe('AC-16: no composition in the dataset', () => {
     }
   })
 })
+
+// 027 NFR-10: the sibling modules are pure too. A type-only `@prisma/client`
+// import is erased and allowed (as in aspectRatio.ts); sources.ts and refresh.ts
+// are the two prisma files of factsCheck (added by a later task).
+describe('027 NFR-10: postStyles and factsCheck stay pure', () => {
+  const PRISMA_FILES = new Set(['src/lib/factsCheck/sources.ts', 'src/lib/factsCheck/refresh.ts'])
+  const files = [...walk('src/lib/postStyles'), ...walk('src/lib/factsCheck')].filter(
+    (f) => !PRISMA_FILES.has(f),
+  )
+
+  function runtimeViolations(source: string): string[] {
+    const src = stripComments(source)
+    const typeOnly = new Set<string>()
+    for (const m of src.matchAll(
+      /(?:^|[;\n])\s*import\s+type\s+[^;'"]*?\bfrom\s*['"]([^'"]+)['"]/g,
+    ))
+      typeOnly.add(m[1])
+    return purityViolations(source).filter((v) => {
+      const spec = v.split(' ').pop()!
+      return !(typeOnly.has(spec) && specifiers(source).filter((s) => s === spec).length === 1)
+    })
+  }
+
+  it('scans the postStyles files', () => {
+    expect(files.filter((f) => f.startsWith('src/lib/postStyles/')).length).toBeGreaterThanOrEqual(
+      3,
+    )
+  })
+
+  it('imports no server module at runtime', () => {
+    for (const f of files)
+      expect(runtimeViolations(readFileSync(join(ROOT, f), 'utf8')), f).toEqual([])
+  })
+
+  it('the filter allows a type-only prisma import and flags a runtime one', () => {
+    expect(runtimeViolations(`import type { AspectRatio } from '@prisma/client'`)).toEqual([])
+    expect(runtimeViolations(`import { PrismaClient } from '@prisma/client'`)).not.toEqual([])
+    expect(runtimeViolations(`import { prisma } from '@/lib/prisma'`)).not.toEqual([])
+  })
+
+  it('designData never imports postStyles (the edge is one-way)', () => {
+    for (const f of walk('src/lib/designData'))
+      for (const spec of specifiers(readFileSync(join(ROOT, f), 'utf8')))
+        expect(spec, f).not.toMatch(/postStyles/)
+  })
+})

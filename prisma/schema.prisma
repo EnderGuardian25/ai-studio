@@ -371,6 +371,9 @@ model Campaign {
   brandKitId   String?
   brandKit     BrandKit?          @relation("CampaignBrandKit", fields: [brandKitId], references: [id])
   defaultTone  String?
+  // 027: pre-fills the wizard, the queue and (as the default) MCP/ACP. Plain TEXT,
+  // validated in code (src/lib/postStyles), so a retired key needs no migration.
+  defaultPostStyle String?
   isDeleted    Boolean            @default(false)
   deletedAt    DateTime?
   createdAt    DateTime           @default(now())
@@ -421,6 +424,8 @@ model ScheduledGeneration {
   description String?
   goal        String
   tone        String
+  // 027: the post style key (TEXT, validated in code). Null = before 027.
+  postStyle   String?
   channels    Channel[]
   aspectRatio AspectRatio          @default(SQUARE)
   designMode  DesignMode
@@ -433,6 +438,8 @@ model ScheduledGeneration {
   // Lifecycle — mirrors Post's H12 fields (nextRetryAt doubles as the RUNNING lease).
   status      GenerationStatus     @default(PENDING)
   errorReason String?
+  // 027: why a post action was not run (the facts check). Null otherwise.
+  heldReason  String?
   retryCount  Int                  @default(0)
   nextRetryAt DateTime?
   // Results: the Brief is created on the first run attempt and reused across
@@ -508,6 +515,9 @@ model Brief {
   // so a retired key needs no migration. The default keeps every pre-009 row
   // (and the previous image's brief.create) on the classic plan.
   imageStyle          String             @default("classic")
+  // 027: the post style key (TEXT, validated in code, so a retired key needs
+  // no migration). Null = before 027: the user's own goal and tone stand.
+  postStyle           String?
   createdAt           DateTime           @default(now())
   drafts              Draft[]
   scheduledGenerations ScheduledGeneration[]
@@ -597,6 +607,11 @@ model Draft {
   // 009: the composition stamp for the live htmlContent, validated in
   // src/lib/designData/stamp.ts (tolerant parse at read). Null = before 009.
   composition     Json?
+  // 027: the post style stamp { key, version, revision } of the last generation or
+  // regeneration, validated in src/lib/postStyles/stamp.ts. Null = before 027.
+  postStyle       Json?
+  // 027: the facts-check result (numbers and places only, no text). Null = never checked.
+  factsCheck      Json?
   createdAt       DateTime        @default(now())
   // @default(now()) keeps the added column valid for pre-existing rows
   updatedAt       DateTime        @default(now()) @updatedAt
@@ -816,6 +831,8 @@ model DraftRevision {
   // 009: the composition stamp of this row's htmlSnapshot, part of the same
   // render stamp, validated in src/lib/designData/stamp.ts. Null = before 009.
   composition          Json?
+  // 027: the post style stamp at this row's render. Null = before 027.
+  postStyle            Json?
   // Drafts whose current not-applied outcome references this rejected row.
   notAppliedOn   Draft[]  @relation("DraftNotAppliedRevision")
 

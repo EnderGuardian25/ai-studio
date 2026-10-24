@@ -41,7 +41,7 @@ This is phase a. Phase b (STORY layouts, the five new looks, pixel-check changes
 
 ### Wave 1: Columns and dataset
 
-- [ ] `T1` — The seven columns, the migration, the down script and the post-style dataset
+- [x] `T1` — The seven columns, the migration, the down script and the post-style dataset
   - Files: `prisma/schema.prisma`, `prisma/migrations/20261025120000_post_styles/migration.sql` (new), `prisma/rollback/027-post-styles.down.sql` (new), `src/lib/postStyles/{types,styles,index}.ts` (new), `tests/unit/{postStylesDataset,postStylesBoundary}.test.ts` (new), `tests/unit/designDataBoundary.test.ts` (walk the two new directories for the purity rule; the authoring rule is unchanged)
   - Estimate: medium
   - Kind: migration
