@@ -2,3 +2,4 @@
 {"ev":"stop","span":"propose","at":"2026-10-23T15:28:24Z","ts":1792769304,"status":"ok"}
 {"ev":"start","span":"plan","kind":"phase","label":"plan","at":"2026-10-23T15:32:21Z","ts":1792769541}
 {"ev":"stop","span":"plan","at":"2026-10-23T15:40:53Z","ts":1792770053,"status":"ok"}
+{"ev":"start","span":"W1","kind":"wave","label":"wave 1","at":"2026-10-24T07:57:38Z","ts":1792828658}

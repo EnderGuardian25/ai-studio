@@ -7,6 +7,8 @@
 // enforced here. NOT_NEEDED is never stored, because a model choosing a
 // CSS/SVG design is a design decision, not a failure (design Key decision 4).
 
+import { redactText } from '@/lib/text/redact'
+
 export const BACKGROUND_SKIP_REASONS = ['NO_PROVIDER', 'PROVIDER_ERROR', 'DECISION_ERROR', 'NOT_NEEDED'] as const
 export type BackgroundSkipReason = (typeof BACKGROUND_SKIP_REASONS)[number]
 
@@ -33,21 +35,9 @@ export function clipSkipDetail(detail: string): string {
 
 // Provider error text is shown to EVERY viewer of the draft, not just the
 // person who configured the key, so anything that identifies a credential or
-// an internal endpoint is removed before it is clipped or stored. Order
-// matters: whole URLs go first (a key in a query string goes with them), then
-// bare keys, then key=… pairs outside a URL, then host:port pairs.
-const REDACTIONS: Array<[RegExp, string]> = [
-  [/\b[a-z][a-z0-9+.-]*:\/\/[^\s'"<>()]+/gi, '<url>'],
-  [/\bsk-[\w*.-]+/g, '<redacted>'],
-  [/\bAIza[\w-]+/g, '<redacted>'],
-  // No leading \b: "api_key=" and "apikey=" must match too.
-  [/(key=)[^&\s]+/gi, '$1<redacted>'],
-  [/\b(?:\d{1,3}(?:\.\d{1,3}){3}|[a-z][a-z0-9-]*(?:\.[a-z0-9-]+)*):\d{2,5}\b/gi, '<host>'],
-]
-
-export function redactSkipDetail(detail: string): string {
-  return REDACTIONS.reduce((text, [re, replacement]) => text.replace(re, replacement), detail)
-}
+// an internal endpoint is removed before it is clipped or stored. The rules
+// live in one place, src/lib/text/redact.ts (shared with 006's analytics).
+export const redactSkipDetail = redactText
 
 // Redact, then clip: what every writer stores and every reader shows.
 export function cleanSkipDetail(detail: string): string {

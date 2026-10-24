@@ -36,7 +36,7 @@ Waves 4 and 5 are the user's staged scope (2026-10-23): each is independently sh
 
 ### Wave 1 — Schema, catalogue, wrapper
 
-- [ ] `T1` — The tables, the catalogue, `track`, the drop counter and `redactText`
+- [x] `T1` — The tables, the catalogue, `track`, the drop counter and `redactText`
   - Files: `prisma/schema.prisma`, `prisma/migrations/20261024120000_analytics_events/migration.sql` (new), `prisma/rollback/006-product-observability.down.sql` (new), `src/lib/analytics/{catalogue,track,trace}.ts` (new), `src/lib/text/redact.ts` (new), `src/lib/drafts/backgroundNotice.ts` (`redactSkipDetail` re-exports `redactText`), `tests/unit/{analyticsTrack,analyticsCatalogue,analyticsCoverage,redactText}.test.ts` (new)
   - Estimate: medium
   - Kind: migration

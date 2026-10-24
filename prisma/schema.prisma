@@ -879,3 +879,46 @@ model WorkerHeartbeat {
   lastTickEndedAt   DateTime?
   updatedAt         DateTime  @updatedAt
 }
+
+// 006: where an analytics event came from. A Postgres enum because the set is
+// closed and tiny; a new source is `ALTER TYPE … ADD VALUE`, alone in its migration.
+enum AnalyticsSource {
+  web
+  scheduler
+  mcp
+}
+
+// 006: the append-only product event store. Written only by track()
+// (src/lib/analytics/track.ts), read only by src/lib/analytics/queries.ts.
+// Deliberately NO relations: teamId, userId and draftId are plain strings, so
+// the table never blocks a delete and never cascades by accident (006 FR-01,
+// like LegacyCaptionArchive). Delete behaviour is explicit (006 FR-12).
+model AnalyticsEvent {
+  id            String          @id @default(cuid())
+  at            DateTime        @default(now()) @db.Timestamptz(3)
+  name          String
+  schemaVersion Int
+  source        AnalyticsSource
+  teamId        String
+  userId        String?
+  draftId       String?
+  durationMs    Int?
+  outcome       String?
+  payload       Json
+
+  @@index([at])
+  @@index([name, at])
+  @@index([teamId, at])
+  @@index([draftId])
+}
+
+// 006: events track() could not store (dropped) or would not store because the
+// payload failed its schema (rejected), per event name. Shown on the insights
+// page so a lost event never reads as a healthy zero.
+model AnalyticsDrop {
+  name       String   @id
+  dropped    Int      @default(0)
+  rejected   Int      @default(0)
+  lastAt     DateTime @db.Timestamptz(3)
+  lastReason String
+}
