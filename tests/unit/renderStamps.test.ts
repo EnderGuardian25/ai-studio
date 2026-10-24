@@ -91,7 +91,16 @@ vi.mock('@/providers/registry', () => ({
     }),
   }),
 }))
-vi.mock('@/lib/agent/briefInput', () => ({ buildBriefInput: () => ({}) }))
+vi.mock('@/lib/agent/briefInput', () => ({
+  buildBriefInput: () => ({}),
+  briefPostStyleStamp: () => null,
+  imageRulesAtStamp: () => undefined,
+}))
+// 027: the facts check has its own tests; here it is a clear result and a no-op refresh.
+vi.mock('@/lib/factsCheck/refresh', () => ({
+  computeFactsCheck: async () => ({ v: 1, status: 'clear', checkedAt: '2026-10-24T00:00:00.000Z', flagged: [] }),
+  refreshFactsCheck: async () => {},
+}))
 vi.mock('@/lib/agent/pathA', () => ({
   runPathADesign: async () => ({ htmlContent: '<html>a</html>', exportUrl: 'exports/a.png' }),
   assertTemplateMatchesBrief: () => {},
@@ -319,31 +328,32 @@ describe('RenderStamp.model (008 FR-08, D4)', () => {
   })()
 
   it('currentRenderStamp(model) carries the arg that crossed the boundary and the refused value', () => {
-    expect(currentRenderStamp(resolved, null)).toEqual({
+    expect(currentRenderStamp(resolved, null, null)).toEqual({
       ...STAMP,
       model: 'claude-sonnet-5-5',
       modelSubstitutedFrom: 'OPUS',
-      composition: null,
+      composition: null, postStyle: null,
     })
-    expect(currentRenderStamp(null, null)).toEqual({ ...STAMP, model: null, modelSubstitutedFrom: null, composition: null })
+    expect(currentRenderStamp(null, null, null)).toEqual({ ...STAMP, model: null, modelSubstitutedFrom: null, composition: null, postStyle: null })
   })
 
   it('draftStampFields maps model → designModel, and nothing else changes name', () => {
-    expect(draftStampFields(currentRenderStamp(resolved, null))).toEqual({
+    expect(draftStampFields(currentRenderStamp(resolved, null, null))).toEqual({
       ...STAMP,
       designModel: 'claude-sonnet-5-5',
       designModelSubstitutedFrom: 'OPUS',
       // 009: no composition stamp is SQL NULL, not a JSON null.
       composition: Prisma.DbNull,
+      postStyle: Prisma.DbNull,
     })
   })
 
   it("restoredRenderStamp copies the revision's own model, whether or not its PNG is re-rendered (A6)", () => {
     const row = { promptVersion: 'pv-old', fontSet: 'fonts-old', model: 'claude-sonnet-4-6', modelSubstitutedFrom: 'HAIKU' }
-    expect(restoredRenderStamp(row, false)).toEqual({ ...row, composition: null })
-    expect(restoredRenderStamp(row, true)).toEqual({ ...row, fontSet: 'fonts-test', composition: null })
+    expect(restoredRenderStamp(row, false, null)).toEqual({ ...row, composition: null, postStyle: null })
+    expect(restoredRenderStamp(row, true, null)).toEqual({ ...row, fontSet: 'fonts-test', composition: null, postStyle: null })
     // A pre-008 row reads as unknown, never as the current model.
-    expect(restoredRenderStamp({ promptVersion: 'pv', fontSet: 'f' }, false)).toMatchObject({
+    expect(restoredRenderStamp({ promptVersion: 'pv', fontSet: 'f' }, false, null)).toMatchObject({
       model: null,
       modelSubstitutedFrom: null,
     })

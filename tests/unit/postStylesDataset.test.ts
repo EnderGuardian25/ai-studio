@@ -273,6 +273,7 @@ describe('FR-02: lookups', () => {
         'TONE_KEYS',
         'activeStyles',
         'checklistPromptText',
+        'derivedPromptVersion',
         'getStyle',
         'isStyleKey',
         'legacyGoalStyle',

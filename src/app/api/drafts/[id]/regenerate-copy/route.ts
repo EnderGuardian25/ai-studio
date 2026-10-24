@@ -5,7 +5,7 @@ import { canAccessContent } from '@/lib/authz/visibility'
 import { copyProviderIsClaude, resolveCopyProvider } from '@/providers/registry'
 import { resolveBrandKit } from '@/lib/brandkit/resolve'
 import { getActiveCampaignBriefing } from '@/lib/campaign/briefing'
-import { buildBriefInput } from '@/lib/agent/briefInput'
+import { briefPostStyleStamp, buildBriefInput } from '@/lib/agent/briefInput'
 import { writeCaptions } from '@/lib/captions/generate'
 import { parseRegenerateBody } from '@/lib/captions/requests'
 import { failedCaptionFields } from '@/lib/captions/actionTargets'
@@ -127,13 +127,15 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
       user.teamId,
       claim,
       async () => {
-        const { fields, stamp } = await writeCaptions(
-          provider,
-          buildBriefInput(draft.brief, kit, campaignBriefing),
-          targets,
-          model,
-        )
-        await settleCaptionAction(draft.id, claim, targets, fields, stamp)
+        // 027: the brief's post style rules, if it has one (a stored key that does
+        // not resolve throws here and settles the rows as failed).
+        const briefInput = buildBriefInput(draft.brief, kit, campaignBriefing)
+        const { fields, stamp } = await writeCaptions(provider, briefInput, targets, model)
+        // The copy ran under the style's current version; the settle writes it to
+        // Draft.postStyle (claim-guarded) and recomputes the facts check. Only when
+        // some target validated: a run that changed no text keeps the old stamp.
+        const anyOk = Object.values(fields).some((f) => f?.ok)
+        await settleCaptionAction(draft.id, claim, targets, fields, stamp, undefined, anyOk ? briefPostStyleStamp(draft.brief) : undefined)
         // A headline has no row to carry a failure, so it is reported on
         // pendingActionError; the stored headline is unchanged.
         const headline = fields.HEADLINE

@@ -1,10 +1,10 @@
-// 027 FR-11 (the loader and refreshFactsCheck; the write points are wired in T4)
+// 027 FR-11 (the loader, refreshFactsCheck and computeFactsCheck; the write points)
 // with a fake prisma: READY rows only, a PENDING row skipped, a failed write
 // logs and stores an error when it can, never throws. No real database.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import type { PrismaClient } from '@prisma/client'
 import { loadFactsSources, type FactsBrief, type SourceLoaders } from '@/lib/factsCheck/sources'
-import { refreshFactsCheck, type RefreshDeps } from '@/lib/factsCheck/refresh'
+import { computeFactsCheck, refreshFactsCheck, type RefreshDeps } from '@/lib/factsCheck/refresh'
 import { parseFactsCheck } from '@/lib/factsCheck'
 
 const BRIEF: FactsBrief = {
@@ -214,5 +214,113 @@ describe('refreshFactsCheck', () => {
     const json = JSON.stringify(s.writes[0])
     for (const text of ['Join 1,250 customers', 'Launch of the academy', 'Only $99', 'Call us on'])
       expect(json).not.toContain(text)
+  })
+})
+
+// ── T4: the write points (027 FR-11, AC-11) ─────────────────────────────────
+
+describe('computeFactsCheck (the synchronous generation’s check)', () => {
+  let errors: string[]
+  beforeEach(() => {
+    errors = []
+    vi.spyOn(console, 'error').mockImplementation((...a: unknown[]) => void errors.push(a.join(' ')))
+  })
+  afterEach(() => vi.restoreAllMocks())
+
+  const TEXTS = [
+    { where: 'headline' as const, text: 'Only $99' },
+    { where: 'INSTAGRAM' as const, text: 'Doors open at 18:00' },
+  ]
+
+  it('checks the texts against the sources the loader returns, with the preloaded values passed through', async () => {
+    const seen: unknown[] = []
+    const check = await computeFactsCheck(
+      { brief: BRIEF, texts: TEXTS, preloaded: { campaignBriefing: null, voicePrompt: 'V' } },
+      async (b, p) => {
+        seen.push([b, p])
+        return ['Doors open 18:00']
+      },
+    )
+    expect(seen).toEqual([[BRIEF, { campaignBriefing: null, voicePrompt: 'V' }]])
+    expect(check.status).toBe('flagged')
+    expect(check.flagged.map((f) => `${f.where}|${f.kind}|${f.value}`)).toEqual(['headline|cur|$99'])
+  })
+
+  it('a clear check is stored as clear with no flags', async () => {
+    const check = await computeFactsCheck({ brief: BRIEF, texts: TEXTS }, async () => ['Only $99', 'at 18:00'])
+    expect(check).toMatchObject({ v: 1, status: 'clear', flagged: [] })
+  })
+
+  it('a loader that throws is status error, logged once, redacted, and never thrown', async () => {
+    const check = await computeFactsCheck({ brief: BRIEF, texts: TEXTS }, async () => {
+      throw new Error('db down https://db.internal:5432/x key=secret')
+    })
+    expect(check.status).toBe('error')
+    expect(check.flagged).toEqual([])
+    expect(check.reason).not.toContain('secret')
+    expect(check.reason).not.toContain('db.internal')
+    expect(errors).toHaveLength(1)
+    expect(errors[0]).toContain('[facts-check]')
+  })
+
+  it('stores no caption or brief text, only what a flag needs', async () => {
+    const check = await computeFactsCheck({ brief: BRIEF, texts: TEXTS }, async () => ['x'])
+    const json = JSON.stringify(check)
+    expect(json).not.toContain('Doors open')
+    expect(json).not.toContain('Launch of the academy')
+  })
+})
+
+describe('refreshFactsCheck: a partial override (a store function given its own client)', () => {
+  it('overrides only the fields it names, so a caller can pass just its db', async () => {
+    const s: FakeState = {
+      draft: { headline: 'Only $99', brief: BRIEF },
+      captions: [],
+      writes: [],
+      failWrites: 0,
+    }
+    const deps = fake(s)
+    await refreshFactsCheck('d1', { db: deps.db, loadSources: deps.loadSources, loadCaptions: deps.loadCaptions })
+    expect(s.writes).toHaveLength(1)
+    // Only the db named: the default captions loader runs on it. A fake db with no
+    // caption rows to read fails inside the wrapper and is stored as error, never thrown.
+    const s2: FakeState = { draft: { headline: 'h', brief: BRIEF }, captions: [], writes: [], failWrites: 0 }
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    await expect(refreshFactsCheck('d1', { db: fake(s2).db })).resolves.toBeUndefined()
+    expect(parseFactsCheck(s2.writes.at(-1)?.factsCheck)?.status).toBe('error')
+    vi.restoreAllMocks()
+  })
+})
+
+describe('the __MOCK_FACT_ERROR__ seam (MOCK_AI only)', () => {
+  const load = async (env: Record<string, string>) => {
+    vi.resetModules()
+    vi.unstubAllEnvs()
+    for (const [k, v] of Object.entries(env)) vi.stubEnv(k, v)
+    return await import('@/lib/factsCheck/refresh')
+  }
+  afterEach(() => {
+    vi.unstubAllEnvs()
+    vi.restoreAllMocks()
+  })
+
+  it('with MOCK_AI on, the sentinel makes both entry points store status error (the generation and the action go on)', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    const mod = await load({ MOCK_AI: 'true', DESIGN_PROVIDER: 'claude-html' })
+    const brief = { ...BRIEF, topic: 'launch __MOCK_FACT_ERROR__' }
+    const computed = await mod.computeFactsCheck({ brief, texts: [{ where: 'headline', text: 'fine' }] }, async () => ['x'])
+    expect(computed.status).toBe('error')
+
+    const s: FakeState = { draft: { headline: 'fine', brief }, captions: [], writes: [], failWrites: 0 }
+    const deps = fake(s)
+    await mod.refreshFactsCheck('d1', deps)
+    expect(parseFactsCheck(s.writes.at(-1)?.factsCheck)?.status).toBe('error')
+  })
+
+  it('with MOCK_AI off, the sentinel is plain text and the check runs', async () => {
+    const mod = await load({})
+    const brief = { ...BRIEF, topic: 'launch __MOCK_FACT_ERROR__' }
+    const computed = await mod.computeFactsCheck({ brief, texts: [{ where: 'headline', text: 'fine' }] }, async () => ['x'])
+    expect(computed.status).toBe('clear')
   })
 })

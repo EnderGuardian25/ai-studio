@@ -4,6 +4,7 @@
 import { describe, it, expect } from 'vitest'
 import { buildBrandKitSystemContext } from '@/lib/brandkit/systemContext'
 import { PROMPT_VERSION } from '@/lib/agent/prompts/shared'
+import { POST_STYLES_REVISION } from '@/lib/postStyles'
 import type { ResolvedBrandKit } from '@/lib/brandkit/resolve'
 
 const kit: ResolvedBrandKit = {
@@ -37,7 +38,7 @@ describe('generation is untouched by 007', () => {
       ].join('\n'),
     )
   })
-  it('PROMPT_VERSION is unchanged', () => {
-    expect(PROMPT_VERSION).toBe('2026-10-21.1')
+  it('PROMPT_VERSION moved only by 027 (the derived post-styles suffix)', () => {
+    expect(PROMPT_VERSION).toBe(`2026-10-25.1+ps${POST_STYLES_REVISION}`)
   })
 })

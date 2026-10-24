@@ -11,6 +11,7 @@ import {
   findCommittedRevision,
   restoreDraftToRevision,
   restoredRenderStamp,
+  draftPostStyleStamp,
   DraftBusyError,
 } from '@/lib/drafts/revisions'
 
@@ -33,7 +34,7 @@ export const POST = withTeamAuth<Params>(async (_req, { params }, user) => {
   // itself — restoring concurrently would race it.
   const draftState = await prisma.draft.findUnique({
     where: { id: params.id },
-    select: { pendingAction: true, currentRevisionNumber: true },
+    select: { pendingAction: true, currentRevisionNumber: true, postStyle: true },
   })
   if (draftState?.pendingAction) {
     return NextResponse.json(
@@ -56,7 +57,9 @@ export const POST = withTeamAuth<Params>(async (_req, { params }, user) => {
   let key = revision.exportUrl
   // F3 (AC-04): the draft takes the restored revision's own render stamp — or,
   // when its PNG is re-rendered below, the font set that rasterizes it now.
-  const stamp = restoredRenderStamp(revision, !key)
+  // 027: the draft's current post-style stamp is carried (a restore moves the
+  // render pointer; it does not re-run the rules).
+  const stamp = restoredRenderStamp(revision, !key, draftPostStyleStamp(draftState ?? {}))
   if (!key) {
     const draft = await prisma.draft.findUnique({
       where: { id: params.id },

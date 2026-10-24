@@ -87,7 +87,7 @@ This is phase a. Phase b (STORY layouts, the five new looks, pixel-check changes
 
 ### Wave 4: Generation wiring
 
-- [ ] `T4` — Prompts, stamps on every writer, derived prompt versions, the check's write points and the mock seams
+- [x] `T4` — Prompts, stamps on every writer, derived prompt versions, the check's write points and the mock seams
   - Files: `src/lib/agent/{briefInput,generateDraft,pathA,pathB,background}.ts`, `src/lib/agent/prompts/{caption,pathA,pathB,background,refine,shared}.ts`, `src/providers/interfaces/CopyProvider.ts`, `src/lib/drafts/revisions.ts`, `src/lib/captions/store.ts`, `src/app/api/drafts/[id]/{regenerate-design,regenerate-copy,refine,inline-edit}/route.ts`, `src/app/api/drafts/[id]/rejected/[revisionId]/adopt/route.ts`, `src/app/api/drafts/[id]/revisions/[rev]/restore/route.ts`, `src/app/api/generate/copy/route.ts`, `src/lib/testHooks.ts`, `tests/unit/{postStylesPrompts,postStylesStamp,factsCheckRefresh}.test.ts` (extended), `tests/unit/postStylesWriters.test.ts` (new); existing unit tests whose fakes build a `brief` or `draft` (adapt, never delete)
   - Estimate: large
   - Kind: impl

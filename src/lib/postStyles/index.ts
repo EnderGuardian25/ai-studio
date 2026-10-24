@@ -16,6 +16,7 @@ export {
   parsePostStyleStamp,
   stampFor,
   rulesAtStamp,
+  derivedPromptVersion,
   type PostStyleStamp,
 } from './stamp'
 export { checklistPromptText, CHECKLIST_PREAMBLE } from './promptText'

@@ -466,3 +466,85 @@ describe('hero seams (mockRegionSamples, mockLayoutBoxes)', () => {
     expect(hooks.mockLayoutBoxes('__MOCK_HERO_LAYOUT__', regions)).toHaveLength(2)
   })
 })
+
+// 027 FR-15 / AC-15 — the facts-check seams. A fact sentinel in the TOPIC adds
+// one invented value to the mock reply, with no digit of its own; a topic with
+// no sentinel gets today's reply byte for byte.
+describe('027 fact sentinels in buildMockCaptionReply', () => {
+  const ALL = ['HEADLINE', 'INSTAGRAM', 'LINKEDIN'] as const
+  const FOUR: Array<[string, string]> = [
+    ['__MOCK_FACT_PRICE__', '$49'],
+    ['__MOCK_FACT_PCT__', '35% off'],
+    ['__MOCK_FACT_DATE__', '30 March 2027'],
+    ['__MOCK_FACT_NUM__', '1,250 customers'],
+  ]
+  const fields = async (hooks: typeof import('@/lib/testHooks'), topic: string) => {
+    const { extractCaptionReply } = await import('@/lib/captions/extract')
+    const result = extractCaptionReply(hooks.buildMockCaptionReply(topic, ALL), ALL)
+    if (!result.ok) throw new Error('mock reply rejected')
+    return Object.fromEntries(Object.entries(result.fields).map(([k, v]) => [k, v.ok ? v.text : '']))
+  }
+
+  it('a topic with no sentinel is byte-identical to the reply of before 027', async () => {
+    const hooks = await loadHooks()
+    const topic = 'Launch day'
+    const old = JSON.stringify(
+      {
+        headline: `Mock headline ${topic}`.slice(0, 100),
+        instagram: `Mock Instagram caption [${topic}]`,
+        linkedin: `Mock LinkedIn caption [${topic}]`,
+      },
+      null,
+      2,
+    )
+    expect(hooks.buildMockCaptionReply(topic, ALL)).toBe(
+      ['Here are your captions:', '', '```json', old, '```', '', "Let me know if you'd like changes."].join('\n'),
+    )
+  })
+
+  it.each(FOUR)('%s adds exactly its value to the headline and to every caption, and no other digit', async (sentinel, value) => {
+    const hooks = await loadHooks()
+    const got = await fields(hooks, `Launch ${sentinel}`)
+    for (const text of Object.values(got)) {
+      expect(text).toContain(value)
+      expect(text.split(value)).toHaveLength(2)
+      expect(text.replace(value, '')).not.toMatch(/\d/)
+    }
+  })
+
+  it('the sentinels hold no digit themselves', () => {
+    for (const [sentinel] of [...FOUR, ['__MOCK_FACT_HEADLINE__'], ['__MOCK_FACT_ERROR__']]) {
+      expect(sentinel).not.toMatch(/\d/)
+    }
+  })
+
+  it('__MOCK_FACT_HEADLINE__ puts $49 in the headline only', async () => {
+    const hooks = await loadHooks()
+    const got = await fields(hooks, 'Launch __MOCK_FACT_HEADLINE__')
+    expect(got.HEADLINE).toContain('$49')
+    expect(got.INSTAGRAM).not.toMatch(/\d/)
+    expect(got.LINKEDIN).not.toMatch(/\d/)
+  })
+
+  it('a long topic never hides the value: it is appended after the cut and the headline stays within 100 characters', async () => {
+    const hooks = await loadHooks()
+    const got = await fields(hooks, `${'y'.repeat(200)} __MOCK_FACT_PRICE__`)
+    expect(got.HEADLINE.endsWith(' $49')).toBe(true)
+    expect(Array.from(got.HEADLINE).length).toBeLessThanOrEqual(100)
+  })
+
+  it('two sentinels add both values', async () => {
+    const hooks = await loadHooks()
+    const got = await fields(hooks, 'x __MOCK_FACT_PRICE__ __MOCK_FACT_PCT__')
+    expect(got.INSTAGRAM).toContain('$49')
+    expect(got.INSTAGRAM).toContain('35% off')
+  })
+
+  it('shouldMockFactError needs both MOCK_AI and the sentinel', async () => {
+    const on = await loadHooks({ MOCK_AI: 'true' })
+    expect(on.shouldMockFactError('x __MOCK_FACT_ERROR__')).toBe(true)
+    expect(on.shouldMockFactError('x')).toBe(false)
+    const off = await loadHooks()
+    expect(off.shouldMockFactError('x __MOCK_FACT_ERROR__')).toBe(false)
+  })
+})

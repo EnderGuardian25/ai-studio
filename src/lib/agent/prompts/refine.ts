@@ -37,6 +37,9 @@ export interface RefinePromptOptions {
   // The draft's stamped hero contract (009): the version it was made under, at
   // its size. Absent for a classic draft: the prompt is unchanged.
   compositionContract?: { label: string; version: number; size: SizeContract }
+  // 027 FR-09: the image-scope rules of the draft's STAMPED post style, at the
+  // stamped version (a version is immutable). Absent: the prompt is unchanged.
+  imageRules?: string
 }
 
 // Instruction fragment injected when the refine pre-step generated a new background.
@@ -56,10 +59,15 @@ function refinePlaceholderNote(hasInlineAssets: boolean): string {
 }
 
 export function buildRefineSystemPrompt(opts: RefinePromptOptions): string {
-  const { kit, mode, width, height, hasInlineAssets, backgroundImageUrl, compositionContract } = opts
-  const contractNote = compositionContract ? `
+  const { kit, mode, width, height, hasInlineAssets, backgroundImageUrl, compositionContract, imageRules } = opts
+  const contractNote =
+    (compositionContract
+      ? `
 
-${refineContractText(compositionContract)}` : ''
+${refineContractText(compositionContract)}`
+      : '') + (imageRules ? `
+
+${imageRules}` : '')
 
   if (mode === 'cli') {
     return `You are a design refinement agent. Apply the user's instruction as a targeted edit to the HTML, staying on-brand. Classify the instruction first (classes below): content the instruction does not name stays exactly as it is, and content a replace or remove names must be gone.

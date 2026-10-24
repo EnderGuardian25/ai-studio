@@ -4,7 +4,7 @@ import { withTeamAuth } from '@/lib/api/handler'
 import { canAccessContent } from '@/lib/authz/visibility'
 import { dimensionsFor } from '@/lib/aspectRatio'
 import { resolveExportUrl } from '@/lib/storage/minio'
-import { commitDraftRevision, AdoptConflictError } from '@/lib/drafts/revisions'
+import { commitDraftRevision, draftPostStyleStamp, AdoptConflictError } from '@/lib/drafts/revisions'
 import { inlineEditBlockReason } from '@/lib/drafts/inlineEdit'
 import { track } from '@/lib/analytics/track'
 
@@ -107,6 +107,8 @@ export const POST = withTeamAuth<{ id: string; revisionId: string }>(async (_req
       // 009: an adopt carries the rejected row's own composition stamp
       // (rejectedRenderStamp reads it); this value is ignored.
       composition: null,
+      // 027: an adopt carries the draft's current post-style stamp.
+      postStyle: draftPostStyleStamp(draft),
     })
     await track('revision.adopted', {
       source: 'web',

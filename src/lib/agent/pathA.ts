@@ -8,6 +8,7 @@ import { dimensionsFor } from '@/lib/aspectRatio'
 import { isCliMode, pipelineMode } from '@/lib/agent/config'
 import type { ResolvedModel } from '@/lib/models/resolve'
 import { buildPathASystemPrompt, buildPathAUserMessage } from '@/lib/agent/prompts/pathA'
+import { imageRulesFor } from '@/lib/agent/briefInput'
 
 // Template/brief mismatch — thrown by the guards below so both HTTP routes
 // (mapped to 400) and the headless scheduler (recorded as errorReason) get the
@@ -90,6 +91,8 @@ export async function runPathADesign(
     width,
     height,
     additionalImageUrl: brief.additionalImageUrl,
+    // 027 FR-09: Path A gets the image rules only (the template fixes the look).
+    imageRules: imageRulesFor(brief),
   })
 
   return isCliMode()

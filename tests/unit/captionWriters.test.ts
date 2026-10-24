@@ -94,6 +94,11 @@ vi.mock('@/lib/agent/pathA', () => ({
   assertTemplateMatchesBrief: () => {},
 }))
 vi.mock('@/lib/agent/pathB', () => ({ runPathBDesign: h.pathB }))
+// 027: the facts check has its own tests; here it is a clear result and a no-op refresh.
+vi.mock('@/lib/factsCheck/refresh', () => ({
+  computeFactsCheck: async () => ({ v: 1, status: 'clear', checkedAt: '2026-10-24T00:00:00.000Z', flagged: [] }),
+  refreshFactsCheck: async () => {},
+}))
 vi.mock('@/lib/api/handler', () => ({
   withTeamAuth:
     (handler: (req: unknown, ctx: { params: unknown }, user: unknown) => unknown) =>

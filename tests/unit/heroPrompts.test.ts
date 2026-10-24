@@ -280,7 +280,8 @@ describe('hero prompts: the fallback keeps the classic prompt (FR-10)', () => {
 
 describe('PROMPT_VERSION (009 FR-18, AC-08)', () => {
   it('is a new build-date value and says what changed it', () => {
-    expect(PROMPT_VERSION).toMatch(/^\d{4}-\d{2}-\d{2}\.\d+$/)
+    // 027: the build-date value carries the derived post-styles suffix.
+    expect(PROMPT_VERSION).toMatch(/^\d{4}-\d{2}-\d{2}\.\d+(\+ps\d+)?$/)
     expect(PROMPT_VERSION).not.toBe('2026-10-11.1')
     const shared = readFileSync(join(process.cwd(), 'src/lib/agent/prompts/shared.ts'), 'utf8')
     expect(shared).toContain('hero image styles (009)')

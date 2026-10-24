@@ -6,7 +6,7 @@ import { canAccessContent } from '@/lib/authz/visibility'
 import { dimensionsFor } from '@/lib/aspectRatio'
 import { resolveExportUrl } from '@/lib/storage/minio'
 import { track } from '@/lib/analytics/track'
-import { commitDraftRevision, draftCompositionStamp, draftModelStamp, RevisionConflictError } from '@/lib/drafts/revisions'
+import { commitDraftRevision, draftCompositionStamp, draftModelStamp, draftPostStyleStamp, RevisionConflictError } from '@/lib/drafts/revisions'
 import {
   sanitizeInlineHtml,
   inlineEditBlockReason,
@@ -83,6 +83,8 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
     model: draftModelStamp(draft),
     // 009: the HTML is still the render its composition stamp describes.
     composition: draftCompositionStamp(draft),
+    // 027: an edit keeps the rules the draft was made under.
+    postStyle: draftPostStyleStamp(draft),
   })
   await track('revision.edited', {
     source: 'web',
@@ -200,6 +202,8 @@ async function handleElementEdit(raw: unknown, draftId: string, user: TeamAuthed
       model: draftModelStamp(draft),
       // 009: the HTML is still the render its composition stamp describes.
       composition: draftCompositionStamp(draft),
+      // 027: an edit keeps the rules the draft was made under.
+      postStyle: draftPostStyleStamp(draft),
     })
   } catch (err) {
     if (err instanceof RevisionConflictError) {

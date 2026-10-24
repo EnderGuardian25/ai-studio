@@ -6,6 +6,7 @@ import { buildCaptionPrompt, CAPTION_MAX_TOKENS, CAPTION_PROMPT_VERSION } from '
 import { buildBackgroundDecisionPrompt } from '@/lib/agent/prompts/background'
 import { onImageHeadline, placeholderNote, SCRIPT_SUPPORT_NOTE, PROMPT_VERSION } from '@/lib/agent/prompts/shared'
 import { UNTRUSTED_CONTENT_GUARD } from '@/lib/agent/untrusted'
+import { POST_STYLES_REVISION } from '@/lib/postStyles'
 
 const kit: ResolvedBrandKit = {
   id: 'kit-1',
@@ -244,7 +245,8 @@ describe('SCRIPT_SUPPORT_NOTE — no-emoji guidance', () => {
     // 2026-10-01.2: VERIFIER_SYSTEM no longer paraphrases class criteria (final F1b / M-1).
     // 2026-10-11.1: the design prompts take the fenced headline, not the caption (012 FR-09).
     // 2026-10-21.1: hero image styles (009): the image-style contract in the art-director, Path B and refine prompts.
-    expect(PROMPT_VERSION).toBe('2026-10-21.1')
+    // 2026-10-25.1: post styles (027): the value derives from the post-style dataset.
+    expect(PROMPT_VERSION).toBe(`2026-10-25.1+ps${POST_STYLES_REVISION}`)
   })
 })
 
@@ -324,8 +326,9 @@ describe('buildCaptionPrompt (012 FR-07)', () => {
   })
 
   it('exports the caption prompt version and the token budget', () => {
-    expect(CAPTION_PROMPT_VERSION).toMatch(/^\d{4}-\d{2}-\d{2}\.\d+$/)
-    expect(CAPTION_PROMPT_VERSION).toBe('2026-10-23.1')
+    expect(CAPTION_PROMPT_VERSION).toMatch(/^\d{4}-\d{2}-\d{2}\.\d+\+ps\d+$/)
+    // 2026-10-25.1: post styles (027): derived from the post-style dataset.
+    expect(CAPTION_PROMPT_VERSION).toBe(`2026-10-25.1+ps${POST_STYLES_REVISION}`)
     expect(CAPTION_MAX_TOKENS).toBe(8192)
   })
 

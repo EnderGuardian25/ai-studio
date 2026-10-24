@@ -12,6 +12,9 @@ import type { FieldResult } from '@/lib/captions/extract'
 import { settleCaptionRow, type CaptionStamp } from '@/lib/captions/actionTargets'
 import { resolveCaptionForPublish, type CaptionResolution } from '@/lib/captions/resolve'
 import { claimData, claimWhere, logLostClaim, newClaimId, type DraftClaim } from '@/lib/drafts/claim'
+import { refreshFactsCheck } from '@/lib/factsCheck/refresh'
+import { postStyleColumn } from '@/lib/drafts/revisions'
+import type { PostStyleStamp } from '@/lib/postStyles'
 
 export interface CaptionRow {
   channel: Channel
@@ -123,6 +126,19 @@ export async function loadCaptionTexts(
 
 // ── Writers ─────────────────────────────────────────────────────────────────
 
+// 027 FR-11: after a write that changes the stored captions or headline, the
+// draft's facts check is recomputed from what is stored now. Best-effort and
+// never throws (refreshFactsCheck swallows its own errors), so the caller's
+// result is unchanged; a client the caller was given is used for the reads.
+async function refreshAfterWrite(draftId: string, db: PrismaClient): Promise<void> {
+  try {
+    await refreshFactsCheck(draftId, db === prisma ? {} : { db })
+  } catch (err) {
+    // refreshFactsCheck already swallows its own errors; this is the backstop.
+    console.error(`[facts-check] draft ${draftId}: refresh failed:`, err)
+  }
+}
+
 // The caption stamp (008 FR-08) is defined beside the pure settle rule.
 export type { CaptionStamp }
 
@@ -211,6 +227,9 @@ export async function saveGenerationCaptions(
         ]
       : []),
   ])
+  // 027 FR-11: the interactive generation's check, after the write (the
+  // scheduled path computes its check in the draft's own create).
+  await refreshAfterWrite(draftId, prisma)
 }
 
 // Claim the draft-level caption action (A2, design §5): REGENERATE_COPY,
@@ -286,6 +305,11 @@ async function settlePendingRows(
 // target whose field validated — the row's model, or headlineModel in the
 // headline's guarded write — and never on a failed one, which keeps its stamp
 // with its text (A7). The failure settles (onError, an unstarted run) pass none.
+//
+// 027 FR-05/FR-11: `postStyle` is the stamp of the run, written to
+// Draft.postStyle in the claim-guarded draft write (the copy ran under that
+// version); undefined, as in every failure settle, leaves it alone. When the
+// claim held, the facts check is recomputed after the transaction.
 export async function settleCaptionAction(
   draftId: string,
   claim: DraftClaim,
@@ -293,17 +317,23 @@ export async function settleCaptionAction(
   fields: Partial<Record<CaptionTarget, FieldResult>>,
   stamp: CaptionStamp | null = null,
   db: PrismaClient = prisma,
+  postStyle?: PostStyleStamp | null,
 ): Promise<void> {
   const headline = targets.includes('HEADLINE') ? fields.HEADLINE : undefined
+  let settled = false
   await db.$transaction(async (tx) => {
     const { count } = await tx.draft.updateMany({
       where: { id: draftId, ...claimWhere(claim) },
-      data: { updatedAt: new Date() },
+      data: {
+        updatedAt: new Date(),
+        ...(postStyle !== undefined ? { postStyle: postStyleColumn(postStyle) } : {}),
+      },
     })
     if (count === 0) {
       logLostClaim(draftId, claim)
       return
     }
+    settled = true
     await settlePendingRows(
       tx,
       draftId,
@@ -318,6 +348,7 @@ export async function settleCaptionAction(
       })
     }
   })
+  if (settled) await refreshAfterWrite(draftId, db)
 }
 
 // The stale sweep's caption half (FR-11): an interrupted generation or caption
@@ -344,6 +375,7 @@ export async function saveCaptionEdit(
     where: { draftId, channel, status: { not: 'PENDING' } },
     data: { text, status: 'READY', failureReason: null },
   })
+  if (count === 1) await refreshAfterWrite(draftId, db)
   return count === 1
 }
 
@@ -363,5 +395,6 @@ export async function saveHeadlineEdit(
     },
     data: { headline },
   })
+  if (count === 1) await refreshAfterWrite(draftId, db)
   return count === 1
 }

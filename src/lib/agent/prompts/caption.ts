@@ -12,10 +12,14 @@ import type { BriefInput } from '@/providers/interfaces/CopyProvider'
 import { CAPTION_CHANNELS, type CaptionTarget } from '@/lib/channels'
 import { captionReplyKeys } from '@/lib/captions/extract'
 import { HEADLINE_MAX } from '@/lib/captions/headline'
+import { derivedPromptVersion } from '@/lib/postStyles'
 
 // Bump when caption prompt content changes materially; logged with every
 // caption call. Separate from PROMPT_VERSION, which versions the design prompts.
-export const CAPTION_PROMPT_VERSION = '2026-10-23.1'
+// 2026-10-25.1: post styles (027): derived from the post-style dataset, like
+// PROMPT_VERSION, and the user prompt carries the style's caption rules.
+export const CAPTION_PROMPT_VERSION_BASE = '2026-10-25.1'
+export const CAPTION_PROMPT_VERSION = derivedPromptVersion(CAPTION_PROMPT_VERSION_BASE)
 
 // Room for two captions plus a headline, including non-Latin scripts at about
 // one token per character.
@@ -53,6 +57,11 @@ export function buildCaptionPrompt(brief: BriefInput, targets: readonly CaptionT
     bullets.push(`- "${s.jsonKey}" (${s.label}): ${s.brief}${length ? ` ${length}` : ''}`)
   }
 
+  // 027 FR-09: the post style's caption rules, after Tone and before the task.
+  const rulesBlock = brief.captionRules ? `
+
+${brief.captionRules}` : ''
+
   const keys = captionReplyKeys(targets)
     .map((k) => `"${k}"`)
     .join(', ')
@@ -66,7 +75,7 @@ export function buildCaptionPrompt(brief: BriefInput, targets: readonly CaptionT
     user: `Topic: ${brief.topic}
 Description: ${brief.description}
 Goal: ${brief.goal}
-Tone: ${brief.tone}
+Tone: ${brief.tone}${rulesBlock}
 
 Write the following for the brief above:
 ${bullets.join('\n')}

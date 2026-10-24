@@ -29,6 +29,13 @@ export function stampFor(
   return postStyleStampSchema.parse({ key, version, revision })
 }
 
+// A prompt version derived from the dataset (FR-05): the build-date base plus
+// the dataset's revision, so a checklist edit (which raises the revision)
+// changes it with no manual bump. Pure, so a test can derive one for a fixture.
+export function derivedPromptVersion(base: string, revision: number = POST_STYLES_REVISION): string {
+  return `${base}+ps${revision}`
+}
+
 // The rules of a stamped (key, version), optionally for one scope. A version is
 // immutable, so a stamp that resolves yields the rules that ran. Returns null
 // when the stamp is null/unreadable or its key or version no longer resolves

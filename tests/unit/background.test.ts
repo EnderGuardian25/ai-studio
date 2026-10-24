@@ -897,7 +897,7 @@ describe('redactSkipDetail — no credential or internal endpoint reaches a draf
 })
 
 describe('commitDraftRevision — the refine skip write rides the same draft write', () => {
-  const base = { draftId: 'd1', instruction: 'add a background', html: '<html></html>', width: 1080, height: 1080, exportKey: 'exports/x.png', composition: null }
+  const base = { draftId: 'd1', instruction: 'add a background', html: '<html></html>', width: 1080, height: 1080, exportKey: 'exports/x.png', composition: null, postStyle: null }
 
   beforeEach(() => {
     h.draftUpdates.length = 0

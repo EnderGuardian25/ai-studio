@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { resolveBrandKit } from '@/lib/brandkit/resolve'
 import { getActiveCampaignBriefing } from '@/lib/campaign/briefing'
 import { resolveCopyProvider } from '@/providers/registry'
-import { buildBriefInput } from '@/lib/agent/briefInput'
+import { briefPostStyleStamp, buildBriefInput } from '@/lib/agent/briefInput'
 import { runPathADesign, assertTemplateMatchesBrief } from '@/lib/agent/pathA'
 import { runPathBDesign } from '@/lib/agent/pathB'
 import { currentRenderStamp, draftStampFields, revisionStampFields, type RenderStamp } from '@/lib/drafts/revisions'
@@ -19,6 +19,9 @@ import { captionRowsFromFields, headlineStampFields, saveGenerationCaptions, typ
 import { resolveModel } from '@/lib/models/policy'
 import type { ResolvedModel } from '@/lib/models/resolve'
 import { touchGeneration } from '@/lib/drafts/draftActions'
+import { computeFactsCheck } from '@/lib/factsCheck/refresh'
+import type { CheckText, FactWhere } from '@/lib/factsCheck'
+import type { Prisma } from '@prisma/client'
 
 // Path B needs a resolvable brand kit; thrown before any model call is paid for.
 export class NoBrandKitError extends Error {
@@ -155,7 +158,7 @@ async function produceDesign(
       // Path A has no background step: nothing was skipped.
       backgroundSkip: generationSkipFields(null),
       // 009: a Path A draft is classic (and gives the evidence its denominator).
-      stamp: currentRenderStamp(model, classicStamp()),
+      stamp: currentRenderStamp(model, classicStamp(), briefPostStyleStamp(brief)),
     }
   }
   const result = await runPathBDesign(brief, kit!, headline, campaignBriefing, actor, model, { onBeforeDesign })
@@ -166,7 +169,7 @@ async function produceDesign(
     backgroundSkip: generationSkipFields(result.background),
     // 009 FR-12: the run's composition stamp (the image style asked for, the
     // one applied, why not), resolved by runPathBDesign.
-    stamp: currentRenderStamp(model, result.composition),
+    stamp: currentRenderStamp(model, result.composition, briefPostStyleStamp(brief)),
   }
 }
 
@@ -272,6 +275,18 @@ async function emitGenerationFinished(
   })
 }
 
+// The texts the facts check reads from a caption reply: the validated headline
+// and each registry caption that validated (027 FR-10). Anything else in the
+// reply is not stored, so it is not checked.
+function checkTexts(headline: string, fields: Awaited<ReturnType<typeof writeCaptions>>['fields']): CheckText[] {
+  const texts: CheckText[] = [{ where: 'headline', text: headline }]
+  for (const { channel } of CAPTION_CHANNELS) {
+    const field = fields[channel]
+    if (field?.ok && field.text) texts.push({ where: channel as FactWhere, text: field.text })
+  }
+  return texts
+}
+
 // SYNCHRONOUS brief→draft orchestrator: captions → design → render, then create
 // the draft (EXPORTED, with its caption rows and v1) at the END on success. Used
 // by the NON-interactive callers — MCP/ACP surface and the scheduled-generation
@@ -325,6 +340,16 @@ async function generateDraftForBriefInner(
   trace.captionStamp = captionStamp
   const headline = requireHeadline(fields)
 
+  // 027 FR-11: the facts check runs on every generation, styled or not, over
+  // the headline and the captions in hand, and is written in the draft's own
+  // create below. It never fails the generation: a check that cannot run is
+  // stored as status 'error'.
+  const factsCheck = await computeFactsCheck({
+    brief,
+    texts: checkTexts(headline, fields),
+    preloaded: { campaignBriefing: inputs.campaignBriefing ?? null, voicePrompt: inputs.kit?.voicePrompt ?? null },
+  })
+
   const design = await produceDesign(brief, inputs, headline, actor, models.design, opts?.onBeforeDesign)
   trace.design = design
 
@@ -337,6 +362,7 @@ async function generateDraftForBriefInner(
         // requireHeadline passed, so the headline validated: it carries the stamp.
         ...headlineStampFields(captionStamp),
         captions: { create: captionRowsFromFields(fields, captionStamp) },
+        factsCheck: factsCheck as unknown as Prisma.InputJsonValue,
         htmlContent: design.htmlContent,
         templateId: inputs.template?.id ?? null,
         exportUrl: design.exportUrl,

@@ -9,6 +9,7 @@ import type { DraftNotApplied } from '@/lib/api-types'
 import type { BackgroundSkipFields } from '@/lib/drafts/backgroundNotice'
 import type { ResolvedModel } from '@/lib/models/resolve'
 import { compositionStampSchema, parseCompositionStamp, type CompositionStamp } from '@/lib/designData'
+import { parsePostStyleStamp, postStyleStampSchema, type PostStyleStamp } from '@/lib/postStyles'
 
 // ── The revision chain vs. rejected renders (change 004 Phase 2, T15/T16) ────
 // DraftRevision holds two kinds of row. COMMITTED rows are the chain: numbered
@@ -48,12 +49,17 @@ import { compositionStampSchema, parseCompositionStamp, type CompositionStamp } 
 // the one applied, why not, the observations), one JSON value on both tables.
 // null is "unknown" (a pre-009 row, or a writer that never knew), as for the
 // model.
+//
+// 027 FR-05: it also carries the post-style stamp ({ key, version, revision }),
+// one JSON value on both tables. null is "no style" (a pre-027 row, or a brief
+// with no style) or unknown, as for the composition.
 export interface RenderStamp {
   promptVersion: string | null
   fontSet: string | null
   model: string | null
   modelSubstitutedFrom: string | null
   composition: CompositionStamp | null
+  postStyle: PostStyleStamp | null
 }
 
 // The model half of a RenderStamp, as stored. A render made now takes it from
@@ -92,16 +98,33 @@ export function draftModelStamp(draft: {
 // model is known for this render; history reads it as "unknown", the 004 rule.
 // 009: `composition` has no default, so a caller that forgets it is a type
 // error: pass the run's stamp, a carried one, or null for "unknown".
+// 027: `postStyle` is the same, required for the same reason: the run's stamp
+// (briefPostStyleStamp), a carried one (draftPostStyleStamp), or null.
 export function currentRenderStamp(
   model: ResolvedModel | ModelStamp | null,
   composition: CompositionStamp | null,
+  postStyle: PostStyleStamp | null,
 ): RenderStamp {
   return {
     promptVersion: PROMPT_VERSION,
     fontSet: getFontSetId(),
     ...modelStampOf(model),
     composition,
+    postStyle,
   }
+}
+
+// The draft's CURRENT post-style stamp (027), carried forward by a write that
+// keeps the render (refine, inline edit, override, adopt, restore). A stored
+// value that no longer parses is null: unknown is honest.
+export function draftPostStyleStamp(draft: { postStyle?: unknown }): PostStyleStamp | null {
+  return parsePostStyleStamp(draft.postStyle)
+}
+
+// The post-style stamp as a Json column value: SQL NULL when there is none,
+// otherwise the value, validated by its schema at every write.
+export function postStyleColumn(stamp: PostStyleStamp | null): Prisma.InputJsonValue | typeof Prisma.DbNull {
+  return stamp ? (postStyleStampSchema.parse(stamp) as Prisma.InputJsonValue) : Prisma.DbNull
 }
 
 // The draft's CURRENT composition stamp (009), carried forward by a write whose
@@ -127,6 +150,7 @@ export function revisionStampFields(stamp: RenderStamp): {
   model: string | null
   modelSubstitutedFrom: string | null
   composition: Prisma.InputJsonValue | typeof Prisma.DbNull
+  postStyle: Prisma.InputJsonValue | typeof Prisma.DbNull
 } {
   return {
     promptVersion: stamp.promptVersion,
@@ -134,6 +158,7 @@ export function revisionStampFields(stamp: RenderStamp): {
     model: stamp.model,
     modelSubstitutedFrom: stamp.modelSubstitutedFrom,
     composition: toJsonColumn(stamp.composition),
+    postStyle: postStyleColumn(stamp.postStyle),
   }
 }
 
@@ -145,6 +170,7 @@ export function draftStampFields(stamp: RenderStamp): {
   designModel: string | null
   designModelSubstitutedFrom: string | null
   composition: Prisma.InputJsonValue | typeof Prisma.DbNull
+  postStyle: Prisma.InputJsonValue | typeof Prisma.DbNull
 } {
   return {
     promptVersion: stamp.promptVersion,
@@ -152,6 +178,7 @@ export function draftStampFields(stamp: RenderStamp): {
     designModel: stamp.model,
     designModelSubstitutedFrom: stamp.modelSubstitutedFrom,
     composition: toJsonColumn(stamp.composition),
+    postStyle: postStyleColumn(stamp.postStyle),
   }
 }
 
@@ -170,6 +197,10 @@ export function restoredRenderStamp(
     composition?: unknown
   },
   rerendered: boolean,
+  // 027: the draft's CURRENT post-style stamp, carried (a restore moves the
+  // render pointer; it does not re-run the rules). Required, so a caller must
+  // choose.
+  postStyle: PostStyleStamp | null,
 ): RenderStamp {
   return {
     promptVersion: revision.promptVersion ?? null,
@@ -178,6 +209,7 @@ export function restoredRenderStamp(
     modelSubstitutedFrom: revision.modelSubstitutedFrom ?? null,
     // 009: the row's own stamp (null on a legacy row, or one that no longer parses).
     composition: parseCompositionStamp(revision.composition),
+    postStyle,
   }
 }
 
@@ -359,6 +391,11 @@ export interface CommitRevisionArgs {
   // (or refineReplacedStamp), a fresh render its own. null = unknown. Ignored
   // by an adopt, which carries the rejected row's own stamp.
   composition: CompositionStamp | null
+  // 027 FR-05: the post-style stamp of the render `html` is. Required for the
+  // same reason: every writer passes the draft's current stamp (a carry-forward)
+  // or the run's own. An adopt carries the draft's current stamp too (the
+  // rejected row's composition and model are still its own). null = no style.
+  postStyle: PostStyleStamp | null
 }
 
 // Thrown (and never retried — only P2002 is) when the expectedRevisionNumber
@@ -429,8 +466,8 @@ export async function commitDraftRevision(
   // unknown row reads as null here and the guard inside the transaction
   // refuses it. 008: a fresh commit's model is the caller's (args.model).
   const stamp = adoptRejectedRevisionId
-    ? await rejectedRenderStamp(draftId, adoptRejectedRevisionId)
-    : currentRenderStamp(args.model ?? null, args.composition)
+    ? await rejectedRenderStamp(draftId, adoptRejectedRevisionId, args.postStyle)
+    : currentRenderStamp(args.model ?? null, args.composition, args.postStyle)
 
   let finalExportKey = args.exportKey
   // Set only when THIS call rendered + uploaded the export — the only object
@@ -580,7 +617,11 @@ export async function commitDraftRevision(
 
 // The adopted rejected row's own stamp (null on a pre-F3 row, or on a row
 // that is not this draft's).
-async function rejectedRenderStamp(draftId: string, revisionId: string): Promise<RenderStamp> {
+async function rejectedRenderStamp(
+  draftId: string,
+  revisionId: string,
+  postStyle: PostStyleStamp | null,
+): Promise<RenderStamp> {
   const row = await prisma.draftRevision.findFirst({
     where: { id: revisionId, draftId },
     select: { promptVersion: true, fontSet: true, model: true, modelSubstitutedFrom: true, composition: true },
@@ -591,6 +632,7 @@ async function rejectedRenderStamp(draftId: string, revisionId: string): Promise
     model: row?.model ?? null,
     modelSubstitutedFrom: row?.modelSubstitutedFrom ?? null,
     composition: parseCompositionStamp(row?.composition),
+    postStyle,
   }
 }
 
@@ -761,6 +803,9 @@ export interface RecordRejectedRenderArgs {
   // 009 FR-12: the composition stamp the attempt's render carries: the draft's
   // current one (a refine of the current design). null = unknown.
   composition: CompositionStamp | null
+  // 027 FR-05: the draft's current post-style stamp (a refine keeps the rules
+  // the draft was made under). null = no style.
+  postStyle: PostStyleStamp | null
   // 019: the refine's claim. The discard and the final draft write are guarded
   // on it; a miss throws DraftClaimLostError and nothing is recorded.
   claim: DraftClaim
@@ -782,7 +827,7 @@ export async function recordRejectedRender(
   // F3: the rejected row carries the stamp of ITS render, so a later "Use
   // anyway" can reinstate it. The draft's stamp is untouched: its current
   // render did not change. 008: with the attempt's model.
-  const stamp = currentRenderStamp(args.model ?? null, args.composition)
+  const stamp = currentRenderStamp(args.model ?? null, args.composition, args.postStyle)
 
   let exportKey: string | null = null
   let exported: RejectionDiagnostics['export'] = 'none'

@@ -28,6 +28,8 @@ interface Row {
   // F3 (AC-04): the render stamp each row carries.
   // 009: the composition stamp (a JSON value, or Prisma.DbNull for none).
   composition?: unknown
+  // 027: the post-style stamp (a JSON value, or Prisma.DbNull for none).
+  postStyle?: unknown
   fontSet?: string | null
   promptVersion?: string | null
   // 008 FR-08: the model whose output the row's HTML is.
@@ -306,6 +308,9 @@ import {
   restoredRenderStamp,
   revisionStampFields,
   draftCompositionStamp,
+  draftPostStyleStamp,
+  draftStampFields,
+  postStyleColumn,
   modelStampOf,
   draftModelStamp,
   type RejectionDiagnostics,
@@ -471,7 +476,7 @@ describe('commitDraftRevision (refine + inline-edit writer)', () => {
   it('writes a committed row at the next committed number and points the draft at it', async () => {
     db.rows = [committed('d1', 1), rejected('d1')]
     const { exportKey } = await commitDraftRevision({
-      composition: null,
+      composition: null, postStyle: null,
       draftId: 'd1',
       instruction: 'darker background',
       html: '<html>new</html>',
@@ -490,7 +495,7 @@ describe('commitDraftRevision (refine + inline-edit writer)', () => {
   it('returns the new revision number (the pointer the draft now carries)', async () => {
     db.rows = [committed('d1', 1), committed('d1', 2)]
     const out = await commitDraftRevision({
-      composition: null,
+      composition: null, postStyle: null,
       draftId: 'd1', instruction: 'x', html: '<html/>', width: 1080, height: 1080, exportKey: 'k',
     })
     expect(out.revisionNumber).toBe(3)
@@ -508,7 +513,7 @@ describe('commitDraftRevision expectedRevisionNumber (element-edit CAS)', () => 
     html: '<html>edited</html>',
     width: 1080,
     height: 1080,
-    composition: null,
+    composition: null, postStyle: null,
     ...over,
   })
 
@@ -606,7 +611,7 @@ describe('commitDraftRevision lock order: the revision insert precedes every dra
     db.rows = [committed('d1', 1)]
     db.currentRevisionNumber = 1
     await commitDraftRevision({
-      composition: null,
+      composition: null, postStyle: null,
       draftId: 'd1', instruction: 'Element edit: text', html: '<html/>', width: 1080, height: 1080,
       exportKey: 'k', expectedRevisionNumber: 1,
     })
@@ -625,7 +630,7 @@ describe('commitDraftRevision lock order: the revision insert precedes every dra
     db.ops = []
     db.draftUpdates = []
     await commitDraftRevision({
-      composition: null,
+      composition: null, postStyle: null,
       draftId: 'd1', instruction: 'Use anyway: reduce the text', html: '<html/>', width: 1080, height: 1080,
       exportKey: exportKey!, adoptRejectedRevisionId: rejectedId,
     })
@@ -642,7 +647,7 @@ describe('commitDraftRevision lock order: the revision insert precedes every dra
 
   it('non-CAS path is unchanged: insert, then a plain draft.update (no guard)', async () => {
     db.rows = [committed('d1', 1)]
-    await commitDraftRevision({ composition: null, draftId: 'd1', instruction: 'x', html: '<html/>', width: 1080, height: 1080, exportKey: 'k' })
+    await commitDraftRevision({ composition: null, postStyle: null, draftId: 'd1', instruction: 'x', html: '<html/>', width: 1080, height: 1080, exportKey: 'k' })
     expect(draftWrites(db.ops)).toEqual(['draft.update'])
     expect(db.ops.indexOf('draft.update')).toBeGreaterThan(db.ops.indexOf('revision.create'))
   })
@@ -652,7 +657,7 @@ describe('commitDraftRevision lock order: the revision insert precedes every dra
     db.currentRevisionNumber = 2
     await expect(
       commitDraftRevision({
-        composition: null,
+        composition: null, postStyle: null,
         draftId: 'd1', instruction: 'Element edit: color', html: '<html/>', width: 1080, height: 1080,
         exportKey: 'k', expectedRevisionNumber: 1,
       }),
@@ -680,7 +685,7 @@ describe('commitDraftRevision lock order: the revision insert precedes every dra
     }
     await expect(
       commitDraftRevision({
-        composition: null,
+        composition: null, postStyle: null,
         draftId: 'd1', instruction: 'Element edit: text', html: '<html/>', width: 1080, height: 1080,
         exportKey: 'k', expectedRevisionNumber: 1,
       }),
@@ -697,7 +702,7 @@ describe('commitDraftRevision lock order: the revision insert precedes every dra
 describe('commitDraftRevision CAS single-flight (pendingAction)', () => {
   const casArgs = (expectedRevisionNumber: number) => ({
     draftId: 'd1', instruction: 'Element edit: text', html: '<html/>', width: 1080, height: 1080,
-    exportKey: 'k', expectedRevisionNumber, composition: null,
+    exportKey: 'k', expectedRevisionNumber, composition: null, postStyle: null,
   })
 
   it('a claimed pendingAction refuses the commit, writes nothing, and reports the action', async () => {
@@ -723,7 +728,7 @@ describe('commitDraftRevision CAS single-flight (pendingAction)', () => {
   it('the non-CAS path still commits while an action is claimed (refine commits under its own claim)', async () => {
     db.rows = [committed('d1', 1)]
     db.pendingAction = 'REFINE'
-    const out = await commitDraftRevision({ composition: null, draftId: 'd1', instruction: 'x', html: '<html/>', width: 1080, height: 1080, exportKey: 'k' })
+    const out = await commitDraftRevision({ composition: null, postStyle: null, draftId: 'd1', instruction: 'x', html: '<html/>', width: 1080, height: 1080, exportKey: 'k' })
     expect(out.revisionNumber).toBe(2)
   })
 })
@@ -767,7 +772,7 @@ const rejectArgs = (over: Partial<Parameters<typeof recordRejectedRender>[0]> = 
   height: 1350,
   reason: 'The edit could not be applied: remove missed.',
   diagnostics: diagnostics(),
-  composition: null,
+  composition: null, postStyle: null,
   ...over,
 })
 
@@ -871,7 +876,7 @@ describe('recordRejectedRender (FR-12/13, Ruling D/E)', () => {
 describe('interactive transactions wait long enough for a pool connection', () => {
   it('commitDraftRevision and recordRejectedRender both pass maxWait = TX_MAX_WAIT_MS (10 s)', async () => {
     expect(TX_MAX_WAIT_MS).toBeGreaterThanOrEqual(10_000)
-    await commitDraftRevision({ composition: null, draftId: 'd1', instruction: 'x', html: '<html/>', width: 1080, height: 1080, exportKey: 'k' })
+    await commitDraftRevision({ composition: null, postStyle: null, draftId: 'd1', instruction: 'x', html: '<html/>', width: 1080, height: 1080, exportKey: 'k' })
     await recordHeld(rejectArgs())
     expect(db.txOptions).toEqual([{ maxWait: TX_MAX_WAIT_MS }, { maxWait: TX_MAX_WAIT_MS }])
   })
@@ -882,7 +887,7 @@ describe('commitDraftRevision clears the not-applied outcome', () => {
     db.rows = [committed('d1', 1)]
     const { revisionId: rejectedId } = await recordHeld(rejectArgs())
     db.draftUpdates = []
-    await commitDraftRevision({ composition: null, draftId: 'd1', instruction: 'x', html: '<html/>', width: 1080, height: 1080, exportKey: 'k' })
+    await commitDraftRevision({ composition: null, postStyle: null, draftId: 'd1', instruction: 'x', html: '<html/>', width: 1080, height: 1080, exportKey: 'k' })
     expect(db.draftUpdates[0].data).toMatchObject({ notAppliedReason: null, notAppliedRevisionId: null, currentRevisionNumber: 2 })
     expect(db.rows.find((r) => r.id === rejectedId)!.discardedAt).toBeInstanceOf(Date)
   })
@@ -891,7 +896,7 @@ describe('commitDraftRevision clears the not-applied outcome', () => {
     const { revisionId: rejectedId } = await recordHeld(rejectArgs())
     const row = db.rows.find((r) => r.id === rejectedId)!
     row.adoptedAt = new Date()
-    await commitDraftRevision({ composition: null, draftId: 'd1', instruction: 'x', html: '<html/>', width: 1080, height: 1080, exportKey: 'k' })
+    await commitDraftRevision({ composition: null, postStyle: null, draftId: 'd1', instruction: 'x', html: '<html/>', width: 1080, height: 1080, exportKey: 'k' })
     expect(row.discardedAt ?? null).toBeNull()
   })
 })
@@ -909,7 +914,7 @@ describe('commitDraftRevision adoptRejectedRevisionId (T19 "Use anyway")', () =>
 
     const before = db.rows.length
     const { revisionId, exportKey } = await commitDraftRevision({
-      composition: null,
+      composition: null, postStyle: null,
       draftId: 'd1',
       instruction: 'Use anyway: make the logo bigger',
       html: db.rows.find((r) => r.id === rejectedId)!.htmlSnapshot,
@@ -961,7 +966,7 @@ describe('commitDraftRevision adoptRejectedRevisionId (T19 "Use anyway")', () =>
     // the live `second` row must be untouched.
     await expect(
       commitDraftRevision({
-        composition: null,
+        composition: null, postStyle: null,
         draftId: 'd1',
         instruction: 'Use anyway: first',
         html: '<html/>',
@@ -980,7 +985,7 @@ describe('commitDraftRevision adoptRejectedRevisionId (T19 "Use anyway")', () =>
     const rowsBeforeFirstAdopt = db.rows.length
 
     await commitDraftRevision({
-      composition: null,
+      composition: null, postStyle: null,
       draftId: 'd1',
       instruction: 'Use anyway: reduce the text',
       html: '<html>REJECTED RENDER</html>',
@@ -994,7 +999,7 @@ describe('commitDraftRevision adoptRejectedRevisionId (T19 "Use anyway")', () =>
 
     await expect(
       commitDraftRevision({
-        composition: null,
+        composition: null, postStyle: null,
         draftId: 'd1',
         instruction: 'Use anyway: reduce the text',
         html: '<html>REJECTED RENDER</html>',
@@ -1016,7 +1021,7 @@ describe('commitDraftRevision adoptRejectedRevisionId (T19 "Use anyway")', () =>
 
     await expect(
       commitDraftRevision({
-        composition: null,
+        composition: null, postStyle: null,
         draftId: 'd1',
         instruction: 'Use anyway: reduce the text',
         html: '<html>whatever</html>',
@@ -1036,7 +1041,7 @@ describe('commitDraftRevision adoptRejectedRevisionId (T19 "Use anyway")', () =>
     // db.notAppliedRevisionId is null — no live outcome at all.
     await expect(
       commitDraftRevision({
-        composition: null,
+        composition: null, postStyle: null,
         draftId: 'd1',
         instruction: 'Use anyway: some other refine',
         html: stray.htmlSnapshot,
@@ -1060,7 +1065,7 @@ describe('commitDraftRevision adoptRejectedRevisionId (T19 "Use anyway")', () =>
 
     await expect(
       commitDraftRevision({
-        composition: null,
+        composition: null, postStyle: null,
         draftId: 'd1',
         instruction: 'Use anyway: reduce the text',
         html: '<html>REJECTED RENDER</html>',
@@ -1175,7 +1180,7 @@ const STAMP_V2 = {
   fontSet: 'fonts-v2',
   model: 'claude-sonnet-4-6',
   modelSubstitutedFrom: null,
-  composition: null,
+  composition: null, postStyle: null,
 }
 
 describe('restoreDraftToRevision (F2 — restore guard)', () => {
@@ -1217,19 +1222,19 @@ describe('restoreDraftToRevision (F2 — restore guard)', () => {
 
 describe('F3 render stamps: every revision write records the render it holds', () => {
   it('currentRenderStamp is the prompt version + the installed font set (+ the 008 model, null when unknown)', () => {
-    expect(currentRenderStamp(null, null)).toEqual({
+    expect(currentRenderStamp(null, null, null)).toEqual({
       promptVersion: PROMPT_VERSION,
       fontSet: 'fonts-test',
       model: null,
       modelSubstitutedFrom: null,
-      composition: null,
+      composition: null, postStyle: null,
     })
   })
 
   it('commitDraftRevision stamps BOTH the new revision row and the draft (caller-supplied export)', async () => {
     db.rows = [committed('d1', 1)]
     const { revisionId } = await commitDraftRevision({
-      composition: null,
+      composition: null, postStyle: null,
       draftId: 'd1', instruction: 'darker', html: '<html>n</html>', width: 1080, height: 1080, exportKey: 'exports/n.png',
     })
     const row = db.rows.find((r) => r.id === revisionId)!
@@ -1241,7 +1246,7 @@ describe('F3 render stamps: every revision write records the render it holds', (
   it('commitDraftRevision stamps both when it renders the export itself', async () => {
     db.rows = [committed('d1', 1)]
     const { revisionId } = await commitDraftRevision({
-      composition: null,
+      composition: null, postStyle: null,
       draftId: 'd1', instruction: 'inline edit', html: '<html>e</html>', width: 1080, height: 1080,
     })
     expect(db.render.calls).toBe(1)
@@ -1254,7 +1259,7 @@ describe('F3 render stamps: every revision write records the render it holds', (
     db.rows = [committed('d1', 1)]
     db.currentRevisionNumber = 1
     const { revisionId } = await commitDraftRevision({
-      composition: null,
+      composition: null, postStyle: null,
       draftId: 'd1', instruction: 'el', html: '<html>c</html>', width: 1080, height: 1080, exportKey: 'k', expectedRevisionNumber: 1,
     })
     expect(db.rows.find((r) => r.id === revisionId)).toMatchObject({ fontSet: 'fonts-test', promptVersion: PROMPT_VERSION })
@@ -1295,7 +1300,7 @@ describe("F3 restore: the draft takes the restored revision's stamp", () => {
     db.currentRevisionNumber = 3
     await restoreDraftToRevision(
       'd1', 2, '<html>v2</html>', 'exports/d1-2.png',
-      restoredRenderStamp({ promptVersion: null, fontSet: null }, false),
+      restoredRenderStamp({ promptVersion: null, fontSet: null }, false, null),
     )
     const data = db.draftUpdates.at(-1)!.data
     expect(data).toHaveProperty('promptVersion', null)
@@ -1303,34 +1308,34 @@ describe("F3 restore: the draft takes the restored revision's stamp", () => {
   })
 
   it("restoredRenderStamp copies the revision's own values when its stored PNG is reused", () => {
-    expect(restoredRenderStamp({ promptVersion: 'pv-old', fontSet: 'fonts-old' }, false)).toEqual({
+    expect(restoredRenderStamp({ promptVersion: 'pv-old', fontSet: 'fonts-old' }, false, null)).toEqual({
       promptVersion: 'pv-old',
       fontSet: 'fonts-old',
       model: null,
       modelSubstitutedFrom: null,
-      composition: null,
+      composition: null, postStyle: null,
     })
   })
 
   it("restoredRenderStamp never lets the CURRENT font set leak onto a reused legacy PNG", () => {
-    expect(restoredRenderStamp({ promptVersion: null, fontSet: null }, false)).toEqual({
+    expect(restoredRenderStamp({ promptVersion: null, fontSet: null }, false, null)).toEqual({
       promptVersion: null,
       fontSet: null,
       model: null,
       modelSubstitutedFrom: null,
-      composition: null,
+      composition: null, postStyle: null,
     })
   })
 
   it('a restore that RE-RENDERS (legacy row with no stored PNG) stamps the font set that just rasterized it', () => {
     // The HTML is still the revision's (its prompt version, null if legacy);
     // the pixels are this render's.
-    expect(restoredRenderStamp({ promptVersion: null, fontSet: null }, true)).toEqual({
+    expect(restoredRenderStamp({ promptVersion: null, fontSet: null }, true, null)).toEqual({
       promptVersion: null,
       fontSet: 'fonts-test',
       model: null,
       modelSubstitutedFrom: null,
-      composition: null,
+      composition: null, postStyle: null,
     })
   })
 })
@@ -1345,7 +1350,7 @@ describe('F3 adopt: "Use anyway" carries the rejected render\'s OWN stamp', () =
 
   function adopt(r: Row) {
     return commitDraftRevision({
-      composition: null,
+      composition: null, postStyle: null,
       draftId: 'd1',
       instruction: `Use anyway: ${r.instruction}`,
       html: r.htmlSnapshot,
@@ -1426,7 +1431,7 @@ describe('008 FR-08: commitDraftRevision / recordRejectedRender record the model
   it('a refine commit stamps the new revision AND the draft with the refine model', async () => {
     db.rows = [committed('d1', 1)]
     const { revisionId } = await commitDraftRevision({
-      composition: null,
+      composition: null, postStyle: null,
       draftId: 'd1', instruction: 'darker', html: '<html>n</html>', width: 1080, height: 1080, model: refineModel,
     })
     expect(db.rows.find((r) => r.id === revisionId)).toMatchObject({
@@ -1444,7 +1449,7 @@ describe('008 FR-08: commitDraftRevision / recordRejectedRender record the model
     db.currentRevisionNumber = 1
     const carried = draftModelStamp({ designModel: 'claude-opus-5-5', designModelSubstitutedFrom: null })
     const { revisionId } = await commitDraftRevision({
-      composition: null,
+      composition: null, postStyle: null,
       draftId: 'd1', instruction: 'el', html: '<html>c</html>', width: 1080, height: 1080, exportKey: 'k',
       expectedRevisionNumber: 1, model: carried,
     })
@@ -1455,7 +1460,7 @@ describe('008 FR-08: commitDraftRevision / recordRejectedRender record the model
   it('no model given reads as unknown (null), never a stale value', async () => {
     db.rows = [committed('d1', 1)]
     const { revisionId } = await commitDraftRevision({
-      composition: null,
+      composition: null, postStyle: null,
       draftId: 'd1', instruction: 'x', html: '<html/>', width: 1080, height: 1080, exportKey: 'k',
     })
     expect(db.rows.find((r) => r.id === revisionId)).toMatchObject({ model: null, modelSubstitutedFrom: null })
@@ -1468,7 +1473,7 @@ describe('008 FR-08: commitDraftRevision / recordRejectedRender record the model
     db.rows.push(r)
     db.notAppliedRevisionId = r.id
     const { revisionId } = await commitDraftRevision({
-      composition: null,
+      composition: null, postStyle: null,
       draftId: 'd1', instruction: 'Use anyway', html: r.htmlSnapshot, width: 1080, height: 1080,
       exportKey: r.exportUrl!, adoptRejectedRevisionId: r.id, model: refineModel,
     })
@@ -1490,14 +1495,14 @@ describe('008 FR-08: commitDraftRevision / recordRejectedRender record the model
 
   it('currentRenderStamp takes the internal / resolved model as its arg, never the key', () => {
     const m = internalModel('INTERNAL_VERIFIER', 'api')
-    expect(currentRenderStamp(m, null)).toMatchObject({ model: m.arg, modelSubstitutedFrom: null })
+    expect(currentRenderStamp(m, null, null)).toMatchObject({ model: m.arg, modelSubstitutedFrom: null })
   })
 })
 
 // ── 019: the content writes from a claimed run are guarded on the claim ──────
 describe('019 commitDraftRevision with a claim (the refine commit)', () => {
   const claimArgs = (over: Partial<Parameters<typeof commitDraftRevision>[0]> = {}) => ({
-    draftId: 'd1', instruction: 'refine', html: '<html/>', width: 1080, height: 1080, claim: CLAIM, composition: null, ...over,
+    draftId: 'd1', instruction: 'refine', html: '<html/>', width: 1080, height: 1080, claim: CLAIM, composition: null, postStyle: null, ...over,
   })
   const hold = () => {
     db.pendingAction = CLAIM.action
@@ -1570,7 +1575,7 @@ describe('019 commitDraftRevision with a claim (the refine commit)', () => {
 
   it('without a claim nothing changes: the plain commit is still the unguarded draft.update', async () => {
     db.rows = [committed('d1', 1)]
-    await commitDraftRevision({ composition: null, draftId: 'd1', instruction: 'x', html: '<html/>', width: 1080, height: 1080, exportKey: 'k' })
+    await commitDraftRevision({ composition: null, postStyle: null, draftId: 'd1', instruction: 'x', html: '<html/>', width: 1080, height: 1080, exportKey: 'k' })
     expect(db.ops.filter((o) => o.startsWith('draft.'))).toEqual(['draft.update'])
   })
 })
@@ -1640,7 +1645,7 @@ describe('009 composition stamp: every revision writer carries it', () => {
     db.rows = [committed('d1', 1)]
     const { revisionId } = await commitDraftRevision({
       draftId: 'd1', instruction: 'x', html: '<html/>', width: 1080, height: 1080, exportKey: 'k',
-      composition: KEPT_STAMP,
+      composition: KEPT_STAMP, postStyle: null,
     })
     expect(db.rows.find((r) => r.id === revisionId)!.composition).toEqual(KEPT_STAMP)
     expect(db.draftUpdates.at(-1)!.data.composition).toEqual(KEPT_STAMP)
@@ -1650,7 +1655,7 @@ describe('009 composition stamp: every revision writer carries it', () => {
     db.rows = [committed('d1', 1)]
     const { revisionId } = await commitDraftRevision({
       draftId: 'd1', instruction: 'x', html: '<html/>', width: 1080, height: 1080, exportKey: 'k',
-      composition: null,
+      composition: null, postStyle: null,
     })
     expect(db.rows.find((r) => r.id === revisionId)!.composition).toBe(Prisma.DbNull)
     expect(db.draftUpdates.at(-1)!.data.composition).toBe(Prisma.DbNull)
@@ -1661,7 +1666,7 @@ describe('009 composition stamp: every revision writer carries it', () => {
     await expect(
       commitDraftRevision({
         draftId: 'd1', instruction: 'x', html: '<html/>', width: 1080, height: 1080, exportKey: 'k',
-        composition: { ...KEPT_STAMP, appliedArchetype: 'classic' },
+        composition: { ...KEPT_STAMP, appliedArchetype: 'classic' }, postStyle: null,
       }),
     ).rejects.toThrow()
     expect(db.draftUpdates).toEqual([])
@@ -1672,7 +1677,7 @@ describe('009 composition stamp: every revision writer carries it', () => {
     db.currentRevisionNumber = 1
     await commitDraftRevision({
       draftId: 'd1', instruction: 'el', html: '<html/>', width: 1080, height: 1080, exportKey: 'k',
-      expectedRevisionNumber: 1, composition: FALLBACK_STAMP,
+      expectedRevisionNumber: 1, composition: FALLBACK_STAMP, postStyle: null,
     })
     expect(db.draftUpdates.at(-1)!.data.composition).toEqual(FALLBACK_STAMP)
   })
@@ -1691,24 +1696,24 @@ describe('009 composition stamp: every revision writer carries it', () => {
     db.notAppliedRevisionId = r.id
     const { revisionId } = await commitDraftRevision({
       draftId: 'd1', instruction: 'Use anyway', html: r.htmlSnapshot, width: 1080, height: 1080,
-      exportKey: r.exportUrl!, adoptRejectedRevisionId: r.id, composition: null,
+      exportKey: r.exportUrl!, adoptRejectedRevisionId: r.id, composition: null, postStyle: null,
     })
     expect(db.rows.find((x) => x.id === revisionId)!.composition).toEqual(FALLBACK_STAMP)
     expect(db.draftUpdates.at(-1)!.data.composition).toEqual(FALLBACK_STAMP)
   })
 
   it('restoredRenderStamp reads the revision’s own stamp; a legacy or corrupt value is null', () => {
-    expect(restoredRenderStamp({ composition: KEPT_STAMP }, false).composition).toEqual(KEPT_STAMP)
-    expect(restoredRenderStamp({ composition: null }, false).composition).toBeNull()
-    expect(restoredRenderStamp({}, true).composition).toBeNull()
-    expect(restoredRenderStamp({ composition: { appliedArchetype: 'nope' } }, false).composition).toBeNull()
+    expect(restoredRenderStamp({ composition: KEPT_STAMP }, false, null).composition).toEqual(KEPT_STAMP)
+    expect(restoredRenderStamp({ composition: null }, false, null).composition).toBeNull()
+    expect(restoredRenderStamp({}, true, null).composition).toBeNull()
+    expect(restoredRenderStamp({ composition: { appliedArchetype: 'nope' } }, false, null).composition).toBeNull()
   })
 
   it('restoreDraftToRevision writes the restored stamp onto the draft', async () => {
     db.currentRevisionNumber = 3
     await restoreDraftToRevision(
       'd1', 2, '<html>v2</html>', 'exports/d1-2.png',
-      restoredRenderStamp({ promptVersion: 'pv', fontSet: 'f', composition: FALLBACK_STAMP }, false),
+      restoredRenderStamp({ promptVersion: 'pv', fontSet: 'f', composition: FALLBACK_STAMP }, false, null),
     )
     expect(db.draftUpdates.at(-1)!.data.composition).toEqual(FALLBACK_STAMP)
   })
@@ -1720,12 +1725,109 @@ describe('009 composition stamp: every revision writer carries it', () => {
   })
 
   it('revisionStampFields is the revision row’s four old fields plus composition', () => {
-    expect(revisionStampFields(currentRenderStamp(null, KEPT_STAMP))).toEqual({
+    expect(revisionStampFields(currentRenderStamp(null, KEPT_STAMP, null))).toEqual({
       promptVersion: PROMPT_VERSION,
       fontSet: 'fonts-test',
       model: null,
       modelSubstitutedFrom: null,
       composition: KEPT_STAMP,
+      postStyle: Prisma.DbNull,
     })
+  })
+})
+
+// ── 027 FR-05: the post-style stamp rides every revision writer ─────────────
+// One JSON value ({ key, version, revision }) on the revision row and the
+// draft. A fresh commit and a rejected render write the caller's, which every
+// carry-forward writer takes from the draft (draftPostStyleStamp); an adopt
+// writes the draft's current stamp, not the rejected row's; a restore carries
+// the draft's too. No stamp is SQL NULL (Prisma.DbNull), never a JSON null.
+
+const STYLE_STAMP = { key: 'promotion', version: 1, revision: 8 }
+const OTHER_STYLE_STAMP = { key: 'event', version: 1, revision: 8 }
+
+describe('027 post-style stamp: every revision writer carries it', () => {
+  it('commitDraftRevision (refine, inline edit, override) writes the caller’s stamp to the new row and the draft', async () => {
+    db.rows = [committed('d1', 1)]
+    const { revisionId } = await commitDraftRevision({
+      draftId: 'd1', instruction: 'x', html: '<html/>', width: 1080, height: 1080, exportKey: 'k',
+      composition: null, postStyle: STYLE_STAMP,
+    })
+    expect(db.rows.find((r) => r.id === revisionId)!.postStyle).toEqual(STYLE_STAMP)
+    expect(db.draftUpdates.at(-1)!.data.postStyle).toEqual(STYLE_STAMP)
+  })
+
+  it('no stamp is SQL NULL on both (never a JSON null)', async () => {
+    db.rows = [committed('d1', 1)]
+    const { revisionId } = await commitDraftRevision({
+      draftId: 'd1', instruction: 'x', html: '<html/>', width: 1080, height: 1080, exportKey: 'k',
+      composition: null, postStyle: null,
+    })
+    expect(db.rows.find((r) => r.id === revisionId)!.postStyle).toBe(Prisma.DbNull)
+    expect(db.draftUpdates.at(-1)!.data.postStyle).toBe(Prisma.DbNull)
+  })
+
+  it('the compare-and-swap commit (element edit) carries it too', async () => {
+    db.rows = [committed('d1', 1)]
+    db.currentRevisionNumber = 1
+    await commitDraftRevision({
+      draftId: 'd1', instruction: 'el', html: '<html/>', width: 1080, height: 1080, exportKey: 'k',
+      expectedRevisionNumber: 1, composition: null, postStyle: STYLE_STAMP,
+    })
+    expect(db.draftUpdates.at(-1)!.data.postStyle).toEqual(STYLE_STAMP)
+  })
+
+  it('a stamp that breaks its schema is refused at the write', async () => {
+    db.rows = [committed('d1', 1)]
+    await expect(
+      commitDraftRevision({
+        draftId: 'd1', instruction: 'x', html: '<html/>', width: 1080, height: 1080, exportKey: 'k',
+        composition: null, postStyle: { key: '', version: 1, revision: 8 },
+      }),
+    ).rejects.toThrow()
+    expect(db.draftUpdates).toEqual([])
+  })
+
+  it('recordRejectedRender stamps the rejected row with the caller’s and leaves the draft’s stamp alone', async () => {
+    db.rows = [committed('d1', 1)]
+    const { revisionId } = await recordHeld(rejectArgs({ postStyle: STYLE_STAMP }))
+    expect(db.rows.find((r) => r.id === revisionId)!.postStyle).toEqual(STYLE_STAMP)
+    expect('postStyle' in db.draftUpdates.at(-1)!.data).toBe(false)
+  })
+
+  it('adopt writes the DRAFT’s current stamp, whatever the rejected row carries', async () => {
+    db.rows = [committed('d1', 1)]
+    const r = { ...rejected('d1'), postStyle: OTHER_STYLE_STAMP }
+    db.rows.push(r)
+    db.notAppliedRevisionId = r.id
+    const { revisionId } = await commitDraftRevision({
+      draftId: 'd1', instruction: 'Use anyway', html: r.htmlSnapshot, width: 1080, height: 1080,
+      exportKey: r.exportUrl!, adoptRejectedRevisionId: r.id, composition: null, postStyle: STYLE_STAMP,
+    })
+    expect(db.rows.find((x) => x.id === revisionId)!.postStyle).toEqual(STYLE_STAMP)
+    expect(db.draftUpdates.at(-1)!.data.postStyle).toEqual(STYLE_STAMP)
+  })
+
+  it('restore carries the draft’s current stamp (the render pointer moves; the rules are not re-run)', async () => {
+    db.currentRevisionNumber = 3
+    const stamp = restoredRenderStamp({ promptVersion: 'pv', fontSet: 'f' }, false, STYLE_STAMP)
+    expect(stamp.postStyle).toEqual(STYLE_STAMP)
+    await restoreDraftToRevision('d1', 2, '<html>v2</html>', 'exports/d1-2.png', stamp)
+    expect(db.draftUpdates.at(-1)!.data.postStyle).toEqual(STYLE_STAMP)
+  })
+
+  it('draftPostStyleStamp parses the draft’s stored value (null when absent or corrupt)', () => {
+    expect(draftPostStyleStamp({ postStyle: STYLE_STAMP })).toEqual(STYLE_STAMP)
+    expect(draftPostStyleStamp({})).toBeNull()
+    expect(draftPostStyleStamp({ postStyle: 'x' })).toBeNull()
+    expect(draftPostStyleStamp({ postStyle: { key: 'a', version: 1, revision: 1, extra: true } })).toBeNull()
+  })
+
+  it('currentRenderStamp requires it and the field helpers write it as a column value', () => {
+    const stamp = currentRenderStamp(null, null, STYLE_STAMP)
+    expect(stamp.postStyle).toEqual(STYLE_STAMP)
+    expect(revisionStampFields(stamp).postStyle).toEqual(STYLE_STAMP)
+    expect(draftStampFields(stamp).postStyle).toEqual(STYLE_STAMP)
+    expect(postStyleColumn(null)).toBe(Prisma.DbNull)
   })
 })

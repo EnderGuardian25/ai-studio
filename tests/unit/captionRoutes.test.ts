@@ -276,6 +276,9 @@ describe('regenerate-copy — 008 FR-09 stamp tier, resolved before the claim', 
       ['LINKEDIN'],
       { LINKEDIN: { ok: true, text: 'new LINKEDIN' } },
       { model: HAIKU, substitutedFrom: OPUS },
+      // 027: the db default, then the post-style stamp (null: the brief has no style).
+      undefined,
+      null,
     )
   })
 

@@ -121,7 +121,16 @@ vi.mock('@/providers/registry', async (importOriginal) => ({
   resolveCopyProvider: async () => ({}),
   resolveAnthropicApiKey: async () => 'sk-ant-FAKE',
 }))
-vi.mock('@/lib/agent/briefInput', () => ({ buildBriefInput: () => ({}) }))
+vi.mock('@/lib/agent/briefInput', () => ({
+  buildBriefInput: () => ({}),
+  briefPostStyleStamp: () => null,
+  imageRulesAtStamp: () => undefined,
+}))
+// 027: the facts check has its own tests; here it is a clear result and a no-op refresh.
+vi.mock('@/lib/factsCheck/refresh', () => ({
+  computeFactsCheck: async () => ({ v: 1, status: 'clear', checkedAt: '2026-10-24T00:00:00.000Z', flagged: [] }),
+  refreshFactsCheck: async () => {},
+}))
 vi.mock('@/lib/captions/generate', () => ({ writeCaptions: h.writeCaptions }))
 vi.mock('@/lib/captions/store', () => ({
   loadDraftCaptions: async () => ({
@@ -153,6 +162,7 @@ vi.mock('@/lib/drafts/revisions', () => ({
   commitDraftRevision: h.commit,
   draftModelStamp: () => ({ model: null, modelSubstitutedFrom: null }),
   draftCompositionStamp: () => null,
+  draftPostStyleStamp: () => null,
   recordRejectedRender: vi.fn(),
   currentRenderStamp: vi.fn(),
   draftStampFields: vi.fn(),

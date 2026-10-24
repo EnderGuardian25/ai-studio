@@ -50,6 +50,7 @@ import type { ImageProvider } from '@/providers/interfaces/ImageProvider'
 import { persistDataUrlImage } from '@/lib/storage/minio'
 import { runClaudeCli, stripCodeFences } from '@/lib/agent/claudeCli'
 import { isCliMode, pipelineMode } from '@/lib/agent/config'
+import { imageRulesFor } from '@/lib/agent/briefInput'
 import type { GenerationActor } from '@/lib/agent/types'
 import {
   buildBackgroundDecisionPrompt,
@@ -314,6 +315,7 @@ export async function generateBackgroundForBrief(
         tone: brief.tone,
         headline,
         campaignBriefing,
+        imageRules: imageRulesFor(brief),
         ...(hero ? { hero: { label: hero.label, contract: hero.contract, size: hero.sizeContract } } : {}),
       }),
     {

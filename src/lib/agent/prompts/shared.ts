@@ -5,6 +5,7 @@
 import type { PipelineMode } from '@/lib/agent/config'
 import { fenceUntrusted, UNTRUSTED_CONTENT_GUARD } from '@/lib/agent/untrusted'
 import { HEADLINE_MAX } from '@/lib/captions/headline'
+import { derivedPromptVersion } from '@/lib/postStyles'
 
 // Bump when prompt content changes materially; persisted on Draft.promptVersion
 // so output quality can be correlated with prompt revisions.
@@ -17,7 +18,11 @@ import { HEADLINE_MAX } from '@/lib/captions/headline'
 // slots only from the brief topic and description.
 // 2026-10-21.1: hero image styles (009): the image-style contract in the
 // art-director, Path B and refine prompts.
-export const PROMPT_VERSION = '2026-10-21.1'
+// 2026-10-25.1: post styles (027): the version now derives from the post-style
+// dataset, so a checklist edit (which raises POST_STYLES_REVISION) changes it
+// with no manual bump. A brief with no style gets the same prompt text as before.
+export const PROMPT_VERSION_BASE = '2026-10-25.1'
+export const PROMPT_VERSION = derivedPromptVersion(PROMPT_VERSION_BASE)
 
 // The on-image headline block every design prompt carries (012 FR-09): the
 // one line the design prints, never a caption. It is model output (or, for a

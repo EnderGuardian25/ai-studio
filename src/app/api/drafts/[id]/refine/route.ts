@@ -19,7 +19,9 @@ import { modelError, parseModelField } from '@/lib/models/requests'
 import { buildRefineSystemPrompt, buildRefineUserMessage } from '@/lib/agent/prompts/refine'
 import { generateBackgroundForRefine } from '@/lib/agent/background'
 import { refineSkipFields } from '@/lib/drafts/backgroundNotice'
-import { commitDraftRevision, draftCompositionStamp, recordRejectedRender, type ModelStamp } from '@/lib/drafts/revisions'
+import { commitDraftRevision, draftCompositionStamp, draftPostStyleStamp, recordRejectedRender, type ModelStamp } from '@/lib/drafts/revisions'
+import { imageRulesAtStamp } from '@/lib/agent/briefInput'
+import type { PostStyleStamp } from '@/lib/postStyles'
 import { contractAt, refineReplacedStamp, styleLabel, type CompositionStamp, type SizeContract } from '@/lib/designData'
 import { claimWhere, logLostClaim } from '@/lib/drafts/claim'
 import { claimDraftAction, startDraftAction, touchDraftAction } from '@/lib/drafts/draftActions'
@@ -129,6 +131,7 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
       height,
       { model: pending.model, modelSubstitutedFrom: pending.modelSubstitutedFrom },
       draftCompositionStamp(draft),
+      draftPostStyleStamp(draft),
       { teamId: user.teamId, userId: user.userId },
     )
   }
@@ -226,6 +229,12 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
     // keeps its stamp (refineReplacedStamp returns it unchanged).
     const commitStamp = prevStamp && background.url ? refineReplacedStamp(prevStamp) : prevStamp
 
+    // 027 FR-09: the image rules of the draft's STAMPED post style, at the
+    // stamped version. No stamp, or one that no longer resolves, passes none
+    // (the unresolvable case warns once); it never fails a refine.
+    const postStyle = draftPostStyleStamp(draft)
+    const imageRules = imageRulesAtStamp(postStyle, draft.id)
+
     const systemPrompt = buildRefineSystemPrompt({
       kit,
       mode,
@@ -234,6 +243,7 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
       hasInlineAssets,
       backgroundImageUrl,
       compositionContract,
+      imageRules,
     })
     const userMessage = (retryReasons?: string[]) =>
       buildRefineUserMessage({ slimHtml, hasHtml: !!draft.htmlContent, instruction, width, height, retryReasons })
@@ -342,6 +352,8 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
           // 009 FR-12/FR-13: the carried stamp, or the re-stamp when this refine
           // replaced the background.
           composition: commitStamp,
+          // 027: a refine keeps the rules the draft was made under.
+          postStyle,
         })
       },
       conflict: async (conflict) => {
@@ -388,6 +400,7 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
           // The rejected render carries the same stamp a commit would: if it also
           // replaced the background, "Use anyway" adopts a classic render.
           composition: commitStamp,
+          postStyle,
           claim,
         })
       },
@@ -406,6 +419,7 @@ async function commitRevision(
   height: number,
   model: ModelStamp,
   composition: CompositionStamp | null,
+  postStyle: PostStyleStamp | null,
   who: { teamId: string; userId: string },
 ) {
   const { revisionId, exportKey } = await commitDraftRevision({
@@ -416,6 +430,7 @@ async function commitRevision(
     height,
     model,
     composition,
+    postStyle,
   })
   // 006 FR-06: the override is a revision with its own event, after the write.
   await track('revision.override', { source: 'web', teamId: who.teamId, userId: who.userId, draftId, outcome: 'ok', payload: {} })

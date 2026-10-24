@@ -61,12 +61,15 @@ export interface GenerationDecisionOptions {
   // Present only for a hero plan (009): replaces the classic image rules and the
   // default-to-yes paragraph. Absent: the output is byte-identical to before.
   hero?: HeroPromptContext
+  // 027 FR-09: the image-scope rules of the brief's post style, already
+  // rendered; they go after Tone in the user message. Absent: unchanged.
+  imageRules?: string
 }
 
 // Initial generation (Path B): biased toward generating — most posts benefit
 // from a real background; skip only when a flat/gradient design is clearly better.
 export function buildBackgroundDecisionPrompt(opts: GenerationDecisionOptions): BackgroundDecisionPrompt {
-  const { kit, topic, description, goal, tone, headline, campaignBriefing, hero } = opts
+  const { kit, topic, description, goal, tone, headline, campaignBriefing, hero, imageRules } = opts
 
   const briefingSection = campaignBriefing
     ? `Campaign briefing (applies to every post in this campaign):
@@ -101,7 +104,9 @@ ${OUTPUT_PROTOCOL}`
 Topic: ${topic}
 Description: ${description || 'none'}
 Goal: ${goal}
-Tone: ${tone}
+Tone: ${tone}${imageRules ? `
+
+${imageRules}` : ''}
 
 ${onImageHeadline(headline)}`
 

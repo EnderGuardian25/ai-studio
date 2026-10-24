@@ -9,7 +9,7 @@ import { dimensionsFor } from '@/lib/aspectRatio'
 import { isCliMode, pipelineMode } from '@/lib/agent/config'
 import type { ResolvedModel } from '@/lib/models/resolve'
 import { buildPathBSystemPrompt, buildPathBUserMessage } from '@/lib/agent/prompts/pathB'
-import { parseBriefImages } from '@/lib/agent/briefInput'
+import { imageRulesFor, parseBriefImages } from '@/lib/agent/briefInput'
 import { generateBackgroundForBrief, type BackgroundResult } from '@/lib/agent/background'
 import {
   compositionStampSchema,
@@ -166,6 +166,7 @@ export async function runPathBDesign(
     height,
     briefImages,
     heroPrecedence: !!kept,
+    imageRules: imageRulesFor(brief),
   })
 
   await opts?.onBeforeDesign?.()

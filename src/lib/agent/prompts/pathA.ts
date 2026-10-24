@@ -53,10 +53,13 @@ export interface PathAUserMessageOptions {
   width: number
   height: number
   additionalImageUrl?: string | null
+  // 027 FR-09: the image-scope rules of the brief's post style, already
+  // rendered. Absent: the message is exactly what it was before 027.
+  imageRules?: string
 }
 
 export function buildPathAUserMessage(opts: PathAUserMessageOptions): string {
-  const { slimTemplate, headline, topic, description, mode, width, height, additionalImageUrl } = opts
+  const { slimTemplate, headline, topic, description, mode, width, height, additionalImageUrl, imageRules } = opts
 
   const imageNote = additionalImageUrl
     ? `\nUser-provided image URL (embed this into the main photo/subject slot): ${additionalImageUrl}`
@@ -75,7 +78,9 @@ ${onImageHeadline(headline)}
 
 Put the headline in the template's main headline slot. Fill any other text slots only from the brief topic and description below, and invent no facts, numbers or dates.
 Topic: ${topic}
-Description: ${description || 'none'}${imageNote}
+Description: ${description || 'none'}${imageNote}${imageRules ? `
+
+${imageRules}` : ''}
 
 Replace all placeholder text. ${finalStep}`
 }

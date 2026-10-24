@@ -37,6 +37,30 @@ const DROP_CAPTION_SENTINELS: Partial<Record<CaptionTarget, string>> = {
   LINKEDIN: '__DROP_CAPTION_LINKEDIN__',
 }
 
+// ── 027 FR-15: the facts-check seams ────────────────────────────────────────
+// Sentinels in the TOPIC add one invented value to the mock reply. No sentinel
+// holds a digit, so a sentinel never becomes a supported value of its own. The
+// values are constants. A topic with no sentinel gets today's reply, byte for
+// byte.
+const FACT_VALUE_SENTINELS: ReadonlyArray<readonly [sentinel: string, value: string]> = [
+  ['__MOCK_FACT_PRICE__', '$49'],
+  ['__MOCK_FACT_PCT__', '35% off'],
+  ['__MOCK_FACT_DATE__', '30 March 2027'],
+  ['__MOCK_FACT_NUM__', '1,250 customers'],
+]
+const FACT_HEADLINE_SENTINEL = '__MOCK_FACT_HEADLINE__'
+const FACT_HEADLINE_VALUE = '$49'
+const FACT_ERROR_SENTINEL = '__MOCK_FACT_ERROR__'
+
+/**
+ * Whether the facts check must fail for this topic (MOCK_AI only): the check's
+ * own wrapper then stores `status: 'error'`, and the generation or action goes
+ * on. Consulted by the code that runs the check, never by the pure extractor.
+ */
+export function shouldMockFactError(topic: string): boolean {
+  return MOCK_AI && topic.includes(FACT_ERROR_SENTINEL)
+}
+
 /**
  * Deterministic RAW caption reply returned by the mock copy provider (MOCK_AI):
  * a chat preamble, a ```json-fenced object holding only the requested keys,
@@ -51,6 +75,10 @@ const DROP_CAPTION_SENTINELS: Partial<Record<CaptionTarget, string>> = {
  * a reply that requests every channel (a generation or "Regenerate all"). So
  * a single-channel regenerate of the dropped channel succeeds, with no stored
  * state. Deterministic: same input, same bytes.
+ *
+ * 027: a fact sentinel in the topic (__MOCK_FACT_PRICE__ and the other three)
+ * appends its invented value to the headline and to every caption;
+ * __MOCK_FACT_HEADLINE__ appends one to the headline only.
  */
 export function buildMockCaptionReply(topic: string, targets: readonly CaptionTarget[]): string {
   const allChannels = CAPTION_CHANNELS.every((s) => targets.includes(s.channel))
@@ -59,13 +87,20 @@ export function buildMockCaptionReply(topic: string, targets: readonly CaptionTa
     return allChannels && sentinel !== undefined && topic.includes(sentinel)
   }
 
+  const values = FACT_VALUE_SENTINELS.filter(([sentinel]) => topic.includes(sentinel)).map(([, value]) => value)
+  const headlineValues = topic.includes(FACT_HEADLINE_SENTINEL) ? [...values, FACT_HEADLINE_VALUE] : values
+  const withValues = (text: string, add: string[]) => (add.length > 0 ? `${text} ${add.join(' ')}` : text)
+
   const reply: Record<string, string> = {}
   if (targets.includes('HEADLINE') && !dropped('HEADLINE')) {
-    reply.headline = `Mock headline ${topic}`.slice(0, HEADLINE_MAX)
+    // The values are appended after the cut, so a long topic never hides one;
+    // the cut leaves room for them inside HEADLINE_MAX.
+    const tail = headlineValues.length > 0 ? ` ${headlineValues.join(' ')}` : ''
+    reply.headline = `Mock headline ${topic}`.slice(0, HEADLINE_MAX - tail.length) + tail
   }
   for (const s of CAPTION_CHANNELS) {
     if (!targets.includes(s.channel) || dropped(s.channel)) continue
-    reply[s.jsonKey] = `Mock ${s.label} caption [${topic}]`
+    reply[s.jsonKey] = withValues(`Mock ${s.label} caption [${topic}]`, values)
   }
 
   return [

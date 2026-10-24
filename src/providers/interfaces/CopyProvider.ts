@@ -18,6 +18,9 @@ export interface BriefInput {
   // Active campaign briefing (campaign-level context shared by every post in
   // the campaign), when the brief belongs to a campaign that has one.
   campaignBriefing?: string
+  // 027 FR-09: the caption-scope rules of the brief's post style, already
+  // rendered by checklistPromptText. Absent for a brief with no style.
+  captionRules?: string
 }
 
 // The COPY slot keeps its name (it also drives brand-voice drafting). One call

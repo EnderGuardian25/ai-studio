@@ -94,12 +94,15 @@ export interface PathBUserMessageOptions {
   // A kept hero archetype is in force (009): the briefing's layout instructions
   // yield to the layout contract in the system prompt.
   heroPrecedence?: boolean
+  // 027 FR-09: the image-scope rules of the brief's post style, already
+  // rendered. Absent: the message is exactly what it was before 027.
+  imageRules?: string
 }
 
 export type { BriefImage }
 
 export function buildPathBUserMessage(opts: PathBUserMessageOptions): string {
-  const { topic, description, goal, tone, channels, headline, mode, width, height, briefImages = [], campaignBriefing, heroPrecedence } = opts
+  const { topic, description, goal, tone, channels, headline, mode, width, height, briefImages = [], campaignBriefing, heroPrecedence, imageRules } = opts
 
   const imageSection = briefImages.length > 0
     ? `\n\nProvided images (follow intent rules from system prompt):\n${briefImages.map((img) => `- ${img.url} (intent: ${img.intent})`).join('\n')}`
@@ -124,7 +127,9 @@ Goal: ${goal}
 Tone: ${tone}
 Channels: ${channels.join(', ')}
 
-${onImageHeadline(headline)}${imageSection}
+${onImageHeadline(headline)}${imageSection}${imageRules ? `
+
+${imageRules}` : ''}
 
 Design a complete, original HTML/CSS post. ${finalStep}`
 }

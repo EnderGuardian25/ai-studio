@@ -3,6 +3,7 @@
 // claim. Prisma is mocked.
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { Prisma } from '@prisma/client'
 
 const h = vi.hoisted(() => ({
   draftFindUnique: vi.fn(),
@@ -11,7 +12,11 @@ const h = vi.hoisted(() => ({
   captionCreateMany: vi.fn(),
   captionUpdateMany: vi.fn(),
   transaction: vi.fn(),
+  refresh: vi.fn(),
 }))
+
+// 027: the facts check has its own tests; here only its write points are observed.
+vi.mock('@/lib/factsCheck/refresh', () => ({ refreshFactsCheck: h.refresh }))
 
 vi.mock('@/lib/prisma', () => ({
   prisma: {
@@ -551,5 +556,90 @@ describe('008 FR-09: loadDraftCaptions exposes each row stamp', () => {
     const select = h.draftFindUnique.mock.calls[0][0].select.captions.select
     expect(select).toMatchObject({ model: true, modelSubstitutedFrom: true })
     expect(loaded!.captions.map((c) => c.model)).toEqual([null, 'claude-opus-5-5'])
+  })
+})
+
+// ── 027 FR-05 / FR-11 (AC-04, AC-11): the facts-check write points and the
+// regenerate-copy stamp ─────────────────────────────────────────────────────
+
+describe('027 FR-11: the interactive writers recompute the facts check after their write', () => {
+  it('saveGenerationCaptions: once, after the transaction, on the default client', async () => {
+    await saveGenerationCaptions('d1', { INSTAGRAM: { ok: true, text: 'ig' } }, { model: 'm', substitutedFrom: null, route: null })
+    expect(h.refresh).toHaveBeenCalledTimes(1)
+    expect(h.refresh).toHaveBeenCalledWith('d1', {})
+    expect(h.refresh.mock.invocationCallOrder[0]).toBeGreaterThan(h.transaction.mock.invocationCallOrder[0])
+  })
+
+  it('settleCaptionAction: after the transaction when the claim held', async () => {
+    h.captionFindMany.mockResolvedValue([])
+    await settleCaptionAction('d1', CLAIM, ['INSTAGRAM'], { INSTAGRAM: { ok: true, text: 'x' } })
+    expect(h.refresh).toHaveBeenCalledTimes(1)
+    expect(h.refresh).toHaveBeenCalledWith('d1', {})
+    expect(h.refresh.mock.invocationCallOrder[0]).toBeGreaterThan(h.draftUpdateMany.mock.invocationCallOrder[0])
+  })
+
+  it('settleCaptionAction: a lost claim writes nothing and recomputes nothing', async () => {
+    h.draftUpdateMany.mockResolvedValue({ count: 0 })
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    await settleCaptionAction('d1', CLAIM, ['INSTAGRAM'], { INSTAGRAM: { ok: true, text: 'x' } })
+    expect(h.refresh).not.toHaveBeenCalled()
+    warn.mockRestore()
+  })
+
+  it('saveCaptionEdit and saveHeadlineEdit: after a successful write only', async () => {
+    expect(await saveCaptionEdit('d1', 'LINKEDIN', 'typed')).toBe(true)
+    expect(await saveHeadlineEdit('d1', 'Line')).toBe(true)
+    expect(h.refresh).toHaveBeenCalledTimes(2)
+    h.refresh.mockClear()
+    h.captionUpdateMany.mockResolvedValue({ count: 0 })
+    h.draftUpdateMany.mockResolvedValue({ count: 0 })
+    expect(await saveCaptionEdit('d1', 'LINKEDIN', 'x')).toBe(false)
+    expect(await saveHeadlineEdit('d1', 'Line')).toBe(false)
+    expect(h.refresh).not.toHaveBeenCalled()
+  })
+
+  it('a client the caller supplies is the one the recompute reads from', async () => {
+    const db = { draftCaption: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) } }
+    await saveCaptionEdit('d1', 'LINKEDIN', 'typed', db as never)
+    expect(h.refresh).toHaveBeenCalledWith('d1', { db })
+  })
+
+  it('a recompute that throws (it should not) never changes the caption write’s result', async () => {
+    const err = vi.spyOn(console, 'error').mockImplementation(() => {})
+    h.refresh.mockRejectedValue(new Error('boom'))
+    expect(await saveCaptionEdit('d1', 'LINKEDIN', 'typed')).toBe(true)
+    expect(await saveHeadlineEdit('d1', 'Line')).toBe(true)
+    err.mockRestore()
+  })
+})
+
+describe('027 FR-05: regenerate copy writes Draft.postStyle in its claim-guarded settle write', () => {
+  const STYLE = { key: 'promotion', version: 1, revision: 8 }
+
+  it('the stamp rides the guard write, the first draft write of the transaction', async () => {
+    h.captionFindMany.mockResolvedValue([])
+    await settleCaptionAction('d1', CLAIM, ['INSTAGRAM'], { INSTAGRAM: { ok: true, text: 'x' } }, null, undefined, STYLE)
+    expect(h.draftUpdateMany.mock.calls[0][0]).toEqual({
+      where: GUARD,
+      data: { updatedAt: expect.any(Date), postStyle: STYLE },
+    })
+  })
+
+  it('a brief with no style clears it (SQL NULL); the failure settles pass none and leave it alone', async () => {
+    h.captionFindMany.mockResolvedValue([])
+    await settleCaptionAction('d1', CLAIM, ['INSTAGRAM'], { INSTAGRAM: { ok: true, text: 'x' } }, null, undefined, null)
+    expect(h.draftUpdateMany.mock.calls[0][0].data.postStyle).toBe(Prisma.DbNull)
+    h.draftUpdateMany.mockClear()
+    await settleCaptionAction('d1', CLAIM, ['INSTAGRAM'], { INSTAGRAM: { ok: false, reason: 'boom' } })
+    expect(h.draftUpdateMany.mock.calls[0][0].data).not.toHaveProperty('postStyle')
+  })
+
+  it('a lost claim writes no stamp (the guard write matches no row)', async () => {
+    h.draftUpdateMany.mockResolvedValue({ count: 0 })
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    await settleCaptionAction('d1', CLAIM, ['INSTAGRAM'], { INSTAGRAM: { ok: true, text: 'x' } }, null, undefined, STYLE)
+    expect(h.draftUpdateMany).toHaveBeenCalledTimes(1)
+    expect(h.captionUpdateMany).not.toHaveBeenCalled()
+    warn.mockRestore()
   })
 })

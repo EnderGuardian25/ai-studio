@@ -5,9 +5,12 @@ import {
   parsePostStyleStamp,
   stampFor,
   rulesAtStamp,
+  derivedPromptVersion,
   POST_STYLES_REVISION,
 } from '@/lib/postStyles'
-import { styles } from '@/lib/postStyles/styles'
+import { styles, revisionOf } from '@/lib/postStyles/styles'
+import { PROMPT_VERSION, PROMPT_VERSION_BASE } from '@/lib/agent/prompts/shared'
+import { CAPTION_PROMPT_VERSION, CAPTION_PROMPT_VERSION_BASE } from '@/lib/agent/prompts/caption'
 import type { PostStyle } from '@/lib/postStyles/types'
 
 describe('postStyleStampSchema', () => {
@@ -96,5 +99,32 @@ describe('rulesAtStamp', () => {
     }
     expect(rulesAtStamp(stampFor('tip', 1), undefined, grown)).toEqual(v1.checklist)
     expect(rulesAtStamp(stampFor('tip', 2), undefined, grown)).toHaveLength(1)
+  })
+})
+
+// ── T4: the derived prompt versions (027 FR-05, AC-04) ───────────────────────
+
+describe('PROMPT_VERSION and CAPTION_PROMPT_VERSION derive from the dataset', () => {
+  it('both end with +ps<POST_STYLES_REVISION> on the build-date base', () => {
+    expect(PROMPT_VERSION).toBe(`${PROMPT_VERSION_BASE}+ps${POST_STYLES_REVISION}`)
+    expect(CAPTION_PROMPT_VERSION).toBe(`${CAPTION_PROMPT_VERSION_BASE}+ps${POST_STYLES_REVISION}`)
+    expect(PROMPT_VERSION).toMatch(/^\d{4}-\d{2}-\d{2}\.\d+\+ps\d+$/)
+    expect(CAPTION_PROMPT_VERSION).toMatch(/^\d{4}-\d{2}-\d{2}\.\d+\+ps\d+$/)
+  })
+
+  it('adding a version to a fixture dataset changes both strings, with no manual bump', () => {
+    const copy = JSON.parse(JSON.stringify(styles)) as Record<string, PostStyle & { current: number; versions: Record<number, unknown> }>
+    copy.tip.versions[2] = copy.tip.versions[1]
+    copy.tip.current = 2
+    const revision = revisionOf(copy as Record<string, PostStyle>)
+    expect(revision).toBe(POST_STYLES_REVISION + 1)
+    expect(derivedPromptVersion(PROMPT_VERSION_BASE, revision)).not.toBe(PROMPT_VERSION)
+    expect(derivedPromptVersion(CAPTION_PROMPT_VERSION_BASE, revision)).not.toBe(CAPTION_PROMPT_VERSION)
+    expect(derivedPromptVersion(PROMPT_VERSION_BASE, POST_STYLES_REVISION)).toBe(PROMPT_VERSION)
+  })
+
+  it('both fit the 006 catalogue field (at most 40 characters), so no analytics event is rejected', () => {
+    expect(PROMPT_VERSION.length).toBeLessThanOrEqual(40)
+    expect(CAPTION_PROMPT_VERSION.length).toBeLessThanOrEqual(40)
   })
 })
