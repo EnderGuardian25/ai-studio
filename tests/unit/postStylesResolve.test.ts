@@ -123,7 +123,7 @@ describe.each(SURFACES)('resolvePostStyle on surface %s', (surface) => {
 })
 
 describe('resolvePostStyle: image style', () => {
-  // No current style defaults to a look, so a fixture gives one that does.
+  // Launch and Announcement default to a look; the fixture keeps the withLook path covered.
   const withLook = (look: string): Record<string, PostStyle> => ({
     ...styles,
     launch: {
@@ -181,6 +181,47 @@ describe('resolvePostStyle: image style', () => {
     const r = ok(base({ explicit: { imageStyle: 'no-such-look' } }))
     expect(r.imageStyle).toBe('classic')
     expect(r.notes).toContain('default-unavailable')
+  })
+})
+
+// 028 AC-04: every surface x look x size.
+describe('resolvePostStyle: looks per surface and size (028 AC-04)', () => {
+  const LOOKS = ['product-showcase', 'editorial-split', 'full-bleed-scene', 'spotlight']
+  const SIZES = ['SQUARE', 'PORTRAIT', 'STORY'] as const
+  const cases = SURFACES.flatMap((surface) =>
+    LOOKS.flatMap((look) => SIZES.map((aspectRatio) => [surface, look, aspectRatio] as const)),
+  )
+
+  it.each(cases)('%s, explicit %s at %s', (surface, look, aspectRatio) => {
+    const r = ok(base({ surface, aspectRatio, explicit: { imageStyle: look } }))
+    if (UNATTENDED.includes(surface)) {
+      expect(r.imageStyle).toBe('classic')
+      expect(r.notes).toContain('unattended-classic')
+    } else {
+      expect(r.imageStyle).toBe(look)
+      expect(r.notes).toEqual([])
+    }
+  })
+
+  it.each(['wizard', 'briefs-api'] as Surface[])(
+    '%s at STORY: Launch keeps product-showcase and Announcement keeps editorial-split, no note',
+    (surface) => {
+      const l = ok(base({ surface, aspectRatio: 'STORY', style: 'launch' }))
+      expect(l.imageStyle).toBe('product-showcase')
+      expect(l.notes).toEqual([])
+      const a = ok(base({ surface, aspectRatio: 'STORY', style: 'announcement' }))
+      expect(a.imageStyle).toBe('editorial-split')
+      expect(a.notes).toEqual([])
+    },
+  )
+
+  it.each(UNATTENDED)('%s: a style whose default is a look stays classic at every size', (surface) => {
+    for (const aspectRatio of SIZES)
+      for (const style of ['launch', 'announcement']) {
+        const r = ok(base({ surface, aspectRatio, style }))
+        expect(r.imageStyle).toBe('classic')
+        expect(r.notes).toContain('unattended-classic')
+      }
   })
 })
 

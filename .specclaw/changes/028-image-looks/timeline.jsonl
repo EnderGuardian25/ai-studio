@@ -16,3 +16,5 @@
 {"ev":"stop","span":"W2","at":"2026-10-24T19:28:24Z","ts":1792870104,"status":"ok"}
 {"ev":"start","span":"W3","kind":"wave","label":"wave 3","at":"2026-10-24T19:28:24Z","ts":1792870104}
 {"ev":"start","span":"T4","kind":"task","label":"e2e","parent":"W3","model":"sonnet","attempt":"1","at":"2026-10-24T19:28:24Z","ts":1792870104}
+{"ev":"stop","span":"T4","at":"2026-10-24T19:47:21Z","ts":1792871241,"status":"ok"}
+{"ev":"stop","span":"W3","at":"2026-10-24T19:47:21Z","ts":1792871241,"status":"ok"}

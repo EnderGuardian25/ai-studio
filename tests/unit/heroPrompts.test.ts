@@ -362,7 +362,7 @@ const NEW_GOLDEN = [
     version: 1,
     label: 'Spotlight',
     dims: { width: 1080, height: 1350 },
-    image: lit(52, 24),
+    image: lit(42, 24),
     design: spotBands(24, 324, 1026, 1350),
     refine: spotRefine(24),
   },

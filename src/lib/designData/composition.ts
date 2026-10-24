@@ -229,7 +229,7 @@ export const archetypes: ArchetypeMap = deepFreeze({
           },
           PORTRAIT: {
             subject:
-              'a single subject (an object, a product or an emblem) centred in the middle 52% of the frame, lit by one spotlight against a plain, dark background that stays dark at the top and bottom',
+              'a single subject (an object, a product or an emblem) centred in the middle 42% of the frame, lit by one spotlight against a plain, dark background that stays dark at the top and bottom',
             regions: [
               band(0, 0, 100, 24, 'the headline'),
               band(0, 76, 100, 24, 'the call to action and the logo'),
@@ -298,20 +298,25 @@ export interface ImageStyleOption {
   summary: string
 }
 
+// The picker source for a dataset: classic first, then its active looks only.
+export function imageStylesOf(source: ArchetypeMap): ImageStyleOption[] {
+  return [
+    { key: 'classic', label: 'Classic', summary: 'The standard post design.' },
+    ...Object.values(source)
+      .filter((a) => a.status === 'active')
+      .map((a) => ({ key: a.key, label: a.label, summary: a.summary })),
+  ]
+}
+
 // The wizard's picker source: classic first, then the active archetypes only.
-export const IMAGE_STYLES: readonly ImageStyleOption[] = deepFreeze([
-  { key: 'classic', label: 'Classic', summary: 'The standard post design.' },
-  ...Object.values(archetypes)
-    .filter((a) => a.status === 'active')
-    .map((a) => ({ key: a.key, label: a.label, summary: a.summary })),
-])
+export const IMAGE_STYLES: readonly ImageStyleOption[] = deepFreeze(imageStylesOf(archetypes))
 
 // Each style with whether the chosen size supports it (classic always does).
 export function imageStyleOptions(
   aspectRatio: AspectRatio,
   source: ArchetypeMap = archetypes,
 ): Array<ImageStyleOption & { supported: boolean }> {
-  return IMAGE_STYLES.map((s) => {
+  return imageStylesOf(source).map((s) => {
     const current = getArchetype(s.key, source)?.current ?? 0
     return {
       ...s,

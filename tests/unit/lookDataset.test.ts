@@ -1,7 +1,7 @@
 // 028 T1: the look dataset (FR-01 to FR-04, NFR-04). Validation rules each fail
 // on their own fixture, every (key, version) is pinned by a hash, the key list
 // is committed, and v2 of the two original looks equals v1.
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import {
@@ -9,6 +9,7 @@ import {
   lookDatasetProblems,
   imageStyleOptions,
   IMAGE_STYLES,
+  imageStylesOf,
   contractAt,
   styleLabel,
   supportsSize,
@@ -29,7 +30,7 @@ const HASHES: Record<string, string> = {
   'editorial-split@1': '440d41092cd4ef97baba2d2e02971f389cee0ecd340b4517e9b32e38d411ecc6',
   'editorial-split@2': '1e403779e9a3f44d1002c67bfa75a94455a3a9e40b224060924157c62adb6733',
   'full-bleed-scene@1': '37f092ceaf25161f099c37736e3101669f404fd9e7006d1abca5dab4609a0b8e',
-  'spotlight@1': '6f48b77bc7982379333d5e5fb3ac626f01feb1bf542c0b6e10355248e1c643c6',
+  'spotlight@1': '856a579c1ac7fb5fdc9a2918671b774691b6db803b6d56d39c8a53a8c0c2634f',
 }
 
 describe('the shipped dataset (AC-01, AC-02)', () => {
@@ -237,11 +238,57 @@ describe('lookDatasetProblems (AC-02)', () => {
   })
 })
 
-describe('load-time assertion', () => {
-  it('index.ts runs lookDatasetProblems outside production and throws', () => {
-    const src = readFileSync('src/lib/designData/index.ts', 'utf8')
-    expect(src).toContain('lookDatasetProblems(archetypes)')
-    expect(src).toContain("process.env.NODE_ENV !== 'production'")
-    expect(src).toContain('throw new Error')
+describe('load-time assertion (AC-02)', () => {
+  afterEach(() => {
+    vi.doUnmock('@/lib/designData/composition')
+    vi.unstubAllEnvs()
+    vi.resetModules()
+  })
+
+  const loadWithBadDataset = async () => {
+    vi.resetModules()
+    vi.doMock('@/lib/designData/composition', async (orig) => {
+      const real = await orig<typeof import('@/lib/designData/composition')>()
+      // A record key that differs from archetype.key breaks FR-03 rule 1.
+      return { ...real, archetypes: { 'bad-key': { ...real.archetypes.spotlight, key: 'other' } } }
+    })
+    return import('@/lib/designData')
+  }
+
+  it('importing designData with a bad dataset throws outside production', async () => {
+    vi.stubEnv('NODE_ENV', 'test')
+    await expect(loadWithBadDataset()).rejects.toThrow(/design data/)
+  })
+
+  it('does not throw at import in production', async () => {
+    vi.stubEnv('NODE_ENV', 'production')
+    await expect(loadWithBadDataset()).resolves.toBeDefined()
+  })
+})
+
+describe('the picker derives from the dataset it is given (AC-03)', () => {
+  const retiredSpotlight = (): ArchetypeMap => {
+    const m = structuredClone(archetypes) as Record<string, Archetype>
+    m.spotlight = { ...m.spotlight, status: 'retired' }
+    return m
+  }
+
+  it('imageStylesOf(archetypes) equals IMAGE_STYLES', () => {
+    expect(imageStylesOf(archetypes)).toEqual(IMAGE_STYLES)
+  })
+
+  it('a retired look is omitted from the list and the options, but still resolves', () => {
+    const fixture = retiredSpotlight()
+    expect(imageStylesOf(fixture).map((s) => s.key)).not.toContain('spotlight')
+    expect(imageStyleOptions('SQUARE', fixture).map((o) => o.key)).not.toContain('spotlight')
+    expect(supportsSize('spotlight', 'SQUARE', fixture)).toBe(false)
+    expect(styleLabel('spotlight', fixture)).toBe('Spotlight')
+    expect(contractAt('spotlight', 1, 'SQUARE', fixture)).not.toBeNull()
+  })
+
+  it('a look that exists only in the fixture is listed', () => {
+    const m = structuredClone(archetypes) as Record<string, Archetype>
+    m['only-here'] = { ...m.spotlight, key: 'only-here' as Archetype['key'], label: 'Only here' }
+    expect(imageStyleOptions('SQUARE', m).find((o) => o.key === 'only-here')?.supported).toBe(true)
   })
 })
