@@ -11,22 +11,26 @@ import { deflateSync } from "node:zlib"
 import { renderHtmlToPng } from "@/lib/renderer/puppeteer"
 
 export type Shape = "SQUARE" | "PORTRAIT"
+// The 009 fixtures stay on Shape; the 028 look fixtures add the 9:16 shape.
+export type LookShape = Shape | "STORY"
 
 // Image pixels the fixtures produce (css viewport x2).
-export const IMAGE_PX: Record<Shape, { w: number; h: number }> = {
+export const IMAGE_PX: Record<LookShape, { w: number; h: number }> = {
   SQUARE: { w: 1024, h: 1024 },
   PORTRAIT: { w: 1024, h: 1536 },
+  STORY: { w: 1024, h: 1536 },
 }
 // The post canvas for each shape.
-export const CANVAS: Record<Shape, { width: number; height: number }> = {
+export const CANVAS: Record<LookShape, { width: number; height: number }> = {
   SQUARE: { width: 1080, height: 1080 },
   PORTRAIT: { width: 1080, height: 1350 },
+  STORY: { width: 1080, height: 1920 },
 }
 
 export const toDataUrl = (png: Buffer) => `data:image/png;base64,${png.toString("base64")}`
 
 // Rasterize a page whose body fills the image at half size (the renderer is 2x).
-async function raster(shape: Shape, bodyCss: string, inner = ""): Promise<string> {
+export async function raster(shape: LookShape, bodyCss: string, inner = ""): Promise<string> {
   const { w, h } = IMAGE_PX[shape]
   const html =
     `<!doctype html><html><head><style>html,body{margin:0;width:${w / 2}px;height:${h / 2}px;overflow:hidden}` +
@@ -34,9 +38,9 @@ async function raster(shape: Shape, bodyCss: string, inner = ""): Promise<string
   return toDataUrl(await renderHtmlToPng(html, w / 2, h / 2))
 }
 
-const CALM = "background:linear-gradient(135deg,#0b1220,#16243a)"
+export const CALM = "background:linear-gradient(135deg,#0b1220,#16243a)"
 // 4 css px black / 4 css px white vertical stripes (8 image px each at 2x).
-const STRIPES = "repeating-linear-gradient(90deg,#000 0 4px,#fff 4px 8px)"
+export const STRIPES = "repeating-linear-gradient(90deg,#000 0 4px,#fff 4px 8px)"
 
 // A calm dark gradient: the image a hero archetype wants behind light text.
 export const calmDark = (shape: Shape) => raster(shape, CALM)

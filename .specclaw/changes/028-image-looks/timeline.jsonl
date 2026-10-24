@@ -8,3 +8,5 @@
 {"ev":"stop","span":"W1","at":"2026-10-24T19:09:45Z","ts":1792868985,"status":"ok"}
 {"ev":"start","span":"W2","kind":"wave","label":"wave 2","at":"2026-10-24T19:09:52Z","ts":1792868992}
 {"ev":"start","span":"T2","kind":"task","label":"resolver","parent":"W2","model":"sonnet","attempt":"1","at":"2026-10-24T19:09:52Z","ts":1792868992}
+{"ev":"stop","span":"T2","at":"2026-10-24T19:14:35Z","ts":1792869276,"status":"ok"}
+{"ev":"start","span":"T3","kind":"task","label":"fixtures","parent":"W2","model":"sonnet","attempt":"1","at":"2026-10-24T19:14:41Z","ts":1792869281}

@@ -73,7 +73,7 @@ This change has **7 tasks in 5 waves**:
     - Grep and record in `reports/T2.md`: `grep -rn "\.notes\|ResolveNote" src` (no production reader of the notes) and `git grep -n "STORY" -- src` (only the kept lines of the spec FR-06 table remain).
     - **Gate:** tsc, lint, unit, `npm run build` (then `rm -rf .next`; check with the orchestrator about :3002 first).
 
-- [ ] `T3` — The fixture set: the table, the images, the render test and the completeness test
+- [x] `T3` — The fixture set: the table, the images, the render test and the completeness test
   - Files: `tests/render/{lookFixtureTable,lookFixtures,look-fixtures.test}.ts` (new), `tests/render/heroFixtures.ts` (STORY shape, export `CALM` and `STRIPES`), `tests/unit/lookFixtureCompleteness.test.ts` (new); `src/lib/designData/composition.ts` and the T1 hash table **only** if a contract must be tuned (NFR-04)
   - Estimate: medium
   - Kind: test
