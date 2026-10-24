@@ -59,8 +59,11 @@ export default function NewBriefPage() {
             brandKitId={wizard.brandKitId}
             setBrandKitId={wizard.setBrandKitId}
             brandKitOptions={wizard.brandKitOptions}
+            postStyle={wizard.postStyle}
+            setPostStyle={wizard.setPostStyle}
             imageStyle={wizard.imageStyle}
             setImageStyle={wizard.setImageStyle}
+            imageStyleFromStyle={wizard.imageStyleFromStyle}
             designMode={wizard.designMode}
             setDesignMode={wizard.setDesignMode}
             templateId={wizard.templateId}
@@ -78,9 +81,9 @@ export default function NewBriefPage() {
             prompt={wizard.prompt}
             setPrompt={wizard.setPrompt}
             goal={wizard.goal}
-            setGoal={wizard.setGoal}
             tone={wizard.tone}
             setTone={wizard.setTone}
+            toneFromStyle={wizard.toneFromStyle}
             campaignId={wizard.campaignId}
             brandKitId={wizard.brandKitId}
           />
@@ -102,11 +105,12 @@ export default function NewBriefPage() {
             selectedCampaign={wizard.selectedCampaign}
             selectedBrandKit={wizard.selectedBrandKit}
             aspectRatio={wizard.aspectRatio}
+            postStyle={wizard.postStyle}
+            imageStyleFromStyle={wizard.imageStyleFromStyle}
             imageStyle={wizard.imageStyle}
             designMode={wizard.designMode}
             selectedTemplate={wizard.selectedTemplate}
             selectedRefTemplate={wizard.selectedRefTemplate}
-            goal={wizard.goal}
             tone={wizard.tone}
             images={wizard.images}
             topic={wizard.topic}

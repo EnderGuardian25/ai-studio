@@ -96,12 +96,12 @@ test.describe('Path A — template-fill generation', () => {
 
   // TC-GEN-03 — Brief validation: missing required fields / bad FK → 4xx.
   test('brief creation rejects missing fields and bad FKs', async () => {
-    // Missing goal.
+    // Missing goal: no longer an error (027 FR-06). The goal comes from the post
+    // style, so a brief without one is accepted and stores General's goal.
     const noGoal = await api.post('/api/briefs', {
       topic: 'x', tone: 'professional', channels: ['INSTAGRAM'], designMode: 'GENERATE', copyProviderKey: 'cli',
     })
-    expect(noGoal.status()).toBeGreaterThanOrEqual(400)
-    expect(noGoal.status()).toBeLessThan(500)
+    expect(noGoal.status()).toBe(201)
 
     // Missing channels.
     const noChannels = await api.post('/api/briefs', {

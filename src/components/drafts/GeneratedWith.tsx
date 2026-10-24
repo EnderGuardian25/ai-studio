@@ -29,3 +29,24 @@ export function GeneratedWith({ stamp, substitutedFrom, className }: GeneratedWi
     </p>
   )
 }
+
+export interface PostStyleLineProps {
+  /** The draft's `postStyle` summary from GET /api/drafts/[id]; null before 027. */
+  style: { key: string; label: string; version: number } | null | undefined
+  className?: string
+}
+
+// 027 FR-13: the muted "Post style: Promotion" line beside the Generated-with
+// line. Nothing without a stamp. The version is in the title, not the text.
+export function PostStyleLine({ style, className }: PostStyleLineProps) {
+  if (!style) return null
+  return (
+    <p
+      className={cn('text-ui-xs text-fg-muted', className)}
+      data-testid="post-style-line"
+      title={`${style.label}, version ${style.version}`}
+    >
+      Post style: {style.label}
+    </p>
+  )
+}

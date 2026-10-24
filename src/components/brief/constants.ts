@@ -23,14 +23,6 @@ export const ASPECT_OPTIONS: { value: AspectRatio; icon: React.ElementType; sub:
   { value: 'STORY', icon: Smartphone, sub: dimensionsLabel('STORY') },
 ]
 
-export const GOAL_OPTIONS = [
-  { value: 'awareness', label: 'Awareness' },
-  { value: 'engagement', label: 'Engagement' },
-  { value: 'conversion', label: 'Conversion' },
-  { value: 'hiring', label: 'Hiring' },
-  { value: 'announcement', label: 'Announcement' },
-]
-
 const TONE_LABELS: Record<ToneKey, string> = {
   professional: 'Professional',
   casual: 'Casual',

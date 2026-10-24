@@ -14,6 +14,7 @@ import { useCurrentUser } from '@/lib/hooks/useCurrentUser'
 import { ASIDE_BLOCK, CRUMB_CURRENT, CRUMB_LINK } from '@/components/campaigns/classes'
 import { CampaignBriefingSection } from '@/components/campaigns/CampaignBriefingSection'
 import { ScheduledQueueSection } from '@/components/campaigns/ScheduledQueueSection'
+import { postStyleLabel, postStyleOptions } from '@/components/campaigns/postStyleOptions'
 import type { Campaign, BrandKitSummary, ProjectSummary, ResolvedBrandKitResponse } from '@/lib/api-types'
 
 const SOURCE_LABEL: Record<string, string> = {
@@ -30,9 +31,11 @@ export default function CampaignDetailPage() {
   const { isTeamAdmin } = useCurrentUser()
   const [savingKit, setSavingKit] = useState(false)
   const [savingProject, setSavingProject] = useState(false)
+  const [savingStyle, setSavingStyle] = useState(false)
   // The aside selects are named by their visible dt (FR-12 rows 23, 24).
   const projectLabelId = React.useId()
   const kitLabelId = React.useId()
+  const styleLabelId = React.useId()
 
   const campaignQuery = useQuery({
     queryKey: ['campaigns', params.id],
@@ -83,6 +86,25 @@ export default function CampaignDetailPage() {
       toast.error(e instanceof Error ? e.message : 'Failed to update brand kit')
     } finally {
       setSavingKit(false)
+    }
+  }
+
+  // 027 FR-08: '' clears the default (the wizard then falls to General).
+  async function updatePostStyle(value: string) {
+    setSavingStyle(true)
+    try {
+      await apiFetch(`/api/campaigns/${params.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ defaultPostStyle: value || null }),
+      })
+      await invalidate()
+      // The brief wizard and the list read the same campaigns cache.
+      await queryClient.invalidateQueries({ queryKey: ['campaigns'] })
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : 'Failed to update post style')
+    } finally {
+      setSavingStyle(false)
     }
   }
 
@@ -198,6 +220,28 @@ export default function CampaignDetailPage() {
                 ) : (
                   <dd className="font-medium text-fg">
                     {campaign.projects[0]?.project.name ?? 'Standalone'}
+                  </dd>
+                )}
+              </div>
+              <div>
+                <dt id={styleLabelId} className="flex items-center gap-1.5 text-ui-xs text-fg-muted">
+                  Default post style
+                  {savingStyle && <Loader2 {...ICON_SM} className="animate-spin" aria-hidden />}
+                </dt>
+                {isTeamAdmin ? (
+                  <dd className="mt-1">
+                    <Select
+                      aria-labelledby={styleLabelId}
+                      data-testid="campaign-default-post-style"
+                      options={postStyleOptions('No default (General)', campaign.defaultPostStyle)}
+                      value={campaign.defaultPostStyle ?? ''}
+                      onChange={e => updatePostStyle(e.target.value)}
+                      disabled={savingStyle}
+                    />
+                  </dd>
+                ) : (
+                  <dd className="font-medium text-fg" data-testid="campaign-default-post-style-text">
+                    {postStyleLabel(campaign.defaultPostStyle) ?? 'General'}
                   </dd>
                 )}
               </div>

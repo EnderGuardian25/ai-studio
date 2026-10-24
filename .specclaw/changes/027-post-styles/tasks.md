@@ -119,7 +119,7 @@ This is phase a. Phase b (STORY layouts, the five new looks, pixel-check changes
 
 ### Wave 6: UI
 
-- [ ] `T6` — The wizard picker (step 1, before the size and design choices), the campaign default, the queue modal and held line, the draft notice; E2E §AE (UI cases)
+- [x] `T6` — The wizard picker (step 1, before the size and design choices), the campaign default, the queue modal and held line, the draft notice; E2E §AE (UI cases)
   - Files: `src/components/brief/{PostStylePicker,ContentStep,ReviewStep,SizeDesignStep,useBriefWizard}.ts(x)`, `src/app/(app)/brief/page.tsx`, `src/lib/brief/briefDraftPayload.ts`, `src/app/(app)/campaigns/page.tsx`, `src/app/(app)/campaigns/[id]/page.tsx`, `src/components/campaigns/{QueueEntryModal,ScheduledQueueSection}.tsx`, `src/components/drafts/{FactsCheckNotice,GeneratedWith}.tsx`, `src/app/(app)/drafts/[id]/page.tsx`, `tests/unit/{briefDraftPayload,postStylesWizard}.test.ts`, `tests/e2e/post-styles.test.ts` (UI cases)
   - Estimate: large
   - Kind: impl

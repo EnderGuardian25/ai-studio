@@ -630,7 +630,8 @@ test.describe('Brief wizard (T8)', () => {
     await expect(page.getByRole('heading', { name: 'Brief & Caption Direction' })).toBeVisible()
     await page.getByPlaceholder('e.g. Q3 product launch').fill(`T8 wizard ${Date.now()}`)
     await page.locator('textarea').fill('Announce the restyled brief wizard with a short call to action.')
-    await expect(page.getByRole('combobox', { name: 'Goal' })).toBeVisible()
+    // The Goal select is gone (027 FR-07): the post style on step 1 sets the goal.
+    await expect(page.getByRole('combobox', { name: 'Goal' })).toHaveCount(0)
     await expect(page.getByRole('combobox', { name: 'Tone' })).toBeVisible()
     await page.getByRole('button', { name: 'Enhance with AI' }).click()
     await expect(page.getByRole('region', { name: 'AI suggestion' })).toBeVisible({ timeout: 30_000 })
@@ -939,11 +940,11 @@ test.describe('Campaigns and projects (T10)', () => {
     expect(await crumbs.ariaSnapshot()).not.toContain(camp.name)
     await expect(page.getByRole('heading', { name: camp.name, level: 1 })).toBeVisible()
 
-    // The briefing and the queue, with the aside's two selects.
+    // The briefing and the queue, with the aside's three selects (027 FR-08 added the default post style).
     await expect(page.getByRole('heading', { name: 'Campaign Briefing', level: 2 })).toBeVisible()
     await expect(page.getByText('T10 briefing v2, the active one')).toBeVisible()
     await expect(page.getByRole('heading', { name: 'Planned Posts (2)', level: 2 })).toBeVisible()
-    await expect(page.getByRole('combobox')).toHaveCount(2)
+    await expect(page.getByRole('combobox')).toHaveCount(3)
     const queue = page.getByRole('region', { name: 'Planned posts' })
     await expect(queue.getByRole('button', { name: 'Edit' })).toHaveCount(1)
     await expect(queue.getByRole('button', { name: 'Cancel' })).toHaveCount(1)

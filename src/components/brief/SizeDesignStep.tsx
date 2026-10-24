@@ -13,6 +13,7 @@ import { cardCls } from './cardCls'
 import { FieldLabel } from '@/components/ui/FieldLabel'
 import { ICON } from '@/components/ui/atoms'
 import { StepHead } from './StepHead'
+import { PostStylePicker } from './PostStylePicker'
 import { TemplateCard } from './TemplateCard'
 
 // ─── Step 1 — Size & Design ──────────────────────────────────────────────────
@@ -26,8 +27,12 @@ interface SizeDesignStepProps {
   brandKitId: string
   setBrandKitId: (id: string) => void
   brandKitOptions: { value: string; label: string }[]
+  postStyle: string
+  setPostStyle: (key: string) => void
   imageStyle: string
   setImageStyle: (key: string) => void
+  /** True when the image style shown is the post style's own default. */
+  imageStyleFromStyle?: boolean
   designMode: DesignMode
   setDesignMode: (m: DesignMode) => void
   templateId: string
@@ -51,8 +56,11 @@ export function SizeDesignStep({
   brandKitId,
   setBrandKitId,
   brandKitOptions,
+  postStyle,
+  setPostStyle,
   imageStyle,
   setImageStyle,
+  imageStyleFromStyle,
   designMode,
   setDesignMode,
   templateId,
@@ -67,6 +75,12 @@ export function SizeDesignStep({
         Choose the post size, which brand kit to use, and how the design is generated.
         You&apos;ll pick where to publish (Instagram / LinkedIn) at publish time.
       </StepHead>
+
+      {/* Post style (027 FR-07): above the size and design choices, so the image
+          style lower on this step is pre-filled from it. */}
+      <div className="pb-5">
+        <PostStylePicker value={postStyle} onChange={setPostStyle} />
+      </div>
 
       {/* Post size */}
       <div className={SECTION}>
@@ -162,6 +176,11 @@ export function SizeDesignStep({
             A hero style asks for an image made for the layout. If it can&apos;t be used, the classic style is used and
             the post says why.
           </p>
+          {imageStyleFromStyle && (
+            <p className="mb-3 text-ui-xs text-fg-muted" data-testid="image-style-from-style">
+              Pre-selected from the post style. Pick another to keep your choice.
+            </p>
+          )}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {imageStyleOptions(aspectRatio).map(opt => {
               const selected = imageStyle === opt.key

@@ -205,6 +205,17 @@ export function ScheduledQueueSection({ campaignId, resolvedKitId, isTeamAdmin }
                   </td>
                   <td className="py-2.5 pr-3">
                     <StatusChip status={CHIP[entry.status]} />
+                    {/* 027 FR-12: an auto-publish the facts check held back. The
+                        values are in the sentence and in the title. */}
+                    {entry.heldReason && (
+                      <p
+                        className="mt-1 max-w-[16rem] break-words text-ui-xs text-status-scheduled"
+                        title={entry.heldReason}
+                        data-testid="queue-held-reason"
+                      >
+                        {entry.heldReason}
+                      </p>
+                    )}
                     {entry.retryCount > 0 && entry.status === 'PENDING' && (
                       <span className="mt-0.5 block text-ui-xs text-fg-muted">
                         retry {entry.retryCount}

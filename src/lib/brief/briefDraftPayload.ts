@@ -25,7 +25,10 @@ export const briefDraftPayloadSchema = z.object({
   referenceTemplateId: z.string(),
   topic: z.string().max(500),
   prompt: z.string().max(20_000),
-  goal: z.string().max(100),
+  // 027 FR-07: the Goal picker is gone; the goal follows the post style. A row
+  // saved before 027 still carries one (it parses and is ignored); a new
+  // autosave leaves it out, and a resumed brief with no style opens as General.
+  goal: z.string().max(100).optional(),
   tone: z.string().max(100),
   images: z
     .array(
@@ -44,6 +47,8 @@ export const briefDraftPayloadSchema = z.object({
   // 009 FR-03: the image style; absent = classic. An unknown stored value is
   // read back as classic by the wizard (resumeImageStyle), never a parse failure.
   imageStyle: z.string().max(40).optional(),
+  // 027 FR-07: the post style key; absent (an old row) or unknown = General.
+  postStyle: z.string().max(40).optional(),
 })
 
 export type BriefDraftPayload = z.infer<typeof briefDraftPayloadSchema>

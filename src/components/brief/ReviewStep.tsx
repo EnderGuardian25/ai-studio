@@ -14,6 +14,7 @@ import {
   type BriefModelField,
 } from '@/lib/brief/modelPicks'
 import { styleLabel } from '@/lib/designData'
+import { getStyle } from '@/lib/postStyles'
 import type { DesignMode, UploadedImage } from './types'
 import { ReviewRow, type ReviewRowProps } from './ReviewRow'
 import { Notice } from '@/components/ui/Notice'
@@ -27,11 +28,13 @@ interface ReviewStepProps {
   selectedCampaign: Campaign | null
   selectedBrandKit: BrandKitSummary | null
   aspectRatio: AspectRatio
+  postStyle: string
+  /** True when the image style is the post style's own default (027 FR-07). */
+  imageStyleFromStyle?: boolean
   imageStyle: string
   designMode: DesignMode
   selectedTemplate: TemplateSummary | null
   selectedRefTemplate: TemplateSummary | null
-  goal: string
   tone: string
   images: UploadedImage[]
   topic: string
@@ -55,11 +58,12 @@ export function ReviewStep({
   selectedCampaign,
   selectedBrandKit,
   aspectRatio,
+  postStyle,
+  imageStyleFromStyle,
   imageStyle,
   designMode,
   selectedTemplate,
   selectedRefTemplate,
-  goal,
   tone,
   images,
   topic,
@@ -93,9 +97,13 @@ export function ReviewStep({
     { label: 'Brand kit', value: selectedBrandKit?.name ?? '—' },
     { label: 'Size', value: `${ASPECT_LABELS[aspectRatio]} · ${dimensionsLabel(aspectRatio)} px` },
     { label: 'Path', value: `Path ${designMode === 'TEMPLATE' ? 'A — Template fill' : 'B — Freeform design'}` },
-    ...(designMode === 'GENERATE'
-      ? [{ label: 'Image style', value: imageStyle === 'classic' ? 'Classic' : styleLabel(imageStyle) }]
-      : []),
+    // Always shown (027 FR-07): Path A and 9:16 read Classic, whatever the style says.
+    {
+      label: 'Image style',
+      value:
+        (imageStyle === 'classic' ? 'Classic' : styleLabel(imageStyle)) +
+        (imageStyleFromStyle ? ' (from the post style)' : ''),
+    },
     {
       label: 'Template',
       value:
@@ -107,7 +115,7 @@ export function ReviewStep({
     },
     ...(captionModelName ? [{ label: 'Caption model', value: captionModelName }] : []),
     ...(designModelName ? [{ label: 'Design model', value: designModelName }] : []),
-    { label: 'Goal', value: goal, capitalize: true },
+    { label: 'Post style', value: getStyle(postStyle)?.label ?? 'General' },
     { label: 'Tone', value: tone, capitalize: true },
     {
       label: 'Images',

@@ -143,3 +143,28 @@ describe('briefImageKeyFromUrl', () => {
     ).toBeNull()
   })
 })
+
+// 027 FR-07: the post style survives autosave -> resume; goal is a legacy optional field.
+describe('briefDraftPayloadSchema: post style (027)', () => {
+  it('round-trips postStyle through JSON', () => {
+    const picked: BriefDraftPayload = { ...base, postStyle: 'launch' }
+    const parsed = briefDraftPayloadSchema.safeParse(JSON.parse(JSON.stringify(picked)))
+    expect(parsed.success && parsed.data).toStrictEqual(picked)
+  })
+
+  it('an old row with a goal and no style still parses (it resumes as General)', () => {
+    const parsed = briefDraftPayloadSchema.safeParse(base)
+    expect(parsed.success).toBe(true)
+    expect(parsed.success && parsed.data.goal).toBe('awareness')
+    expect(parsed.success && 'postStyle' in parsed.data).toBe(false)
+  })
+
+  it('a new payload with no goal parses', () => {
+    const { goal: _goal, ...noGoal } = base
+    expect(briefDraftPayloadSchema.safeParse({ ...noGoal, postStyle: 'event' }).success).toBe(true)
+  })
+
+  it('postStyle is capped at 40 characters', () => {
+    expect(briefDraftPayloadSchema.safeParse({ ...base, postStyle: 'x'.repeat(41) }).success).toBe(false)
+  })
+})

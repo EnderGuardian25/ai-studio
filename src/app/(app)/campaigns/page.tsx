@@ -15,6 +15,7 @@ import { PageHead } from '@/components/ui/PageHead'
 import { FOCUS, ICON, ICON_BUTTON, ICON_SM, SECTION_HEAD, TAG } from '@/components/ui/atoms'
 import { apiFetch } from '@/lib/apiFetch'
 import { ROW_TITLE } from '@/components/campaigns/classes'
+import { postStyleLabel, postStyleOptions } from '@/components/campaigns/postStyleOptions'
 import type { Campaign, BrandKitSummary, ProjectSummary, ProjectRef } from '@/lib/api-types'
 
 // A campaign row in a group card: ruled above on --line-subtle, except the
@@ -29,6 +30,7 @@ export default function CampaignsPage() {
   const [newName, setNewName] = useState('')
   const [newBrandKitId, setNewBrandKitId] = useState('')
   const [newProjectId, setNewProjectId] = useState('')
+  const [newPostStyle, setNewPostStyle] = useState('')
   const [showDeleted, setShowDeleted] = useState(false)
 
   const {
@@ -76,9 +78,10 @@ export default function CampaignsPage() {
           name: newName.trim(),
           brandKitId: newBrandKitId || undefined,
           projectId: newProjectId || undefined,
+          defaultPostStyle: newPostStyle || undefined,
         }),
       })
-      setNewName(''); setNewBrandKitId(''); setNewProjectId(''); setCreating(false)
+      setNewName(''); setNewBrandKitId(''); setNewProjectId(''); setNewPostStyle(''); setCreating(false)
       invalidateCampaigns()
     } catch (e: unknown) { toast.error(e instanceof Error ? e.message : 'Something went wrong') }
   }
@@ -179,9 +182,17 @@ export default function CampaignsPage() {
                 onChange={e => setNewBrandKitId(e.target.value)}
               />
             </div>
+            <div className="sm:w-52">
+              <Select
+                label="Default post style"
+                options={postStyleOptions('No default (General)')}
+                value={newPostStyle}
+                onChange={e => setNewPostStyle(e.target.value)}
+              />
+            </div>
             <div className="flex gap-2">
               <Button type="submit" disabled={!newName.trim()}>Create</Button>
-              <Button variant="ghost" type="button" onClick={() => { setCreating(false); setNewName(''); setNewBrandKitId(''); setNewProjectId('') }}>Cancel</Button>
+              <Button variant="ghost" type="button" onClick={() => { setCreating(false); setNewName(''); setNewBrandKitId(''); setNewProjectId(''); setNewPostStyle('') }}>Cancel</Button>
             </div>
           </form>
         </Panel>
@@ -245,6 +256,11 @@ export default function CampaignsPage() {
                           <span title={`Brand kit: ${campaign.brandKit.name}`} className={TAG}>
                             <Palette {...ICON_SM} aria-hidden className="flex-shrink-0 text-fg-muted" />
                             <span className="truncate">{campaign.brandKit.name}</span>
+                          </span>
+                        )}
+                        {postStyleLabel(campaign.defaultPostStyle) && (
+                          <span title="Default post style" className={TAG} data-testid="campaign-post-style">
+                            <span className="truncate">{postStyleLabel(campaign.defaultPostStyle)}</span>
                           </span>
                         )}
                         {campaign.defaultTone && (

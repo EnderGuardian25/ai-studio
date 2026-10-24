@@ -13,6 +13,7 @@ import { cn } from '@/lib/utils'
 import { CHANNEL_VALUES, channelLabel } from '@/lib/channels'
 import type { AspectRatio, Channel } from '@prisma/client'
 import type { ScheduledGeneration, PostGenerationAction } from '@/lib/api-types'
+import { postStyleOptions } from './postStyleOptions'
 
 // Create/edit modal for a scheduled-generation queue entry. The per-post
 // specifics (topic, prompt, size, path) mirror the brief wizard; the campaign
@@ -53,8 +54,11 @@ const ACTION_OPTIONS: Array<{ value: PostGenerationAction; label: string; hint: 
 export function QueueEntryModal({ campaignId, resolvedKitId, isTeamAdmin, entry, onClose, onSaved }: QueueEntryModalProps) {
   const [topic, setTopic] = useState(entry?.topic ?? '')
   const [description, setDescription] = useState(entry?.description ?? '')
-  const [goal, setGoal] = useState(entry?.goal ?? '')
-  const [tone, setTone] = useState(entry?.tone ?? 'professional')
+  // 027 FR-06: the post style ('' = the campaign's default, else General). The
+  // goal is no longer typed: the style sets it. A new entry leaves the tone
+  // blank so the style (or the campaign) sets it; an edit shows the stored one.
+  const [postStyle, setPostStyle] = useState(entry?.postStyle ?? '')
+  const [tone, setTone] = useState(entry?.tone ?? '')
   const [channels, setChannels] = useState<Channel[]>(entry?.channels ?? [...CHANNEL_VALUES])
   const [aspectRatio, setAspectRatio] = useState(entry?.aspectRatio ?? 'SQUARE')
   const [designMode, setDesignMode] = useState(entry?.designMode ?? 'GENERATE')
@@ -88,8 +92,9 @@ export function QueueEntryModal({ campaignId, resolvedKitId, isTeamAdmin, entry,
       const body = {
         topic,
         description: description || undefined,
-        goal,
-        tone,
+        // Blank = not sent: the server resolves it (an edit keeps the stored one).
+        postStyle: postStyle || undefined,
+        tone: tone.trim() || undefined,
         channels,
         aspectRatio,
         designMode,
@@ -121,8 +126,6 @@ export function QueueEntryModal({ campaignId, resolvedKitId, isTeamAdmin, entry,
 
   const valid =
     topic.trim() &&
-    goal.trim() &&
-    tone.trim() &&
     channels.length > 0 &&
     generateAt &&
     (designMode !== 'TEMPLATE' || templateId) &&
@@ -168,8 +171,19 @@ export function QueueEntryModal({ campaignId, resolvedKitId, isTeamAdmin, entry,
         </div>
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <Input label="Goal" value={goal} onChange={e => setGoal(e.target.value)} placeholder="e.g. Awareness" />
-          <Input label="Tone" value={tone} onChange={e => setTone(e.target.value)} placeholder="e.g. professional" />
+          <Select
+            label="Post style"
+            data-testid="queue-post-style"
+            options={postStyleOptions(entry ? 'Not set' : 'Campaign default', entry?.postStyle)}
+            value={postStyle}
+            onChange={e => setPostStyle(e.target.value)}
+          />
+          <Input
+            label="Tone"
+            value={tone}
+            onChange={e => setTone(e.target.value)}
+            placeholder="From the post style"
+          />
         </div>
 
         <div>

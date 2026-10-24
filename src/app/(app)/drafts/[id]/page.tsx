@@ -27,7 +27,8 @@ import { RefinementPanel } from '@/components/drafts/RefinementPanel'
 import { InlineEditModal } from '@/components/drafts/InlineEditModal'
 import { BackgroundNotice } from '@/components/drafts/BackgroundNotice'
 import { CompositionNotice } from '@/components/drafts/CompositionNotice'
-import { GeneratedWith } from '@/components/drafts/GeneratedWith'
+import { GeneratedWith, PostStyleLine } from '@/components/drafts/GeneratedWith'
+import { FactsCheckNotice } from '@/components/drafts/FactsCheckNotice'
 import { ModelPicker } from '@/components/ui/ModelPicker'
 import { PageTitle } from '@/components/ui/PageHead'
 import { EYEBROW, FOCUS, ICON, ICON_SM, PILL_BADGE } from '@/components/ui/atoms'
@@ -512,12 +513,18 @@ export default function DraftDetailPage() {
               />
             )}
 
+            {/* 027 FR-13: the post style the draft was made with. */}
+            {!isFailed && <PostStyleLine style={draft.postStyle} className="mt-1 text-center" />}
+
             {/* 005 FR-07: why this design has no AI background, when that
               was not the model's choice. Non-blocking. */}
             {draft.backgroundSkipped && <BackgroundNotice skipped={draft.backgroundSkipped} />}
 
             {/* 009 FR-15: the image style asked for was not (fully) applied. */}
             {draft.compositionNotice && <CompositionNotice notice={draft.compositionNotice} />}
+
+            {/* 027 FR-13: values the post states that the brief does not. Never blocks. */}
+            <FactsCheckNotice check={draft.factsCheck} />
 
             {/* The versions (§8.13, the study's .v): a thumbnail at the post's
               ratio, the number, the instruction. The current one is ringed in

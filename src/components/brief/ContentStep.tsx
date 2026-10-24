@@ -11,7 +11,7 @@ import { cn } from '@/lib/utils'
 import { FieldLabel } from '@/components/ui/FieldLabel'
 import { EYEBROW, ICON, SCROLL_FOCUS, SMALL_CAPS } from '@/components/ui/atoms'
 import { StepHead } from './StepHead'
-import { GOAL_OPTIONS, TONE_OPTIONS } from './constants'
+import { TONE_OPTIONS } from './constants'
 
 // ─── Step 2 — Content ────────────────────────────────────────────────────────
 
@@ -20,16 +20,18 @@ interface ContentStepProps {
   setTopic: (v: string) => void
   prompt: string
   setPrompt: (v: string) => void
+  // The goal the post style stands for; sent to the enhance call, never chosen here.
   goal: string
-  setGoal: (v: string) => void
   tone: string
   setTone: (v: string) => void
+  // 027 FR-07: true while the tone is the style's (or the campaign's), not the user's.
+  toneFromStyle?: boolean
   // Context for the AI enhance call — matches generation-time grounding.
   campaignId: string
   brandKitId: string
 }
 
-export function ContentStep({ topic, setTopic, prompt, setPrompt, goal, setGoal, tone, setTone, campaignId, brandKitId }: ContentStepProps) {
+export function ContentStep({ topic, setTopic, prompt, setPrompt, goal, tone, setTone, toneFromStyle, campaignId, brandKitId }: ContentStepProps) {
   const [enhancing, setEnhancing] = useState(false)
   // The Topic and Brief labels name their fields (014 FR-12 rows 4, 5).
   const topicId = React.useId()
@@ -63,7 +65,7 @@ export function ContentStep({ topic, setTopic, prompt, setPrompt, goal, setGoal,
   return (
     <div>
       <StepHead title={<>Brief &amp; Caption Direction</>}>
-        Give the post a short topic, tell Claude what it&apos;s about, then pick a goal and tone.
+        Give the post a short topic, tell Claude what it&apos;s about, then check the tone.
       </StepHead>
 
       <FieldLabel htmlFor={topicId} className="mb-2.5">Topic</FieldLabel>
@@ -151,9 +153,13 @@ export function ContentStep({ topic, setTopic, prompt, setPrompt, goal, setGoal,
         </>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-5 border-t border-line-subtle">
-        <Select label="Goal" options={GOAL_OPTIONS} value={goal} onChange={e => setGoal(e.target.value)} />
+      <div className="pt-5 border-t border-line-subtle sm:max-w-xs">
         <Select label="Tone" options={TONE_OPTIONS} value={tone} onChange={e => setTone(e.target.value)} />
+        {toneFromStyle && (
+          <p className="mt-2 text-ui-xs text-fg-muted" data-testid="tone-from-style">
+            From the post style. Change it if you want a different tone.
+          </p>
+        )}
       </div>
     </div>
   )

@@ -1,10 +1,13 @@
-import { test, expect, type APIRequestContext } from '@playwright/test'
+import { test, expect, type APIRequestContext, type Page } from '@playwright/test'
+import { Prisma } from '@prisma/client'
 import { loginAs, waitForDraft, type ApiClient } from '../helpers/api'
 import { prisma, dbAvailable } from '../helpers/db'
+import { briefDraftIds, expectNoHorizontalScroll, pageLogin } from '../helpers/ui'
+import { expectNoAxeViolations } from '../helpers/axe'
 
-// §AE — Post styles and the facts check (change 027), the SERVER cases:
-// TC-PS-01 onward. The wizard, queue-modal, held-line and draft-notice cases
-// are the UI half (027 T6) and extend this file.
+// §AE — Post styles and the facts check (change 027). The SERVER cases are
+// TC-PS-01 to TC-PS-29; the UI cases (T6: the wizard, the campaign default, the
+// queue modal and held line, the draft notice) are TC-PS-30 onward, at the end.
 //
 // Everything runs under MOCK_AI (no model call). The facts check is exercised
 // through the mock caption seams in src/lib/testHooks.ts: a sentinel in the
@@ -686,5 +689,399 @@ test.describe('ACP generate_post', () => {
     expect(cap.input.required).toEqual(['topic', 'channels', 'designMode'])
     expect(cap.input.properties.postStyle.enum).toContain('general')
     expect(Object.keys(cap.output.properties)).toEqual(expect.arrayContaining(['postStyle', 'factsCheck']))
+  })
+})
+
+// ── The UI cases (027 T6): the wizard, the campaign default, the queue and the draft page ──
+
+const WIZARD_PROMPT = 'Announce the new post styles with a short call to action for the team.'
+
+const nextPost = (page: Page, suffix: string) =>
+  page.waitForRequest((r) => r.method() === 'POST' && new URL(r.url()).pathname.endsWith(suffix))
+
+const summary = (page: Page, label: string) =>
+  page.getByRole('term').filter({ hasText: new RegExp(`^${label}$`) }).locator('xpath=following-sibling::dd[1]')
+
+// Step 0 -> step 1 (Size & Design), optionally under a campaign, with the suite's kit.
+async function openStepOne(page: Page, campaignName?: string) {
+  await pageLogin(page)
+  await page.goto('/brief')
+  await expect(page.getByRole('heading', { name: 'Select Campaign' })).toBeVisible({ timeout: 20_000 })
+  if (campaignName) await page.getByRole('button', { name: new RegExp(campaignName) }).click()
+  await page.getByRole('button', { name: /continue/i }).click()
+  await expect(page.getByRole('heading', { name: 'Size & Design' })).toBeVisible()
+  const kit = page.getByRole('combobox', { name: 'Brand Kit' })
+  await expect(kit.locator(`option[value="${kitId}"]`)).toBeAttached()
+  await kit.selectOption(kitId)
+}
+
+const styleCard = (page: Page, key: string) => page.getByTestId(`post-style-${key}`)
+const lookCard = (page: Page, key: string) => page.getByTestId(`image-style-${key}`)
+
+async function toContentStep(page: Page) {
+  await page.getByRole('button', { name: /continue/i }).click()
+  await expect(page.getByRole('heading', { name: 'Brief & Caption Direction' })).toBeVisible()
+}
+
+async function fillContent(page: Page, topic: string) {
+  await page.getByPlaceholder('e.g. Q3 product launch').fill(topic)
+  await page.locator('textarea').fill(WIZARD_PROMPT)
+}
+
+test.describe('The wizard: the post style picker on step 1', () => {
+  test.skip(!MOCKED(), NOT_MOCKED)
+  let before: Set<string>
+  test.beforeEach(async () => {
+    before = new Set(await briefDraftIds(admin))
+  })
+  test.afterEach(async () => {
+    for (const id of await briefDraftIds(admin)) if (!before.has(id)) await admin.del(`/api/brief-drafts/${id}`)
+  })
+
+  test('TC-PS-30: the picker sits above the size choices with General selected, moves by arrow keys, and the Content step has no Goal select', async ({ page }) => {
+    await openStepOne(page)
+    const picker = page.getByTestId('post-style-picker')
+    await expect(picker).toBeVisible()
+    await expect(picker.getByRole('radio')).toHaveCount(8)
+    await expect(styleCard(page, 'general')).toHaveAttribute('aria-checked', 'true')
+
+    // Above the size choices.
+    const pickerBox = (await picker.boundingBox())!
+    const sizeBox = (await page.getByText('Post Size', { exact: true }).boundingBox())!
+    expect(pickerBox.y + pickerBox.height).toBeLessThanOrEqual(sizeBox.y)
+
+    // One tab stop; the arrow keys move the choice and the focus.
+    await styleCard(page, 'general').focus()
+    await page.keyboard.press('ArrowRight')
+    await expect(styleCard(page, 'launch')).toHaveAttribute('aria-checked', 'true')
+    await expect(styleCard(page, 'launch')).toBeFocused()
+    await expect(styleCard(page, 'general')).toHaveAttribute('aria-checked', 'false')
+    await expect(styleCard(page, 'general')).toHaveAttribute('tabindex', '-1')
+    await page.keyboard.press('ArrowLeft')
+    await expect(styleCard(page, 'general')).toHaveAttribute('aria-checked', 'true')
+    await page.keyboard.press('End')
+    await expect(styleCard(page, 'milestone')).toHaveAttribute('aria-checked', 'true')
+    await page.keyboard.press('Home')
+    await expect(styleCard(page, 'general')).toHaveAttribute('aria-checked', 'true')
+
+    await expectNoAxeViolations(page, 'brief step 1 with the post style picker', { settle: true })
+    await page.setViewportSize({ width: 390, height: 900 })
+    await expectNoHorizontalScroll(page, 'brief step 1 with the picker at 390px')
+    await page.setViewportSize({ width: 1440, height: 900 })
+
+    // The Content step: Tone, and no Goal.
+    await page.getByRole('button', { name: /Path B — Freeform/ }).click()
+    await toContentStep(page)
+    await expect(page.getByRole('combobox', { name: 'Tone' })).toBeVisible()
+    await expect(page.getByRole('combobox', { name: 'Goal' })).toHaveCount(0)
+  })
+
+  test('TC-PS-31: the image style on step 1 is pre-filled from the style, a look picked by hand is kept, 9:16 and Path A fall to Classic', async ({ page }) => {
+    await openStepOne(page)
+    await page.getByRole('button', { name: /Path B — Freeform/ }).click()
+    await expect(lookCard(page, 'classic')).toHaveAttribute('aria-pressed', 'true')
+    await expect(page.getByTestId('image-style-from-style')).toHaveCount(0)
+
+    await styleCard(page, 'launch').click()
+    await expect(lookCard(page, 'product-showcase')).toHaveAttribute('aria-pressed', 'true')
+    await expect(page.getByTestId('image-style-from-style')).toBeVisible()
+    await styleCard(page, 'announcement').click()
+    await expect(lookCard(page, 'editorial-split')).toHaveAttribute('aria-pressed', 'true')
+
+    // A look picked by hand is kept when the style changes.
+    await lookCard(page, 'product-showcase').click()
+    await expect(page.getByTestId('image-style-from-style')).toHaveCount(0)
+    await styleCard(page, 'event').click()
+    await expect(lookCard(page, 'product-showcase')).toHaveAttribute('aria-pressed', 'true')
+    // Choosing Classic by hand is a choice too.
+    await lookCard(page, 'classic').click()
+    await styleCard(page, 'launch').click()
+    await expect(lookCard(page, 'classic')).toHaveAttribute('aria-pressed', 'true')
+
+    // 9:16: the hero looks are not available, so the field reads Classic.
+    await lookCard(page, 'classic').click()
+    await styleCard(page, 'announcement').click()
+    await page.getByRole('button', { name: /9:16 Story/ }).click()
+    await expect(lookCard(page, 'classic')).toHaveAttribute('aria-pressed', 'true')
+    await page.getByRole('button', { name: /1:1 Square/ }).click()
+    // The 9:16 reset dropped the hand-pick: the field follows the style again.
+    await expect(lookCard(page, 'editorial-split')).toHaveAttribute('aria-pressed', 'true')
+
+    // Path A has no image style at all.
+    await page.getByRole('button', { name: /Path A — Template/ }).click()
+    await expect(page.getByTestId('image-style-section')).toHaveCount(0)
+  })
+
+  test('TC-PS-32: the style pre-fills the Tone, a Tone changed by hand is kept, and the Review shows the resolved rows', async ({ page }) => {
+    await openStepOne(page)
+    await page.getByRole('button', { name: /Path B — Freeform/ }).click()
+    await styleCard(page, 'promotion').click()
+    await toContentStep(page)
+    const tone = page.getByRole('combobox', { name: 'Tone' })
+    await expect(tone).toHaveValue('bold')
+    await expect(page.getByTestId('tone-from-style')).toBeVisible()
+
+    // A tone changed by hand survives a different style.
+    await tone.selectOption('casual')
+    await expect(page.getByTestId('tone-from-style')).toHaveCount(0)
+    await page.getByRole('button', { name: /back/i }).click()
+    await styleCard(page, 'launch').click()
+    await toContentStep(page)
+    await expect(tone).toHaveValue('casual')
+    await fillContent(page, `PS wizard rows ${tag()}`)
+    await page.getByRole('button', { name: /continue/i }).click()
+    await page.getByRole('button', { name: /continue/i }).click()
+    await expect(page.getByRole('heading', { name: 'Review & Generate' })).toBeVisible()
+    await expect(summary(page, 'Post style')).toHaveText('Launch / new offer')
+    await expect(summary(page, 'Tone')).toHaveText('casual')
+    await expect(summary(page, 'Image style')).toHaveText('Product showcase (from the post style)')
+    await expect(page.getByRole('term').filter({ hasText: /^Goal$/ })).toHaveCount(0)
+
+    // 9:16 reads Classic on the Review (Path A has no image-style field to read: TC-PS-31).
+    for (let i = 0; i < 3; i++) await page.getByRole('button', { name: /back/i }).click()
+    await expect(page.getByRole('heading', { name: 'Size & Design' })).toBeVisible()
+    await page.getByRole('button', { name: /9:16 Story/ }).click()
+    for (let i = 0; i < 3; i++) await page.getByRole('button', { name: /continue/i }).click()
+    await expect(page.getByRole('heading', { name: 'Review & Generate' })).toBeVisible()
+    await expect(summary(page, 'Image style')).toHaveText('Classic')
+  })
+
+  test('TC-PS-33: the request carries postStyle always, and tone and imageStyle only when touched', async ({ page }) => {
+    await openStepOne(page)
+    await page.getByRole('button', { name: /Path B — Freeform/ }).click()
+    await styleCard(page, 'launch').click()
+    await toContentStep(page)
+    await fillContent(page, `PS wizard body ${tag()}`)
+    await page.getByRole('button', { name: /continue/i }).click()
+    await page.getByRole('button', { name: /continue/i }).click()
+    await expect(page.getByRole('heading', { name: 'Review & Generate' })).toBeVisible()
+
+    // The brief POST is stubbed so no generation starts: this case is about what is sent.
+    const bodies: Record<string, unknown>[] = []
+    await page.route('**/api/briefs', async (route) => {
+      if (route.request().method() !== 'POST') return route.fallback()
+      bodies.push(route.request().postDataJSON() as Record<string, unknown>)
+      await route.fulfill({ status: 400, contentType: 'application/json', body: JSON.stringify({ error: 'stubbed' }) })
+    })
+    // The listener is created before the click that triggers the request.
+    let posted = nextPost(page, '/api/briefs')
+    await page.getByRole('button', { name: 'Generate Post' }).click()
+    await posted
+    expect(bodies[0].postStyle).toBe('launch')
+    expect('tone' in bodies[0]).toBe(false)
+    expect('imageStyle' in bodies[0]).toBe(false)
+    expect('goal' in bodies[0]).toBe(false)
+
+    // Touch the tone and the look, then send again.
+    await expect(page.getByRole('button', { name: 'Generate Post' })).toBeEnabled()
+    for (let i = 0; i < 3; i++) await page.getByRole('button', { name: /back/i }).click()
+    await lookCard(page, 'editorial-split').click()
+    await toContentStep(page)
+    await page.getByRole('combobox', { name: 'Tone' }).selectOption('casual')
+    await page.getByRole('button', { name: /continue/i }).click()
+    await page.getByRole('button', { name: /continue/i }).click()
+    posted = nextPost(page, '/api/briefs')
+    await page.getByRole('button', { name: 'Generate Post' }).click()
+    await posted
+    expect(bodies[1]).toMatchObject({ postStyle: 'launch', tone: 'casual', imageStyle: 'editorial-split' })
+    await page.unroute('**/api/briefs')
+  })
+
+  test('TC-PS-34: the stored style resumes (an unknown key and an old row open as General)', async ({ page }) => {
+    await openStepOne(page)
+    await page.getByRole('button', { name: /Path B — Freeform/ }).click()
+    await styleCard(page, 'event').click()
+    await toContentStep(page)
+    await fillContent(page, `PS wizard resume ${tag()}`)
+    const saved = page.waitForResponse(
+      (r) =>
+        r.request().method() === 'PUT' &&
+        new URL(r.url()).pathname === '/api/brief-drafts' &&
+        (r.request().postDataJSON() as { payload: Record<string, unknown> }).payload.postStyle === 'event',
+    )
+    const draftId = ((await (await saved).json()) as { id: string }).id
+
+    const row = (await (await admin.get(`/api/brief-drafts/${draftId}`)).json()) as { payload: Record<string, unknown> }
+    expect(row.payload.postStyle).toBe('event')
+    expect('goal' in row.payload).toBe(false)
+    const put = (payload: Record<string, unknown>) => admin.put('/api/brief-drafts', { id: draftId, payload: { ...payload, step: 4 } })
+    const reviewStyle = async () => {
+      await page.goto(`/brief?resume=${draftId}`)
+      await expect(page.getByRole('heading', { name: 'Review & Generate' })).toBeVisible({ timeout: 20_000 })
+      return summary(page, 'Post style')
+    }
+
+    expect((await put(row.payload)).status()).toBe(200)
+    await expect(await reviewStyle()).toHaveText('Event')
+    expect((await put({ ...row.payload, postStyle: 'ghost-style' })).status()).toBe(200)
+    await expect(await reviewStyle()).toHaveText('General')
+
+    // An old row: a goal, no style.
+    const { postStyle: _gone, ...old } = row.payload
+    expect((await put({ ...old, goal: 'hiring' })).status()).toBe(200)
+    await expect(await reviewStyle()).toHaveText('General')
+  })
+})
+
+test.describe('The campaign default post style', () => {
+  test.skip(!MOCKED(), NOT_MOCKED)
+  let name = ''
+  let nameB = ''
+  test.beforeAll(async () => {
+    name = ((await (await admin.get(`/api/campaigns/${campA}`)).json()) as { name: string }).name
+    nameB = ((await (await admin.get(`/api/campaigns/${campB}`)).json()) as { name: string }).name
+  })
+  test.afterEach(async () => {
+    await admin.patch(`/api/campaigns/${campA}`, { defaultPostStyle: null })
+  })
+
+  test('TC-PS-35: the wizard opens with the campaign default selected; a campaign with none gives General', async ({ page }) => {
+    const set = await admin.patch(`/api/campaigns/${campA}`, { defaultPostStyle: 'hiring' })
+    expect(set.status()).toBe(200)
+    await openStepOne(page, name)
+    await expect(styleCard(page, 'hiring')).toHaveAttribute('aria-checked', 'true')
+    await page.getByRole('button', { name: /back/i }).click()
+    await page.getByRole('button', { name: new RegExp(nameB) }).click()
+    await page.getByRole('button', { name: /continue/i }).click()
+    await expect(page.getByRole('heading', { name: 'Size & Design' })).toBeVisible()
+    await expect(styleCard(page, 'general')).toHaveAttribute('aria-checked', 'true')
+  })
+
+  test('TC-PS-36: an admin sets and clears the default on the detail page; the list shows it; an editor sees text only', async ({ page, browser }) => {
+    await pageLogin(page)
+    await page.goto(`/campaigns/${campA}`)
+    const select = page.getByTestId('campaign-default-post-style')
+    await expect(select).toBeVisible()
+    await expect(select).toHaveValue('')
+    const patched = page.waitForResponse((r) => r.request().method() === 'PATCH' && new URL(r.url()).pathname === `/api/campaigns/${campA}`)
+    await select.selectOption('event')
+    expect((await patched).status()).toBe(200)
+    expect(((await (await admin.get(`/api/campaigns/${campA}`)).json()) as { defaultPostStyle: string }).defaultPostStyle).toBe('event')
+
+    await page.goto('/campaigns')
+    await expect(page.getByTestId('campaign-post-style').first()).toContainText('Event')
+
+    // An editor: the value as text, no select.
+    const ctx = await browser.newContext()
+    const editorPage = await ctx.newPage()
+    await editorPage.goto('/login')
+    await editorPage.getByPlaceholder('Username').fill(EDITOR_EMAIL)
+    await editorPage.getByPlaceholder('Password').fill(PASSWORD)
+    await editorPage.getByRole('button', { name: 'Sign in' }).click()
+    await editorPage.waitForURL((url) => url.pathname === '/' || url.pathname === '/choose-team')
+    await editorPage.goto(`/campaigns/${campA}`)
+    await expect(editorPage.getByTestId('campaign-default-post-style-text')).toHaveText('Event')
+    await expect(editorPage.getByTestId('campaign-default-post-style')).toHaveCount(0)
+    await ctx.close()
+
+    // Clearing it.
+    await page.goto(`/campaigns/${campA}`)
+    const cleared = page.waitForResponse((r) => r.request().method() === 'PATCH' && new URL(r.url()).pathname === `/api/campaigns/${campA}`)
+    await page.getByTestId('campaign-default-post-style').selectOption('')
+    expect((await cleared).status()).toBe(200)
+    expect(((await (await admin.get(`/api/campaigns/${campA}`)).json()) as { defaultPostStyle: string | null }).defaultPostStyle).toBeNull()
+  })
+
+  test('TC-PS-37: the create form takes a default post style', async ({ page }) => {
+    await pageLogin(page)
+    await page.goto('/campaigns')
+    await page.getByRole('button', { name: 'New Campaign' }).click()
+    const nm = `PS created ${tag()}`
+    await page.getByLabel('Campaign name').fill(nm)
+    await page.getByRole('combobox', { name: 'Default post style' }).selectOption('tip')
+    const created = page.waitForResponse((r) => r.request().method() === 'POST' && new URL(r.url()).pathname === '/api/campaigns')
+    await page.getByRole('button', { name: 'Create', exact: true }).click()
+    const body = (await (await created).json()) as { id: string; defaultPostStyle: string }
+    expect(body.defaultPostStyle).toBe('tip')
+    await admin.del(`/api/campaigns/${body.id}`)
+  })
+})
+
+test.describe('The queue: the post style field and the held line', () => {
+  test.skip(!MOCKED() || !dbAvailable, NOT_MOCKED)
+
+  test('TC-PS-38: the modal sends postStyle (and no goal); an entry shows its held line, with the values in its title', async ({ page }) => {
+    await pageLogin(page)
+    await page.setViewportSize({ width: 1440, height: 1000 })
+    await page.goto(`/campaigns/${campA}`)
+    await page.getByRole('button', { name: 'Plan a post' }).click()
+    const modal = page.getByRole('dialog', { name: 'Plan a post' })
+    await expect(modal).toBeVisible()
+    const topic = `PS modal ${tag()}`
+    await modal.getByLabel('Topic').fill(topic)
+    await modal.getByTestId('queue-post-style').selectOption('event')
+    await modal.getByLabel('Generate at').fill('2031-01-01T10:00')
+    const posted = page.waitForRequest((r) => r.method() === 'POST' && new URL(r.url()).pathname === `/api/campaigns/${campA}/queue`)
+    await modal.getByRole('button', { name: 'Add to queue' }).click()
+    const body = (await posted).postDataJSON() as Record<string, unknown>
+    expect(body.postStyle).toBe('event')
+    expect('goal' in body).toBe(false)
+    await expect(page.getByText(topic)).toBeVisible()
+    const row = await prisma!.scheduledGeneration.findFirst({ where: { campaignId: campA, topic } })
+    expect(row?.postStyle).toBe('event')
+    await prisma!.scheduledGeneration.update({ where: { id: row!.id }, data: { status: 'CANCELLED' } })
+
+    // A held entry shows the amber line.
+    const heldTopic = `__MOCK_FACT_PRICE__ PS held line ${tag()}`
+    const held = await addEntry(campA, heldTopic, { postAction: 'PUBLISH_NOW' })
+    const after = await tickUntilSettled(admin, held.id)
+    expect(after.heldReason).toBeTruthy()
+    await page.reload()
+    const line = page.getByRole('row', { name: new RegExp(heldTopic) }).getByTestId('queue-held-reason')
+    await expect(line).toContainText('Not published: the facts check flagged $49')
+    await expect(line).toHaveAttribute('title', /\$49/)
+    await expectNoAxeViolations(page, 'the queue with a held entry', { settle: true })
+    await page.setViewportSize({ width: 390, height: 900 })
+    await expectNoHorizontalScroll(page, 'the campaign page with a held entry at 390px')
+  })
+})
+
+test.describe('The draft page: the facts notice and the style line', () => {
+  test.skip(!MOCKED(), NOT_MOCKED)
+
+  test('TC-PS-39: a flagged draft shows the notice, a clear one does not, the check that could not run says so, and Publish stays enabled', async ({ page }) => {
+    await pageLogin(page)
+    await page.setViewportSize({ width: 1440, height: 900 })
+
+    const flagged = await generate(admin, { topic: `__MOCK_FACT_PRICE__ __MOCK_FACT_DATE__ PS notice ${tag()}`, postStyle: 'promotion' })
+    expect(flagged.factsCheck?.status).toBe('flagged')
+    await page.goto(`/drafts/${flagged.id}`)
+    const notice = page.getByTestId('facts-check-notice')
+    await expect(notice).toBeVisible()
+    await expect(notice).toHaveAttribute('role', 'status')
+    await expect(notice).toHaveAttribute('data-status', 'flagged')
+    await expect(notice).toContainText('$49')
+    await expect(notice).toContainText('30 March 2027')
+    await expect(notice).toContainText('(Instagram caption)')
+    await expect(notice).toContainText('These are not in your brief or campaign. Check them before publishing.')
+    await expect(page.getByRole('button', { name: /^publish$/i })).toBeEnabled()
+    await expect(page.getByTestId('post-style-line')).toHaveText('Post style: Promotion / deal')
+    await expectNoAxeViolations(page, '/drafts/[id] with the facts notice', { settle: true })
+    await page.setViewportSize({ width: 390, height: 900 })
+    await expect(notice).toBeVisible()
+    await expectNoHorizontalScroll(page, '/drafts/[id] with the facts notice at 390px')
+    await page.setViewportSize({ width: 1440, height: 900 })
+
+    // A clear check shows nothing.
+    const clear = await generate(admin, { topic: `PS clear ${tag()}` })
+    expect(clear.factsCheck?.status).toBe('clear')
+    await page.goto(`/drafts/${clear.id}`)
+    await expect(page.getByTestId('post-style-line')).toBeVisible()
+    await expect(page.getByTestId('facts-check-notice')).toHaveCount(0)
+
+    // A null check (never checked) shows nothing.
+    if (dbAvailable) {
+      await prisma!.draft.update({ where: { id: clear.id }, data: { factsCheck: Prisma.DbNull } })
+      await page.reload()
+      await expect(page.getByTestId('post-style-line')).toBeVisible()
+      await expect(page.getByTestId('facts-check-notice')).toHaveCount(0)
+    }
+
+    // A check that could not run.
+    const errored = await generate(admin, { topic: `__MOCK_FACT_ERROR__ PS error ${tag()}` })
+    expect(errored.factsCheck?.status).toBe('error')
+    await page.goto(`/drafts/${errored.id}`)
+    await expect(page.getByTestId('facts-check-notice')).toContainText('The facts check could not run for this post.')
+    await expect(page.getByRole('button', { name: /^publish$/i })).toBeEnabled()
   })
 })

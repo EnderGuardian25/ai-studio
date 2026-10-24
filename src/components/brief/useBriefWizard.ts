@@ -21,7 +21,14 @@ import type {
   ProviderInfo,
   ResolvedBrandKitResponse,
 } from '@/lib/api-types'
-import { matchToneOption } from '@/lib/postStyles'
+import {
+  campaignStyleKey,
+  knownStyleKey,
+  resolveWizardStyle,
+  resumeWizardStyle,
+  styleRequestFields,
+  DEFAULT_POST_STYLE,
+} from '@/lib/brief/wizardStyleState'
 import { DEFAULT_CHANNELS } from './constants'
 import type { DesignMode, ResolvedKit, UploadedImage } from './types'
 import {
@@ -69,9 +76,15 @@ export interface UseBriefWizardResult {
   brandKitId: string
   setBrandKitId: React.Dispatch<React.SetStateAction<string>>
   brandKitOptions: { value: string; label: string }[]
-  /** 009 FR-03: the image style key ('classic' or an archetype). Path B only. */
+  /** 027 FR-07: the post style key. Pre-fills the tone and the image style. */
+  postStyle: string
+  setPostStyle: (key: string) => void
+  /** 009 FR-03: the image style shown ('classic' or an archetype). Path B only. */
   imageStyle: string
+  /** The user's own pick: marks the image style touched, so a style change never moves it. */
   setImageStyle: (key: string) => void
+  /** True when the image style shown comes from the post style, not the user. */
+  imageStyleFromStyle: boolean
   designMode: DesignMode
   /** Also resets a design model the new path can't run (008 FR-19). */
   setDesignMode: (mode: DesignMode) => void
@@ -86,10 +99,13 @@ export interface UseBriefWizardResult {
   setTopic: React.Dispatch<React.SetStateAction<string>>
   prompt: string
   setPrompt: React.Dispatch<React.SetStateAction<string>>
+  /** The goal the post style stands for (read-only: sent to the enhance call, never chosen). */
   goal: string
-  setGoal: React.Dispatch<React.SetStateAction<string>>
+  /** The tone shown: the user's pick, else the style's (or the campaign's). */
   tone: string
-  setTone: React.Dispatch<React.SetStateAction<string>>
+  /** The user's own pick: marks the tone touched. */
+  setTone: (value: string) => void
+  toneFromStyle: boolean
 
   // Step 3 — Images
   images: UploadedImage[]
@@ -133,10 +149,24 @@ export function useBriefWizard(): UseBriefWizardResult {
   // Step 0 — Campaign
   const [campaignId, setCampaignId] = useState('')
 
+  // The campaigns list is read here (not further down) because the style
+  // resolution and the autosave both need the selected campaign's defaults.
+  const { data: campaigns = [] } = useQuery({
+    queryKey: ['campaigns'],
+    queryFn: () => apiFetch<Campaign[]>('/api/campaigns'),
+  })
+
   // Step 1 — Size & Design
   const [aspectRatio, setAspectRatioState] = useState<AspectRatio>('SQUARE')
+  // 027 FR-07: the post style, and the tone and image style the user picked
+  // themselves. An untouched field follows the style (through the resolver); a
+  // touched one is never overwritten.
+  const [postStyle, setPostStyleState] = useState<string>(DEFAULT_POST_STYLE)
+  const [toneValue, setToneValue] = useState('professional')
+  const [toneTouched, setToneTouched] = useState(false)
   // 009 FR-03: Path B only; reset to classic when the size or path can't run it.
-  const [imageStyle, setImageStyle] = useState<string>(CLASSIC_STYLE)
+  const [imageStyleValue, setImageStyleValue] = useState<string>(CLASSIC_STYLE)
+  const [imageStyleTouched, setImageStyleTouched] = useState(false)
   const [brandKitId, setBrandKitId] = useState('')
   const [designMode, setDesignModeState] = useState<DesignMode>('TEMPLATE')
   const [templateId, setTemplateId] = useState('')
@@ -161,10 +191,30 @@ export function useBriefWizard(): UseBriefWizardResult {
     setModelErrors(({ designModel: _refused, ...rest }) => rest)
   }, [])
 
-  // 009 FR-03: a size an archetype does not support (STORY) resets the style.
+  // 009 FR-03: a size an archetype does not support (STORY) resets the style
+  // (the pick is dropped, so the field follows the style again).
   function setAspectRatio(ratio: AspectRatio) {
     setAspectRatioState(ratio)
-    if (ratio === 'STORY') setImageStyle(CLASSIC_STYLE)
+    if (ratio === 'STORY') resetImageStyle()
+  }
+
+  function resetImageStyle() {
+    setImageStyleValue(CLASSIC_STYLE)
+    setImageStyleTouched(false)
+  }
+
+  function setImageStyle(key: string) {
+    setImageStyleValue(key)
+    setImageStyleTouched(true)
+  }
+
+  function setTone(value: string) {
+    setToneValue(value)
+    setToneTouched(true)
+  }
+
+  function setPostStyle(key: string) {
+    setPostStyleState(knownStyleKey(key))
   }
 
   // FR-19: a design pick the new path can't run (Opus → template fill) resets,
@@ -172,7 +222,7 @@ export function useBriefWizard(): UseBriefWizardResult {
   function setDesignMode(mode: DesignMode) {
     if (mode === designMode) return
     setDesignModeState(mode)
-    if (mode === 'TEMPLATE') setImageStyle(CLASSIC_STYLE)
+    if (mode === 'TEMPLATE') resetImageStyle()
     const next = designPickForPath(designModel, mode)
     setDesignModel(next.pick) // clears the previous path's note and refusal
     if (next.note) setDesignModelNote(next.note)
@@ -183,12 +233,27 @@ export function useBriefWizard(): UseBriefWizardResult {
   // prompt = the full brief text (Brief.description — Claude's prompt context).
   const [topic, setTopic] = useState('')
   const [prompt, setPrompt] = useState('')
-  const [goal, setGoal] = useState('awareness')
-  const [tone, setTone] = useState('professional')
 
   // Step 3 — Images
   const [images, setImages] = useState<UploadedImage[]>([])
   const [uploading, setUploading] = useState(false)
+
+  // 027 FR-07: what the tone and the image style actually are right now.
+  const selectedCampaign = campaigns.find(c => c.id === campaignId) ?? null
+  const styleInput = {
+    postStyle,
+    campaign: selectedCampaign,
+    designMode,
+    aspectRatio,
+    tone: toneValue,
+    toneTouched,
+    imageStyle: imageStyleValue,
+    imageStyleTouched,
+  }
+  const styleView = resolveWizardStyle(styleInput)
+  const tone = styleView.tone
+  const imageStyle = styleView.imageStyle
+  const goal = styleView.goal
 
   // ── Unfinished-brief autosave + resume ─────────────────────────────────
   // The recoverable state is debounce-PUT to /api/brief-drafts once it's
@@ -253,7 +318,7 @@ export function useBriefWizard(): UseBriefWizardResult {
       referenceTemplateId,
       topic,
       prompt,
-      goal,
+      postStyle,
       tone,
       images: images.map(({ id, url, filename, intent }) => ({ id, url, filename, intent })),
       // An untouched pick is undefined, which JSON.stringify leaves out.
@@ -277,7 +342,7 @@ export function useBriefWizard(): UseBriefWizardResult {
     referenceTemplateId,
     topic,
     prompt,
-    goal,
+    postStyle,
     tone,
     images,
     captionModel,
@@ -325,16 +390,25 @@ export function useBriefWizard(): UseBriefWizardResult {
         setReferenceTemplateId(p.referenceTemplateId)
         setTopic(p.topic)
         setPrompt(p.prompt)
-        setGoal(p.goal)
-        setTone(p.tone)
         setImages(p.images.map((img) => ({ ...img })))
         setCaptionModelState(p.captionModel)
         setDesignModelState(p.designModel)
         // An unknown or retired stored value resumes as classic; so does a style
         // the stored size or path can't run.
-        setImageStyle(
-          p.aspectRatio === 'STORY' || p.designMode === 'TEMPLATE' ? CLASSIC_STYLE : resumeImageStyle(p.imageStyle),
+        const storedImageStyle =
+          p.aspectRatio === 'STORY' || p.designMode === 'TEMPLATE' ? CLASSIC_STYLE : resumeImageStyle(p.imageStyle)
+        // 027 FR-07: an unknown stored style opens as General; a stored tone or
+        // image style is the user's own only if it differs from what the style
+        // would give (so an untouched field keeps following the style).
+        const restored = resumeWizardStyle(
+          { postStyle: p.postStyle, tone: p.tone, imageStyle: storedImageStyle },
+          { campaign: null, designMode: p.designMode, aspectRatio: p.aspectRatio },
         )
+        setPostStyleState(restored.postStyle)
+        setToneValue(p.tone)
+        setToneTouched(restored.toneTouched)
+        setImageStyleValue(restored.imageStyle)
+        setImageStyleTouched(restored.imageStyleTouched)
       })
       .catch(() => {
         /* deleted/expired/foreign id → fresh wizard */
@@ -359,10 +433,6 @@ export function useBriefWizard(): UseBriefWizardResult {
   const { data: templates = [] } = useQuery({
     queryKey: ['templates'],
     queryFn: () => apiFetch<TemplateSummary[]>('/api/templates'),
-  })
-  const { data: campaigns = [] } = useQuery({
-    queryKey: ['campaigns'],
-    queryFn: () => apiFetch<Campaign[]>('/api/campaigns'),
   })
   const { data: projects = [] } = useQuery({
     queryKey: ['projects'],
@@ -442,12 +512,9 @@ export function useBriefWizard(): UseBriefWizardResult {
 
   function selectCampaign(id: string) {
     setCampaignId(id)
-    const c = campaigns.find(x => x.id === id)
-    // Pre-fill tone from the campaign default when it matches a known option.
-    if (c?.defaultTone) {
-      const match = matchToneOption(c.defaultTone)
-      if (match) setTone(match)
-    }
+    // 027 FR-07: the style comes from the campaign's default (General when it
+    // has none); the tone follows through the resolver while untouched.
+    setPostStyleState(campaignStyleKey(campaigns.find(x => x.id === id)))
   }
 
   function clearCampaign() {
@@ -529,13 +596,15 @@ export function useBriefWizard(): UseBriefWizardResult {
     setSubmitting(true)
     try {
       const embedImages = images.filter(i => i.intent === 'embed')
+      const styleRequest = styleRequestFields(styleInput)
       const briefBody = {
         // Short title → Brief.topic (names the post in the library);
         // full prompt → Brief.description (Claude uses both).
         topic: topic.trim(),
         description: prompt.trim(),
-        goal,
-        tone,
+        // 027 FR-07: the style always; tone and imageStyle only when the user
+        // picked them, so the server resolves the rest and cannot disagree.
+        ...styleRequest,
         channels: DEFAULT_CHANNELS,
         aspectRatio,
         designMode,
@@ -555,8 +624,6 @@ export function useBriefWizard(): UseBriefWizardResult {
         // pick is left out by JSON.stringify, so the server resolves the default.
         captionModel,
         designModel,
-        // 009 FR-03: sent only when a style was chosen; absent means classic.
-        imageStyle: designMode === 'GENERATE' && imageStyle !== CLASSIC_STYLE ? imageStyle : undefined,
         // 006 FR-08: whether the brief came from a resumed brief draft (read by
         // the route for brief.submitted only; not stored).
         resumed: resumedRef.current || undefined,
@@ -618,7 +685,6 @@ export function useBriefWizard(): UseBriefWizardResult {
 
   const standaloneCampaigns = campaigns.filter(c => c.projects.length === 0)
 
-  const selectedCampaign = campaigns.find(c => c.id === campaignId) ?? null
   const selectedTemplate = templates.find(t => t.id === templateId) ?? null
   const selectedRefTemplate = templates.find(t => t.id === referenceTemplateId) ?? null
   const selectedBrandKit = brandKits.find(k => k.id === brandKitId) ?? null
@@ -639,8 +705,11 @@ export function useBriefWizard(): UseBriefWizardResult {
     standaloneCampaigns,
     aspectRatio,
     setAspectRatio,
+    postStyle: styleView.postStyle,
+    setPostStyle,
     imageStyle,
     setImageStyle,
+    imageStyleFromStyle: styleView.imageStyleFromStyle,
     brandKitId,
     setBrandKitId,
     brandKitOptions,
@@ -656,9 +725,9 @@ export function useBriefWizard(): UseBriefWizardResult {
     prompt,
     setPrompt,
     goal,
-    setGoal,
     tone,
     setTone,
+    toneFromStyle: styleView.toneFromStyle,
     images,
     uploading,
     fileInputRef,
