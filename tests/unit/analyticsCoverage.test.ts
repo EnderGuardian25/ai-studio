@@ -9,6 +9,7 @@ import { CATALOGUE, EVENT_NAMES } from '@/lib/analytics/catalogue'
 import { MODEL_KEYS } from '@/lib/models/catalogue'
 import { INSTRUCTION_CLASS_KEYS } from '@/lib/agent/instructionClasses'
 import { archetypes, FALLBACK_REASONS } from '@/lib/designData'
+import { POST_STYLE_KEYS } from '@/lib/postStyles'
 
 const SOURCES = ['web', 'scheduler', 'mcp'] as const
 
@@ -23,6 +24,7 @@ const OWNED: Record<string, readonly string[]> = {
   INSTRUCTION_CLASS_KEYS,
   FALLBACK_REASONS,
   archetypes: Object.keys(archetypes),
+  POST_STYLE_KEYS,
 }
 
 /** Quoted strings in `source`, comments removed, that equal an owned value. */
@@ -73,6 +75,10 @@ describe('analytics coverage guard (006 FR-13, AC-03)', () => {
     expect(findCopiedVocabulary(`z.enum(['SONNET'])`)).toEqual(['MODEL_KEYS:SONNET'])
     expect(findCopiedVocabulary(`z.enum(['replace'])`)).toEqual(['INSTRUCTION_CLASS_KEYS:replace'])
     expect(findCopiedVocabulary(`z.enum(['editorial-split'])`)).toEqual(['archetypes:editorial-split'])
+  })
+
+  it('catches a planted copy of the post style keys', () => {
+    expect(findCopiedVocabulary(`z.enum(['launch'])`)).toEqual(['POST_STYLE_KEYS:launch'])
   })
 
   it('ignores owned words in comments', () => {

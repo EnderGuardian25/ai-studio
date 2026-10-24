@@ -20,7 +20,8 @@ import { resolveModel } from '@/lib/models/policy'
 import type { ResolvedModel } from '@/lib/models/resolve'
 import { touchGeneration } from '@/lib/drafts/draftActions'
 import { computeFactsCheck } from '@/lib/factsCheck/refresh'
-import type { CheckText, FactWhere } from '@/lib/factsCheck'
+import { parseFactsCheck, type CheckText, type FactWhere, type FactsCheck } from '@/lib/factsCheck'
+import { isStyleKey } from '@/lib/postStyles'
 import type { Prisma } from '@prisma/client'
 
 // Path B needs a resolvable brand kit; thrown before any model call is paid for.
@@ -220,13 +221,15 @@ interface GenerationTrace {
   models?: GenerationModels
   captionStamp?: CaptionStamp
   design?: ProducedDesign
+  // 027 FR-14: the facts check as it stood when the generation settled.
+  factsCheck?: FactsCheck | null
 }
 
 const ROUTE_STAMPS = ['CLI', 'API_KEY', 'SERVER_KEY', 'OTHER'] as const
 type RouteStamp = (typeof ROUTE_STAMPS)[number]
 
 async function emitGenerationFinished(
-  brief: Pick<Brief, 'designMode' | 'aspectRatio' | 'imageStyle'>,
+  brief: Pick<Brief, 'designMode' | 'aspectRatio' | 'imageStyle' | 'postStyle'>,
   actor: GenerationRunActor,
   draftId: string | null,
   trace: GenerationTrace,
@@ -263,6 +266,11 @@ async function emitGenerationFinished(
       captionRoute: route && (ROUTE_STAMPS as readonly string[]).includes(route) ? (route as RouteStamp) : null,
       ...(trace.design?.stamp.promptVersion ? { promptVersion: trace.design.stamp.promptVersion } : {}),
       requestedArchetype: brief.imageStyle,
+      // 027 FR-14: the key, a status and a count; never a flagged value (NFR-05).
+      postStyle: isStyleKey(brief.postStyle) ? brief.postStyle : null,
+      ...(trace.factsCheck
+        ? { factsStatus: trace.factsCheck.status, factsFlagCount: trace.factsCheck.flagged.length }
+        : {}),
       ...(composition
         ? {
             appliedArchetype: composition.appliedArchetype as 'classic',
@@ -349,6 +357,8 @@ async function generateDraftForBriefInner(
     texts: checkTexts(headline, fields),
     preloaded: { campaignBriefing: inputs.campaignBriefing ?? null, voicePrompt: inputs.kit?.voicePrompt ?? null },
   })
+
+  trace.factsCheck = factsCheck
 
   const design = await produceDesign(brief, inputs, headline, actor, models.design, opts?.onBeforeDesign)
   trace.design = design
@@ -494,6 +504,13 @@ async function runGenerationForDraftInner(draftId: string, actor: GenerationRunA
       })
   }
   if (finished) {
+    // The caption write refreshed the stored check; read what is there now.
+    try {
+      const row = await prisma.draft.findUnique({ where: { id: draftId }, select: { factsCheck: true } })
+      trace.factsCheck = parseFactsCheck(row?.factsCheck)
+    } catch {
+      trace.factsCheck = null
+    }
     const done = finished as { outcome: 'ok' } | { outcome: 'failed'; err: unknown }
     await emitGenerationFinished(
       draft.brief,

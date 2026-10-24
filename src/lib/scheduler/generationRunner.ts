@@ -5,7 +5,7 @@ import { findLivePost } from "../publish/publishDraft"
 import { withClaudeAuth } from "../agent/userToken"
 import { isClaudeUsageLimit } from "../agent/claudeCli"
 import { track } from "../analytics/track"
-import { resolvePostStyle } from "../postStyles"
+import { isStyleKey, resolvePostStyle } from "../postStyles"
 import { parseFactsCheck } from "../factsCheck/types"
 import { checkHoldsPublish, heldReasonFor } from "./heldReason"
 
@@ -191,6 +191,7 @@ export async function runGenerationJobs(): Promise<void> {
       draftId: string | null
       retryCount?: number
       errorReason?: string
+      held?: boolean
     } | null = null
     try {
       await renewGenerationLease(entry.id)
@@ -237,7 +238,7 @@ export async function runGenerationJobs(): Promise<void> {
         },
       })
       console.log(`[generation] entry ${entry.id} → COMPLETED (draft ${draft.id})`)
-      settled = { outcome: "completed", draftId: draft.id, retryCount: entry.retryCount }
+      settled = { outcome: "completed", draftId: draft.id, retryCount: entry.retryCount, held: heldReason !== null }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
       // Retry and backoff are the same either way; only the reason says more.
@@ -286,6 +287,9 @@ export async function runGenerationJobs(): Promise<void> {
         payload: {
           ...(s.retryCount !== undefined ? { retryCount: s.retryCount } : {}),
           ...(s.errorReason !== undefined ? { errorReason: s.errorReason } : {}),
+          // 027 FR-14: the style key and whether the post action was held.
+          postStyle: isStyleKey(entry.postStyle) ? entry.postStyle : null,
+          held: s.held === true,
         },
       })
     }

@@ -22,6 +22,7 @@ import { MODEL_KEYS } from '@/lib/models/catalogue'
 import type { CaptionRoute as CaptionRouteStamp, RouteSetting } from '@/lib/models/route'
 import { INSTRUCTION_CLASS_KEYS } from '@/lib/agent/instructionClasses'
 import { archetypes, FALLBACK_REASONS, type ArchetypeKey } from '@/lib/designData'
+import { POST_STYLE_KEYS } from '@/lib/postStyles'
 import { redactText } from '@/lib/text/redact'
 
 export const INSTRUCTION_MAX = 2000
@@ -68,6 +69,8 @@ const refineAttempt = z.object({
   reasons: z.number().int().min(0),
 })
 
+// 027: the facts check's statuses, as stored on Draft.factsCheck.
+export const FACTS_STATUSES = ['clear', 'flagged', 'error'] as const
 const wizardStep = z.number().int().min(0).max(4)
 
 // ── The events ─────────────────────────────────────────────────────────────
@@ -99,6 +102,9 @@ export const CATALOGUE = {
       failureReason: failureReason.optional(),
       inputTokens: tokens.optional(),
       outputTokens: tokens.optional(),
+      postStyle: z.enum(POST_STYLE_KEYS).nullable().optional(),
+      factsStatus: z.enum(FACTS_STATUSES).nullable().optional(),
+      factsFlagCount: z.number().int().min(0).max(20).optional(),
     }),
   },
   'generation.swept': {
@@ -163,6 +169,8 @@ export const CATALOGUE = {
     schema: z.object({
       retryCount: z.number().int().min(0).optional(),
       errorReason: failureReason.optional(),
+      postStyle: z.enum(POST_STYLE_KEYS).nullable().optional(),
+      held: z.boolean().optional(),
     }),
   },
   'wizard.step': {
@@ -180,6 +188,7 @@ export const CATALOGUE = {
       aspectRatio: z.nativeEnum(AspectRatio).optional(),
       imageStyle: z.enum(APPLIED_ARCHETYPES).optional(),
       resumed: z.boolean().optional(),
+      postStyle: z.enum(POST_STYLE_KEYS).nullable().optional(),
     }),
   },
   'brief.abandoned': {

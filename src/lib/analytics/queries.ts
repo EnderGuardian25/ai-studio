@@ -21,6 +21,7 @@
 //   durations      = successful (`ok`) events only, p50 and p90 by surface.
 import { prisma } from '@/lib/prisma'
 import { OFFLINE_THRESHOLD_MS } from '@/lib/scheduler/heartbeatStatus'
+import { getStyle, POST_STYLE_KEYS } from '@/lib/postStyles'
 
 export const RANGES = ['7d', '30d', '90d'] as const
 export type InsightsRange = (typeof RANGES)[number]
@@ -120,6 +121,35 @@ export function shapeStyles(rows: StyleRow[], fallbacks: FallbackRow[]) {
     appliedRate: ratio(r.applied, r.okGenerations),
     fallbacks: fallbacks.filter((f) => f.style === r.style).map((f) => ({ reason: f.reason, n: f.n })),
   }))
+}
+
+export interface PostStyleRow {
+  style: string
+  chosen: number
+  generations: number
+  flagged: number
+  held: number
+}
+
+/**
+ * One row per dataset style (retired included), zeros for a style no event
+ * names. flagRate = flagged / generations (027 FR-14).
+ */
+export function shapePostStyles(rows: PostStyleRow[]) {
+  return POST_STYLE_KEYS.map((key) => {
+    const r = rows.find((x) => x.style === key)
+    const generations = r?.generations ?? 0
+    const flagged = r?.flagged ?? 0
+    return {
+      style: key as string,
+      label: getStyle(key)?.label ?? key,
+      chosen: r?.chosen ?? 0,
+      generations,
+      flagged,
+      flagRate: ratio(flagged, generations),
+      held: r?.held ?? 0,
+    }
+  })
 }
 
 export const WIZARD_STEPS = [0, 1, 2, 3, 4] as const
@@ -291,6 +321,21 @@ async function imageStyles({ from, to }: DateRange) {
   return shapeStyles(rows, fallbacks)
 }
 
+async function postStyles({ from, to }: DateRange) {
+  const rows = await prisma.$queryRaw<PostStyleRow[]>`
+    SELECT payload->>'postStyle' AS style,
+           (count(*) FILTER (WHERE name = 'brief.submitted'))::int AS chosen,
+           (count(*) FILTER (WHERE name = 'generation.finished'))::int AS generations,
+           (count(*) FILTER (WHERE name = 'generation.finished' AND payload->>'factsStatus' = 'flagged'))::int AS flagged,
+           (count(*) FILTER (WHERE name = 'scheduled_generation.settled' AND payload->>'held' = 'true'))::int AS held
+    FROM "AnalyticsEvent"
+    WHERE name IN ('brief.submitted', 'generation.finished', 'scheduled_generation.settled')
+      AND payload->>'postStyle' IS NOT NULL
+      AND "at" >= ${from} AND "at" < ${to}
+    GROUP BY 1`
+  return shapePostStyles(rows)
+}
+
 export interface DurationRow {
   surface: string
   model: string | null
@@ -401,10 +446,11 @@ async function retentionHealth(now: Date) {
 
 export async function insights(range: InsightsRange, now: Date = new Date()) {
   const window = rangeFor(range, now)
-  const [refineSection, failureSection, styles, durationRows, funnelSection, teams, lost, retention] = await Promise.all([
+  const [refineSection, failureSection, styles, postStyleRows, durationRows, funnelSection, teams, lost, retention] = await Promise.all([
     refine(window),
     failures(window),
     imageStyles(window),
+    postStyles(window),
     durations(window),
     funnel(window),
     teamActivity(window),
@@ -418,6 +464,7 @@ export async function insights(range: InsightsRange, now: Date = new Date()) {
     refine: refineSection,
     failures: failureSection,
     styles,
+    postStyles: postStyleRows,
     durations: durationRows,
     funnel: funnelSection,
     teams,

@@ -276,9 +276,19 @@ describe('brief.submitted', () => {
       source: 'web',
       teamId: 'team1',
       userId: 'u1',
-      payload: { path: 'B', aspectRatio: 'PORTRAIT', imageStyle: 'classic', resumed: true },
+      payload: { path: 'B', aspectRatio: 'PORTRAIT', imageStyle: 'classic', resumed: true, postStyle: null },
     })
     expect(JSON.stringify(h.track.mock.calls)).not.toContain('SECRET')
+  })
+
+  it('carries the stored post style key, and null for a key outside the dataset (027 FR-14)', async () => {
+    h.briefCreate.mockResolvedValue({ id: 'b1', aspectRatio: 'PORTRAIT', postStyle: 'launch' })
+    await submit({})
+    expect(h.track.mock.calls[0][1].payload.postStyle).toBe('launch')
+    h.track.mockClear()
+    h.briefCreate.mockResolvedValue({ id: 'b1', aspectRatio: 'PORTRAIT', postStyle: 'ghost' })
+    await submit({})
+    expect(h.track.mock.calls[0][1].payload.postStyle).toBeNull()
   })
 
   it('resumed is false unless it is exactly true, and a refused brief emits nothing', async () => {

@@ -1,13 +1,14 @@
 import { test, expect, type APIRequestContext, type Page } from '@playwright/test'
 import { Prisma } from '@prisma/client'
-import { loginAs, waitForDraft, type ApiClient } from '../helpers/api'
+import { findTeamIdByName, loginAs, waitForDraft, type ApiClient } from '../helpers/api'
 import { prisma, dbAvailable } from '../helpers/db'
 import { briefDraftIds, expectNoHorizontalScroll, pageLogin } from '../helpers/ui'
 import { expectNoAxeViolations } from '../helpers/axe'
 
 // §AE — Post styles and the facts check (change 027). The SERVER cases are
 // TC-PS-01 to TC-PS-29; the UI cases (T6: the wizard, the campaign default, the
-// queue modal and held line, the draft notice) are TC-PS-30 onward, at the end.
+// queue modal and held line, the draft notice) are TC-PS-30 onward, and the
+// insights section (T7, TC-PS-40) is last.
 //
 // Everything runs under MOCK_AI (no model call). The facts check is exercised
 // through the mock caption seams in src/lib/testHooks.ts: a sentinel in the
@@ -1083,5 +1084,82 @@ test.describe('The draft page: the facts notice and the style line', () => {
     await page.goto(`/drafts/${errored.id}`)
     await expect(page.getByTestId('facts-check-notice')).toContainText('The facts check could not run for this post.')
     await expect(page.getByRole('button', { name: /^publish$/i })).toBeEnabled()
+  })
+})
+
+test.describe('The insights page: Post styles', () => {
+  test.skip(!MOCKED(), NOT_MOCKED)
+
+  const SEAM = '/api/test/analytics-events'
+  test.afterAll(async () => {
+    if (admin) await admin.del(SEAM)
+  })
+
+  test('TC-PS-40: the section equals a hand count over seeded events, an unchosen style shows zeros, and an editor is refused', async ({ page }) => {
+    expect((await admin.del(SEAM)).status()).toBe(204)
+    const team = await findTeamIdByName(admin, 'Bistec')
+    const at = (h: number) => new Date(Date.now() - h * 3600_000).toISOString()
+    const row = (name: string, postStyle: string | null, outcome: string | null, extra: Record<string, unknown> = {}, h = 1) => ({
+      name, source: name === 'scheduled_generation.settled' ? 'scheduler' : 'web', teamId: team, userId: null, outcome, at: at(h),
+      payload: { postStyle, ...extra },
+    })
+    const gen = (style: string | null, factsStatus: string | null) =>
+      row('generation.finished', style, 'ok', factsStatus ? { factsStatus, factsFlagCount: factsStatus === 'flagged' ? 2 : 0 } : {})
+    const rows = [
+      // launch: chosen 3, generations 4 (2 flagged, 1 error, 1 clear), held 2
+      ...Array.from({ length: 3 }, () => row('brief.submitted', 'launch', null)),
+      gen('launch', 'flagged'), gen('launch', 'flagged'), gen('launch', 'error'), gen('launch', 'clear'),
+      row('scheduled_generation.settled', 'launch', 'completed', { held: true }),
+      row('scheduled_generation.settled', 'launch', 'completed', { held: true }),
+      row('scheduled_generation.settled', 'launch', 'completed', { held: false }),
+      // tip: chosen 1, generations 1 (clear)
+      row('brief.submitted', 'tip', null), gen('tip', 'clear'),
+      // hiring: generations 2 with no chosen brief (a queued one), 1 flagged
+      gen('hiring', 'flagged'), gen('hiring', 'clear'),
+      // not counted: no style, and out of the range
+      gen(null, 'flagged'),
+      { ...gen('event', 'flagged'), at: at(100 * 24) },
+    ]
+    expect((await admin.post(SEAM, { seed: rows })).status()).toBe(200)
+
+    const api = await (await admin.get('/api/admin/insights?range=30d')).json()
+    const byKey = Object.fromEntries(api.postStyles.map((r: { style: string }) => [r.style, r]))
+    expect(api.postStyles).toHaveLength(8)
+    expect(byKey.launch).toMatchObject({ chosen: 3, generations: 4, flagged: 2, flagRate: 0.5, held: 2 })
+    expect(byKey.tip).toMatchObject({ chosen: 1, generations: 1, flagged: 0, flagRate: 0, held: 0 })
+    expect(byKey.hiring).toMatchObject({ chosen: 0, generations: 2, flagged: 1, flagRate: 0.5, held: 0 })
+    for (const k of ['general', 'promotion', 'event', 'announcement', 'milestone']) {
+      expect(byKey[k]).toMatchObject({ chosen: 0, generations: 0, flagged: 0, flagRate: null, held: 0 })
+    }
+
+    await pageLogin(page)
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await page.goto('/admin/insights')
+    const section = page.getByTestId('section-post-styles')
+    await expect(section).toBeVisible()
+    await expect(page.getByTestId('post-style-launch')).toContainText('3')
+    await expect(page.getByTestId('post-style-rate-launch')).toHaveText('50%')
+    await expect(page.getByTestId('post-style-rate-tip')).toHaveText('0%')
+    await expect(page.getByTestId('post-style-rate-milestone')).toHaveText('–')
+    await expect(page.getByTestId('post-style-milestone')).toContainText('0')
+    await expectNoAxeViolations(page, '/admin/insights post styles', { settle: true })
+
+    // The review captures (gitignored): 1440 px and 390 px, light and dark.
+    for (const [width, height] of [[1440, 900], [390, 900]]) {
+      await page.setViewportSize({ width, height })
+      if (width === 390) await expectNoHorizontalScroll(page, '/admin/insights post styles at 390px')
+      for (const scheme of ['light', 'dark'] as const) {
+        await page.emulateMedia({ colorScheme: scheme })
+        await section.screenshot({ path: `ui-captures/027/post-styles-${width}-${scheme}.png` })
+      }
+    }
+
+    const ed = await loginAs(page.request, EDITOR_EMAIL, PASSWORD)
+    try {
+      expect((await ed.get('/api/admin/insights')).status()).toBe(403)
+    } finally {
+      await ed.dispose()
+    }
+    expect((await admin.del(SEAM)).status()).toBe(204)
   })
 })

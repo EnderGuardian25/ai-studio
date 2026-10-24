@@ -20,7 +20,7 @@ import {
 import { copyProviderIsClaude } from '@/providers/registry'
 import { loadCaptionRoute } from '@/providers/captionRoute'
 import type { ModelKey, UserSurface } from '@/lib/models/catalogue'
-import { resolvePostStyle } from '@/lib/postStyles'
+import { isStyleKey, resolvePostStyle } from '@/lib/postStyles'
 import { track } from '@/lib/analytics/track'
 import type { EventPayloadInput } from '@/lib/analytics/catalogue'
 
@@ -302,6 +302,7 @@ export const POST = withTeamAuth(async (req: NextRequest, _ctx, user) => {
       aspectRatio: brief.aspectRatio,
       imageStyle: imageStyle as EventPayloadInput<'brief.submitted'>['imageStyle'],
       resumed: body.resumed === true,
+      postStyle: isStyleKey(brief.postStyle) ? brief.postStyle : null,
     },
   })
 

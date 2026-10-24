@@ -768,7 +768,7 @@ test.describe('§AD — product observability', () => {
 
     const submitted = await waitEvents(admin, {}, 'brief.submitted', 1)
     expect(submitted).toHaveLength(1)
-    expect(submitted[0].payload).toEqual({ path: 'B', aspectRatio: 'SQUARE', imageStyle: 'classic', resumed: false })
+    expect(submitted[0].payload).toEqual({ path: 'B', aspectRatio: 'SQUARE', imageStyle: 'classic', resumed: false, postStyle: 'general' })
     // Generate deletes the brief draft keeping its images: that is not an abandonment.
     const all = await events(admin)
     expect(byName(all, 'brief.abandoned')).toHaveLength(0)
@@ -989,6 +989,66 @@ test.describe('§AD — product observability', () => {
     await expect(cliRow).toContainText('100%')
   })
 
+  // ── Post styles (027 FR-14, AC-14) ───────────────────────────────────────
+
+  test('TC-OBS-31: brief.submitted, generation.finished and scheduled_generation.settled carry the post style, the facts status and held; none holds a flagged value', async () => {
+    if (!MOCKED() || !dbAvailable) { test.skip(); return }
+    const generate = async (topic: string, postStyle: string) => {
+      const res = await admin.post('/api/briefs', { topic, postStyle, channels: ['INSTAGRAM'], designMode: 'GENERATE', copyProviderKey: 'cli' })
+      expect(res.status()).toBe(201)
+      const brief = await res.json()
+      const assemble = await admin.post('/api/generate/assemble-b', { briefId: brief.id })
+      expect(assemble.status()).toBe(202)
+      const draft = await waitForDraft(admin, (await assemble.json()).draftId)
+      expect(draft.status).toBe('EXPORTED')
+      rememberText(draft)
+      return draft as { id: string }
+    }
+    const flagged = await generate(`__MOCK_FACT_PRICE__ __MOCK_FACT_DATE__ Obs styled ${Date.now()}`, 'promotion')
+    const clear = await generate(`Obs clear ${Date.now()}`, 'tip')
+
+    const submitted = byName(await events(admin), 'brief.submitted')
+    expect(submitted.map((e) => e.payload.postStyle).sort()).toEqual(['promotion', 'tip'])
+
+    // two invented values, each placed in the headline and both captions: six flags
+    const [f] = await waitEvents(admin, { draftId: flagged.id }, 'generation.finished', 1)
+    expect(f.payload).toMatchObject({ postStyle: 'promotion', factsStatus: 'flagged', factsFlagCount: 6 })
+    const [c] = await waitEvents(admin, { draftId: clear.id }, 'generation.finished', 1)
+    expect(c.payload).toMatchObject({ postStyle: 'tip', factsStatus: 'clear', factsFlagCount: 0 })
+
+    // The scheduler: a flagged check holds a PUBLISH_NOW entry, a HOLD entry is not held.
+    const camp = await createCampaign(admin, `Obs Style Sched ${Date.now()}`)
+    const addEntry = async (topic: string, postAction: string) => {
+      const entry = await (await admin.post(`/api/campaigns/${camp.id}/queue`, {
+        topic, postStyle: 'launch', channels: ['INSTAGRAM'], designMode: 'GENERATE',
+        generateAt: new Date(Date.now() + 24 * 3600_000).toISOString(), postAction,
+      })).json()
+      await prisma!.scheduledGeneration.update({ where: { id: entry.id }, data: { generateAt: new Date(Date.now() - 1000), nextRetryAt: null } })
+      return entry.id as string
+    }
+    await clearStore(admin)
+    await addEntry(`__MOCK_FACT_PRICE__ Obs held ${Date.now()}`, 'PUBLISH_NOW')
+    expect((await admin.post('/api/test/generation-tick', {})).status()).toBe(200)
+    const heldEvent = byName(await events(admin), 'scheduled_generation.settled')
+    expect(heldEvent).toHaveLength(1)
+    expect(heldEvent[0]).toMatchObject({ outcome: 'completed' })
+    expect(heldEvent[0].payload).toMatchObject({ postStyle: 'launch', held: true })
+
+    await clearStore(admin)
+    await addEntry(`Obs hold ${Date.now()}`, 'HOLD')
+    expect((await admin.post('/api/test/generation-tick', {})).status()).toBe(200)
+    const holdEvent = byName(await events(admin), 'scheduled_generation.settled')
+    expect(holdEvent).toHaveLength(1)
+    expect(holdEvent[0].payload).toMatchObject({ postStyle: 'launch', held: false })
+
+    // NFR-05: the invented values the mock wrote never reach an event.
+    for (const e of [...submitted, f, c, ...heldEvent, ...holdEvent]) {
+      const text = JSON.stringify(e.payload)
+      expect(text, `${e.name} payload`).not.toContain('$49')
+      expect(text, `${e.name} payload`).not.toContain('30 March 2027')
+    }
+  })
+
   // ── Privacy (AC-04) ──────────────────────────────────────────────────────
 
   test('TC-OBS-22: no event the suite collected holds the brief text, a caption, the headline or HTML', async () => {
@@ -999,6 +1059,7 @@ test.describe('§AD — product observability', () => {
       const text = JSON.stringify(e.payload)
       expect(text, `${e.name} payload`).not.toContain(DESC_MARKER)
       expect(text, `${e.name} payload`).not.toMatch(/<html|<!doctype|<body/i)
+      for (const v of ['$49', '35% off', '30 March 2027', '1,250 customers']) expect(text, `${e.name} payload holds a flagged value`).not.toContain(v)
       for (const t of forbiddenText) expect(text, `${e.name} payload holds a caption`).not.toContain(t)
     }
   })

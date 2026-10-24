@@ -137,7 +137,7 @@ This is phase a. Phase b (STORY layouts, the five new looks, pixel-check changes
 
 ### Wave 7: Analytics and the insights section
 
-- [ ] `T7` — The catalogue fields, the emitters, `queries.postStyles` and the "Post styles" section; E2E §AE (analytics cases)
+- [x] `T7` — The catalogue fields, the emitters, `queries.postStyles` and the "Post styles" section; E2E §AE (analytics cases)
   - Files: `src/lib/analytics/{catalogue,queries}.ts`, `src/lib/agent/generateDraft.ts` (the `generation.finished` fields), `src/lib/scheduler/generationRunner.ts` (the settle fields), `src/app/api/briefs/route.ts` (the `brief.submitted` field), `src/components/admin/insights/sections.tsx`, `src/app/(app)/admin/insights/page.tsx`, `tests/unit/{postStylesAnalytics,analyticsCoverage,analyticsQueries}.test.ts`, `tests/e2e/post-styles.test.ts` and `tests/e2e/analytics.test.ts` (extended)
   - Estimate: medium
   - Kind: impl

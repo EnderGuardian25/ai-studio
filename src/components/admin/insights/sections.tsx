@@ -136,6 +136,28 @@ export function StylesSection({ data }: { data: Insights['styles'] }) {
   )
 }
 
+// ── 3b. Post styles ────────────────────────────────────────────────────────
+
+export function PostStylesSection({ data }: { data: Insights['postStyles'] }) {
+  const cols: Column<Insights['postStyles'][number]>[] = [
+    { key: 'style', header: 'Post style', cell: (r) => r.label },
+    { key: 'chosen', header: 'Chosen', align: 'right', cell: (r) => r.chosen },
+    { key: 'gen', header: 'Generations', align: 'right', cell: (r) => r.generations },
+    { key: 'flagged', header: 'Flagged', align: 'right', cell: (r) => r.flagged },
+    { key: 'rate', header: 'Flag rate', align: 'right', cell: (r) => <RateBar rate={r.flagRate} testId={`post-style-rate-${r.style}`} /> },
+    { key: 'held', header: 'Held', align: 'right', cell: (r) => r.held },
+  ]
+  return (
+    <InsightSection
+      id="post-styles"
+      title="Post styles"
+      question="Which post styles people pick, how often the facts check flags a generation, and how many scheduled posts it held. Flag rate = flagged ÷ generations; chosen counts wizard briefs."
+    >
+      <DataTable label="Post styles" columns={cols} rows={data} rowKey={(r) => r.style} rowTestId={(r) => `post-style-${r.style}`} minWidth={600} />
+    </InsightSection>
+  )
+}
+
 // ── 4. Model and route choices ─────────────────────────────────────────────
 
 export function DurationsSection({ data }: { data: Insights['durations'] }) {
