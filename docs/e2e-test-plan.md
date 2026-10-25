@@ -1114,7 +1114,7 @@ The mock suite proves the mechanism with mock replies; it records no real model 
 
 **Status (2026-10-25, end of Group A).** Only **TC-SHOT-01** is implemented, by T2 (`159083d`). It covers AC-06: `device-screen` is unavailable without a screenshot, and the picker card is disabled with "Needs a product screenshot". **TC-SHOT-02 to TC-SHOT-14 are planned for Group B** (T6 to T12), and they run only after an OP-025 go. Their scope is copied from the spec ("Mock E2E plan") and the design (section 16).
 
-**The seams (planned).** `__MOCK_BG__` (a hero image); `__MOCK_HERO_SCREEN__` (new: only the screen region is busy); `__MOCK_COMPOSITE_FAIL__` (new: the pure HTML check fails). The mock suite proves the mechanism with mock replies; it makes no real model or image call (NFR-11).
+**The seams (planned).** `__MOCK_BG__` (a hero image); `__MOCK_HERO_SCREEN__` (new: only the screen region is busy); `__MOCK_COMPOSITE_FAIL__` (new: the pure HTML check fails); `__MOCK_HERO_SCREEN_OFFSET__` (Amendment A1, new: the synthetic screen is drawn off the contract region, so the stamped `composites[].rect` differs from the region). **Group B E2E (TC-SHOT-07 onwards) must assert the stamped `rect`, not the region:** under `__MOCK_HERO_SCREEN_OFFSET__` the two differ. The mock suite proves the mechanism with mock replies; it makes no real model or image call (NFR-11).
 
 **TC-LOOK-10 (§AF) now expects six cards** (025 T2): the five existing looks keep their behaviour, and `device-screen` is shown disabled until a screenshot is uploaded.
 

@@ -125,7 +125,7 @@ This change has **12 tasks in 6 waves**:
     - The four released contracts, their hashes, `BUSY_STDDEV_MAX` and `BLANK_STDDEV_MAX` are unchanged. The `device-screen@1` rows are unchanged.
     - `--recheck` makes no network call and no image call. The orchestrator runs it on the 4 saved renders; it must reproduce the prototype verdicts in spec A1 (SQUARE 1 fail; SQUARE 2, PORTRAIT 1 and STORY 1 pass).
     - **Gate:** tsc, lint, unit, `npm run test:render` twice, then the targeted E2E (TC-SHOT-01, `image-looks`, `hero-image`, `post-styles`) on a fresh `:3001`.
-- [ ] `T14` — Amendment A1 docs (handoff, CLAUDE.md, e2e plan)
+- [x] `T14` — Amendment A1 docs (handoff, CLAUDE.md, e2e plan)
   - Files: `docs/handoff.md`, `CLAUDE.md`, `docs/e2e-test-plan.md`
   - Estimate: small
   - Kind: docs

@@ -1,7 +1,9 @@
 # bistec-studio roadmap — changes 004–025
 
 **Updated:** 2026-10-25 · **Branch:** all of this lands on `v2` (see Branching at the bottom); handoff in `docs/handoff.md` top section.
-**Status (2026-10-25, end of Group A):** **025** hero product screenshots: Group A (T1 to T5) is built (T1 `03389a5`, T2 `159083d`, T3 `cd19491`, T4 `cf00ffb`; T5 is the docs). **OP-025 waits on the user's go** (it spends up to 9 image calls and 9 Haiku calls); then Group B (T6 to T12) runs only after an OP-025 go. Then the stale-headline badge.
+**Status (2026-10-26):** **025** hero product screenshots: Group A (T1 to T5) and Amendment A1 (screen detection, T13) are built, and **OP-025 PASSED at all three sizes** (7 of 9 calls; the user accepted all six kept renders). **Group B (T6 to T12) is next, on the user's go.** Then the stale-headline badge.
+
+**(Superseded) Status (2026-10-25, end of Group A):** **025** hero product screenshots: Group A (T1 to T5) is built (T1 `03389a5`, T2 `159083d`, T3 `cd19491`, T4 `cf00ffb`; T5 is the docs). **OP-025 waits on the user's go** (it spends up to 9 image calls and 9 Haiku calls); then Group B (T6 to T12) runs only after an OP-025 go. Then the stale-headline badge.
 
 **(Superseded) Status (2026-10-25, later):** **025** hero product screenshots is planned (deep panel answered by the user; spec 17 FR / 10 NFR / 18 AC; 12 tasks; `0865ad2`) and building: Group A (T1 to T5), then OP-025 (the user decides the spend), then Group B (T6 to T12). T1 is done (`03389a5`); next is T2. Then the stale-headline badge.
 
@@ -100,7 +102,7 @@ B4 scheduler fix (ops) ───────────────► 010 sche
 1. **024** caption credential route: VERIFIED PASS (17/17); small and self-contained, it can ride in the `v2` → `main` merge. It completes 005 item 2 (the COPY route), which waited on 008's resolver.
 2. **007** brand-kit design system: VERIFIED PASS (22/22, 2026-10-23); the biggest quality gain with no prod dependency; it extends `src/lib/designData/` (a separate `authoring/` part) before 025 does. Follow-up proposals: a typography dataset, and the campaign briefing editor as a second host of the review panel.
 3. **027a** post styles: VERIFIED PASS 22/22 (2026-10-24); then **028** (027b) image looks: VERIFIED PASS 21/21, OP-028 and T7 done (Event and Hiring moved to `full-bleed-scene`; spotlight failed). Both come before 025.
-   3b. **025** hero product screenshots: OP-1 **passed** (2026-10-23, 6 of 6); Group A (T1 to T5) is built (2026-10-25); next is OP-025, its small real-model check that a blank device screen is achievable, on the user's go.
+   3b. **025** hero product screenshots: OP-1 **passed** (2026-10-23, 6 of 6); Group A (T1 to T5) and Amendment A1 are built; **OP-025 PASSED at all three sizes** (2026-10-26, 7 of 9 calls); Group B (T6 to T12) is next, on the user's go.
 4. **006** observability: VERIFIED PASS 17/17 (2026-10-24); in-app event store, no PostHog, no replay, 180-day retention. The user moved it ahead of 025 while OP-1 was pending.
 5. **026** drop the WhatsApp caption; Refine under the preview: VERIFIED PASS 11/11 (2026-10-24); CI green at `8bef317` (run 40002885901).
 6. **Stale-headline badge:** split out of 006; to be proposed.
