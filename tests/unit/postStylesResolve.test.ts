@@ -135,7 +135,10 @@ describe('resolvePostStyle: image style', () => {
   it('every real style on every surface keeps classic when its default is classic', () => {
     for (const s of SURFACES)
       for (const k of Object.keys(styles))
-        if (styles[k as keyof typeof styles].versions[1].defaultImageStyle === 'classic')
+        if (
+          styles[k as keyof typeof styles].versions[styles[k as keyof typeof styles].current]
+            .defaultImageStyle === 'classic'
+        )
           expect(ok(base({ surface: s, style: k })).imageStyle).toBe('classic')
   })
 

@@ -136,12 +136,36 @@ export const styles: Readonly<Record<PostStyleKey, PostStyle>> = deepFreeze({
     label: 'Event',
     summary: 'An event, a webinar or a session people can attend.',
     status: 'active',
-    current: 1,
+    current: 2,
     versions: {
       1: {
         goal: 'engagement',
         defaultTone: 'professional',
         defaultImageStyle: 'classic',
+        checklist: [
+          {
+            id: 'event.when-where-if-stated',
+            scope: 'caption',
+            check: 'facts-check',
+            text: 'State the date, the time and the place only if the brief states each one. Omit any it does not state.',
+          },
+          {
+            id: 'event.how-to-join',
+            scope: 'caption',
+            text: 'Say how to register or attend as the brief states it. If it states none, invite people to ask for details.',
+          },
+          {
+            id: 'event.image-values',
+            scope: 'image',
+            check: 'facts-check',
+            text: 'Print a date, a time or a place on the image only if the brief states it.',
+          },
+        ],
+      },
+      2: {
+        goal: 'engagement',
+        defaultTone: 'professional',
+        defaultImageStyle: 'full-bleed-scene',
         checklist: [
           {
             id: 'event.when-where-if-stated',
@@ -169,12 +193,41 @@ export const styles: Readonly<Record<PostStyleKey, PostStyle>> = deepFreeze({
     label: 'Hiring',
     summary: 'A role that is open.',
     status: 'active',
-    current: 1,
+    current: 2,
     versions: {
       1: {
         goal: 'hiring',
         defaultTone: 'professional',
         defaultImageStyle: 'classic',
+        checklist: [
+          {
+            id: 'hiring.role-named',
+            scope: 'caption',
+            text: 'Name the role in the first sentence, as the brief writes it.',
+          },
+          {
+            id: 'hiring.how-to-apply',
+            scope: 'caption',
+            text: 'Say how to apply as the brief states it. If it states none, ask applicants to get in touch.',
+          },
+          {
+            id: 'hiring.no-invented-terms',
+            scope: 'caption',
+            check: 'facts-check',
+            text: 'State a salary, location, work arrangement, benefit or deadline only if the brief states it.',
+          },
+          {
+            id: 'hiring.image-values',
+            scope: 'image',
+            check: 'facts-check',
+            text: 'Print the role name. Print no salary, location or deadline the brief does not state.',
+          },
+        ],
+      },
+      2: {
+        goal: 'hiring',
+        defaultTone: 'professional',
+        defaultImageStyle: 'full-bleed-scene',
         checklist: [
           {
             id: 'hiring.role-named',

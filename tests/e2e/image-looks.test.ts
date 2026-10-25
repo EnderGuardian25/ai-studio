@@ -6,7 +6,7 @@ import { ADMIN_EMAIL, ADMIN_PASSWORD, briefDraftIds, pageLogin } from '../helper
 import { archetypes } from '../../src/lib/designData/composition'
 
 // §AF — image looks (change 028, FR-05, FR-10 to FR-13, NFR-10; AC-10 to AC-14,
-// AC-18; TC-LOOK-01 to TC-LOOK-12). Adapted from §AA (hero-image.test.ts), with
+// AC-18; TC-LOOK-01 to TC-LOOK-16). Adapted from §AA (hero-image.test.ts), with
 // the same MOCK_AI + MOCK_PUPPETEER seams and the same `__MOCK_HERO_*__`
 // sentinels (no new sentinel):
 //   __MOCK_BG__            an image exists (a hero look needs it)
@@ -342,6 +342,47 @@ test.describe('§AF — unattended surfaces are unchanged', () => {
     const draft = await prisma!.draft.findUnique({ where: { id: row!.draftId! }, select: { composition: true } })
     expect(draft!.composition).toEqual(stamp({ requestedArchetype: 'classic', appliedArchetype: 'classic' }))
   })
+
+  // T7 (FR-16, AC-20): Event and Hiring now default to Full-bleed scene in the wizard;
+  // an unattended entry for either still resolves classic (unattended-classic).
+  for (const [id, postStyle] of [
+    ['TC-LOOK-15', 'event'],
+    ['TC-LOOK-16', 'hiring'],
+  ] as const) {
+    test(`${id}: a queue entry with postStyle ${postStyle} at 9:16 runs classic although the style now defaults to Full-bleed scene`, async () => {
+      const res = await admin.post(`/api/campaigns/${campaignId}/queue`, {
+        topic: `Look queue ${postStyle} ${tag()}`,
+        channels: ['INSTAGRAM'],
+        designMode: 'GENERATE',
+        aspectRatio: 'STORY',
+        postStyle,
+        generateAt: new Date(Date.now() + 24 * 3600_000).toISOString(),
+        postAction: 'HOLD',
+      })
+      expect(res.status(), await res.text()).toBe(201)
+      const entryId = (await res.json()).id as string
+
+      let row = await prisma!.scheduledGeneration.findUnique({ where: { id: entryId } })
+      for (let i = 0; i < 6; i++) {
+        await prisma!.scheduledGeneration.update({
+          where: { id: entryId },
+          data: { generateAt: new Date(Date.now() - 1000), nextRetryAt: null },
+        })
+        expect((await admin.post('/api/test/generation-tick', {})).status()).toBe(200)
+        row = await prisma!.scheduledGeneration.findUnique({ where: { id: entryId } })
+        if (row && (row.status !== 'PENDING' || row.retryCount > 0)) break
+      }
+      expect(row!.status, String(row!.errorReason)).toBe('COMPLETED')
+      expect(row!.heldReason).toBeNull()
+
+      const brief = await prisma!.brief.findUnique({ where: { id: row!.briefId! } })
+      expect(brief!.postStyle).toBe(postStyle)
+      expect(brief!.imageStyle).toBe('classic')
+      expect(brief!.aspectRatio).toBe('STORY')
+      const draft = await prisma!.draft.findUnique({ where: { id: row!.draftId! }, select: { composition: true } })
+      expect(draft!.composition).toEqual(stamp({ requestedArchetype: 'classic', appliedArchetype: 'classic' }))
+    })
+  }
 })
 
 // ── TC-LOOK-10: the wizard (the seeded Bistec team) ──────────────────────────
@@ -452,4 +493,40 @@ test.describe('§AF — the wizard picker', () => {
     expect(row.payload.imageStyle).toBe('spotlight')
     expect(row.payload.aspectRatio).toBe('STORY')
   })
+
+  // T7 (FR-16, AC-20): the post styles whose default moved after OP-028.
+  for (const [id, postStyle] of [
+    ['TC-LOOK-13', 'event'],
+    ['TC-LOOK-14', 'hiring'],
+  ] as const) {
+    test(`${id}: the ${postStyle} post style pre-fills Full-bleed scene at 1:1 and at 9:16, with the hint`, async ({ page }) => {
+      await pageLogin(page)
+      await page.goto('/brief')
+      await expect(page.getByRole('heading', { name: 'Select Campaign' })).toBeVisible({ timeout: 20_000 })
+      await page.getByRole('button', { name: /continue/i }).click()
+      await expect(page.getByRole('heading', { name: 'Size & Design' })).toBeVisible()
+      const kit = page.getByRole('combobox', { name: 'Brand Kit' })
+      await expect(kit.locator(`option[value="${kitId}"]`)).toBeAttached()
+      await kit.selectOption(kitId)
+      await page.getByRole('button', { name: /Path B — Freeform/ }).click()
+
+      const option = (key: string) => page.getByTestId(`image-style-${key}`)
+      await page.getByRole('button', { name: /1:1 Square/ }).click()
+      await expect(page.getByTestId('image-style-from-style')).toHaveCount(0)
+      await page.getByTestId(`post-style-${postStyle}`).click()
+      await expect(option('full-bleed-scene')).toHaveAttribute('aria-pressed', 'true')
+      await expect(page.getByTestId('image-style-from-style')).toBeVisible()
+
+      // An untouched pre-fill survives the size change.
+      await page.getByRole('button', { name: /9:16 Story/ }).click()
+      await expect(option('full-bleed-scene')).toHaveAttribute('aria-pressed', 'true')
+      await expect(page.getByTestId('image-style-from-style')).toBeVisible()
+
+      // Picking the style afresh at 9:16 gives the same look.
+      await page.getByTestId('post-style-general').click()
+      await expect(option('classic')).toHaveAttribute('aria-pressed', 'true')
+      await page.getByTestId(`post-style-${postStyle}`).click()
+      await expect(option('full-bleed-scene')).toHaveAttribute('aria-pressed', 'true')
+    })
+  }
 })

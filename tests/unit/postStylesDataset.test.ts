@@ -30,7 +30,13 @@ const COMMITTED_HASHES: Record<string, string> = {
   'announcement@1': 'ab3db8fcc1162608534fb65ecb9f876259618246c3deb9e51883157dc9e6a621',
   'tip@1': '7d693c53be37711b1eab32b3105dd6cd1b28807be311afcf7a9c6bcc5800f3b2',
   'milestone@1': '4d0285194b42a29fd8589648efaf60e922f8200f92ff70f958dc238e575e8202',
+  // 028 T7: only the looks that passed OP-028 (full-bleed-scene) moved a default.
+  'event@2': 'b6f870ec5f5717d233d93086a66b3b4bdd674d9b04d3ffcd0ac0b80311e437b1',
+  'hiring@2': '7bdc7bc6a7fb936043ba439a1a2233d9b65cc6055169e534a9dcfabfdef76f0a',
 }
+
+// 028 T7: the styles whose current version is 2, and the look each now defaults to.
+const MOVED: Record<string, string> = { event: 'full-bleed-scene', hiring: 'full-bleed-scene' }
 
 // The committed key list: keys are permanent, so a deletion fails the subset test.
 const COMMITTED_KEYS = [
@@ -78,12 +84,12 @@ describe('AC-02: the dataset', () => {
     for (const k of POST_STYLE_KEYS) expect(styles[k].key).toBe(k)
   })
 
-  it('every style is active at version 1 with a label, a summary and its current version', () => {
+  it('every style is active with a label, a summary and its current version (2 for the moved styles)', () => {
     for (const s of all) {
       expect(s.label.length, s.key).toBeGreaterThan(0)
       expect(s.summary.length, s.key).toBeGreaterThan(0)
       expect(s.status, s.key).toBe('active')
-      expect(s.current, s.key).toBe(1)
+      expect(s.current, s.key).toBe(s.key in MOVED ? 2 : 1)
       expect(s.versions[s.current], s.key).toBeDefined()
     }
   })
@@ -102,6 +108,14 @@ describe('AC-02: the dataset', () => {
     for (const s of all) {
       const v = s.versions[1]
       expect([v.goal, v.defaultTone, v.defaultImageStyle], s.key).toEqual(table[s.key])
+      if (s.key in MOVED) {
+        const v2 = s.versions[2]
+        expect([v2.goal, v2.defaultTone, v2.defaultImageStyle], s.key).toEqual([
+          table[s.key][0],
+          table[s.key][1],
+          MOVED[s.key],
+        ])
+      }
       expect(TONE_KEYS).toContain(v.defaultTone)
     }
   })
@@ -131,19 +145,28 @@ describe('AC-02: the dataset', () => {
     expect(defaultImageStyleProblems(bad('gone-look'), retired)).toHaveLength(1)
   })
 
-  it('every rule has a unique id of the form <key>.<slug>, a scope and non-empty text', () => {
+  it('every rule has an id of the form <key>.<slug>, unique within a version, stable across versions, a scope and non-empty text', () => {
     const ids = new Set<string>()
-    for (const s of all)
-      for (const v of Object.values(s.versions))
+    for (const s of all) {
+      const first = new Map<string, { scope: string; text: string; check?: string }>()
+      for (const v of Object.values(s.versions)) {
+        const inVersion = new Set<string>()
         for (const r of v.checklist) {
           expect(r.id, r.id).toMatch(new RegExp(`^${s.key}\\.[a-z0-9-]+$`))
           expect(r.id).toMatch(/^[a-z0-9.-]+$/)
-          expect(ids.has(r.id), `duplicate ${r.id}`).toBe(false)
+          expect(inVersion.has(r.id), `duplicate ${r.id} in one version`).toBe(false)
+          inVersion.add(r.id)
           ids.add(r.id)
+          // an id seen in two versions of one style keeps its scope, text and check
+          const seen = first.get(r.id)
+          if (seen) expect(seen, r.id).toEqual({ scope: r.scope, text: r.text, check: r.check })
+          else first.set(r.id, { scope: r.scope, text: r.text, check: r.check })
           expect(['caption', 'image']).toContain(r.scope)
           expect(r.text.trim().length, r.id).toBeGreaterThan(0)
           if (r.check !== undefined) expect(r.check).toBe('facts-check')
         }
+      }
+    }
     expect(ids.size).toBe(3 + 4 + 3 + 3 + 4 + 3 + 3 + 3)
   })
 
@@ -199,9 +222,9 @@ describe('FR-02: immutability and the hash guard', () => {
     copy.tip.current = 2
     expect(hashProblems(copy, COMMITTED_HASHES).join('\n')).toMatch(/tip@2: no committed hash/)
     delete copy.tip.versions[2]
-    delete copy.event.versions[1]
+    delete copy.event.versions[2]
     expect(hashProblems(copy, COMMITTED_HASHES).join('\n')).toMatch(
-      /event@1: committed but missing/,
+      /event@2: committed but missing/,
     )
   })
 
@@ -218,7 +241,7 @@ describe('FR-02: immutability and the hash guard', () => {
 
   it('POST_STYLES_REVISION equals the sum of current, and adding a version raises it', () => {
     expect(POST_STYLES_REVISION).toBe(all.reduce((n, s) => n + s.current, 0))
-    expect(POST_STYLES_REVISION).toBe(8)
+    expect(POST_STYLES_REVISION).toBe(10)
     const copy = clone()
     copy.tip.versions[2] = copy.tip.versions[1]
     copy.tip.current = 2
