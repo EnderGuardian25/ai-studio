@@ -14,14 +14,23 @@ import { generateBackgroundForBrief, type BackgroundResult } from '@/lib/agent/b
 import {
   compositionStampSchema,
   evaluateLayout,
+  getArchetype,
   planComposition,
   settleComposition,
+  type CompositeOutcome,
   type CompositionStamp,
   type HeroPlan,
+  type Rect,
   type Region,
+  type SizeContract,
 } from '@/lib/designData'
 import { observeLayout, type LayoutObservation } from '@/lib/renderer/layoutFacts'
 import { MOCK_PUPPETEER, mockLayoutBoxes } from '@/lib/testHooks'
+import { compositeRenderForSource } from '@/lib/composite/assets'
+import { insertComposite } from '@/lib/composite/insert'
+import { CompositeRenderError, type CompositeRender } from '@/lib/composite/render'
+import { parseCompositeSource } from '@/lib/brief/compositeSource'
+import { deleteObject, BUCKET_EXPORTS } from '@/lib/storage/minio'
 
 // Re-export for existing importers; canonical home is agent/briefInput.ts.
 export { buildBriefInput } from '@/lib/agent/briefInput'
@@ -55,6 +64,7 @@ async function observeKeptLayout(
   backgroundImageUrl: string | null,
   canvas: { width: number; height: number },
   seamText: string,
+  composites: CompositeRender | null,
 ): Promise<LayoutObservation | null> {
   const textRegions: Region[] = plan.sizeContract.regions.filter((r) => r.purpose === 'text')
   if (MOCK_PUPPETEER) {
@@ -68,7 +78,14 @@ async function observeKeptLayout(
     ...canvas,
     logoUrls,
     excludeUrls: backgroundImageUrl ? [backgroundImageUrl] : [],
+    composites,
   })
+}
+
+// The contract's size with its composite region moved to the screen the check
+// found (025 A1), so the design prompt names the rect the screenshot will fill.
+function withDetectedScreen(size: SizeContract, rect: Rect): SizeContract {
+  return { ...size, regions: size.regions.map((r) => (r.purpose === 'composite' ? { ...r, rect } : r)) }
 }
 
 // Runs the Path B (freeform) design pipeline for a given brief + its on-image
@@ -135,64 +152,155 @@ export async function runPathBDesign(
   // writes the image prompt from the archetype's contract and gets its pixels
   // checked; every exit that is not an explicit pass settles to classic over the
   // same image (settleComposition), so there is never a second image call.
-  const plan = planComposition({ imageStyle: brief.imageStyle, aspectRatio: brief.aspectRatio })
+  // 025: the brief's product screenshot, when it has a valid one.
+  const source = parseCompositeSource(brief.compositeSource)
+  const plan = planComposition({
+    imageStyle: brief.imageStyle,
+    aspectRatio: brief.aspectRatio,
+    hasCompositeSource: source !== null,
+  })
   const heroPlan = plan.kind === 'hero' ? plan : undefined
   const background = await generateBackgroundForBrief(brief, kit, headline, campaignBriefing, actor, heroPlan)
-  const backgroundImageUrl = background.url
-  const settled = settleComposition(plan, background)
+  const needsComposite = !!heroPlan && !!getArchetype(heroPlan.requestedArchetype)?.requires
+  // PROVISIONAL, never stored: it only decides whether the look was kept at the
+  // pixel check. The stored stamp is settled below, after the render that
+  // placed the screenshot passed (NFR-08).
+  const placed: CompositeOutcome | undefined =
+    needsComposite && source ? { ok: true, source: { kind: 'brief-upload', key: source.key } } : undefined
+  const provisional = settleComposition(plan, background, placed)
   // The contract reaches the design prompt only when the archetype was KEPT.
-  const kept = heroPlan && settled.appliedArchetype !== 'classic' ? heroPlan : undefined
+  let kept = heroPlan && provisional.appliedArchetype !== 'classic' ? heroPlan : undefined
 
-  const systemPrompt = buildPathBSystemPrompt({
-    kit,
-    mode,
-    width,
-    height,
-    artifactUrls,
-    referenceTemplateHtml,
-    backgroundImageUrl,
-    ...(kept ? { composition: { label: kept.label, contract: kept.contract, size: kept.sizeContract } } : {}),
-  })
-  const userMessage = buildPathBUserMessage({
-    campaignBriefing,
-    topic: brief.topic,
-    description: brief.description,
-    goal: brief.goal,
-    tone: brief.tone,
-    channels: brief.channels,
-    headline,
-    mode,
-    width,
-    height,
-    briefImages,
-    heroPrecedence: !!kept,
-    imageRules: imageRulesFor(brief),
-  })
+  // 025 FR-13: the screenshot's bytes, read once for this run, at the screen
+  // the check detected (A1). A failure falls back to classic without the hero
+  // image (no second image call).
+  let composites: CompositeRender | null = null
+  let detected: Rect | null = null
+  let fallbackReason: 'composite-not-rendered' | 'composite-source-missing' | null = null
+  if (kept && needsComposite) {
+    detected = provisional.composites?.[0]?.rect ?? null
+    try {
+      if (!source || !detected) throw new CompositeRenderError('composite-source-missing', 'no screenshot or screen rect')
+      composites = await compositeRenderForSource(source.key, detected, brief.teamId, { width, height })
+    } catch (err) {
+      fallbackReason = err instanceof CompositeRenderError ? err.reason : 'composite-source-missing'
+      console.warn(
+        `[pathB] composite look not placed (${fallbackReason}): ${err instanceof Error ? err.message : String(err)}`,
+      )
+      kept = undefined
+      detected = null
+    }
+  }
+  // The image the design may use: none once the composite look has fallen back.
+  let designImageUrl: string | null = fallbackReason ? null : background.url
+
+  const designOnce = async (
+    hero: HeroPlan | undefined,
+    imageUrl: string | null,
+    render: CompositeRender | null,
+    screen: Rect | null,
+  ) => {
+    const systemPrompt = buildPathBSystemPrompt({
+      kit,
+      mode,
+      width,
+      height,
+      artifactUrls,
+      referenceTemplateHtml,
+      backgroundImageUrl: imageUrl,
+      ...(hero
+        ? {
+            composition: {
+              label: hero.label,
+              contract: hero.contract,
+              // The prompt names the screen the check found, not the contract region.
+              size: screen ? withDetectedScreen(hero.sizeContract, screen) : hero.sizeContract,
+            },
+          }
+        : {}),
+    })
+    const userMessage = buildPathBUserMessage({
+      campaignBriefing,
+      topic: brief.topic,
+      description: brief.description,
+      goal: brief.goal,
+      tone: brief.tone,
+      channels: brief.channels,
+      headline,
+      mode,
+      width,
+      height,
+      briefImages,
+      heroPrecedence: !!hero,
+      imageRules: imageRulesFor(brief),
+    })
+    // 025 FR-15: code inserts the screenshot at the detected screen after the
+    // model's HTML is extracted and restored, before every render.
+    const insert =
+      render && screen
+        ? { postProcess: (h: string) => insertComposite(h, screen, { width, height }), composites: render }
+        : {}
+    return isCliMode()
+      ? runDesignAgentCli({ systemPrompt, userMessage, briefId: brief.id, width, height, model, ...insert })
+      : runDesignAgent({
+          systemPrompt,
+          userMessage,
+          briefId: brief.id,
+          model,
+          maxToolCalls: 15,
+          width,
+          height,
+          actor,
+          ...insert,
+        })
+  }
 
   await opts?.onBeforeDesign?.()
 
-  const result = isCliMode()
-    ? await runDesignAgentCli({ systemPrompt, userMessage, briefId: brief.id, width, height, model })
-    : await runDesignAgent({
-        systemPrompt,
-        userMessage,
-        briefId: brief.id,
-        model,
-        maxToolCalls: 15,
-        width,
-        height,
-        actor,
-      })
+  let result: DesignAgentResult
+  try {
+    result = await designOnce(kept, designImageUrl, composites, detected)
+  } catch (err) {
+    // 025 FR-15: a screenshot that could not be placed falls back to classic,
+    // once, without the hero image. Any other failure is the caller's.
+    if (!(err instanceof CompositeRenderError) || !composites) throw err
+    for (const abandoned of err.uploadedKeys ?? []) {
+      await deleteObject(BUCKET_EXPORTS, abandoned).catch((e) =>
+        console.warn(
+          `[pathB] could not delete the abandoned export ${abandoned}: ${e instanceof Error ? e.message : String(e)}`,
+        ),
+      )
+    }
+    console.warn(`[pathB] composite render failed (${err.reason}); re-running the design as classic`)
+    fallbackReason = err.reason
+    kept = undefined
+    composites = null
+    detected = null
+    designImageUrl = null
+    result = await designOnce(undefined, null, null, null)
+  }
 
+  // The stored stamp: a fallback is classic with the reason; a kept composite
+  // look is stamped only now, after its render passed (NFR-08).
+  let composition: CompositionStamp = fallbackReason
+    ? settleComposition(plan, background, { ok: false, reason: fallbackReason })
+    : provisional
   // The layout observation, only for an applied non-classic archetype. A
   // violation is recorded and shown, never a fallback (no second design call).
-  let composition = settled
-  if (kept) {
-    const observation = await observeKeptLayout(result.htmlContent, kept, kit, backgroundImageUrl, { width, height }, brief.topic)
+  if (kept && !fallbackReason) {
+    const observation = await observeKeptLayout(
+      result.htmlContent,
+      kept,
+      kit,
+      designImageUrl,
+      { width, height },
+      brief.topic,
+      composites,
+    )
     if (observation && !observation.ok) {
-      composition = compositionStampSchema.parse({ ...settled, observations: ['layout-violation'] })
+      composition = compositionStampSchema.parse({ ...composition, observations: ['layout-violation'] })
     }
   }
 
-  return { ...result, backgroundImageUrl, background, composition }
+  return { ...result, backgroundImageUrl: designImageUrl, background, composition }
 }

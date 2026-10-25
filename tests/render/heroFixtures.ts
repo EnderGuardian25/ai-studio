@@ -35,7 +35,7 @@ export async function raster(shape: LookShape, bodyCss: string, inner = ""): Pro
   const html =
     `<!doctype html><html><head><style>html,body{margin:0;width:${w / 2}px;height:${h / 2}px;overflow:hidden}` +
     `body{position:relative;${bodyCss}}.abs{position:absolute;left:0;width:100%}</style></head><body>${inner}</body></html>`
-  return toDataUrl(await renderHtmlToPng(html, w / 2, h / 2))
+  return toDataUrl(await renderHtmlToPng(html, w / 2, h / 2, null))
 }
 
 export const CALM = "background:linear-gradient(135deg,#0b1220,#16243a)"

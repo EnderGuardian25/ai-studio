@@ -6,7 +6,7 @@ import { renderHtmlToPng } from "@/lib/renderer/puppeteer"
 import { uploadObject, exportKey, BUCKET_EXPORTS } from "@/lib/storage/minio"
 import type { ResolvedModel } from "@/lib/models/resolve"
 
-type CliAgentOptions = Pick<DesignAgentOptions, "systemPrompt" | "userMessage" | "briefId" | "inlineAssets" | "width" | "height"> & {
+type CliAgentOptions = Pick<DesignAgentOptions, "systemPrompt" | "userMessage" | "briefId" | "inlineAssets" | "width" | "height" | "postProcess" | "composites"> & {
   // 008 FR-07: the DESIGN_TEMPLATE / DESIGN_FREEFORM model the caller resolved.
   // The CLI runs exactly its arg, and the spawn's timeout is its surface timeout.
   model: ResolvedModel
@@ -29,6 +29,8 @@ export async function runDesignAgentCli(options: CliAgentOptions): Promise<Desig
     width = 1080,
     height = 1080,
     model,
+    postProcess,
+    composites = null,
   } = options
 
   const prompt = `${systemPrompt}\n\n${userMessage}`
@@ -65,8 +67,13 @@ export async function runDesignAgentCli(options: CliAgentOptions): Promise<Desig
     html = restoreInlineAssets(html, inlineAssets)
   }
 
-  // Render HTML → PNG → MinIO (same pipeline as the export route).
-  const png = await renderHtmlToPng(html, width, height)
+  // 025 FR-15: code inserts the screenshot after extract and restore, before
+  // the render; the stored HTML is this inserted HTML with the token.
+  if (postProcess) html = postProcess(html)
+
+  // Render HTML → PNG → MinIO (same pipeline as the export route). A failed
+  // composite check throws before anything is uploaded.
+  const png = await renderHtmlToPng(html, width, height, composites)
   const key = exportKey("cli", briefId)
   await uploadObject(png, BUCKET_EXPORTS, key, "image/png")
 

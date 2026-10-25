@@ -572,6 +572,18 @@ export function mockLayoutBoxes(seamText: string, textRegions: ReadonlyArray<Reg
   return boxes
 }
 
+// ── 025 FR-14: the composite render failure seam ─────────────────────────────
+export const COMPOSITE_MOCK_SENTINEL = '__MOCK_COMPOSITE_FAIL__'
+
+/**
+ * True when MOCK_AI is on and the design HTML carries the sentinel (the mock
+ * design HTML copies it from the brief topic into a comment). The renderer
+ * then fails the composite check as composite-not-rendered.
+ */
+export function shouldMockCompositeFail(html: string): boolean {
+  return MOCK_AI && html.includes(COMPOSITE_MOCK_SENTINEL)
+}
+
 /** Deterministic 1×1 transparent PNG returned by the mock Puppeteer renderer. */
 export const MOCK_PNG_BUFFER = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
@@ -586,8 +598,10 @@ export const MOCK_PNG_BUFFER = Buffer.from(
  */
 export function buildMockHtml(promptContext: string, width = 1080, height = 1080): string {
   const hex = promptContext.match(/#[0-9a-fA-F]{6}/)?.[0] ?? '#0f172a'
+  // 025: the composite failure sentinel rides along as a comment.
+  const sentinel = promptContext.includes(COMPOSITE_MOCK_SENTINEL) ? `<!-- ${COMPOSITE_MOCK_SENTINEL} -->` : ''
   return `<!DOCTYPE html>
-<html>
+${sentinel}<html>
 <head><style>
 body { margin: 0; width: ${width}px; height: ${height}px; background: ${hex}; display: flex; align-items: center; justify-content: center; }
 .card { color: #ffffff; font-family: Inter, sans-serif; font-size: 48px; text-align: center; padding: 40px; }

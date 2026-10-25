@@ -1,4 +1,5 @@
 import type { AnalyticsSource } from '@prisma/client'
+import type { CompositeRender } from '@/lib/composite/render'
 
 // The identity ON WHOSE BEHALF a generation/refine call runs — NOT necessarily
 // the brief's owner. Teammate B refining/regenerating teammate A's shared
@@ -51,6 +52,13 @@ export interface DesignAgentOptions {
   // generateImage tool (see tools.ts's toolGenerateImage). Optional only for
   // callers that predate this threading; pathA.ts/pathB.ts always supply it.
   actor?: GenerationActor
+  // 025 FR-15: for a kept composite look, code puts the screenshot into the
+  // model's HTML after extract and restore, before every render.
+  // `postProcess` is that insertion (a pure HTML to HTML function) and
+  // `composites` the render argument that resolves the token and checks the
+  // element. Absent: today's behaviour, byte for byte.
+  postProcess?: (html: string) => string
+  composites?: CompositeRender | null
 }
 
 export interface DesignAgentResult {

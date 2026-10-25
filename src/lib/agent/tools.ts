@@ -5,6 +5,7 @@ import { resolveImageProvider } from "@/providers/registry"
 import { imageSizeFor } from "@/providers/imageCapabilities"
 import type { AspectRatio } from "@prisma/client"
 import type { BrandKitContext, GenerationActor } from "./types"
+import type { CompositeRender } from "@/lib/composite/render"
 
 export async function toolGenerateImage(
   prompt: string,
@@ -49,9 +50,11 @@ export async function toolGenerateImage(
 export async function toolRenderHtml(
   html: string,
   width: number,
-  height: number
+  height: number,
+  // 025: the composite argument (null for every render with no screenshot).
+  composites: CompositeRender | null
 ): Promise<{ url: string; key: string }> {
-  const buffer = await renderHtmlToPng(html, width, height)
+  const buffer = await renderHtmlToPng(html, width, height, composites)
   const key = exportKey("design", "agent")
   await uploadObject(buffer, BUCKET_EXPORTS, key, "image/png")
   // The export PNG stays private. Return a signed URL for the agent's reference

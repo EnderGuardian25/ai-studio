@@ -158,7 +158,8 @@ describe("A3: point sampling, smoothing off", () => {
         },
         url,
         N
-      )
+      ),
+      null
     )
     expect(grey).toBeGreaterThan(100)
   })

@@ -161,7 +161,7 @@ This change has **12 tasks in 6 waves**:
 
 ### Wave 5: Group B, the composite (one at a time)
 
-- [ ] `T8` — The composite engine, the renderer check and generation
+- [x] `T8` — The composite engine, the renderer check and generation
   - Files: `src/lib/composite/{insert,assets}.ts` (new), `src/lib/renderer/puppeteer.ts`, `src/lib/agent/{pathB,designAgentCli,designAgent,tools}.ts`, `src/lib/testHooks.ts` (`__MOCK_COMPOSITE_FAIL__`), **every** `renderHtmlToPng` / `evaluateInRenderedPage` caller (each passes `null` for now except generation; T9 wires the stamp), `tests/unit/{compositeInsert,compositeAssets}.test.ts`, `tests/render/composite.test.ts` (new), `tests/e2e/product-screenshots.test.ts` (TC-SHOT-07 to TC-SHOT-09)
   - Estimate: large
   - Kind: impl

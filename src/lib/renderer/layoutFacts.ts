@@ -21,6 +21,7 @@
 import type { Page } from "puppeteer-core"
 import { evaluateLayout, type Rect, type Region } from "@/lib/designData"
 import { evaluateInRenderedPage } from "@/lib/renderer/puppeteer"
+import type { CompositeRender } from "@/lib/composite/render"
 import { MOCK_PUPPETEER } from "@/lib/testHooks"
 
 // A box covering more than this share of the canvas is a full-bleed element,
@@ -43,6 +44,9 @@ export interface MeasureOptions {
   logoUrls: readonly string[]
   // URLs never measured even if they appear as an <img> (the background image).
   excludeUrls?: readonly string[]
+  // 025: the composite argument for a draft whose HTML carries the screenshot
+  // token (generation passes it; the stamp-driven paths are wired in T9).
+  composites?: CompositeRender | null
 }
 
 interface PxBox {
@@ -98,7 +102,8 @@ export async function measureLayoutBoxes(html: string, opts: MeasureOptions): Pr
       },
       [...opts.logoUrls],
       [...(opts.excludeUrls ?? [])]
-    )
+    ),
+    opts.composites ?? null
   )
   const boxes: Rect[] = []
   for (const b of pxBoxes as PxBox[]) {

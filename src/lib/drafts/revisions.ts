@@ -477,7 +477,7 @@ export async function commitDraftRevision(
   if (!finalExportKey) {
     const { renderHtmlToPng } = await import('@/lib/renderer/puppeteer')
     const { uploadObject, exportKey, BUCKET_EXPORTS } = await import('@/lib/storage/minio')
-    const buffer = await renderHtmlToPng(html, width, height)
+    const buffer = await renderHtmlToPng(html, width, height, null) // 025: T9 passes the stamp's composite
     finalExportKey = exportKey('refine', draftId)
     await uploadObject(buffer, BUCKET_EXPORTS, finalExportKey, 'image/png')
     uploadedKey = finalExportKey
@@ -835,7 +835,7 @@ export async function recordRejectedRender(
     try {
       const { renderHtmlToPng } = await import('@/lib/renderer/puppeteer')
       const { uploadObject, exportKey: mintExportKey, BUCKET_EXPORTS } = await import('@/lib/storage/minio')
-      const buffer = await renderHtmlToPng(html, width, height)
+      const buffer = await renderHtmlToPng(html, width, height, null) // 025: T9 passes the stamp's composite
       const key = mintExportKey('refine', draftId)
       await uploadObject(buffer, BUCKET_EXPORTS, key, 'image/png')
       exportKey = key

@@ -12,6 +12,7 @@ import type { ResolvedModel } from "@/lib/models/resolve"
 import { createMessage, textOf as replyText } from "@/lib/models/anthropicCall"
 import { modelCallFor, recordModelCall } from "@/lib/models/modelCalls"
 import { pipelineMode } from "./config"
+import { CompositeRenderError, type CompositeRender } from "@/lib/composite/render"
 
 const TOOL_DEFINITIONS: Tool[] = [
   {
@@ -72,7 +73,8 @@ async function executeTool(
   input: ToolInput,
   briefId: string,
   actor?: GenerationActor,
-  aspectRatio?: AspectRatio
+  aspectRatio?: AspectRatio,
+  composites: CompositeRender | null = null
 ): Promise<unknown> {
   switch (name) {
     case "generateImage":
@@ -81,7 +83,8 @@ async function executeTool(
       return toolRenderHtml(
         input.html as string,
         input.width as number,
-        input.height as number
+        input.height as number,
+        composites
       )
     case "getBrandKitContext":
       return toolGetBrandKitContext((input.briefId as string | undefined) ?? briefId)
@@ -108,6 +111,8 @@ export async function runDesignAgent(options: RunDesignAgentOptions): Promise<De
     width = 1080,
     height = 1080,
     actor,
+    postProcess,
+    composites = null,
   } = options
   // The whole tool-use loop's budget — maxToolCalls alone doesn't bound slow
   // image generations + renders. Every turn's request is also bounded by it
@@ -127,8 +132,9 @@ export async function runDesignAgent(options: RunDesignAgentOptions): Promise<De
     if (userMessage.includes("conflict_test")) {
       return { htmlContent: buildMockConflict(), exportUrl: "", toolCallCount: 0 }
     }
-    const html = buildMockHtml(`${systemPrompt}\n${userMessage}`, width, height)
-    const { key } = await toolRenderHtml(html, width, height)
+    const mockHtml = buildMockHtml(`${systemPrompt}\n${userMessage}`, width, height)
+    const html = postProcess ? postProcess(mockHtml) : mockHtml
+    const { key } = await toolRenderHtml(html, width, height, composites)
     return { htmlContent: html, exportUrl: key, toolCallCount: 1 }
   }
 
@@ -146,6 +152,8 @@ export async function runDesignAgent(options: RunDesignAgentOptions): Promise<De
   let iteration = 0
   let lastHtml = ""
   let lastExportUrl = ""
+  // Every export this run uploaded (025: the composite fallback deletes them all).
+  const uploadedKeys: string[] = []
 
   while (true) {
     if (Date.now() - startedAt > deadlineMs) {
@@ -187,6 +195,14 @@ export async function runDesignAgent(options: RunDesignAgentOptions): Promise<De
       const text = replyText(response)
       if (text && lastHtml === "") {
         lastHtml = restoreInlineAssets(text, inlineAssets)
+        if (postProcess) lastHtml = postProcess(lastHtml)
+      }
+      // 025 NFR-08: HTML with the screenshot inserted that no render ever
+      // checked must not come back; the caller takes the classic fallback.
+      if (composites && !lastExportUrl) {
+        const err = new CompositeRenderError("composite-not-rendered", "the design was never rendered with the screenshot")
+        err.uploadedKeys = [...uploadedKeys]
+        throw err
       }
       break
     }
@@ -217,13 +233,27 @@ export async function runDesignAgent(options: RunDesignAgentOptions): Promise<De
           }
           toolInput = { ...toolInput, html: restoreInlineAssets(html, inlineAssets) }
         }
+        // 025 FR-15: code inserts the screenshot into the model's HTML before
+        // every render. Like the restored assets, the result stays local, so
+        // the message history keeps the model's own (token-free) version.
+        if (block.name === "renderHtml" && postProcess) {
+          toolInput = { ...toolInput, html: postProcess((toolInput as { html: string }).html) }
+        }
 
-        const result = await executeTool(block.name, toolInput, briefId, actor, nearestAspectRatio(width, height))
+        const result = await executeTool(
+          block.name,
+          toolInput,
+          briefId,
+          actor,
+          nearestAspectRatio(width, height),
+          composites
+        )
 
         if (block.name === "renderHtml") {
           lastHtml = (toolInput as { html: string }).html
           // Persist the object KEY (signed per read), not the transient URL.
           lastExportUrl = (result as { key: string }).key
+          uploadedKeys.push(lastExportUrl)
         }
 
         toolResults.push({
@@ -248,7 +278,12 @@ export async function runDesignAgent(options: RunDesignAgentOptions): Promise<De
     // (keeps the message history valid), then surface the error — the agent
     // halts on any tool failure by design.
     messages.push({ role: "user", content: toolResults })
-    if (toolError) throw toolError
+    if (toolError) {
+      // A composite failure after earlier passing renders: tell the caller
+      // which exports they uploaded, so the fallback can delete them all.
+      if (toolError instanceof CompositeRenderError) toolError.uploadedKeys = [...uploadedKeys]
+      throw toolError
+    }
   }
 
   return { htmlContent: lastHtml, exportUrl: lastExportUrl, toolCallCount }

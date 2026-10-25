@@ -1,9 +1,13 @@
 import puppeteer, { type Browser, type Page } from "puppeteer-core"
 import { existsSync } from "fs"
 import pLimit from "p-limit"
-import { MOCK_PUPPETEER, MOCK_PNG_BUFFER, syntheticScreenGrid } from "@/lib/testHooks"
+import { MOCK_PUPPETEER, MOCK_PNG_BUFFER, syntheticScreenGrid, shouldMockCompositeFail } from "@/lib/testHooks"
 import { env } from "@/lib/env"
+import { compositeHtmlProblems } from "@/lib/composite/insert"
+import { CompositeRenderError, type CompositeRender } from "@/lib/composite/render"
 import {
+  evaluateCompositeFacts,
+  type CompositeFacts,
   GRID_STEP_PX,
   SAMPLE_GRID_MAX,
   coverFit,
@@ -167,7 +171,8 @@ async function withRenderedPage<T>(
   html: string,
   width: number,
   height: number,
-  fn: (page: Page) => Promise<T>
+  fn: (page: Page) => Promise<T>,
+  composites: CompositeRender | null
 ): Promise<T> {
   const browser = await getBrowser()
   const page = await browser.newPage()
@@ -184,7 +189,11 @@ async function withRenderedPage<T>(
         req.abort().catch(() => {})
       }
     })
-    await page.setContent(html, { waitUntil: "networkidle0", timeout: SET_CONTENT_TIMEOUT_MS })
+    // 025 FR-13: the stored string keeps the token; only this render's copy
+    // carries the screenshot's bytes.
+    const resolved = composites ? html.split(composites.token).join(composites.dataUri) : html
+    await page.setContent(resolved, { waitUntil: "networkidle0", timeout: SET_CONTENT_TIMEOUT_MS })
+    if (composites) await verifyComposite(page, composites)
     return await fn(page)
   } finally {
     // Close only the page; the browser is shared and stays alive.
@@ -192,15 +201,67 @@ async function withRenderedPage<T>(
   }
 }
 
+// The pure half of the composite check (025 FR-14): exactly one canonical
+// element at the rect and exactly one token. It runs before any page is
+// opened, in the mock renderer too.
+function assertCompositeHtml(html: string, composites: CompositeRender): void {
+  const problems = compositeHtmlProblems(html, composites.rectPx)
+  if (problems.length > 0) throw new CompositeRenderError("composite-not-rendered", problems.join("; "))
+}
+
+// The in-page half (025 FR-14, amended by A1): measured before the screenshot,
+// against the stamped rect. The verdict is the pure evaluateCompositeFacts.
+async function verifyComposite(page: Page, composites: CompositeRender): Promise<void> {
+  const facts: CompositeFacts = await page.evaluate(async (rect) => {
+    const el = document.querySelector('[data-composite="0"]')
+    if (!el) {
+      return { found: false, complete: false, naturalWidth: 0, box: { left: 0, top: 0, width: 0, height: 0 }, hits: [] }
+    }
+    const img = el.querySelector("img")
+    if (img) {
+      try {
+        await img.decode()
+      } catch {
+        // an undecodable image reads as not complete below
+      }
+    }
+    const b = el.getBoundingClientRect()
+    const points: Array<[number, number]> = [[0.5, 0.5], [0.1, 0.1], [0.9, 0.1], [0.1, 0.9], [0.9, 0.9]]
+    const hits = points.map(([fx, fy]) => {
+      const top = document.elementFromPoint(rect.left + rect.width * fx, rect.top + rect.height * fy)
+      return !!top && el.contains(top)
+    })
+    return {
+      found: true,
+      complete: !!img && img.complete,
+      naturalWidth: img ? img.naturalWidth : 0,
+      box: { left: b.left, top: b.top, width: b.width, height: b.height },
+      hits,
+    }
+  }, composites.rectPx)
+  const verdict = evaluateCompositeFacts(facts, composites.rectPx)
+  if (verdict.ok !== true) throw new CompositeRenderError("composite-not-rendered", verdict.detail)
+}
+
+// `composites` is required (025 FR-13): a caller with no composite passes null,
+// so a missed caller is a type error rather than a broken image.
 export async function renderHtmlToPng(
   html: string,
   width: number,
-  height: number
+  height: number,
+  composites: CompositeRender | null
 ): Promise<Buffer> {
-  // Test seam: skip Chromium entirely and return a fixed PNG.
-  if (MOCK_PUPPETEER) return MOCK_PNG_BUFFER
+  if (composites) assertCompositeHtml(html, composites)
+  // Test seam: skip Chromium entirely and return a fixed PNG. The in-page
+  // check is skipped; the sentinel makes the composite check fail on demand.
+  if (MOCK_PUPPETEER) {
+    if (composites && shouldMockCompositeFail(html)) {
+      throw new CompositeRenderError("composite-not-rendered", "mock composite failure")
+    }
+    return MOCK_PNG_BUFFER
+  }
   return limit(() =>
-    withRenderedPage(html, width, height, async (page) => Buffer.from(await page.screenshot({ type: "png" })))
+    withRenderedPage(html, width, height, async (page) => Buffer.from(await page.screenshot({ type: "png" })), composites)
   )
 }
 
@@ -211,9 +272,11 @@ export async function evaluateInRenderedPage<T>(
   html: string,
   width: number,
   height: number,
-  fn: (page: Page) => Promise<T>
+  fn: (page: Page) => Promise<T>,
+  composites: CompositeRender | null
 ): Promise<T> {
-  return limit(() => withRenderedPage(html, width, height, fn))
+  if (composites) assertCompositeHtml(html, composites)
+  return limit(() => withRenderedPage(html, width, height, fn, composites))
 }
 
 // Sample the dominant colors of an image (F5 brand-kit extraction). The image

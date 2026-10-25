@@ -1,5 +1,6 @@
 import type { Brief } from '@prisma/client'
 import type { ResolvedBrandKit } from '@/lib/brandkit/resolve'
+import { parseCompositeSource } from '@/lib/brief/compositeSource'
 import type { BriefInput } from '@/providers/interfaces/CopyProvider'
 import {
   checklistPromptText,
@@ -42,7 +43,7 @@ export interface BriefPostStyle {
 // It throws here, before any model call: the generation fails, or the action
 // records the error, with this message.
 export function resolveBriefStyle(
-  brief: Pick<Brief, 'designMode' | 'aspectRatio'> & { postStyle?: string | null },
+  brief: Pick<Brief, 'designMode' | 'aspectRatio'> & { postStyle?: string | null; compositeSource?: unknown },
 ): BriefPostStyle | null {
   const key = brief.postStyle?.trim()
   if (!key) return null
@@ -51,8 +52,8 @@ export function resolveBriefStyle(
     path: brief.designMode === 'TEMPLATE' ? 'A' : 'B',
     aspectRatio: brief.aspectRatio,
     surface: 'regenerate',
-    // 025: no screenshot is stored yet (T7), so a look that needs one is classic.
-    hasCompositeSource: false,
+    // 025: a look that needs a screenshot is available only when the brief has one.
+    hasCompositeSource: parseCompositeSource(brief.compositeSource) !== null,
   })
   if (!resolved.ok) throw new Error(`Post style "${brief.postStyle}" is not available`)
   return {
@@ -66,7 +67,7 @@ export function resolveBriefStyle(
 // design share, so first generation, scheduled generation and regenerate use
 // one path. undefined for a brief with no style.
 export function imageRulesFor(
-  brief: Pick<Brief, 'designMode' | 'aspectRatio'> & { postStyle?: string | null },
+  brief: Pick<Brief, 'designMode' | 'aspectRatio'> & { postStyle?: string | null; compositeSource?: unknown },
 ): string | undefined {
   return resolveBriefStyle(brief)?.imageRules
 }
@@ -74,7 +75,7 @@ export function imageRulesFor(
 // The stamp a run under this brief's style records; null for a brief with no
 // style.
 export function briefPostStyleStamp(
-  brief: Pick<Brief, 'designMode' | 'aspectRatio'> & { postStyle?: string | null },
+  brief: Pick<Brief, 'designMode' | 'aspectRatio'> & { postStyle?: string | null; compositeSource?: unknown },
 ): PostStyleStamp | null {
   return resolveBriefStyle(brief)?.stamp ?? null
 }

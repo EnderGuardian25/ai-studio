@@ -51,6 +51,7 @@
 import type { Page } from 'puppeteer-core'
 import { decodeHtmlEntities, type DomElementFact, type DomFacts } from '@/lib/agent/instructionClasses'
 import { evaluateInRenderedPage } from '@/lib/renderer/puppeteer'
+import type { CompositeRender } from '@/lib/composite/render'
 import { MOCK_PUPPETEER } from '@/lib/testHooks'
 
 export interface ElementStyleFacts {
@@ -76,6 +77,8 @@ export interface ExtractDomFactsOptions {
   // token → data URI, as returned by extractInlineAssets for the document the
   // model was shown. Omit when the HTML carries no tokens.
   inlineAssets?: Record<string, string>
+  // 025: the composite argument for HTML that carries the screenshot token.
+  composites?: CompositeRender | null
 }
 
 const TOKEN_SHAPE = /__INLINE_ASSET_\d+__/g
@@ -100,7 +103,14 @@ export function modelFacingSource(source: string, assets: Record<string, string>
 export async function extractDomFacts(html: string, opts: ExtractDomFactsOptions = {}): Promise<StyledDomFacts> {
   if (MOCK_PUPPETEER) return staticDomFacts(html)
   const { width = 1080, height = 1080, inlineAssets } = opts
-  const raw = await evaluateInRenderedPage(tagInlineAssets(html, inlineAssets), width, height, collectFacts)
+  const raw = await evaluateInRenderedPage(
+    tagInlineAssets(html, inlineAssets),
+    width,
+    height,
+    collectFacts,
+    // 025: the stamp-driven argument is wired in T9; no caller passes a composite yet.
+    opts.composites ?? null
+  )
   const name = (s: string) => modelFacingSource(s, inlineAssets)
   return {
     ...raw,

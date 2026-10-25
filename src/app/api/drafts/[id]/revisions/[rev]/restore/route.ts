@@ -66,7 +66,7 @@ export const POST = withTeamAuth<Params>(async (_req, { params }, user) => {
       select: { brief: { select: { aspectRatio: true } } },
     })
     const { width, height } = dimensionsFor(draft?.brief.aspectRatio)
-    const buffer = await renderHtmlToPng(revision.htmlSnapshot, width, height)
+    const buffer = await renderHtmlToPng(revision.htmlSnapshot, width, height, null) // 025: T9 passes the stamp's composite
     key = exportKey('restore', params.id)
     await uploadObject(buffer, BUCKET_EXPORTS, key, 'image/png')
   }

@@ -35,7 +35,7 @@ export const POST = withTeamAuth(async (req: NextRequest, _ctx, user) => {
   }
 
   const { width, height } = dimensionsFor(draft.brief.aspectRatio)
-  const buffer = await renderHtmlToPng(draft.htmlContent, width, height)
+  const buffer = await renderHtmlToPng(draft.htmlContent, width, height, null) // 025: T9 passes the stamp's composite
   const key = exportKey('export', draftId)
   await uploadObject(buffer, BUCKET_EXPORTS, key, 'image/png')
 

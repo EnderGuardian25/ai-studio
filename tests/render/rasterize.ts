@@ -52,7 +52,7 @@ export async function rasterize(html: string, width: number, height: number): Pr
   if (MOCK_PUPPETEER) {
     throw new Error("rasterize: MOCK_PUPPETEER is on — the render harness must run the real renderer")
   }
-  const png = await renderHtmlToPng(html, width, height)
+  const png = await renderHtmlToPng(html, width, height, null)
   if (png.equals(MOCK_PNG_BUFFER)) throw new Error("rasterize: renderHtmlToPng returned the mock PNG")
   const image = decodePng(png)
   return { ...image, scale: image.width / width }

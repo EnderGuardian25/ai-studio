@@ -1,12 +1,12 @@
 import { test, expect, type APIRequestContext } from '@playwright/test'
-import { loginAs } from '../helpers/api'
+import { loginAs, waitForDraft } from '../helpers/api'
 import { ADMIN_EMAIL, ADMIN_PASSWORD } from '../helpers/ui'
 import { prisma, dbAvailable, NO_DB_MSG } from '../helpers/db'
 import { DOCS_BUCKET, objectExists, removeObject } from '../helpers/minio'
 import { GIF_BYTES, SVG_AS_PNG, makePng } from '../helpers/images'
 
-// §AG: product screenshots (change 025). TC-SHOT-01 (T2) and TC-SHOT-02 to 06, 14 (T7); the rest
-// of the suite arrives with T10. Same MOCK_AI + MOCK_PUPPETEER seams as §AF.
+// §AG: product screenshots (change 025). TC-SHOT-01 (T2), TC-SHOT-02 to 06, 14 (T7) and
+// TC-SHOT-07 to 09 (T8); the rest of the suite arrives with T9 and T10. Same MOCK_AI + MOCK_PUPPETEER seams as §AF.
 // The request runs in its OWN fresh team, disposed afterwards, so it does not
 // depend on the seeded team's providers.
 
@@ -261,6 +261,142 @@ test.describe('§AG product screenshots: storage and the brief', () => {
       expect(del.status()).toBe(200)
       expect((await del.json()).briefDeleted).toBe(true)
       expect(await objectExists(DOCS_BUCKET, up.key)).toBe(false)
+    })
+  })
+})
+
+// ── T8: generation places the screenshot ─────────────────────────────────────
+// The IMAGE row is NOT the default: the real resolver reaches it through the
+// oldest-enabled fallback (005 FR-01), as in §AA. __MOCK_BG__ gives the hero
+// image; the other sentinels shape the pixel check and the render check.
+
+async function addImageProvider(api: Fresh['api']) {
+  const res = await api.post('/api/admin/providers', { apiKey: 'sk-shot-fake-openai-key', slot: 'IMAGE' })
+  expect(res.status()).toBe(201)
+  const image = await res.json()
+  expect((await api.patch(`/api/admin/providers/${image.id}`, { isDefault: false })).status()).toBe(200)
+}
+
+type ShotDraft = Record<string, unknown> & {
+  id: string
+  status: string
+  imageUrl: string | null
+  htmlContent: string
+  composition: {
+    appliedArchetype: string
+    contractVersion: number | null
+    fallbackReason?: string
+    composites?: Array<{
+      region: number
+      rect: { x: number; y: number; w: number; h: number }
+      source: { kind: string; key: string }
+    }>
+  } | null
+  compositionNotice: { reason: string; message: string } | null
+}
+
+async function generateDeviceScreen(t: Fresh, topic: string) {
+  const up = await (await uploadShot(t.api, makePng(1280, 800))).json()
+  const source = { kind: 'brief-upload', key: up.key, width: up.width, height: up.height }
+  const briefRes = await t.api.post('/api/briefs', briefBody(t, { topic, imageStyle: 'device-screen', compositeSource: source }))
+  expect(briefRes.status(), await briefRes.text()).toBe(201)
+  const brief = await briefRes.json()
+  const res = await t.api.post('/api/generate/assemble-b', { briefId: brief.id })
+  expect(res.status()).toBe(202)
+  const draft = (await waitForDraft(t.api, (await res.json()).draftId)) as ShotDraft
+  expect(draft.status, String(draft.failureReason)).toBe('EXPORTED')
+  return { draft, up, briefId: brief.id as string }
+}
+
+// The contract region of device-screen v1 SQUARE; __MOCK_HERO_SCREEN_OFFSET__
+// moves the synthetic screen by 3% across and 2% down, so the detected rect is
+// this one shifted, within the detector's one-grid-step resolution (2 px of 1080).
+const REGION = { x: 14, y: 42, w: 72, h: 45 }
+const SHIFTED = { x: REGION.x + 3, y: REGION.y + 2, w: REGION.w, h: REGION.h }
+const STEP_PCT = 0.6
+
+test.describe('§AG product screenshots: generation (T8)', () => {
+  test('TC-SHOT-07: a kept device-screen draft stores one canonical element and the token, and a stamp with the detected rect', async ({ request }) => {
+    await withFreshTeam(request, async (t) => {
+      await addImageProvider(t.api)
+      const { draft, up } = await generateDeviceScreen(t, `Shot kept __MOCK_BG__ __MOCK_HERO_SCREEN_OFFSET__ ${Date.now()}`)
+
+      const stamp = draft.composition!
+      expect(stamp.appliedArchetype).toBe('device-screen')
+      expect(stamp.fallbackReason).toBeUndefined()
+      expect(stamp.composites).toHaveLength(1)
+      const entry = stamp.composites![0]
+      expect(entry.source).toEqual({ kind: 'brief-upload', key: up.key })
+      // The stamped rect is the DETECTED screen, not the contract region.
+      expect(entry.rect).not.toEqual(REGION)
+      for (const k of ['x', 'y', 'w', 'h'] as const) {
+        expect(Math.abs(entry.rect[k] - SHIFTED[k]), k).toBeLessThanOrEqual(STEP_PCT)
+      }
+
+      // The stored HTML: exactly one canonical element, the token, no reference to the object.
+      const html = draft.htmlContent
+      expect(html.match(/data-composite="0"/g)).toHaveLength(1)
+      expect(html.split('__COMPOSITE_0__')).toHaveLength(2)
+      expect(html).not.toContain('screenshots/')
+      expect(html).not.toContain(up.key)
+      expect(html).not.toMatch(/data:image\//)
+      if (dbAvailable && prisma) {
+        const rows = await prisma.draftRevision.findMany({ where: { draftId: draft.id }, select: { htmlSnapshot: true } })
+        expect(rows.length).toBeGreaterThan(0)
+        for (const r of rows) {
+          expect(r.htmlSnapshot).toContain('__COMPOSITE_0__')
+          expect(r.htmlSnapshot).not.toContain('screenshots/')
+        }
+      }
+
+      // The draft's own stamp lets a viewer of the draft preview the screenshot (T7 follow-up).
+      const preview = await t.api.get(`/api/briefs/screenshots?key=${encodeURIComponent(up.key)}&draftId=${draft.id}`)
+      expect(preview.status()).toBe(200)
+      expect(preview.headers()['content-type']).toBe('image/png')
+      expect(preview.headers()['cache-control']).toContain('no-store')
+      // A key the stamp does not carry is still 404 for the same draft.
+      const wrong = await t.api.get(`/api/briefs/screenshots?key=${encodeURIComponent(up.key + 'x')}&draftId=${draft.id}`)
+      expect(wrong.status()).toBe(404)
+      await removeObject(DOCS_BUCKET, up.key)
+    })
+  })
+
+  test('TC-SHOT-08: a render that fails the composite check is EXPORTED as classic with composite-not-rendered and the notice', async ({ request }) => {
+    await withFreshTeam(request, async (t) => {
+      await addImageProvider(t.api)
+      const { draft, up } = await generateDeviceScreen(t, `Shot render fail __MOCK_BG__ __MOCK_COMPOSITE_FAIL__ ${Date.now()}`)
+      expect(draft.composition).toMatchObject({
+        requestedArchetype: 'device-screen',
+        appliedArchetype: 'classic',
+        contractVersion: null,
+        fallbackReason: 'composite-not-rendered',
+      })
+      expect(draft.composition).not.toHaveProperty('composites')
+      expect(draft.compositionNotice).toMatchObject({ reason: 'composite-not-rendered' })
+      expect(draft.compositionNotice!.message).toContain('screenshot')
+      // The second design ran without the hero image and without the element.
+      expect(draft.imageUrl).toBeNull()
+      expect(draft.htmlContent).not.toContain('data-composite')
+      expect(draft.htmlContent).not.toContain('__COMPOSITE_0__')
+      await removeObject(DOCS_BUCKET, up.key)
+    })
+  })
+
+  test('TC-SHOT-09: a busy screen area is composite-not-blank: classic over the same image, no composites', async ({ request }) => {
+    await withFreshTeam(request, async (t) => {
+      await addImageProvider(t.api)
+      const { draft, up } = await generateDeviceScreen(t, `Shot busy screen __MOCK_BG__ __MOCK_HERO_SCREEN__ ${Date.now()}`)
+      expect(draft.composition).toMatchObject({
+        requestedArchetype: 'device-screen',
+        appliedArchetype: 'classic',
+        fallbackReason: 'composite-not-blank',
+      })
+      expect(draft.composition).not.toHaveProperty('composites')
+      expect(draft.compositionNotice).toMatchObject({ reason: 'composite-not-blank' })
+      // The image is reused under classic (Phase 1), so it is stored on the draft.
+      expect(draft.imageUrl).toBeTruthy()
+      expect(draft.htmlContent).not.toContain('data-composite')
+      await removeObject(DOCS_BUCKET, up.key)
     })
   })
 })
