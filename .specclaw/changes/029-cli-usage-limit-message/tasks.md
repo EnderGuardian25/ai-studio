@@ -2,7 +2,7 @@
 
 ## Wave 1
 
-- [ ] `T1` — Recognise the 2.1.310 usage-limit wording and name it in the text-mode error
+- [x] `T1` — Recognise the 2.1.310 usage-limit wording and name it in the text-mode error
   - Files: `src/lib/agent/claudeCli.ts`, `tests/unit/usageLimit.test.ts`
   - Estimate: small
   - Kind: impl

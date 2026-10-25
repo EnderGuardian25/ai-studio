@@ -1,7 +1,7 @@
 # 🦞 SpecClaw Dashboard
 
 **Project:** bistec-studio
-**Last Updated:** 2026-10-25 05:25 UTC
+**Last Updated:** 2026-10-25 05:29 UTC
 
 _1 unnumbered change · run `/specclaw:renumber` to order them_
 
@@ -33,7 +33,7 @@ _1 unnumbered change · run `/specclaw:renumber` to order them_
 - 🔍 **026-drop-whatsapp-caption-refine-under-preview** ▫ — verify PASS | 3/3 tasks (100%) | 0 failed | PR #43 closed | 1h53m
 - 🔍 **027-post-styles** ▣ — verify PASS | 8/8 tasks (100%) | 0 failed | PR #43 closed | 4h9m
 - 🔍 **028-image-looks** ▣ — verify PASS | 7/7 tasks (100%) | 0 failed | PR #43 closed | 3h33m
-- 📝 **029-cli-usage-limit-message** ▫ — tasks done | 0/1 tasks (0%) | 0 failed | 2m
+- 📝 **029-cli-usage-limit-message** ▫ — tasks done | 1/1 tasks (100%) | 0 failed | 2m
 
 ## Pending Proposals
 
