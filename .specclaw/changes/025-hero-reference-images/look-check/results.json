@@ -1,0 +1,14 @@
+[
+  {
+    "slot": "device-screen:SQUARE",
+    "attempt": 1,
+    "runId": "763888e5-5b7e-42d0-a579-5eb536c917f7",
+    "styleKept": false,
+    "fallbackReason": "busy",
+    "threshold": 0.04,
+    "promptHash": "3db759aea9748b09fd5748517c7014c70671e01b15d52a732b757193a0ecd4d4",
+    "render": "device-screen_SQUARE_1.png",
+    "error": null,
+    "accepted": null
+  }
+]

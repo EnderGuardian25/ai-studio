@@ -15,6 +15,7 @@ import {
   contractAt,
   designContractText,
   imageContractText,
+  imageGeometryPin,
   planComposition,
   PRECEDENCE_LINE,
   refineContractText,
@@ -582,6 +583,23 @@ describe('device-screen prompt text (025 AC-05)', () => {
       )
     })
   }
+
+  for (const size of ['SQUARE', 'PORTRAIT', 'STORY'] as const) {
+    it(`${size}: the geometry pin carries the image contract lines word for word`, () => {
+      const sc = contract.sizes[size]!
+      expect(imageGeometryPin(contract, sc)).toBe(
+        `Exact composition, follow these measurements:\n${imageContractText(contract, sc)}`,
+      )
+    })
+  }
+
+  it('a look with no composite region gets no geometry pin', () => {
+    for (const key of ['product-showcase', 'editorial-split', 'full-bleed-scene', 'spotlight'] as const) {
+      const a = archetypes[key]
+      const v = a.versions[a.current]
+      for (const sc of Object.values(v.sizes)) expect(imageGeometryPin(v, sc!)).toBeNull()
+    }
+  })
 
   it('a look with no composite region is unchanged by the new branches', () => {
     const ps = archetypes['product-showcase'].versions[2]

@@ -53,6 +53,16 @@ export function imageContractText(contract: Contract, size: SizeContract): strin
   return lines.join('\n')
 }
 
+// The measurements a composite look appends to the image prompt word for word
+// (025 OP-025). The art-director model paraphrases the contract lines it is
+// given, and a placed screenshot needs the screen exactly where the region is,
+// so for a size with a composite region code carries the lines through to the
+// image model. A size without one returns null and its prompt is unchanged.
+export function imageGeometryPin(contract: Contract, size: SizeContract): string | null {
+  if (!size.regions.some((r) => r.purpose === 'composite')) return null
+  return `Exact composition, follow these measurements:\n${imageContractText(contract, size)}`
+}
+
 // The design prompt's hero block (the image was KEPT): the cover-fit
 // instruction, the text regions in percent and in canvas pixels, the tone and
 // the no-scrim rule. The caller appends PRECEDENCE_LINE beside it.

@@ -20,6 +20,7 @@ import {
   archetypes,
   evaluateLayout,
   evaluateRegions,
+  imageGeometryPin,
   planComposition,
   settleComposition,
   type ArchetypeMap,
@@ -186,6 +187,30 @@ describe('the hero background step: one image call, the check, the fallback (FR-
       appliedArchetype: 'product-showcase',
       contractVersion: 2,
     })
+  })
+
+  it('025: a composite look sends the model prompt plus the geometry pin word for word; other looks send the model prompt alone', async () => {
+    for (const size of ['SQUARE', 'PORTRAIT', 'STORY'] as const) {
+      const p = provider()
+      h.resolveImageProvider.mockResolvedValue(p)
+      h.anthropicCreate.mockResolvedValue(decisionReply({ needed: true, prompt: 'a laptop, centred' }))
+      h.sample.mockResolvedValue([calm(), calm()])
+      const plan = planComposition({ imageStyle: 'device-screen', aspectRatio: size, hasCompositeSource: true })
+      if (plan.kind !== 'hero') throw new Error('expected a hero plan')
+      let sent = ''
+      await generateBackgroundForBrief(mkBrief({ imageStyle: 'device-screen', aspectRatio: size }), kit, 'c', null, actor, plan, (s) => {
+        sent = s
+      })
+      const expected = `a laptop, centred\n\n${imageGeometryPin(plan.contract, plan.sizeContract)}`
+      expect(sent, size).toBe(expected)
+      expect((p.generateImage.mock.calls[0] as unknown[])[0], size).toBe(expected)
+    }
+    const p = provider()
+    h.resolveImageProvider.mockResolvedValue(p)
+    h.anthropicCreate.mockResolvedValue(decisionReply({ needed: true, prompt: 'a laptop on a dark desk' }))
+    h.sample.mockResolvedValue([calm()])
+    await run(mkBrief())
+    expect((p.generateImage.mock.calls[0] as unknown[])[0]).toBe('a laptop on a dark desk')
   })
 
   it('the decision prompt is written from the contract (the region wording reaches the model)', async () => {

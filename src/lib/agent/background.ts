@@ -41,7 +41,7 @@ import {
   shouldMockBackground,
 } from '@/lib/testHooks'
 import { dimensionsFor } from '@/lib/aspectRatio'
-import { evaluateRegions, type HeroCheckResult, type HeroPlan } from '@/lib/designData'
+import { evaluateRegions, imageGeometryPin, type HeroCheckResult, type HeroPlan } from '@/lib/designData'
 import { sampleRegionLuminance } from '@/lib/renderer/puppeteer'
 import type { ResolvedBrandKit } from '@/lib/brandkit/resolve'
 import { resolveImageProvider } from '@/providers/registry'
@@ -210,8 +210,11 @@ async function runBackgroundStep(
     // The fixture swap happens AFTER the real resolver chose the provider.
     const provider = mockSeam ? mockImageProvider(resolved.provider, opts.seamText) : resolved.provider
 
-    log(`generating background · size=${imageSizeFor(provider.providerName, opts.aspectRatio)} · prompt="${decision.prompt.slice(0, 120)}..."`)
-    opts.onPrompt?.(decision.prompt)
+    // A composite look (025) gets its measurements appended word for word.
+    const pin = opts.hero ? imageGeometryPin(opts.hero.contract, opts.hero.sizeContract) : null
+    const imagePrompt = pin ? `${decision.prompt}\n\n${pin}` : decision.prompt
+    log(`generating background · size=${imageSizeFor(provider.providerName, opts.aspectRatio)} · prompt="${imagePrompt.slice(0, 120)}..."`)
+    opts.onPrompt?.(imagePrompt)
     const startedAt = Date.now()
     // TODO(team-tenancy): if a personal UserOpenAiKey was resolved above and this
     // call fails with an auth error, flip it INVALID here (markUserOpenAiKeyInvalid,
@@ -224,8 +227,8 @@ async function runBackgroundStep(
     const size = imageSizeFor(provider.providerName, opts.aspectRatio)
     const heroQuality = opts.hero ? env.IMAGE_QUALITY : undefined
     const result = heroQuality
-      ? await provider.generateImage(decision.prompt, opts.brandKitId, size, { quality: heroQuality })
-      : await provider.generateImage(decision.prompt, opts.brandKitId, size)
+      ? await provider.generateImage(imagePrompt, opts.brandKitId, size, { quality: heroQuality })
+      : await provider.generateImage(imagePrompt, opts.brandKitId, size)
     // persistDataUrlImage enforces the raster allow-list and returns a stable
     // public URL; a provider that already returns an http(s) URL passes through.
     const url = result.url.startsWith('data:')

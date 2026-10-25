@@ -102,6 +102,7 @@ The look is read from the dataset via `getArchetype(appliedArchetype)`. A kept `
 - **`imageContractText`** gets a `composite` branch, the spec FR-07 sentence with `describeRegion(r.rect)`.
 - **`designContractText`** adds, after the text-region list, one line per composite region: `Leave ${describeRegion} (${describeRegionPx}) completely empty: no text, shape, image, overlay or scrim. The product screenshot is placed there automatically.`
 - **`refineContractText`** adds the same sentence.
+- **`imageGeometryPin`** (added during OP-025, 2026-10-25, on the user's decision): for a size with a composite region it returns `Exact composition, follow these measurements:` followed by `imageContractText`, and `runBackgroundStep` appends it to the art-director's image prompt after a blank line. The art-director paraphrased the contract lines (OP-025 attempt 1 drew the laptop centred and high), and a placed screenshot needs the screen exactly where the region is, so code carries the measurements to the image model word for word. A size without a composite region returns null, and its prompt is unchanged.
 
 All existing goldens are unchanged, because no current look has a composite region.
 
