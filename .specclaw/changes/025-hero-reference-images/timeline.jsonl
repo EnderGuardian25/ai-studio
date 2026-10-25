@@ -1,1 +1,5 @@
 {"ev":"start","span":"propose","kind":"phase","label":"propose","at":"2026-10-22T17:37:04Z","ts":1792690624}
+{"ev":"start","span":"propose","kind":"phase","label":"propose","at":"2026-10-25T06:02:01Z","ts":1792908120}
+{"ev":"stop","span":"propose","at":"2026-10-25T06:03:21Z","ts":1792908201,"status":"ok"}
+{"ev":"start","span":"plan","kind":"phase","label":"plan","at":"2026-10-25T06:22:44Z","ts":1792909364}
+{"ev":"stop","span":"plan","at":"2026-10-25T06:35:11Z","ts":1792910111,"status":"ok"}

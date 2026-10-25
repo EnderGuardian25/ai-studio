@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "sig": "3054410559 11123",
+  "sig": "776878708 9680",
   "tier": "deep",
   "tier_source": "classifier",
   "rationale": "Adds a new team-scoped upload type for product screenshots that may show unreleased UI, with a public-or-private storage choice still open, a new region purpose in the layout contract, and an optional field on the persisted composition stamp, so it touches an upload trust boundary, persisted data shape, and an unresolved storage decision that changes the design.",
