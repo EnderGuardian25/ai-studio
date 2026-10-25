@@ -135,6 +135,18 @@ describe('POST /api/admin/look-probe', () => {
     expect(body.fallbackReason).toBe('composite-not-blank')
   })
 
+  it('025 A1: the response carries the detected rect (null when the check kept no screen or failed)', async () => {
+    const rect = { x: 17.41, y: 44.12, w: 71.2, h: 44.5 }
+    h.generate.mockImplementation(async () => ({ url: IMG_URL, check: { ok: true, composites: [{ region: 0, rect }] } }))
+    const kept = await (await call({ key: 'device-screen', size: 'SQUARE' })).json()
+    expect(kept.rect).toEqual(rect)
+    expect(kept.verdict).toEqual({ ok: true, composites: [{ region: 0, rect }] })
+    h.generate.mockImplementation(async () => ({ url: IMG_URL, check: { ok: true } }))
+    expect((await (await call({ key: 'device-screen', size: 'SQUARE' })).json()).rect).toBeNull()
+    h.generate.mockImplementation(async () => ({ url: IMG_URL, check: { ok: false, reason: 'composite-not-blank' } }))
+    expect((await (await call({ key: 'device-screen', size: 'SQUARE' })).json()).rect).toBeNull()
+  })
+
   it('deletes the persisted IMAGES object after building the response', async () => {
     await call({ key: 'device-screen', size: 'SQUARE' })
     expect(h.deleteObject).toHaveBeenCalledTimes(1)

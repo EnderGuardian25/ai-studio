@@ -5,9 +5,13 @@
 // 025 OP-025 probe mode (device-screen; --out defaults to .specclaw/changes/025-hero-reference-images/look-check):
 //   node scripts/look-check/run-look-check.mjs --probe --base http://localhost:3002 [--out <dir>] [--only <slot> ...] [--dry-run]
 //   node scripts/look-check/run-look-check.mjs --probe [--out <dir>] --verdict <slot>#<attempt>=accept|reject
+// 025 A1 recheck (no network, no image call): re-judge every saved render with the shipped check,
+// write `recheck` into results.json and a page with the detected rects drawn (recheck.html):
+//   node scripts/look-check/run-look-check.mjs --probe --recheck [--out <dir>]
 // env (a run only): LOOK_CHECK_USERNAME, LOOK_CHECK_PASSWORD, LOOK_CHECK_TEAM, LOOK_CHECK_KIT
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { spawnSync } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import {
   SLOTS, capFor, checkBase, lastResult, parseLedger, parseVerdictArg, planNext, totalLine,
@@ -59,6 +63,7 @@ function parseArgs(argv) {
     const v = argv[i]
     if (v === '--dry-run') a.dryRun = true
     else if (v === '--probe') a.probe = true
+    else if (v === '--recheck') a.recheck = true
     else if (v === '--base') a.base = argv[++i]
     else if (v === '--out') a.out = argv[++i]
     else if (v === '--verdict') a.verdict = argv[++i]
@@ -92,6 +97,13 @@ async function runProbe() {
     const unknown = args.only.filter((s) => !PROBE_SLOTS.includes(s))
     if (unknown.length) { console.error(`unknown slot: ${unknown.join(', ')}`); process.exit(1) }
     return PROBE_SLOTS.filter((s) => args.only.length === 0 || args.only.includes(s))
+  }
+
+  if (args.recheck) {
+    // The shipped check, run in a tsx entry (it imports the same module the app does) on the saved
+    // renders. It makes no network call and no image call, and writes results.json and recheck.html.
+    const run = spawnSync('npx', ['tsx', 'scripts/look-check/recheck.ts', '--out', JSON.stringify(args.out)], { stdio: 'inherit', shell: true })
+    process.exit(run.status ?? 1)
   }
 
   if (args.verdict) {

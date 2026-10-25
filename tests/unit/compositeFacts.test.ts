@@ -104,6 +104,9 @@ const screen: Region = { rect: { x: 14, y: 42, w: 72, h: 45 }, purpose: 'composi
 const text: Region = { rect: { x: 0, y: 0, w: 100, h: 34 }, purpose: 'text', minAreaPct: 20 }
 const sample = (lum: number[], r: Region) => ({ luminance: lum, areaPct: (r.rect.w * r.rect.h) / 100 })
 
+// Amendment A1: the blank rule moved from evaluateRegions to the screen detector (composite.ts,
+// tests/unit/screenDetect.test.ts, which holds the 0.039 / 0.041 boundary on the seed and the
+// interior). evaluateRegions keeps the invalid rule for a composite region and nothing else.
 describe('the blank check (025 FR-04, AC-03)', () => {
   it('BLANK_STDDEV_MAX is 0.04 and the helper hits the L* standard deviations it claims', () => {
     expect(BLANK_STDDEV_MAX).toBe(0.04)
@@ -112,19 +115,9 @@ describe('the blank check (025 FR-04, AC-03)', () => {
     expect(Math.sqrt(ls.reduce((a, b) => a + (b - mean) ** 2, 0) / ls.length)).toBeCloseTo(0.039, 9)
   })
 
-  it('a composite region with std dev 0.039 passes (there is no contrast test)', () => {
+  it('evaluateRegions leaves a composite region to the detector: std dev 0.039, 0.041 and a bright flat screen all pass it', () => {
     expect(evaluateRegions([sample(withStdDev(0.039), screen)], [screen], 'light')).toEqual({ ok: true })
-  })
-
-  it('a composite region with std dev 0.041 fails as composite-not-blank', () => {
-    expect(evaluateRegions([sample(withStdDev(0.041), screen)], [screen], 'light')).toEqual({
-      ok: false,
-      reason: 'composite-not-blank',
-      region: screen,
-    })
-  })
-
-  it('a bright, flat screen passes: contrast is not tested on a composite region', () => {
+    expect(evaluateRegions([sample(withStdDev(0.041), screen)], [screen], 'light')).toEqual({ ok: true })
     const bright = Array.from({ length: 256 }, () => 0.7)
     expect(evaluateRegions([sample(bright, screen)], [screen], 'light')).toEqual({ ok: true })
   })
@@ -147,13 +140,10 @@ describe('the blank check (025 FR-04, AC-03)', () => {
     expect(evaluateRegions([sample(calm, text)], [text], 'light')).toEqual({ ok: true })
   })
 
-  it('both regions in dataset order: the first failure returns', () => {
+  it('both regions in dataset order: a busy composite region does not fail the evaluation, a busy text region does', () => {
     const busyScreen = sample(withStdDev(0.3), screen)
     const calmText = sample(Array.from({ length: 256 }, () => 0.02), text)
-    expect(evaluateRegions([calmText, busyScreen], [text, screen], 'light')).toMatchObject({
-      reason: 'composite-not-blank',
-      region: screen,
-    })
+    expect(evaluateRegions([calmText, busyScreen], [text, screen], 'light')).toEqual({ ok: true })
     const busyText = sample(withStdDev(0.3), text)
     expect(evaluateRegions([busyText, busyScreen], [text, screen], 'light')).toMatchObject({ reason: 'busy', region: text })
   })

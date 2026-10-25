@@ -47,9 +47,22 @@ export async function lookFixture(spec: FixtureSpec, source: ArchetypeMap = arch
   }
 
   const composite = contract.regions.find((r) => r.purpose === 'composite')
+  const BLANK_SCREEN = 'background:#dcdcdc'
   let inner = ''
-  // An evenly lit blank screen, padded by 1 point; the screen kind overpaints it.
-  if (composite) inner += box(pad(composite.rect, 1), 'background:#dcdcdc')
+  // The screen kinds that change where the blank screen is (025 A1). All are 16:10 like the region.
+  const SHIFT = { dx: 3, dy: 2 } // inside the 12 point search margin
+  let screenRect: Rect | null = composite ? pad(composite.rect, 1) : null
+  if (composite && spec.kind === 'pass-offset') {
+    screenRect = pad({ ...composite.rect, x: composite.rect.x + SHIFT.dx, y: composite.rect.y + SHIFT.dy }, 1)
+  } else if (composite && spec.kind === 'small') {
+    // 0.7 of the region each way (49% of the area), centred, unpadded so it stays 16:10.
+    const w = composite.rect.w * 0.7
+    const h = composite.rect.h * 0.7
+    screenRect = { x: composite.rect.x + (composite.rect.w - w) / 2, y: composite.rect.y + (composite.rect.h - h) / 2, w, h }
+  }
+  // An evenly lit blank screen; the screen kind overpaints it. The text-overlap kind paints its
+  // screen after the text bands, so the screen's top edge stays inside the band.
+  if (screenRect && spec.kind !== 'text-overlap') inner += box(screenRect, BLANK_SCREEN)
   for (const r of texts) inner += box(pad(r.rect, 1), BACKDROP_CSS[backdrop])
   if (spec.kind === 'busy') {
     inner += box(pad(texts[texts.length - 1].rect, -1), `background:${STRIPES}`)
@@ -58,6 +71,12 @@ export async function lookFixture(spec: FixtureSpec, source: ArchetypeMap = arch
   } else if (spec.kind === 'screen') {
     if (!composite) throw new Error(`screen fixture on a contract with no composite region: ${spec.id}`)
     inner += box(pad(composite.rect, -1), `background:${STRIPES}`)
+  } else if (spec.kind === 'text-overlap') {
+    if (!composite) throw new Error(`text-overlap fixture on a contract with no composite region: ${spec.id}`)
+    // The region moved up so its top is half a point inside the text band: small enough that the
+    // text band still passes its own check, large enough that the detected screen intersects it.
+    const bandBottom = Math.max(...texts.map((t) => t.rect.y + t.rect.h))
+    inner += box({ ...composite.rect, y: bandBottom - 0.5 }, BLANK_SCREEN)
   }
   return raster(spec.size, `background:${STRIPES}`, inner)
 }

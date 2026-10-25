@@ -48,7 +48,7 @@ export function compositionNoticeFor(stamp: CompositionStamp | null): Compositio
     case 'composite-not-blank':
       return {
         reason: 'composite-not-blank',
-        message: `${subject} could not be used for this post (the screen area of the image was not blank, so your screenshot could not be placed on it), ${classic}`,
+        message: `${subject} could not be used for this post (no clear blank screen was found in the image, so your screenshot could not be placed on it), ${classic}`,
       }
     case 'composite-not-rendered':
       return {

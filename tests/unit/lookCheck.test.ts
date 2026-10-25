@@ -204,6 +204,36 @@ describe('look-check probe mode (025 AC-07)', () => {
     expect(pv([])[P]).toMatchObject({ passed: false, status: 'fail' })
   })
 
+  it('025 A1: a recheck replaces the response styleKept: a re-judged keep counts, a re-judged fallback does not', () => {
+    const kept = { styleKept: true, fallbackReason: null, rect: { x: 18, y: 40, w: 63, h: 38 } }
+    const fell = { styleKept: false, fallbackReason: 'composite-not-blank', rect: null }
+    // An attempt the live check failed (styleKept false) but the shipped detector keeps.
+    const rejudged = pv([pres(1, { styleKept: false, recheck: kept, accepted: true }), pres(2, { styleKept: false, recheck: kept, accepted: true })])
+    expect(rejudged[P]).toMatchObject({ passed: true, status: 'pass', accepted: 2 })
+    // The reverse: the live check kept it, the recheck says no.
+    expect(pv([pres(1, { recheck: fell, accepted: true }), pres(2, { accepted: true })])[P].passed).toBe(false)
+    // A re-judged keep waits for a verdict; a re-judged fallback does not.
+    expect(pv([pres(1, { styleKept: false, recheck: kept })])[P].status).toBe('pending')
+    expect(pv([pres(1, { recheck: fell })])[P].status).toBe('fail')
+    // No recheck: the response's own styleKept stands (unchanged behaviour).
+    expect(pv([pres(1, { accepted: true }), pres(2, { accepted: true })])[P].passed).toBe(true)
+  })
+
+  it('025 A1: planNextProbe reads the recheck too (a re-judged keep awaits its verdict)', () => {
+    const cap9 = capFor(lc.PROBE_SLOTS, 3)
+    const e = parseLedger(line(P, 1))
+    const kept = { styleKept: true, fallbackReason: null, rect: { x: 18, y: 40, w: 63, h: 38 } }
+    expect(lc.planNextProbe(e, [pres(1, { styleKept: false, recheck: kept })], P, cap9)).toEqual({ ok: false, reason: 'awaiting-verdict' })
+    expect(lc.planNextProbe(e, [pres(1, { styleKept: false })], P, cap9)).toEqual({ ok: true, attempt: 2 })
+  })
+
+  it('025 A1: --probe --recheck is wired to the tsx entry, and the entry file exists', () => {
+    const runner = readFileSync('scripts/look-check/run-look-check.mjs', 'utf8')
+    expect(runner).toContain("'--recheck'")
+    expect(runner).toContain('scripts/look-check/recheck.ts')
+    expect(readFileSync('scripts/look-check/recheck.ts', 'utf8')).toContain('runHeroCheck')
+  })
+
   it('counts the latest result per attempt number', () => {
     const v = pv([pres(1, { accepted: false }), pres(1, { accepted: true }), pres(2, { accepted: true })])
     expect(v[P].passed).toBe(true)

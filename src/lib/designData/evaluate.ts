@@ -13,7 +13,7 @@ export interface RegionSample {
 }
 export type HeroVerdict =
   | { ok: true }
-  | { ok: false; reason: 'busy' | 'contrast' | 'region-invalid' | 'composite-not-blank'; region: Region }
+  | { ok: false; reason: 'busy' | 'contrast' | 'region-invalid'; region: Region }
 
 // Busy when the std. deviation of CIE L*/100 is above this. Correction 1 of
 // the spec: on linear luminance a dark region cannot exceed about 0.09, so the
@@ -68,7 +68,10 @@ function lightnessStdDev(luminance: readonly number[]): number {
 
 // `sampled` is index-aligned with `regions`; null (or a missing entry) means
 // unresolved. Per region, in dataset order: invalid first, then busy, then (a
-// `text` region only) contrast. A `composite` region: invalid, then blank. The first failure returns.
+// `text` region only) contrast. A `composite` region gets the invalid rule only:
+// the screen detector (composite.ts, 025 A1) judges it, and the hero check
+// (src/lib/renderer/heroCheck.ts) never hands one to this function. The first
+// failure returns.
 export function evaluateRegions(
   sampled: ReadonlyArray<RegionSample | null>,
   regions: ReadonlyArray<Region>,
@@ -82,10 +85,7 @@ export function evaluateRegions(
     if (!s || !Number.isFinite(s.areaPct) || s.areaPct < region.minAreaPct || lum.length < MIN_SAMPLES) {
       return { ok: false, reason: 'region-invalid', region }
     }
-    if (region.purpose === 'composite') {
-      if (lightnessStdDev(lum) > BLANK_STDDEV_MAX) return { ok: false, reason: 'composite-not-blank', region }
-      continue
-    }
+    if (region.purpose === 'composite') continue
     if (lightnessStdDev(lum) > BUSY_STDDEV_MAX) return { ok: false, reason: 'busy', region }
     if (region.purpose === 'text') {
       const passing = lum.filter((l) => contrastRatio(l, toneL) >= CONTRAST_MIN).length

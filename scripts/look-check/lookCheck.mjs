@@ -124,7 +124,11 @@ function probeResultsFor(results, slot) {
   return [...byAttempt.values()]
 }
 
-const probeAttemptOk = (r) => r.styleKept === true && r.accepted === true
+// An attempt re-judged offline with the shipped check (--recheck, 025 A1) counts by the recheck's
+// styleKept; the response's own styleKept only stands for an attempt with no recheck.
+const probeStyleKept = (r) => (r.recheck && typeof r.recheck.styleKept === 'boolean' ? r.recheck.styleKept : r.styleKept === true)
+const probePending = (r) => probeStyleKept(r) && (r.accepted === null || r.accepted === undefined)
+const probeAttemptOk = (r) => probeStyleKept(r) && r.accepted === true
 
 // A slot passes with 2 attempts that are each styleKept and accepted.
 export function probeVerdicts(results, slots = PROBE_SLOTS) {
@@ -132,7 +136,7 @@ export function probeVerdicts(results, slots = PROBE_SLOTS) {
   for (const slot of slots) {
     const rs = probeResultsFor(results, slot)
     const ok = rs.filter(probeAttemptOk).length
-    const pending = rs.some((r) => r.styleKept === true && (r.accepted === null || r.accepted === undefined))
+    const pending = rs.some(probePending)
     out[slot] = { passed: ok >= PROBE_ACCEPTS_NEEDED, accepted: ok, status: ok >= PROBE_ACCEPTS_NEEDED ? 'pass' : pending ? 'pending' : 'fail' }
   }
   return out
@@ -147,7 +151,7 @@ export function planNextProbe(entries, results, slot, cap) {
   const rs = probeResultsFor(results, slot)
   const accepted = rs.filter(probeAttemptOk).length
   if (accepted >= PROBE_ACCEPTS_NEEDED) return { ok: false, reason: 'already-passed' }
-  if (rs.some((r) => r.styleKept === true && (r.accepted === null || r.accepted === undefined))) {
+  if (rs.some(probePending)) {
     return { ok: false, reason: 'awaiting-verdict' }
   }
   if (accepted + (PROBE_MAX_ATTEMPTS_PER_SLOT - attempts) < PROBE_ACCEPTS_NEEDED) return { ok: false, reason: 'cannot-pass' }

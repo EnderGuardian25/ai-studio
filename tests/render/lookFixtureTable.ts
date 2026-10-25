@@ -1,11 +1,16 @@
 // The look fixture table (change 028 T3, spec FR-08). Pure data: no renderer
-// import, so a unit test can read it. The 48 rows are written out, not
+// import, so a unit test can read it. The 57 rows are written out, not
 // generated from the dataset, so a size added to the dataset without rows fails
 // fixtureCompletenessProblems.
 import type { AspectRatio } from '@prisma/client'
 import type { ArchetypeMap } from '@/lib/designData'
 
-export type FixtureKind = 'pass' | 'busy' | 'contrast' | 'screen'
+// The last four exist only for a contract with a composite region (025 A1):
+//   screen        a textured screen (the seed is not blank)
+//   pass-offset   a blank screen offset from the region, inside the search margin
+//   text-overlap  a blank screen whose top runs into the text band
+//   small         a blank screen under 60% of the region's area
+export type FixtureKind = 'pass' | 'busy' | 'contrast' | 'screen' | 'pass-offset' | 'text-overlap' | 'small'
 export type Backdrop = 'dark' | 'light'
 
 // The backdrop each look is meant to have behind its text. A literal, never
@@ -79,19 +84,28 @@ export const LOOK_FIXTURES: readonly FixtureSpec[] = [
   row('device-screen', 1, 'SQUARE', 'busy'),
   row('device-screen', 1, 'SQUARE', 'contrast'),
   row('device-screen', 1, 'SQUARE', 'screen'),
+  row('device-screen', 1, 'SQUARE', 'pass-offset'),
+  row('device-screen', 1, 'SQUARE', 'text-overlap'),
+  row('device-screen', 1, 'SQUARE', 'small'),
   row('device-screen', 1, 'PORTRAIT', 'pass'),
   row('device-screen', 1, 'PORTRAIT', 'busy'),
   row('device-screen', 1, 'PORTRAIT', 'contrast'),
   row('device-screen', 1, 'PORTRAIT', 'screen'),
+  row('device-screen', 1, 'PORTRAIT', 'pass-offset'),
+  row('device-screen', 1, 'PORTRAIT', 'text-overlap'),
+  row('device-screen', 1, 'PORTRAIT', 'small'),
   row('device-screen', 1, 'STORY', 'pass'),
   row('device-screen', 1, 'STORY', 'busy'),
   row('device-screen', 1, 'STORY', 'contrast'),
   row('device-screen', 1, 'STORY', 'screen'),
+  row('device-screen', 1, 'STORY', 'pass-offset'),
+  row('device-screen', 1, 'STORY', 'text-overlap'),
+  row('device-screen', 1, 'STORY', 'small'),
 ]
 
 const KINDS: readonly FixtureKind[] = ['pass', 'busy', 'contrast']
-// A `screen` row exists exactly for a contract with a composite region (025).
-const KINDS_WITH_SCREEN: readonly FixtureKind[] = [...KINDS, 'screen']
+// The screen kinds exist exactly for a contract with a composite region (025, A1).
+const KINDS_WITH_SCREEN: readonly FixtureKind[] = [...KINDS, 'screen', 'pass-offset', 'text-overlap', 'small']
 
 // Problems between the dataset's current contracts and the table: a missing or
 // extra (key, current version, size, kind) row, or a duplicate.

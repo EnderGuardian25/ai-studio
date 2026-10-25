@@ -3,7 +3,9 @@
 // and its invariants run at every write; a stored value that fails to parse
 // reads as null), because a vocabulary that grows needs no migration.
 import { z } from 'zod'
-import { getArchetype } from './composition'
+import { ASPECT_DIMENSIONS } from '@/lib/aspectRatio'
+import { contractVersionOf, getArchetype } from './composition'
+import { isScreenAspect, rectInsideCanvas, rectsIntersect } from './composite'
 
 // A stored screenshot object key: screenshots/<teamId>/<userId>/<file> (025).
 export const SCREENSHOT_KEY_RE = /^screenshots\/[^/]+\/[^/]+\/[^/]+$/
@@ -26,9 +28,13 @@ export const IMAGE_QUALITIES = ['default', 'standard', 'high'] as const
 
 export type FallbackReason = (typeof FALLBACK_REASONS)[number]
 
+// A percent of the canvas, two decimals at most is what the detector writes.
+const pct = z.number().finite().min(0).max(100)
 const compositeEntry = z
   .object({
     region: z.literal(0),
+    // The screen the detector found in the image (025 A1), in canvas percent.
+    rect: z.object({ x: pct, y: pct, w: pct, h: pct }).strict(),
     source: z
       .object({ kind: z.literal('brief-upload'), key: z.string().regex(SCREENSHOT_KEY_RE) })
       .strict(),
@@ -64,6 +70,25 @@ export const compositionStampSchema = z
     if (s.appliedArchetype !== 'classic') {
       if (s.composites !== undefined && !requires) issue('composites need a look that requires a composite source')
       if (s.composites === undefined && requires) issue('a look that requires a composite source needs composites')
+    }
+    // The rect invariants (025 A1). The stamp does not record the size, so the
+    // rect must hold at one of the stamped contract's declared sizes.
+    const rect = s.composites?.[0]?.rect
+    if (rect && s.appliedArchetype !== 'classic' && s.contractVersion !== null) {
+      if (!rectInsideCanvas(rect)) {
+        issue('the composite rect must lie inside the canvas')
+      } else {
+        const sizes = contractVersionOf(s.appliedArchetype, s.contractVersion)?.sizes ?? {}
+        const fits = (Object.keys(sizes) as Array<keyof typeof ASPECT_DIMENSIONS>).map((size) => {
+          const regions = sizes[size]?.regions ?? []
+          return {
+            aspect: isScreenAspect(rect, ASPECT_DIMENSIONS[size]),
+            clear: !regions.some((r) => r.purpose === 'text' && rectsIntersect(rect, r.rect)),
+          }
+        })
+        if (!fits.some((f) => f.aspect)) issue('the composite rect must be 16:10 within 5%')
+        else if (!fits.some((f) => f.aspect && f.clear)) issue('the composite rect must not intersect a text region')
+      }
     }
   })
 

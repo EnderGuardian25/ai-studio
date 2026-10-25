@@ -38,11 +38,11 @@ import {
   mockBackgroundDecision,
   mockImageProvider,
   mockRegionSamples,
+  mockScreenGrid,
   shouldMockBackground,
 } from '@/lib/testHooks'
-import { dimensionsFor } from '@/lib/aspectRatio'
-import { evaluateRegions, imageGeometryPin, type HeroCheckResult, type HeroPlan } from '@/lib/designData'
-import { sampleRegionLuminance } from '@/lib/renderer/puppeteer'
+import { imageGeometryPin, type HeroCheckResult, type HeroPlan } from '@/lib/designData'
+import { runHeroCheck } from '@/lib/renderer/heroCheck'
 import type { ResolvedBrandKit } from '@/lib/brandkit/resolve'
 import { resolveImageProvider } from '@/providers/registry'
 import { imageSizeFor, type ImageTier } from '@/providers/imageCapabilities'
@@ -245,31 +245,25 @@ async function runBackgroundStep(
   }
 }
 
-// The pixel check for a hero image (009 FR-09/FR-10): the sampler (or, under
-// MOCK_AI with a __MOCK_BG__ sentinel, the seam's synthetic samples) feeds the
-// REAL evaluateRegions. It FAILS CLOSED: a sampler error, a timeout, a seam
-// error or any other throw is `check-error`, and only an explicit `{ ok: true }`
-// verdict is a pass. Never throws.
+// The pixel check for a hero image (009 FR-09/FR-10, 025 A1): one shared
+// function (renderer/heroCheck.ts) that the OP-025 recheck also runs. Under
+// MOCK_AI with a __MOCK_BG__ sentinel the seams' synthetic samples and screen
+// grid feed the REAL evaluator and detector. It FAILS CLOSED and never throws.
 async function checkHero(
   imageUrl: string,
   hero: HeroPlan,
   mockSeam: boolean,
   seamText: string,
 ): Promise<HeroCheckResult> {
-  try {
-    const regions = hero.sizeContract.regions
-    const tone = hero.contract.textTone
-    const samples =
-      (mockSeam ? mockRegionSamples(seamText, regions, tone) : null) ??
-      (await sampleRegionLuminance(imageUrl, regions, dimensionsFor(hero.size)))
-    const verdict = evaluateRegions(samples, regions, tone)
-    if (verdict.ok === true) return { ok: true }
-    log(`hero check failed (${verdict.reason}) for ${hero.requestedArchetype}`)
-    return { ok: false, reason: verdict.reason }
-  } catch (err) {
-    log(`hero check could not run (${errorText(err)})`)
-    return { ok: false, reason: 'check-error' }
-  }
+  return runHeroCheck(imageUrl, hero, {
+    log,
+    seams: mockSeam
+      ? {
+          regionSamples: (regions, tone) => mockRegionSamples(seamText, regions, tone),
+          screenGrid: (window, region, canvas) => mockScreenGrid(seamText, window, region, canvas),
+        }
+      : undefined,
+  })
 }
 
 // resolveImageProvider never throws (returns null), but keep the guard: a DB

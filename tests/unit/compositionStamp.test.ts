@@ -136,7 +136,9 @@ describe('helpers', () => {
 
 describe('the composites field (025 FR-06)', () => {
   const key = 'screenshots/team-1/user-1/1700000000-abc.png'
-  const entry = { region: 0, source: { kind: 'brief-upload', key } }
+  // The screen the detector found (025 A1): 16:10 in SQUARE pixels, clear of the text band.
+  const rect = { x: 17, y: 44, w: 72, h: 45 }
+  const entry = { region: 0, source: { kind: 'brief-upload', key }, rect }
   const screenKept = {
     requestedArchetype: 'device-screen',
     appliedArchetype: 'device-screen',
@@ -184,6 +186,45 @@ describe('the composites field (025 FR-06)', () => {
     // an unknown source kind, an extra field
     bad({ ...screenKept, composites: [{ region: 0, source: { kind: 'url', key } }] })
     bad({ ...screenKept, composites: [{ ...entry, extra: 1 }] })
+  })
+
+  // 025 A1: the rect invariants, each failing alone with its own message.
+  const messages = (s: unknown) => {
+    const r = compositionStampSchema.safeParse(s)
+    return r.success ? [] : r.error.issues.map((i) => i.message)
+  }
+  const withRect = (r: unknown) => ({ ...screenKept, composites: [{ ...entry, rect: r }] })
+
+  it('the rect is required', () => {
+    const { rect: _r, ...noRect } = entry
+    void _r
+    bad({ ...screenKept, composites: [noRect] })
+  })
+
+  it('the rect must be a number box: a missing or non-finite field fails', () => {
+    bad(withRect({ x: 17, y: 44, w: 72 }))
+    bad(withRect({ x: Number.NaN, y: 44, w: 72, h: 45 }))
+    bad(withRect({ x: 17, y: 44, w: 72, h: 45, extra: 1 }))
+  })
+
+  it('the rect must lie inside the canvas', () => {
+    expect(messages(withRect({ x: 50, y: 50, w: 72, h: 45 }))).toEqual(['the composite rect must lie inside the canvas'])
+    expect(messages(withRect({ x: 17, y: 44, w: 0, h: 45 }))).toEqual(['the composite rect must lie inside the canvas'])
+  })
+
+  it('the rect must be 16:10 within 5% at a size the stamped contract declares', () => {
+    // 50 by 50 percent is 1:1, 4:5-ish and 9:16-ish in pixels: no declared size reads it as 16:10.
+    expect(messages(withRect({ x: 10, y: 45, w: 50, h: 50 }))).toEqual(['the composite rect must be 16:10 within 5%'])
+    // 16:10 at SQUARE (777.6 by 486 px) passes; just past the 5% bound (1.68) fails.
+    expect(compositionStampSchema.safeParse(withRect({ x: 17, y: 44, w: 72, h: 45 })).success).toBe(true)
+    expect(messages(withRect({ x: 5, y: 44, w: 80, h: 45 }))).toEqual(['the composite rect must be 16:10 within 5%'])
+  })
+
+  it('the rect must not intersect a text region of the stamped contract', () => {
+    // 16:10 at SQUARE, but y 20 to 65 runs into the 0 to 34 text band; the other sizes read it as not 16:10.
+    expect(messages(withRect({ x: 14, y: 20, w: 72, h: 45 }))).toEqual(['the composite rect must not intersect a text region'])
+    // touching the band's edge is not an intersection
+    expect(compositionStampSchema.safeParse(withRect({ x: 14, y: 34, w: 72, h: 45 })).success).toBe(true)
   })
 
   it('the classic fallback without composites parses, and refineReplacedStamp drops composites', () => {

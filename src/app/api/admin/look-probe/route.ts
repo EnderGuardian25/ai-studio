@@ -82,8 +82,11 @@ export const POST = withTeamAuth(async (req, _ctx, user) => {
     const type = img.headers.get('content-type') ?? 'image/png'
     const image = `data:${type};base64,${Buffer.from(await img.arrayBuffer()).toString('base64')}`
     const verdict = outcome.check ?? { ok: false as const, reason: 'check-error' as const }
+    // The screen the detector found (025 A1), or null when there is none.
+    const rect = verdict.ok ? (verdict.composites?.[0]?.rect ?? null) : null
     return NextResponse.json({
       verdict,
+      rect,
       fallbackReason: verdict.ok ? null : verdict.reason,
       threshold: BLANK_STDDEV_MAX,
       promptHash: createHash('sha256').update(imagePrompt ?? '').digest('hex'),

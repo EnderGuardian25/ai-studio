@@ -226,13 +226,27 @@ describe('device-screen availability and the composite argument (025 FR-08, desi
     }
   })
 
-  it('the third argument: ok adds composites to a kept stamp', () => {
-    expect(settleComposition(screenPlan(), { url: 'u', check: { ok: true } }, { ok: true, source })).toEqual({
+  // The detected screen (025 A1): the check carries the rect, the third argument carries the source.
+  const rect = { x: 17, y: 44, w: 72, h: 45 }
+  const keptCheck = { ok: true as const, composites: [{ region: 0, rect }] }
+
+  it('the third argument: ok adds composites (the source from the argument, the rect from the check) to a kept stamp', () => {
+    expect(settleComposition(screenPlan(), { url: 'u', check: keptCheck }, { ok: true, source })).toEqual({
       requestedArchetype: 'device-screen',
       appliedArchetype: 'device-screen',
       contractVersion: 1,
       imageQuality: 'default',
-      composites: [{ region: 0, source }],
+      composites: [{ region: 0, source, rect }],
+    })
+  })
+
+  it('a kept requires look whose check carries no rect fails closed to check-error', () => {
+    expect(settleComposition(screenPlan(), { url: 'u', check: { ok: true } }, { ok: true, source })).toEqual({
+      requestedArchetype: 'device-screen',
+      appliedArchetype: 'classic',
+      contractVersion: null,
+      fallbackReason: 'check-error',
+      imageQuality: 'default',
     })
   })
 

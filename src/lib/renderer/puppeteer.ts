@@ -1,12 +1,17 @@
 import puppeteer, { type Browser, type Page } from "puppeteer-core"
 import { existsSync } from "fs"
 import pLimit from "p-limit"
-import { MOCK_PUPPETEER, MOCK_PNG_BUFFER } from "@/lib/testHooks"
+import { MOCK_PUPPETEER, MOCK_PNG_BUFFER, syntheticScreenGrid } from "@/lib/testHooks"
 import { env } from "@/lib/env"
 import {
+  GRID_STEP_PX,
   SAMPLE_GRID_MAX,
+  coverFit,
+  lightness,
   mapRegionToImage,
   relativeLuminance,
+  type LuminanceGrid,
+  type Rect,
   type Region,
   type RegionSample,
 } from "@/lib/designData"
@@ -438,10 +443,19 @@ export async function sampleRegionLuminance(
   if (typeof dataUrl !== "string" || !dataUrl.startsWith("data:")) {
     throw new HeroCheckError("hero check accepts data: URLs only")
   }
+  return runHeroSample(timeoutMs, (holder) => heroSampleOnce(dataUrl, regions, canvas, holder))
+}
+
+// One sampler job under the concurrency cap, the timeout and the HeroCheckError
+// rule: every failure of a sampler is a HeroCheckError, never anything else.
+function runHeroSample<T>(
+  timeoutMs: number,
+  job: (holder: { page: Page | null; closed: boolean }) => Promise<T>
+): Promise<T> {
   return limit(async () => {
     const holder: { page: Page | null; closed: boolean } = { page: null, closed: false }
     let timer: ReturnType<typeof setTimeout> | undefined
-    const work = heroSampleOnce(dataUrl, regions, canvas, holder)
+    const work = job(holder)
     work.catch(() => {}) // the race below owns the outcome; never an unhandled rejection
     try {
       return await Promise.race([
@@ -461,4 +475,112 @@ export async function sampleRegionLuminance(
       if (timer) clearTimeout(timer)
     }
   })
+}
+
+// ── Screen-detection grid (025 Amendment A1, design.md section 21) ───────────
+// L*/100 at one point per GRID_STEP_PX canvas px over `window` (canvas percent),
+// mapped through the same cover fit as the region sampler, smoothing off (a
+// textured screen reads as textured). Same network-blocked page, timeout and
+// HeroCheckError rules. Null when the window does not map onto the image.
+// `seamRegion` is the contract's composite region, read only by the
+// MOCK_PUPPETEER synthetic grid (a flat screen exactly on it, a dark surround).
+async function heroGridOnce(
+  dataUrl: string,
+  window: Rect,
+  canvas: { width: number; height: number },
+  holder: { page: Page | null; closed: boolean }
+): Promise<LuminanceGrid | null> {
+  const browser = await getBrowser()
+  const page = await browser.newPage()
+  holder.page = page
+  try {
+    if (holder.closed) throw new HeroCheckError("hero check timed out")
+    await page.setRequestInterception(true)
+    page.on("request", (req) => {
+      const u = req.url()
+      if (u.startsWith("data:") || u === "about:blank") req.continue().catch(() => {})
+      else req.abort().catch(() => {})
+    })
+    await page.setContent("<!doctype html><html><body></body></html>", {
+      waitUntil: "domcontentloaded",
+      timeout: SET_CONTENT_TIMEOUT_MS,
+    })
+    const natural = await page.evaluate(async (url: string) => {
+      const img = new Image()
+      img.src = url
+      await img.decode()
+      return { w: img.naturalWidth, h: img.naturalHeight }
+    }, dataUrl)
+    const canvasSize = { w: canvas.width, h: canvas.height }
+    const m = mapRegionToImage(window, canvasSize, natural)
+    if (!m) return null
+    const fit = coverFit(canvasSize, natural)
+    // The mapped window in canvas px (clipped to what the image covers).
+    const cx0 = m.px.x * fit.scale + fit.offset.x
+    const cy0 = m.px.y * fit.scale + fit.offset.y
+    const cols = Math.floor((m.px.w * fit.scale) / GRID_STEP_PX)
+    const rows = Math.floor((m.px.h * fit.scale) / GRID_STEP_PX)
+    if (cols < 1 || rows < 1) return null
+    // Each destination pixel is one step; the source rect is a whole number of steps.
+    const src = {
+      sx: m.px.x,
+      sy: m.px.y,
+      sw: (cols * GRID_STEP_PX) / fit.scale,
+      sh: (rows * GRID_STEP_PX) / fit.scale,
+    }
+    // RGBA comes back as one base64 string: a window can be 270k points.
+    const b64 = await page.evaluate(
+      async (url: string, r: { sx: number; sy: number; sw: number; sh: number }, gw: number, gh: number) => {
+        const img = new Image()
+        img.src = url
+        await img.decode()
+        const c = document.createElement("canvas")
+        c.width = gw
+        c.height = gh
+        const ctx = c.getContext("2d", { willReadFrequently: true })!
+        ctx.imageSmoothingEnabled = false
+        ctx.drawImage(img, r.sx, r.sy, r.sw, r.sh, 0, 0, gw, gh)
+        const data = ctx.getImageData(0, 0, gw, gh).data
+        let s = ""
+        for (let i = 0; i < data.length; i += 0x8000) {
+          s += String.fromCharCode.apply(null, Array.from(data.subarray(i, i + 0x8000)))
+        }
+        return btoa(s)
+      },
+      dataUrl,
+      src,
+      cols,
+      rows
+    )
+    const bytes = Buffer.from(b64, "base64")
+    const values = new Float64Array(cols * rows)
+    for (let i = 0; i < values.length; i++) {
+      // A transparent pixel is NaN, which the detector never treats as screen or as blank.
+      values[i] =
+        bytes[i * 4 + 3] < 128
+          ? Number.NaN
+          : lightness(relativeLuminance(bytes[i * 4], bytes[i * 4 + 1], bytes[i * 4 + 2]))
+    }
+    // The first sample point is the centre of the first step.
+    return { cols, rows, x0: cx0 + GRID_STEP_PX / 2, y0: cy0 + GRID_STEP_PX / 2, step: GRID_STEP_PX, values }
+  } finally {
+    holder.closed = true
+    await page.close().catch(() => {})
+  }
+}
+
+export async function sampleLuminanceGrid(
+  dataUrl: string,
+  window: Rect,
+  canvas: { width: number; height: number },
+  opts: { timeoutMs?: number; seamRegion?: Region } = {}
+): Promise<LuminanceGrid | null> {
+  // Test seam: a flat screen exactly on the region, a dark surround.
+  if (MOCK_PUPPETEER) {
+    return opts.seamRegion ? syntheticScreenGrid(window, opts.seamRegion, canvas) : null
+  }
+  if (typeof dataUrl !== "string" || !dataUrl.startsWith("data:")) {
+    throw new HeroCheckError("hero check accepts data: URLs only")
+  }
+  return runHeroSample(opts.timeoutMs ?? HERO_CHECK_TIMEOUT_MS, (holder) => heroGridOnce(dataUrl, window, canvas, holder))
 }

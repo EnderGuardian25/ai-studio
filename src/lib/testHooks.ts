@@ -20,9 +20,10 @@ import type { ConstrainTarget, InstructionClass } from '@/lib/agent/instructionC
 import type { VerifyResult } from '@/lib/drafts/refineVerify'
 import type { ImageProvider } from '@/providers/interfaces/ImageProvider'
 // Type-only (erased): the module stays free of a runtime import of designData.
-import type { Rect, Region, RegionSample, TextTone } from '@/lib/designData'
+import type { CanvasPx, LuminanceGrid, Rect, Region, RegionSample, TextTone } from '@/lib/designData'
 // layout.ts is pure (type-only imports), so this does not pull the dataset in.
 import { LAYOUT_TOLERANCE_PCT } from '@/lib/designData/layout'
+import { GRID_STEP_PX } from '@/lib/designData/composite'
 import { CAPTION_CHANNELS, type CaptionTarget } from '@/lib/channels'
 import { HEADLINE_MAX } from '@/lib/captions/headline'
 
@@ -425,8 +426,12 @@ export const HERO_MOCK_SENTINELS = {
   contrast: '__MOCK_HERO_CONTRAST__',
   checkError: '__MOCK_HERO_CHECK_ERROR__',
   layout: '__MOCK_HERO_LAYOUT__',
-  // 025: only the composite (screen) regions are busy; text regions stay calm.
+  // 025: the screen's seed patch is textured, so the screen detector says
+  // composite-not-blank; text regions stay calm.
   screen: '__MOCK_HERO_SCREEN__',
+  // 025 A1: the flat screen sits off the contract region (inside the search
+  // margin), so the detected rect differs from the region.
+  screenOffset: '__MOCK_HERO_SCREEN_OFFSET__',
 } as const
 
 const HERO_SAMPLE_COUNT = 256
@@ -442,8 +447,8 @@ const samplesOf = (region: Region, lum: (i: number) => number): RegionSample => 
  * light for __MOCK_HERO_BUSY__ (high lightness variance), flat and on the wrong
  * side of the text colour for __MOCK_HERO_CONTRAST__, and a thrown error for
  * __MOCK_HERO_CHECK_ERROR__ (the caller settles any throw to check-error).
- * __MOCK_HERO_SCREEN__ makes only the composite regions busy (025).
- * null when MOCK_AI is off.
+ * A composite region has no samples of its own to judge here: the screen
+ * detector reads it through mockScreenGrid (025 A1). null when MOCK_AI is off.
  */
 export function mockRegionSamples(
   seamText: string,
@@ -462,12 +467,78 @@ export function mockRegionSamples(
     return regions.map((r) => samplesOf(r, () => flat))
   }
   const calm = textTone === 'light' ? 0.02 : 0.8
-  const screenBusy = seamText.includes(HERO_MOCK_SENTINELS.screen)
-  return regions.map((r) =>
-    screenBusy && r.purpose === 'composite'
-      ? samplesOf(r, (i) => (i % 2 === 0 ? 0.02 : 0.6))
-      : samplesOf(r, (i) => calm + (i % 2 === 0 ? 0.001 : -0.001)),
-  )
+  return regions.map((r) => samplesOf(r, (i) => calm + (i % 2 === 0 ? 0.001 : -0.001)))
+}
+
+// ── 025 A1: the synthetic screen grid ────────────────────────────────────────
+// L*/100 of an evenly lit screen and of the dark surround around it.
+const MOCK_SCREEN_L = 0.86
+const MOCK_SURROUND_L = 0.1
+// How far __MOCK_HERO_SCREEN_OFFSET__ moves the screen, in percent of the canvas.
+const MOCK_SCREEN_OFFSET = { dx: 3, dy: 2 }
+
+/**
+ * A grid over `window` (canvas percent) with a flat screen exactly on `region`
+ * and a dark surround, in the sampler's shape: one point per GRID_STEP_PX canvas
+ * px, the first point at the centre of the first step. `textured` makes the
+ * seed patch (the centre 5% by 5% of the canvas) alternate dark and light;
+ * `offset` moves the screen by MOCK_SCREEN_OFFSET.
+ */
+export function syntheticScreenGrid(
+  window: Rect,
+  region: Region,
+  canvas: CanvasPx,
+  opts: { textured?: boolean; offset?: boolean } = {},
+): LuminanceGrid {
+  const W = canvas.width
+  const H = canvas.height
+  const step = GRID_STEP_PX
+  const wx = (window.x * W) / 100
+  const wy = (window.y * H) / 100
+  const cols = Math.max(1, Math.floor(((window.w * W) / 100) / step))
+  const rows = Math.max(1, Math.floor(((window.h * H) / 100) / step))
+  const shift = opts.offset ? MOCK_SCREEN_OFFSET : { dx: 0, dy: 0 }
+  const left = ((region.rect.x + shift.dx) * W) / 100
+  const top = ((region.rect.y + shift.dy) * H) / 100
+  const right = left + (region.rect.w * W) / 100
+  const bottom = top + (region.rect.h * H) / 100
+  const cx = left + (right - left) / 2
+  const cy = top + (bottom - top) / 2
+  const halfX = (5 * W) / 200
+  const halfY = (5 * H) / 200
+  const x0 = wx + step / 2
+  const y0 = wy + step / 2
+  const values = new Float64Array(cols * rows)
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const px = x0 + c * step
+      const py = y0 + r * step
+      let v = px >= left && px <= right && py >= top && py <= bottom ? MOCK_SCREEN_L : MOCK_SURROUND_L
+      if (opts.textured && Math.abs(px - cx) <= halfX && Math.abs(py - cy) <= halfY) {
+        v = (r + c) % 2 === 0 ? 0.5 : MOCK_SCREEN_L
+      }
+      values[r * cols + c] = v
+    }
+  }
+  return { cols, rows, x0, y0, step, values }
+}
+
+/**
+ * The screen grid for a hero image under the mock seam (025 A1): flat and on
+ * the region by default, a textured seed for __MOCK_HERO_SCREEN__, the screen
+ * moved inside the margin for __MOCK_HERO_SCREEN_OFFSET__. null when MOCK_AI is off.
+ */
+export function mockScreenGrid(
+  seamText: string,
+  window: Rect,
+  region: Region,
+  canvas: CanvasPx,
+): LuminanceGrid | null {
+  if (!MOCK_AI) return null
+  return syntheticScreenGrid(window, region, canvas, {
+    textured: seamText.includes(HERO_MOCK_SENTINELS.screen),
+    offset: seamText.includes(HERO_MOCK_SENTINELS.screenOffset),
+  })
 }
 
 // First cell of a fixed 6 x 6 grid (2% start, 8% step, left to right, top to

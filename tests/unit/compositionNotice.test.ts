@@ -116,6 +116,8 @@ describe('the composite reasons (025 FR-05)', () => {
     const device = (reason: (typeof FALLBACK_REASONS)[number]) => compositionNoticeFor(fallback(reason, 'device-screen'))!
     expect(device('composite-not-blank').message).toContain('Product screen')
     expect(device('composite-not-blank').message).toContain('screenshot')
+    // 025 A1: the detector found no clear blank screen (the old wording said the area was not blank).
+    expect(device('composite-not-blank').message).toContain('no clear blank screen was found')
     for (const reason of ['composite-not-rendered', 'composite-source-missing'] as const) {
       const n = device(reason)
       expect(n.reason).toBe(reason)

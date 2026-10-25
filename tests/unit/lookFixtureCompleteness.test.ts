@@ -10,7 +10,9 @@ import {
 describe('look fixture completeness', () => {
   it('the table covers exactly every current (key, version, size) with the three kinds', () => {
     expect(fixtureCompletenessProblems(archetypes, LOOK_FIXTURES)).toEqual([])
-    expect(LOOK_FIXTURES).toHaveLength(48)
+    // 36 for the four released looks, plus 21 for device-screen (A1: pass, busy, contrast, screen,
+    // pass-offset, text-overlap and small-screen at each of three sizes).
+    expect(LOOK_FIXTURES).toHaveLength(57)
   })
 
   it('a dataset with an added size names the missing ids', () => {

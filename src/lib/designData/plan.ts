@@ -3,6 +3,7 @@
 import type { AspectRatio } from '@prisma/client'
 import type { ImageTier } from '@/providers/imageCapabilities'
 import { archetypes, getArchetype, type ArchetypeMap, type Contract, type SizeContract } from './composition'
+import type { Rect } from './composition'
 import { compositionStampSchema, type CompositeEntry, type CompositionStamp } from './stamp'
 
 export interface HeroPlan {
@@ -24,12 +25,14 @@ export interface ClassicPlan {
 export type CompositionPlan = HeroPlan | ClassicPlan
 
 // The sampler's outcome for a hero image, as `runBackgroundStep` reports it.
+// A kept composite look carries the detected screen (025 A1) in `composites`.
 export type HeroCheckResult =
-  | { ok: true }
+  | { ok: true; composites?: Array<{ region: number; rect: Rect }> }
   | { ok: false; reason: 'busy' | 'contrast' | 'region-invalid' | 'check-error' | 'composite-not-blank' }
 
 // The outcome of placing the author's screenshot (025), passed by the caller
-// that did the placing. Only settleComposition writes `composites`.
+// that did the placing. Only settleComposition writes `composites`: the source
+// comes from here, the rect (the screen detected in the image, A1) from the check.
 export type CompositeOutcome =
   | { ok: true; source: CompositeEntry['source'] }
   | { ok: false; reason: 'composite-not-rendered' | 'composite-source-missing' }
@@ -114,11 +117,14 @@ export function settleComposition(
       return stamp({ appliedArchetype: 'classic', contractVersion: null, fallbackReason: 'composite-source-missing' })
     }
     if (composite && composite.ok === true) {
+      // A kept look needs the detected rect; a check that kept it without one fails closed.
+      const rect = check.composites?.find((c) => c.region === 0)?.rect
+      if (!rect) return stamp({ appliedArchetype: 'classic', contractVersion: null, fallbackReason: 'check-error' })
       return stamp({
         appliedArchetype: plan.requestedArchetype,
         contractVersion: plan.contractVersion,
         fallbackReason: undefined,
-        composites: [{ region: 0, source: composite.source }],
+        composites: [{ region: 0, source: composite.source, rect }],
       })
     }
     return stamp({

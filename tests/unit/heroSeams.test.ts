@@ -18,6 +18,9 @@ import type { Brief } from '@prisma/client'
 import type { ResolvedBrandKit } from '@/lib/brandkit/resolve'
 import {
   archetypes,
+  compositeRegionOf,
+  detectScreenRect,
+  detectionWindow,
   evaluateLayout,
   evaluateRegions,
   imageGeometryPin,
@@ -26,6 +29,7 @@ import {
   type ArchetypeMap,
   type Region,
 } from '@/lib/designData'
+import { ASPECT_DIMENSIONS } from '@/lib/aspectRatio'
 
 const h = vi.hoisted(() => ({
   resolveImageProvider: vi.fn(),
@@ -33,6 +37,8 @@ const h = vi.hoisted(() => ({
   anthropicCreate: vi.fn(),
   persistDataUrlImage: vi.fn(),
   sample: vi.fn(),
+  // 025 A1: the screen-detection grid sampler.
+  grid: vi.fn(),
   imageQuality: undefined as 'standard' | 'high' | undefined,
   // The pipeline mode: API for the background step (the decision goes through
   // the Anthropic mock), CLI for runPathBDesign (the design goes through the CLI mock).
@@ -63,7 +69,7 @@ vi.mock('@anthropic-ai/sdk', () => ({ default: class { messages = { create: h.an
 vi.mock('@/lib/storage/minio', () => ({ persistDataUrlImage: h.persistDataUrlImage }))
 vi.mock('@/lib/renderer/puppeteer', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/renderer/puppeteer')>()
-  return { ...actual, sampleRegionLuminance: h.sample }
+  return { ...actual, sampleRegionLuminance: h.sample, sampleLuminanceGrid: h.grid }
 })
 vi.mock('@/lib/prisma', () => ({
   prisma: {
@@ -140,6 +146,7 @@ beforeEach(() => {
   h.runClaudeCli.mockReset()
   h.persistDataUrlImage.mockReset().mockImplementation(async () => 'https://minio.example.com/bg.png')
   h.sample.mockReset()
+  h.grid.mockReset()
   h.designCalls.length = 0
 })
 
@@ -244,6 +251,66 @@ describe('the hero background step: one image call, the check, the fallback (FR-
       contractVersion: null,
       fallbackReason: reason,
       imageQuality: 'default',
+    })
+  })
+
+  describe('025 A1: a composite look through the real check (the samplers mocked)', () => {
+    const deviceBrief = mkBrief({ imageStyle: 'device-screen', aspectRatio: 'SQUARE' })
+    const devicePlan = () => {
+      const plan = planComposition({ imageStyle: 'device-screen', aspectRatio: 'SQUARE', hasCompositeSource: true })
+      if (plan.kind !== 'hero') throw new Error('expected hero')
+      return plan
+    }
+    const runDevice = () => {
+      h.resolveImageProvider.mockResolvedValue(provider())
+      h.anthropicCreate.mockResolvedValue(decisionReply({ needed: true, prompt: 'a laptop' }))
+      return generateBackgroundForBrief(deviceBrief, kit, 'c', null, actor, devicePlan())
+    }
+    const flatGrid = async (_url: string, window: never, canvas: never, opts: { seamRegion: Region }) =>
+      (await import('@/lib/testHooks')).syntheticScreenGrid(window, opts.seamRegion, canvas)
+
+    it('samples the text regions only, then the screen window, and keeps the look with the detected rect', async () => {
+      h.sample.mockResolvedValue([calm(34)])
+      h.grid.mockImplementation(flatGrid)
+      const result = await runDevice()
+      const plan = devicePlan()
+      const region = compositeRegionOf(plan.sizeContract)!
+      expect(result).toMatchObject({ check: { ok: true, composites: [{ region: 0 }] } })
+      // The text sampler got the text region only.
+      expect((h.sample.mock.calls[0][1] as Region[]).map((r) => r.purpose)).toEqual(['text'])
+      // The grid sampler got the data: URL and the widened window.
+      const [url, window, canvas] = h.grid.mock.calls[0] as [string, unknown, unknown]
+      expect(url).toBe('data:image/png;base64,AAAA')
+      expect(window).toEqual(detectionWindow(region, { width: 1080, height: 1080 }))
+      expect(canvas).toEqual({ width: 1080, height: 1080 })
+    })
+
+    it('a busy text region fails before the screen window is sampled (text first)', async () => {
+      h.sample.mockResolvedValue([busy(34)])
+      h.grid.mockImplementation(flatGrid)
+      expect(await runDevice()).toMatchObject({ check: { ok: false, reason: 'busy' } })
+      expect(h.grid).not.toHaveBeenCalled()
+    })
+
+    it('a screen the detector rejects is composite-not-blank, a window that cannot be sampled is region-invalid, and a sampler error is check-error', async () => {
+      h.sample.mockResolvedValue([calm(34)])
+      h.grid.mockImplementation(async () => ({ cols: 4, rows: 4, x0: 0, y0: 0, step: 2, values: new Float64Array(16).fill(0.5) }))
+      expect(await runDevice()).toMatchObject({ check: { ok: false, reason: 'composite-not-blank' } })
+      h.grid.mockReset()
+      h.grid.mockResolvedValue(null)
+      expect(await runDevice()).toMatchObject({ check: { ok: false, reason: 'region-invalid' } })
+      h.grid.mockReset()
+      h.grid.mockRejectedValue(new HeroCheckError('hero check timed out after 20000 ms'))
+      expect(await runDevice()).toMatchObject({ check: { ok: false, reason: 'check-error' } })
+    })
+
+    it('a look with no composite region never touches the grid sampler, and its check result is exactly { ok: true }', async () => {
+      h.sample.mockResolvedValue([calm()])
+      h.resolveImageProvider.mockResolvedValue(provider())
+      h.anthropicCreate.mockResolvedValue(decisionReply({ needed: true, prompt: 'a laptop' }))
+      const result = await generateBackgroundForBrief(mkBrief(), kit, 'c', null, actor, heroPlanFor(mkBrief()))
+      expect((result as { check: object }).check).toEqual({ ok: true })
+      expect(h.grid).not.toHaveBeenCalled()
     })
   })
 
@@ -440,24 +507,99 @@ describe('the __MOCK_HERO_* seams drive the real planner and evaluators', () => 
     expect(settleComposition(heroPlanFor(brief), result).fallbackReason).toBe('no-image')
   })
 
-  it('025: __MOCK_HERO_SCREEN__ makes only the composite region busy: the REAL evaluateRegions says composite-not-blank', async () => {
+  it('025 A1: the screen grid seam drives the REAL detector: flat on the region by default, textured seed for __MOCK_HERO_SCREEN__, offset for __MOCK_HERO_SCREEN_OFFSET__', async () => {
     const { hooks } = await loadFresh({ MOCK_AI: 'true' })
     expect(hooks.HERO_MOCK_SENTINELS.screen).toBe('__MOCK_HERO_SCREEN__')
+    expect(hooks.HERO_MOCK_SENTINELS.screenOffset).toBe('__MOCK_HERO_SCREEN_OFFSET__')
     for (const size of ['SQUARE', 'PORTRAIT', 'STORY'] as const) {
       const sc = archetypes['device-screen'].versions[1].sizes[size]!
-      const regions = [...sc.regions]
-      const samples = hooks.mockRegionSamples('x __MOCK_BG__ __MOCK_HERO_SCREEN__', regions, 'light')!
-      expect(evaluateRegions(samples, regions, 'light'), size).toMatchObject({
-        ok: false,
-        reason: 'composite-not-blank',
-        region: regions[1],
-      })
-      // Text regions stay calm: with the composite region left out the check passes.
-      expect(evaluateRegions([samples[0]], [regions[0]], 'light'), size).toEqual({ ok: true })
-      // Without the sentinel the whole contract passes, composite included.
-      const calmSamples = hooks.mockRegionSamples('x __MOCK_BG__', regions, 'light')!
-      expect(evaluateRegions(calmSamples, regions, 'light'), size).toEqual({ ok: true })
+      const region = compositeRegionOf(sc)!
+      const texts = sc.regions.filter((r) => r.purpose === 'text')
+      const canvas = ASPECT_DIMENSIONS[size]
+      const window = detectionWindow(region, canvas)
+      const detect = (seam: string) => {
+        const grid = hooks.mockScreenGrid(seam, window, region, canvas)!
+        return detectScreenRect(grid, region, texts, canvas)
+      }
+      // Default: the screen is on the region (within a grid step or two).
+      const flat = detect('x __MOCK_BG__')
+      expect(flat.ok, size).toBe(true)
+      if (flat.ok) {
+        expect(Math.abs(flat.rect.x - region.rect.x), size).toBeLessThan(0.5)
+        expect(Math.abs(flat.rect.y - region.rect.y), size).toBeLessThan(0.5)
+        expect(Math.abs(flat.rect.w - region.rect.w), size).toBeLessThan(0.5)
+        expect(Math.abs(flat.rect.h - region.rect.h), size).toBeLessThan(0.5)
+      }
+      // The screen sentinel: a textured seed, still the one reason.
+      expect(detect('x __MOCK_BG__ __MOCK_HERO_SCREEN__'), size).toEqual({ ok: false, detail: 'seed-not-blank' })
+      // The offset sentinel: a flat screen that moved inside the margin, detected where it is.
+      const moved = detect('x __MOCK_BG__ __MOCK_HERO_SCREEN_OFFSET__')
+      expect(moved.ok, size).toBe(true)
+      if (moved.ok) {
+        expect(moved.rect.x - region.rect.x, size).toBeGreaterThan(2.5)
+        expect(moved.rect.y - region.rect.y, size).toBeGreaterThan(1.5)
+      }
     }
+    // Dormant with MOCK_AI off.
+    const off = await loadFresh({ MOCK_AI: 'false' })
+    const sc = archetypes['device-screen'].versions[1].sizes.SQUARE!
+    const region = compositeRegionOf(sc)!
+    expect(off.hooks.mockScreenGrid('__MOCK_BG__', detectionWindow(region, ASPECT_DIMENSIONS.SQUARE), region, ASPECT_DIMENSIONS.SQUARE)).toBeNull()
+  })
+
+  it('025 A1: the text-region seam no longer touches a composite region (it has no samples to judge)', async () => {
+    const { hooks } = await loadFresh({ MOCK_AI: 'true' })
+    for (const size of ['SQUARE', 'PORTRAIT', 'STORY'] as const) {
+      const regions = [...archetypes['device-screen'].versions[1].sizes[size]!.regions]
+      const withSentinel = hooks.mockRegionSamples('x __MOCK_BG__ __MOCK_HERO_SCREEN__', regions, 'light')!
+      const without = hooks.mockRegionSamples('x __MOCK_BG__', regions, 'light')!
+      expect(withSentinel, size).toEqual(without)
+      expect(evaluateRegions(withSentinel, regions, 'light'), size).toEqual({ ok: true })
+    }
+  })
+
+  it('025 A1: the whole check under the seams: a device-screen look passes with the detected rect, and every sentinel keeps its meaning', async () => {
+    const { bg } = await loadFresh({ MOCK_AI: 'true' })
+    for (const size of ['SQUARE', 'PORTRAIT', 'STORY'] as const) {
+      const plan = planComposition({ imageStyle: 'device-screen', aspectRatio: size, hasCompositeSource: true })
+      if (plan.kind !== 'hero') throw new Error('expected hero')
+      const region = compositeRegionOf(plan.sizeContract)!
+      type Check = { ok: boolean; reason?: string; composites?: Array<{ region: number; rect: { x: number; y: number } }> }
+      const check = async (seam: string) => {
+        h.resolveImageProvider.mockResolvedValue(provider())
+        const result = await bg.generateBackgroundForBrief(
+          mkBrief({ topic: `Q3 ${seam}`, imageStyle: 'device-screen', aspectRatio: size }),
+          kit,
+          'c',
+          null,
+          actor,
+          plan,
+        )
+        return { result, check: (result as unknown as { check: Check }).check }
+      }
+      const pass = await check('__MOCK_BG__')
+      expect(pass.check.ok, size).toBe(true)
+      expect(pass.check.composites, size).toHaveLength(1)
+      expect(pass.check.composites![0].region).toBe(0)
+      expect(Math.abs(pass.check.composites![0].rect.x - region.rect.x), size).toBeLessThan(0.5)
+      const source = { kind: 'brief-upload' as const, key: 'screenshots/t/u/f.png' }
+      const stamp = settleComposition(plan, pass.result, { ok: true, source })
+      expect(stamp, size).toMatchObject({
+        appliedArchetype: 'device-screen',
+        composites: [{ region: 0, source, rect: pass.check.composites![0].rect }],
+      })
+
+      expect((await check('__MOCK_BG__ __MOCK_HERO_SCREEN__')).check, size).toEqual({ ok: false, reason: 'composite-not-blank' })
+      const offset = await check('__MOCK_BG__ __MOCK_HERO_SCREEN_OFFSET__')
+      expect(offset.check.ok, size).toBe(true)
+      expect(offset.check.composites![0].rect.x - region.rect.x, size).toBeGreaterThan(2.5)
+      expect((await check('__MOCK_BG__ __MOCK_HERO_BUSY__')).check, size).toEqual({ ok: false, reason: 'busy' })
+      expect((await check('__MOCK_BG__ __MOCK_HERO_CONTRAST__')).check, size).toEqual({ ok: false, reason: 'contrast' })
+      expect((await check('__MOCK_BG__ __MOCK_HERO_CHECK_ERROR__')).check, size).toEqual({ ok: false, reason: 'check-error' })
+    }
+    // The seams stood in for both samplers.
+    expect(h.sample).not.toHaveBeenCalled()
+    expect(h.grid).not.toHaveBeenCalled()
   })
 
   it('025: the existing sentinels behave as before on a contract with a composite region', async () => {

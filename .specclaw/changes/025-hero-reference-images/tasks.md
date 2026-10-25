@@ -114,7 +114,7 @@ This change has **12 tasks in 6 waves**:
     - **e2e-test-plan:** section AG with TC-SHOT-01; the rest are planned.
     - **Gate:** stop stray node processes (ask about :3002), `rm -rf .next`, drop and recreate `bistec_studio_test`, then `npm run test:e2e:serve` and `npm run test:e2e:mock` (0 failed, 0 flaky, at least 530 passed), tsc, lint, unit, `npm run test:render`, build, `rm -rf .next`. Push `v2` (never `main`) and watch `gh run list --branch v2` until green.
 
-- [ ] `T13` — Amendment A1: screen detection, the stamp rect, fixtures and `--recheck`
+- [x] `T13` — Amendment A1: screen detection, the stamp rect, fixtures and `--recheck`
   - Files: `src/lib/designData/{composite,evaluate,plan,stamp,index}.ts`, `src/lib/renderer/puppeteer.ts` (`sampleLuminanceGrid` only), `src/lib/agent/background.ts` (the check wiring only), `src/lib/testHooks.ts` (the grid seam, `__MOCK_HERO_SCREEN_OFFSET__`), `src/lib/drafts/compositionNotice.ts` (the `composite-not-blank` wording), `src/app/api/admin/look-probe/route.ts` (`rect` in the response), `scripts/look-check/{lookCheck,run-look-check}.mjs` (`--recheck`), `tests/unit/{compositeFacts,compositionStamp,compositionPlan,heroSeams,lookProbe,lookCheck,compositionNotice}.test.ts`, `tests/unit/screenDetect.test.ts` (new), `tests/render/{lookFixtureTable,lookFixtures,look-fixtures.test}.ts`, `tests/unit/lookFixtureCompleteness.test.ts`
   - Estimate: large
   - Kind: impl
