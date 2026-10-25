@@ -137,7 +137,7 @@ This change has **7 tasks in 5 waves**:
 
 ### Wave 5: After OP-028 (operator-gated)
 
-- [>] `T7` — Post-style `versions[2]` for the looks that passed the real-image check
+- [x] `T7` — Post-style `versions[2]` for the looks that passed the real-image check
   - Files: `src/lib/postStyles/styles.ts`, `tests/unit/postStylesDataset.test.ts`, `tests/unit/lookCheckResults.test.ts` (new), `tests/e2e/image-looks.test.ts` (one case per moved style), `docs/handoff.md`, `CLAUDE.md`, `.specclaw/ROADMAP.md`
   - Estimate: small
   - Kind: impl

@@ -157,10 +157,11 @@ test.afterAll(async () => {
 
 test.describe('Post style inputs: briefs', () => {
   test('TC-PS-01: a style is stored with the style goal, the resolved tone and a classic image; the goal sent is ignored', async () => {
-    const res = await postBrief(admin, { postStyle: 'hiring', goal: 'x-ignored' })
+    // 028 T7: hiring now defaults to full-bleed-scene (TC-LOOK-13 to 16); promotion still defaults to classic.
+    const res = await postBrief(admin, { postStyle: 'promotion', goal: 'x-ignored' })
     expect(res.status()).toBe(201)
     const brief = await res.json()
-    expect(brief.postStyle).toBe('hiring')
+    expect(brief.postStyle).toBe('promotion')
     expect(brief.goal).toBeTruthy()
     expect(brief.goal).not.toBe('x-ignored')
     expect(brief.tone).toBeTruthy()
