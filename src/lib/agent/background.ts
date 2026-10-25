@@ -176,6 +176,8 @@ async function runBackgroundStep(
     // required an image), an empty prompt is no image, one image call is made
     // (with the operator's quality tier when set) and its pixels are checked.
     hero?: HeroPlan
+    // Called with the image prompt just before the image call (025 probe).
+    onPrompt?: (prompt: string) => void
   },
 ): Promise<BackgroundOutcome> {
   // NFR-06 seam: without a __MOCK_BG__ sentinel, MOCK_AI skips the step (no
@@ -209,6 +211,7 @@ async function runBackgroundStep(
     const provider = mockSeam ? mockImageProvider(resolved.provider, opts.seamText) : resolved.provider
 
     log(`generating background · size=${imageSizeFor(provider.providerName, opts.aspectRatio)} · prompt="${decision.prompt.slice(0, 120)}..."`)
+    opts.onPrompt?.(decision.prompt)
     const startedAt = Date.now()
     // TODO(team-tenancy): if a personal UserOpenAiKey was resolved above and this
     // call fails with an auth error, flip it INVALID here (markUserOpenAiKeyInvalid,
@@ -304,6 +307,7 @@ export async function generateBackgroundForBrief(
   campaignBriefing: string | null | undefined,
   actor: GenerationActor,
   hero?: HeroPlan,
+  onPrompt?: (prompt: string) => void,
 ): Promise<BackgroundOutcome> {
   return runBackgroundStep(
     () =>
@@ -326,6 +330,7 @@ export async function generateBackgroundForBrief(
       seamText: brief.topic,
       kind: 'generation',
       hero,
+      onPrompt,
     },
   )
 }

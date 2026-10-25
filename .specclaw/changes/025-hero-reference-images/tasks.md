@@ -79,7 +79,7 @@ This change has **12 tasks in 6 waves**:
     - Record in `reports/T3.md` the measured L\* standard deviation of the pass and screen fixtures per size.
     - **Gate:** tsc, lint, unit, `npm run test:render` (at least 96, all passing, run twice).
 
-- [ ] `T4` — The probe route and `run-look-check.mjs --probe`
+- [x] `T4` — The probe route and `run-look-check.mjs --probe`
   - Files: `src/app/api/admin/look-probe/route.ts` (new), `src/lib/agent/background.ts` (`onPrompt` callback only), `scripts/look-check/{lookCheck,run-look-check}.mjs`, `tests/unit/{lookProbe,lookCheck}.test.ts`, `.specclaw/changes/025-hero-reference-images/look-check/.gitignore` (new: `renders/`)
   - Estimate: medium
   - Kind: impl

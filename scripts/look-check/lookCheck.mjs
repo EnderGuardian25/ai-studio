@@ -15,8 +15,8 @@ export const SLOTS = [
 export const MAX_ATTEMPTS_PER_SLOT = 2
 
 // The hard cap on image calls: computed, never typed.
-export function capFor(slots) {
-  return MAX_ATTEMPTS_PER_SLOT * slots.length
+export function capFor(slots, perSlotMax = MAX_ATTEMPTS_PER_SLOT) {
+  return perSlotMax * slots.length
 }
 
 // JSONL to entries. A malformed line is an attempt too: it is kept as
@@ -110,4 +110,59 @@ export function parseVerdictArg(s) {
   const m = /^(.+)=(accept|reject)$/.exec(String(s ?? ''))
   if (!m) return null
   return { slot: m[1], accepted: m[2] === 'accept' }
+}
+
+// ---- 025 OP-025 probe mode ----
+export const PROBE_SLOTS = ['device-screen:SQUARE', 'device-screen:PORTRAIT', 'device-screen:STORY']
+export const PROBE_MAX_ATTEMPTS_PER_SLOT = 3
+export const PROBE_ACCEPTS_NEEDED = 2
+
+// The latest result per attempt number for a slot (a re-recorded attempt replaces the earlier one).
+function probeResultsFor(results, slot) {
+  const byAttempt = new Map()
+  for (const r of results ?? []) if (r && r.slot === slot) byAttempt.set(r.attempt, r)
+  return [...byAttempt.values()]
+}
+
+const probeAttemptOk = (r) => r.styleKept === true && r.accepted === true
+
+// A slot passes with 2 attempts that are each styleKept and accepted.
+export function probeVerdicts(results, slots = PROBE_SLOTS) {
+  const out = {}
+  for (const slot of slots) {
+    const rs = probeResultsFor(results, slot)
+    const ok = rs.filter(probeAttemptOk).length
+    const pending = rs.some((r) => r.styleKept === true && (r.accepted === null || r.accepted === undefined))
+    out[slot] = { passed: ok >= PROBE_ACCEPTS_NEEDED, accepted: ok, status: ok >= PROBE_ACCEPTS_NEEDED ? 'pass' : pending ? 'pending' : 'fail' }
+  }
+  return out
+}
+
+// planNext for the probe. planNext stops a slot after one accepted attempt and
+// allows two attempts; the probe needs two accepted attempts out of at most three.
+export function planNextProbe(entries, results, slot, cap) {
+  if (entries.length >= cap) return { ok: false, reason: 'cap' }
+  const attempts = attemptsFor(entries, slot)
+  if (attempts >= PROBE_MAX_ATTEMPTS_PER_SLOT) return { ok: false, reason: 'max-attempts' }
+  const rs = probeResultsFor(results, slot)
+  const accepted = rs.filter(probeAttemptOk).length
+  if (accepted >= PROBE_ACCEPTS_NEEDED) return { ok: false, reason: 'already-passed' }
+  if (rs.some((r) => r.styleKept === true && (r.accepted === null || r.accepted === undefined))) {
+    return { ok: false, reason: 'awaiting-verdict' }
+  }
+  if (accepted + (PROBE_MAX_ATTEMPTS_PER_SLOT - attempts) < PROBE_ACCEPTS_NEEDED) return { ok: false, reason: 'cannot-pass' }
+  return { ok: true, attempt: attempts + 1 }
+}
+
+// "device-screen:SQUARE#2=accept" -> { slot, attempt: 2, accepted: true }; null when malformed.
+export function parseProbeVerdictArg(s) {
+  const m = /^(.+)#(\d+)=(accept|reject)$/.exec(String(s ?? ''))
+  if (!m) return null
+  return { slot: m[1], attempt: Number(m[2]), accepted: m[3] === 'accept' }
+}
+
+// The ledger line shape. threshold and promptHash are known only from the
+// response, so a line written before the request carries them as null.
+export function probeLedgerLine({ at, runId, slot, attempt, threshold = /** @type {number | null} */ (null), promptHash = /** @type {string | null} */ (null) }) {
+  return { at, runId, slot, attempt, mode: 'probe', threshold, promptHash }
 }

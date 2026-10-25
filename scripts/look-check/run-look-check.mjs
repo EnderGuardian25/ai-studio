@@ -2,12 +2,16 @@
 // Usage:
 //   node scripts/look-check/run-look-check.mjs --base http://localhost:3002 --out <dir> [--only <slot> ...] [--dry-run]
 //   node scripts/look-check/run-look-check.mjs --out <dir> --verdict <slot>=accept|reject
+// 025 OP-025 probe mode (device-screen; --out defaults to .specclaw/changes/025-hero-reference-images/look-check):
+//   node scripts/look-check/run-look-check.mjs --probe --base http://localhost:3002 [--out <dir>] [--only <slot> ...] [--dry-run]
+//   node scripts/look-check/run-look-check.mjs --probe [--out <dir>] --verdict <slot>#<attempt>=accept|reject
 // env (a run only): LOOK_CHECK_USERNAME, LOOK_CHECK_PASSWORD, LOOK_CHECK_TEAM, LOOK_CHECK_KIT
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import {
   SLOTS, capFor, checkBase, lastResult, parseLedger, parseVerdictArg, planNext, totalLine,
+  PROBE_SLOTS, PROBE_MAX_ATTEMPTS_PER_SLOT, planNextProbe, parseProbeVerdictArg, probeLedgerLine, probeVerdicts,
 } from './lookCheck.mjs'
 
 const POLL_MS = 10_000
@@ -54,6 +58,7 @@ function parseArgs(argv) {
   for (let i = 0; i < argv.length; i++) {
     const v = argv[i]
     if (v === '--dry-run') a.dryRun = true
+    else if (v === '--probe') a.probe = true
     else if (v === '--base') a.base = argv[++i]
     else if (v === '--out') a.out = argv[++i]
     else if (v === '--verdict') a.verdict = argv[++i]
@@ -64,6 +69,7 @@ function parseArgs(argv) {
 }
 
 const args = parseArgs(process.argv.slice(2))
+if (args.probe && !args.out) args.out = '.specclaw/changes/025-hero-reference-images/look-check'
 if (!args.out) { console.error('--out <dir> is required'); process.exit(1) }
 
 const ledgerPath = join(args.out, 'ledger.jsonl')
@@ -78,6 +84,122 @@ function wanted() {
   if (unknown.length) { console.error(`unknown slot: ${unknown.join(', ')}`); process.exit(1) }
   return SLOTS.filter((s) => args.only.length === 0 || args.only.includes(s.slot))
 }
+
+// ---- 025 probe mode: the device-screen look, through POST /api/admin/look-probe ----
+async function runProbe() {
+  const pcap = capFor(PROBE_SLOTS, PROBE_MAX_ATTEMPTS_PER_SLOT)
+  const pwanted = () => {
+    const unknown = args.only.filter((s) => !PROBE_SLOTS.includes(s))
+    if (unknown.length) { console.error(`unknown slot: ${unknown.join(', ')}`); process.exit(1) }
+    return PROBE_SLOTS.filter((s) => args.only.length === 0 || args.only.includes(s))
+  }
+
+  if (args.verdict) {
+    const v = parseProbeVerdictArg(args.verdict)
+    if (!v) { console.error('--verdict must be <slot>#<attempt>=accept|reject'); process.exit(1) }
+    const results = readResults()
+    const r = results.find((x) => x.slot === v.slot && x.attempt === v.attempt)
+    if (!r) { console.error(`no result for ${v.slot} attempt ${v.attempt}`); process.exit(1) }
+    r.accepted = v.accepted
+    writeFileSync(resultsPath, JSON.stringify(results, null, 2))
+    console.log(`${v.slot}#${v.attempt}: ${v.accepted ? 'accepted' : 'rejected'}`)
+    console.log(JSON.stringify(probeVerdicts(results)))
+    process.exit(0)
+  }
+
+  if (args.dryRun) {
+    const entries = readLedger()
+    const results = readResults()
+    if (args.base) {
+      const b = checkBase(args.base)
+      if (!b.ok) { console.error(b.error); process.exit(1) }
+    }
+    console.log(`[look-check] probe dry run: ledger ${entries.length} of cap ${pcap}`)
+    console.log(`ledger line shape: ${JSON.stringify(probeLedgerLine({ at: '<iso>', runId: '<uuid>', slot: '<slot>', attempt: 1 }))}`)
+    for (const slot of pwanted()) {
+      const p = planNextProbe(entries, results, slot, pcap)
+      console.log(`${slot}: ${p.ok ? `would run attempt ${p.attempt}` : `refused: ${p.reason}`}`)
+    }
+    process.exit(0)
+  }
+
+  const base = checkBase(args.base)
+  if (!base.ok) { console.error(base.error); process.exit(1) }
+  const { LOOK_CHECK_USERNAME: USER, LOOK_CHECK_PASSWORD: PASS, LOOK_CHECK_TEAM: TEAM } = process.env
+  if (!USER || !PASS || !TEAM) {
+    console.error('LOOK_CHECK_USERNAME, LOOK_CHECK_PASSWORD and LOOK_CHECK_TEAM are required')
+    process.exit(2)
+  }
+  mkdirSync(join(args.out, 'renders'), { recursive: true })
+  if (readLedger().length >= pcap) {
+    console.log(`${totalLine(readLedger().length, pcap)} (cap reached)`)
+    process.exit(3)
+  }
+
+  let cookie = ''
+  async function call(path, init = {}) {
+    const res = await fetch(args.base + path, {
+      ...init,
+      headers: { 'content-type': 'application/json', ...(cookie ? { cookie } : {}), ...(init.headers ?? {}) },
+      redirect: 'manual',
+    })
+    const setCookie = res.headers.getSetCookie?.() ?? []
+    if (setCookie.length) {
+      const jar = new Map(cookie.split('; ').filter(Boolean).map((c) => c.split(/=(.*)/s).slice(0, 2)))
+      for (const c of setCookie) { const [kv] = c.split(';'); const [k, v] = kv.split(/=(.*)/s); jar.set(k, v) }
+      cookie = [...jar].map(([k, v]) => `${k}=${v}`).join('; ')
+    }
+    const text = await res.text()
+    let body; try { body = JSON.parse(text) } catch { body = text }
+    return { status: res.status, body }
+  }
+
+  const login = await call('/api/auth/sign-in/username', { method: 'POST', body: JSON.stringify({ username: USER, password: PASS }) })
+  if (login.status !== 200) { console.error(`login ${login.status}`); process.exit(1) }
+  const team = await call('/api/me/active-team', { method: 'POST', body: JSON.stringify({ teamId: TEAM }) })
+  if (team.status >= 300) { console.error(`active-team ${team.status}`); process.exit(1) }
+
+  const runId = randomUUID()
+  for (const slot of pwanted()) {
+    const entries = readLedger()
+    const results = readResults()
+    const p = planNextProbe(entries, results, slot, pcap)
+    if (!p.ok) {
+      console.log(`${slot}: skipped (${p.reason})`)
+      if (p.reason === 'cap') break
+      continue
+    }
+    // The ledger line goes down first, synchronously: a crash after it still counts. threshold and
+    // promptHash come from the response, so they are null here and are recorded in results.json.
+    appendFileSync(ledgerPath, JSON.stringify(probeLedgerLine({ at: new Date().toISOString(), runId, slot, attempt: p.attempt })) + '\n')
+    console.log(totalLine(entries.length + 1, pcap))
+    log('started', slot, `attempt ${p.attempt}`)
+    const [key, size] = slot.split(':')
+    const result = { slot, attempt: p.attempt, runId, styleKept: false, fallbackReason: null, threshold: null, promptHash: null, render: null, error: null, accepted: null }
+    try {
+      const r = await call('/api/admin/look-probe', { method: 'POST', body: JSON.stringify({ key, size }) })
+      if (r.status !== 200) throw new Error(`probe ${r.status}: ${JSON.stringify(r.body).slice(0, 300)}`)
+      result.styleKept = r.body.verdict?.ok === true
+      result.fallbackReason = r.body.fallbackReason ?? null
+      result.threshold = r.body.threshold ?? null
+      result.promptHash = r.body.promptHash ?? null
+      const m = /^data:[^;]+;base64,(.+)$/s.exec(String(r.body.image ?? ''))
+      if (m) {
+        const name = `${key}_${size}_${p.attempt}.png`
+        writeFileSync(join(args.out, 'renders', name), Buffer.from(m[1], 'base64'))
+        result.render = name
+      }
+    } catch (e) {
+      result.error = String(e?.message ?? e)
+      result.styleKept = false
+    }
+    results.push(result)
+    writeFileSync(resultsPath, JSON.stringify(results, null, 2))
+    log('done', slot, result.error ? `error: ${result.error}` : `styleKept ${result.styleKept}${result.fallbackReason ? ` (${result.fallbackReason})` : ''}`)
+  }
+  process.exit(0)
+}
+if (args.probe) await runProbe()
 
 if (args.verdict) {
   const v = parseVerdictArg(args.verdict)

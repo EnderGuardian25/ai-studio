@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { readFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import * as lc from '../../scripts/look-check/lookCheck.mjs'
 import {
   SLOTS, capFor, parseLedger, attemptsFor, lastResult, slotPassed, planNext,
@@ -154,5 +157,92 @@ describe('look-check pass rule (AC-16)', () => {
     expect(v['full-bleed-scene'].passed).toBe(false)
     expect(slotPassed(res(S, { accepted: true }))).toBe(true)
     expect(slotPassed(res(S))).toBe(false)
+  })
+})
+
+// ---- 025 probe mode (AC-07) ----
+const P = 'device-screen:SQUARE'
+type PV = Record<string, { passed: boolean; status: string; accepted: number }>
+const pv = (r: unknown[]) => lc.probeVerdicts(r) as PV
+const pres = (attempt: number, over: Record<string, unknown> = {}) => ({
+  slot: P, attempt, styleKept: true, accepted: null, ...over,
+})
+
+describe('look-check probe mode (025 AC-07)', () => {
+  it('keeps the 028 slots and cap, and the default per-slot maximum of 2', () => {
+    expect(SLOTS).toHaveLength(8)
+    expect(capFor(SLOTS)).toBe(16)
+    expect(capFor(SLOTS, 2)).toBe(16)
+    expect(lc.MAX_ATTEMPTS_PER_SLOT).toBe(2)
+  })
+
+  it('has three device-screen slots and a computed cap of 9', () => {
+    expect(lc.PROBE_SLOTS).toEqual(['device-screen:SQUARE', 'device-screen:PORTRAIT', 'device-screen:STORY'])
+    expect(capFor(lc.PROBE_SLOTS, 3)).toBe(9)
+    expect(capFor(lc.PROBE_SLOTS, lc.PROBE_MAX_ATTEMPTS_PER_SLOT)).toBe(9)
+  })
+
+  it('writes a ledger line with mode, threshold and promptHash', () => {
+    const l = lc.probeLedgerLine({ at: 't', runId: 'r', slot: P, attempt: 1 })
+    expect(Object.keys(l)).toEqual(['at', 'runId', 'slot', 'attempt', 'mode', 'threshold', 'promptHash'])
+    expect(l.mode).toBe('probe')
+    expect(lc.probeLedgerLine({ at: 't', runId: 'r', slot: P, attempt: 2, threshold: 0.04, promptHash: 'abc' })).toMatchObject({
+      threshold: 0.04, promptHash: 'abc',
+    })
+  })
+
+  it('passes a slot with two attempts that each kept the look and were accepted', () => {
+    const v = pv([pres(1, { accepted: true }), pres(2, { accepted: true })])
+    expect(v[P]).toMatchObject({ passed: true, status: 'pass', accepted: 2 })
+  })
+
+  it('does not pass on one accepted attempt, a rejection, a fallback or a pending verdict', () => {
+    expect(pv([pres(1, { accepted: true })])[P].passed).toBe(false)
+    expect(pv([pres(1, { accepted: true }), pres(2, { accepted: false })])[P].status).toBe('fail')
+    expect(pv([pres(1, { accepted: true }), pres(2, { styleKept: false, accepted: true })])[P].passed).toBe(false)
+    expect(pv([pres(1, { accepted: true }), pres(2)])[P].status).toBe('pending')
+    expect(pv([])[P]).toMatchObject({ passed: false, status: 'fail' })
+  })
+
+  it('counts the latest result per attempt number', () => {
+    const v = pv([pres(1, { accepted: false }), pres(1, { accepted: true }), pres(2, { accepted: true })])
+    expect(v[P].passed).toBe(true)
+  })
+
+  it('plans up to three attempts and refuses a fourth, at the cap, or after a pass', () => {
+    const cap9 = capFor(lc.PROBE_SLOTS, 3)
+    const e = (n: number) => parseLedger(Array.from({ length: n }, (_, i) => line(P, i + 1)).join('\n'))
+    expect(lc.planNextProbe(e(0), [], P, cap9)).toEqual({ ok: true, attempt: 1 })
+    expect(lc.planNextProbe(e(1), [pres(1, { accepted: true })], P, cap9)).toEqual({ ok: true, attempt: 2 })
+    expect(lc.planNextProbe(e(3), [pres(1, { accepted: true }), pres(2, { accepted: false }), pres(3, { accepted: true })], P, cap9))
+      .toEqual({ ok: false, reason: 'max-attempts' })
+    expect(lc.planNextProbe(e(2), [pres(1, { accepted: true }), pres(2, { accepted: true })], P, cap9))
+      .toEqual({ ok: false, reason: 'already-passed' })
+    expect(lc.planNextProbe(e(1), [pres(1)], P, cap9)).toEqual({ ok: false, reason: 'awaiting-verdict' })
+    expect(lc.planNextProbe(e(2), [pres(1, { accepted: false }), pres(2, { accepted: false })], P, cap9))
+      .toEqual({ ok: false, reason: 'cannot-pass' })
+    const full = parseLedger(Array.from({ length: 9 }, (_, i) => line(lc.PROBE_SLOTS[i % 3], 1)).join('\n'))
+    expect(lc.planNextProbe(full, [], 'device-screen:STORY', cap9)).toEqual({ ok: false, reason: 'cap' })
+  })
+
+  it('parses the per-attempt verdict argument', () => {
+    expect(lc.parseProbeVerdictArg('device-screen:SQUARE#2=accept')).toEqual({ slot: P, attempt: 2, accepted: true })
+    expect(lc.parseProbeVerdictArg('device-screen:SQUARE#1=reject')).toEqual({ slot: P, attempt: 1, accepted: false })
+    expect(lc.parseProbeVerdictArg('device-screen:SQUARE=accept')).toBeNull()
+    expect(lc.parseProbeVerdictArg('device-screen:SQUARE#x=accept')).toBeNull()
+  })
+
+  it('--probe --dry-run lists three slots, a cap of 9 and the ledger line shape, and sends nothing', () => {
+    const out = join(mkdtempSync(join(tmpdir(), 'probe-dry-')), 'out')
+    const text = execFileSync(
+      process.execPath,
+      ['scripts/look-check/run-look-check.mjs', '--probe', '--out', out, '--dry-run'],
+      { encoding: 'utf8' },
+    )
+    expect(text).toContain('of cap 9')
+    for (const s of lc.PROBE_SLOTS) expect(text).toContain(`${s}: would run attempt 1`)
+    expect(text).toContain('"threshold":null')
+    expect(text).toContain('"promptHash":null')
+    expect(text).toContain('"mode":"probe"')
   })
 })
