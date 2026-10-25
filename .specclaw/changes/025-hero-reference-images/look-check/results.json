@@ -10,5 +10,41 @@
     "render": "device-screen_SQUARE_1.png",
     "error": null,
     "accepted": null
+  },
+  {
+    "slot": "device-screen:SQUARE",
+    "attempt": 2,
+    "runId": "c31b92c7-9634-45ef-be39-562b4278e2f1",
+    "styleKept": false,
+    "fallbackReason": "composite-not-blank",
+    "threshold": 0.04,
+    "promptHash": "b2384f46707354d9b07fb50411395ef9c2428dddcd73e54c98f6568061ab910c",
+    "render": "device-screen_SQUARE_2.png",
+    "error": null,
+    "accepted": null
+  },
+  {
+    "slot": "device-screen:PORTRAIT",
+    "attempt": 1,
+    "runId": "c31b92c7-9634-45ef-be39-562b4278e2f1",
+    "styleKept": false,
+    "fallbackReason": "composite-not-blank",
+    "threshold": 0.04,
+    "promptHash": "adfbdb1bed1621411620a6e1b3f39906065a68ada85a3e29b5f47a7b810a2129",
+    "render": "device-screen_PORTRAIT_1.png",
+    "error": null,
+    "accepted": null
+  },
+  {
+    "slot": "device-screen:STORY",
+    "attempt": 1,
+    "runId": "c31b92c7-9634-45ef-be39-562b4278e2f1",
+    "styleKept": false,
+    "fallbackReason": "composite-not-blank",
+    "threshold": 0.04,
+    "promptHash": "2b49e927a86925b1b5a88c8a26fc00c01a6c11da4e35aee99ef8075d2ea1c40d",
+    "render": "device-screen_STORY_1.png",
+    "error": null,
+    "accepted": null
   }
 ]
