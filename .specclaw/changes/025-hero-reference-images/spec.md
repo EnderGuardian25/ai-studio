@@ -47,11 +47,11 @@ File map (details in [design.md](design.md)):
 - **FR-01: the `composite` purpose and `requires`.** `Purpose` gains `'composite'`. `Archetype` gains an optional `requires?: 'composite-source'`. A `composite` region is the only kind of region a look with `requires` may add beyond its `text` regions. The `composition.ts` header records that `composite`, `requires` and the three new fallback reasons are permanent names.
 - **FR-02: the `device-screen` look, version 1.** Key `device-screen`, label "Product screen", summary "A laptop showing your own product screenshot, with the text above it.", `status: 'active'`, `current: 1`, `requires: 'composite-source'`, `textTone: 'light'`. One landscape laptop at every size. Every screen rect is 16:10 in canvas pixels. `minAreaPct` is 20 for every region.
 
-  | Size (px)          | `text` region (x, y, w, h %) | `composite` region (x, y, w, h %) | Screen in px |
-  | ------------------ | ---------------------------- | --------------------------------- | ------------ |
-  | SQUARE 1080×1080   | 0, 0, 100, 34                | 14, 42, 72, 45                    | 777.6 × 486  |
-  | PORTRAIT 1080×1350 | 0, 0, 100, 36                | 10, 45, 80, 40                    | 864 × 540    |
-  | STORY 1080×1920    | 0, 0, 100, 34                | 8, 44, 84, 29.5                   | 907.2 × 567  |
+  | Size (px)          | `text` region (x, y, w, h %) | `composite` region (x, y, w, h %) | Screen in px  |
+  | ------------------ | ---------------------------- | --------------------------------- | ------------- |
+  | SQUARE 1080×1080   | 0, 0, 100, 34                | 14, 42, 72, 45                    | 777.6 × 486   |
+  | PORTRAIT 1080×1350 | 0, 0, 100, 36                | 10, 45, 80, 40                    | 864 × 540     |
+  | STORY 1080×1920    | 0, 0, 100, 34                | 8, 44, 84, 29.5                   | 907.2 × 566.4 |
 
   Subject per size: "a modern laptop seen straight on, centred, its screen exactly filling the screen area, on a plain dark surface with soft light". Rows may be tuned in Group A before OP-025 (NFR-04). After OP-025, a size that failed is removed from v1 before release.
 

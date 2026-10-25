@@ -37,7 +37,7 @@ This change has **12 tasks in 6 waves**:
 
 ### Wave 1: Group A, the dataset
 
-- [ ] `T1` — The composite purpose, `device-screen` v1, the blank check, the reasons, the stamp field and the prompt text
+- [x] `T1` — The composite purpose, `device-screen` v1, the blank check, the reasons, the stamp field and the prompt text
   - Files: `src/lib/designData/{composition,validate,evaluate,plan,stamp,promptText,index}.ts`, `src/lib/designData/composite.ts` (new), `src/lib/testHooks.ts` (`mockRegionSamples` per region, `__MOCK_HERO_SCREEN__`), `src/lib/drafts/compositionNotice.ts`, `tests/unit/{lookDataset,designData,designDataBoundary,heroPrompts,compositionStamp,compositionNotice,compositionPlan,heroSeams,designRegions}.test.ts` (adapt and extend), `tests/unit/compositeFacts.test.ts` (new)
   - Estimate: large
   - Kind: impl

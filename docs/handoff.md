@@ -7,7 +7,52 @@
 
 ---
 
-## ⏸️ 2026-10-23 (end of day) — PICK UP HERE: 007 VERIFIED PASS and 009 OP-1 PASSED; 006 planned; 026 VERIFIED PASS; nothing is mid-build
+## ⏸️ 2026-10-25 (later) — PICK UP HERE: 025 hero product screenshots is planned and building (T1 done, next T2)
+
+**Latest:** T1 is DONE (`03389a5`, review NOTE, unit 3960/3960, render 84/84, lint 0/7). **Next is T2.** Carry these T1 review notes forward: (a) `device-screen` shows in the picker until T2 lands, so do not push `v2` between T1 and T2 without T2; (b) **T3** must delete the temporary `!a.requires` filter in `tests/unit/lookFixtureCompleteness.test.ts` and assert 48 rows; (c) **T9** must pass `canvas` to `refineContractText` (it is optional now, so the pixel text is left out without it); (d) **T8** adds a test that a composite `ok:true` for a look without `requires` throws at stamp parse; (e) `settleComposition` fails closed: a kept `requires` look with no third argument settles to classic `composite-source-missing`.
+
+**Where things stand.**
+
+- **025 is planned and approved (architectural), committed at `0865ad2`.**
+  - The 2026-10-22 draft was rewritten for OP-1 (passed), 007, 027a and 028.
+  - The deep party panel (5 seats, 2 rounds, 10 runs) returned CHANGES_REQUESTED: 4 BLOCKs, 18 WARNs and 5 NOTEs upheld, 1 withdrawn.
+  - The user answered it on 2026-10-25:
+    - adopt every fix;
+    - screenshots per post, uploaded by the post author;
+    - all three sizes, each gated by OP-025;
+    - demand is "often".
+  - The proposal's "Panel resolution" table maps each finding.
+- **The design in one paragraph.** A new look, `device-screen` v1 (`requires: 'composite-source'`), shows one landscape laptop at SQUARE, PORTRAIT and STORY.
+  - **The screen:** a `composite` region, with a 16:10 rect in canvas px.
+  - **Image check:** the image model must leave the screen blank. The region check fails above `BLANK_STDDEV_MAX = 0.04`, with the reason `composite-not-blank`.
+  - **Design step:** the design model is told to leave the rect empty.
+  - **Insertion:** code (`src/lib/composite/insert.ts`, Group B) inserts one canonical fixed-position element with the token `__COMPOSITE_0__`.
+  - **Render:** the renderer takes a **required** `composites` argument. It resolves the token to a `data:` URI built from the private object (`BUCKET_DOCS`, `screenshots/<teamId>/<userId>/…`), then checks in the page that the image loaded, sits within 2 px of the rect and is topmost. A failure is `composite-not-rendered`.
+  - **Fallback:** generation falls back to classic **without** the hero image; refine and inline edit fail with a named error and write nothing.
+  - **Storage:** the brief stores `compositeSource` in a new nullable JSONB column, migration `20261026120000_composite_source`.
+- **Two refinements of the approved proposal, both in the spec Overview:**
+  - a `data:` URI at render, not a signed URL;
+  - OP-025 via a super-admin probe route (`POST /api/admin/look-probe`, 404 in production) and `run-look-check.mjs --probe`: one image call and one Haiku call per attempt, a cap of 9, a ledger in `.specclaw/changes/025-hero-reference-images/look-check/`, per-attempt verdicts, and 2 accepted attempts per size to pass.
+
+**Resume, in order.**
+
+1. **T1 is done** (`03389a5`). Its review notes for later tasks are in the "Latest" line above.
+2. **T2** (availability by `requires`), **T3** (12 fixture rows, the `screen` kind), **T4** (the probe route and `--probe`), then **T5** (Group A docs, the full mock E2E and CI on `v2`). One task at a time, following the process in tasks.md.
+3. **Stop before OP-025.** The user decides the spend. The procedure goes in this file at T5.
+4. **Group B (T6 to T12) only after an OP-025 go.** If no size passes, T6 removes the never-released look and the change stops.
+
+**Gotchas.**
+
+- `specclaw-build-context` emits about 500 KB (a docs digest). Give implementers a focused brief like `briefs/T1.md`.
+- Party agent types are `specclaw:party-*`.
+- The untracked `028-image-looks/logs/` and `029-cli-usage-limit-message/logs/` are leftovers.
+- The baselines at `45fae1a` are unit 3903, render 84, lint 0/7 and E2E 529/3/0/0.
+
+**After 025:** the stale-headline badge (no proposal yet). The user still owns the `v2` → `main` merge go-ahead.
+
+---
+
+## ⏸️ 2026-10-23 (end of day; superseded by the 2026-10-25 section above): 007 VERIFIED PASS and 009 OP-1 PASSED; 006 planned; 026 VERIFIED PASS; nothing is mid-build
 
 ### Where things stand
 
