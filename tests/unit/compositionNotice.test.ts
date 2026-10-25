@@ -110,3 +110,24 @@ describe('compositionNoticeFor', () => {
     )
   })
 })
+
+describe('the composite reasons (025 FR-05)', () => {
+  it('name the screenshot; the last two say the post uses classic without the hero image', () => {
+    const device = (reason: (typeof FALLBACK_REASONS)[number]) => compositionNoticeFor(fallback(reason, 'device-screen'))!
+    expect(device('composite-not-blank').message).toContain('Product screen')
+    expect(device('composite-not-blank').message).toContain('screenshot')
+    for (const reason of ['composite-not-rendered', 'composite-source-missing'] as const) {
+      const n = device(reason)
+      expect(n.reason).toBe(reason)
+      expect(n.message).toContain('screenshot')
+      expect(n.message).toContain('classic style without the hero image')
+    }
+  })
+
+  it('every message is unique and at least 20 characters (11 reasons)', () => {
+    expect(FALLBACK_REASONS).toHaveLength(11)
+    const messages = FALLBACK_REASONS.map((r) => compositionNoticeFor(fallback(r))!.message)
+    expect(new Set(messages).size).toBe(11)
+    for (const m of messages) expect(m.length).toBeGreaterThanOrEqual(20)
+  })
+})

@@ -10,7 +10,17 @@ import {
 } from '@/lib/agent/prompts/background'
 import { buildPathBSystemPrompt, buildPathBUserMessage } from '@/lib/agent/prompts/pathB'
 import { buildRefineSystemPrompt } from '@/lib/agent/prompts/refine'
-import { contractAt, planComposition, PRECEDENCE_LINE, type HeroPlan } from '@/lib/designData'
+import {
+  archetypes,
+  contractAt,
+  designContractText,
+  imageContractText,
+  planComposition,
+  PRECEDENCE_LINE,
+  refineContractText,
+  type HeroPlan,
+} from '@/lib/designData'
+import { ASPECT_DIMENSIONS } from '@/lib/aspectRatio'
 import { PROMPT_VERSION } from '@/lib/agent/prompts/shared'
 import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -499,5 +509,85 @@ describe('PROMPT_VERSION (009 FR-18, AC-08)', () => {
       'src/lib/agent/prompts/shared.ts',
       'src/lib/drafts/refineVerify.ts',
     ])
+  })
+})
+
+// ── 025 FR-07: the composite sentences, golden text at all three sizes ──────
+describe('device-screen prompt text (025 AC-05)', () => {
+  const SUBJECT =
+    'Subject: a modern laptop seen straight on, centred, its screen exactly filling the screen area, on a plain dark surface with soft light.'
+  const IMAGE_TAIL =
+    "must be the laptop's screen: flat, facing the viewer, blank and evenly lit, filling exactly this area, with the bezel just outside it."
+  const EMPTY_TAIL =
+    'completely empty: no text, shape, image, overlay or scrim. The product screenshot is placed there automatically.'
+  const cases = {
+    SQUARE: {
+      textPct: 'the top 34% of the frame, full width',
+      textPx: 'x 0 to 1080, y 0 to 367',
+      screenPct: 'the area from 14% to 86% across and 42% to 87% down',
+      screenPx: 'x 151 to 929, y 454 to 940',
+    },
+    PORTRAIT: {
+      textPct: 'the top 36% of the frame, full width',
+      textPx: 'x 0 to 1080, y 0 to 486',
+      screenPct: 'the area from 10% to 90% across and 45% to 85% down',
+      screenPx: 'x 108 to 972, y 608 to 1148',
+    },
+    STORY: {
+      textPct: 'the top 34% of the frame, full width',
+      textPx: 'x 0 to 1080, y 0 to 653',
+      screenPct: 'the area from 8% to 92% across and 44% to 73.5% down',
+      screenPx: 'x 86 to 994, y 845 to 1411',
+    },
+  } as const
+  const contract = archetypes['device-screen'].versions[1]
+
+  for (const size of ['SQUARE', 'PORTRAIT', 'STORY'] as const) {
+    const c = cases[size]
+    const sc = contract.sizes[size]!
+    const canvas = ASPECT_DIMENSIONS[size]
+    const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
+
+    it(`${size}: the image prompt names the subject, the calm text area and the blank screen`, () => {
+      expect(imageContractText(contract, sc)).toBe(
+        [
+          SUBJECT,
+          `${cap(c.textPct)} must be an empty, calm, dark area with no detail.`,
+          `${cap(c.screenPct)} ${IMAGE_TAIL}`,
+        ].join('\n'),
+      )
+    })
+
+    it(`${size}: the design prompt leaves the screen empty`, () => {
+      expect(designContractText(contract, sc, canvas, 'U')).toBe(
+        [
+          'Background image: U',
+          'Paint it as the full-canvas background with `background-size: cover; background-position: center`.',
+          'Headline, body text and the logo go only inside these regions:',
+          `- ${c.textPct} (${c.textPx})`,
+          `Leave ${c.screenPct} (${c.screenPx}) ${EMPTY_TAIL}`,
+          'Text colour: white.',
+          'No scrim or overlay: that is for the classic style only.',
+        ].join('\n'),
+      )
+    })
+
+    it(`${size}: the refine prompt carries the same sentence`, () => {
+      const base = `This post uses the Product screen layout (contract v1). Keep headline, body text and the logo inside: ${c.textPct}.`
+      expect(refineContractText({ label: 'Product screen', version: 1, size: sc, canvas })).toBe(
+        `${base} Leave ${c.screenPct} (${c.screenPx}) ${EMPTY_TAIL}`,
+      )
+      expect(refineContractText({ label: 'Product screen', version: 1, size: sc })).toBe(
+        `${base} Leave ${c.screenPct} ${EMPTY_TAIL}`,
+      )
+    })
+  }
+
+  it('a look with no composite region is unchanged by the new branches', () => {
+    const ps = archetypes['product-showcase'].versions[2]
+    const sc = ps.sizes.SQUARE!
+    expect(designContractText(ps, sc, { width: 1080, height: 1080 }, 'U')).not.toContain('Leave')
+    expect(refineContractText({ label: 'X', version: 2, size: sc })).not.toContain('Leave')
+    expect(imageContractText(ps, sc)).not.toContain('laptop')
   })
 })

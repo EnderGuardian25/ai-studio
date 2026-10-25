@@ -18,6 +18,10 @@ export function describeRegion(r: Rect): string {
   return `the area from ${pct(r.x)} to ${pct(r.x + r.w)} across and ${pct(r.y)} to ${pct(r.y + r.h)} down`
 }
 
+// The sentence that keeps a composite region empty for the placed screenshot.
+const compositeEmptyLine = (r: Rect, canvas?: { width: number; height: number }) =>
+  `Leave ${describeRegion(r)}${canvas ? ` (${describeRegionPx(r, canvas)})` : ''} completely empty: no text, shape, image, overlay or scrim. The product screenshot is placed there automatically.`
+
 const px = (percent: number, total: number) => Math.round((percent * total) / 100)
 
 // The same rect in canvas pixels: "x 0 to 486, y 0 to 1350".
@@ -41,7 +45,9 @@ export function imageContractText(contract: Contract, size: SizeContract): strin
     lines.push(
       region.purpose === 'text'
         ? `${where} must be ${calmArea(contract.textTone)} with no detail.`
-        : `${where} must be kept clear of the subject and of detail.`,
+        : region.purpose === 'composite'
+          ? `${where} must be the laptop's screen: flat, facing the viewer, blank and evenly lit, filling exactly this area, with the bezel just outside it.`
+          : `${where} must be kept clear of the subject and of detail.`,
     )
   }
   return lines.join('\n')
@@ -66,6 +72,9 @@ export function designContractText(
       (r) =>
         `- ${describeRegion(r.rect)} (${describeRegionPx(r.rect, canvas)})${r.use ? `: ${r.use}` : ''}`,
     ),
+    ...size.regions
+      .filter((r) => r.purpose === 'composite')
+      .map((r) => compositeEmptyLine(r.rect, canvas)),
     `Text colour: ${tone}.`,
     'No scrim or overlay: that is for the classic style only.',
   ].join('\n')
@@ -76,6 +85,9 @@ export function refineContractText(opts: {
   label: string
   version: number
   size: SizeContract
+  // Needed for the pixel form of a composite region's sentence (025); the
+  // caller wires it in T9. Absent: the sentence is given in percent only.
+  canvas?: { width: number; height: number }
 }): string {
   const text = opts.size.regions
     .filter((r) => r.purpose === 'text')
@@ -85,5 +97,8 @@ export function refineContractText(opts: {
     .map((r) => describeRegion(r.rect))
   let out = `This post uses the ${opts.label} layout (contract v${opts.version}). Keep headline, body text and the logo inside: ${text.join('; ')}.`
   if (clear.length > 0) out += ` Keep these regions of the background clear: ${clear.join('; ')}.`
+  for (const r of opts.size.regions.filter((r) => r.purpose === 'composite')) {
+    out += ` ${compositeEmptyLine(r.rect, opts.canvas)}`
+  }
   return out
 }

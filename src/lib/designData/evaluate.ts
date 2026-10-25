@@ -11,12 +11,18 @@ export interface RegionSample {
   // The sampled area as a percent of the canvas.
   areaPct: number
 }
-export type HeroVerdict = { ok: true } | { ok: false; reason: 'busy' | 'contrast' | 'region-invalid'; region: Region }
+export type HeroVerdict =
+  | { ok: true }
+  | { ok: false; reason: 'busy' | 'contrast' | 'region-invalid' | 'composite-not-blank'; region: Region }
 
 // Busy when the std. deviation of CIE L*/100 is above this. Correction 1 of
 // the spec: on linear luminance a dark region cannot exceed about 0.09, so the
 // proposal's 0.12 would never fire. A starting value, tuned in T3.
 export const BUSY_STDDEV_MAX = 0.12
+// A composite region (the laptop screen) is blank when the std. deviation of
+// CIE L*/100 is at most this: a third of the busy bar (025 FR-04). A starting
+// value, tuned on fixtures before OP-025.
+export const BLANK_STDDEV_MAX = 0.04
 // The WCAG ratio a sample must reach (text regions only).
 export const CONTRAST_MIN = 4.5
 // The share of samples that must reach it.
@@ -62,7 +68,7 @@ function lightnessStdDev(luminance: readonly number[]): number {
 
 // `sampled` is index-aligned with `regions`; null (or a missing entry) means
 // unresolved. Per region, in dataset order: invalid first, then busy, then (a
-// `text` region only) contrast. The first failure returns.
+// `text` region only) contrast. A `composite` region: invalid, then blank. The first failure returns.
 export function evaluateRegions(
   sampled: ReadonlyArray<RegionSample | null>,
   regions: ReadonlyArray<Region>,
@@ -75,6 +81,10 @@ export function evaluateRegions(
     const lum = s ? s.luminance.filter(Number.isFinite).map((v) => Math.min(1, Math.max(0, v))) : []
     if (!s || !Number.isFinite(s.areaPct) || s.areaPct < region.minAreaPct || lum.length < MIN_SAMPLES) {
       return { ok: false, reason: 'region-invalid', region }
+    }
+    if (region.purpose === 'composite') {
+      if (lightnessStdDev(lum) > BLANK_STDDEV_MAX) return { ok: false, reason: 'composite-not-blank', region }
+      continue
     }
     if (lightnessStdDev(lum) > BUSY_STDDEV_MAX) return { ok: false, reason: 'busy', region }
     if (region.purpose === 'text') {

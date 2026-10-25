@@ -14,12 +14,14 @@ import {
   styleLabel,
   supportsSize,
   type Archetype,
+  compositeRegionOf,
   type ArchetypeMap,
   type Contract,
 } from '@/lib/designData'
+import { ASPECT_DIMENSIONS } from '@/lib/aspectRatio'
 
 // Every look key ever shipped. A deletion or a rename fails the test below.
-const COMMITTED_KEYS = ['product-showcase', 'editorial-split', 'full-bleed-scene', 'spotlight']
+const COMMITTED_KEYS = ['product-showcase', 'editorial-split', 'full-bleed-scene', 'spotlight', 'device-screen']
 
 const hash = (c: unknown) => createHash('sha256').update(JSON.stringify(c)).digest('hex')
 
@@ -31,15 +33,19 @@ const HASHES: Record<string, string> = {
   'editorial-split@2': '1e403779e9a3f44d1002c67bfa75a94455a3a9e40b224060924157c62adb6733',
   'full-bleed-scene@1': '37f092ceaf25161f099c37736e3101669f404fd9e7006d1abca5dab4609a0b8e',
   'spotlight@1': '856a579c1ac7fb5fdc9a2918671b774691b6db803b6d56d39c8a53a8c0c2634f',
+  // 025 T1: computed from the finished rows, before OP-025. A size that fails
+  // OP-025 is removed in T6, which updates this hash.
+  'device-screen@1': 'b53138ccfa78c6ca4ef0e07f555f0f19b079707e021c49583e55c2d3522f2529',
 }
 
 describe('the shipped dataset (AC-01, AC-02)', () => {
-  it('has four active looks at current 2, 2, 1, 1', () => {
+  it('has five active looks at current 2, 2, 1, 1, 1', () => {
     expect(Object.values(archetypes).map((a) => [a.key, a.status, a.current])).toEqual([
       ['product-showcase', 'active', 2],
       ['editorial-split', 'active', 2],
       ['full-bleed-scene', 'active', 1],
       ['spotlight', 'active', 1],
+      ['device-screen', 'active', 1],
     ])
   })
 
@@ -80,7 +86,61 @@ describe('the shipped dataset (AC-01, AC-02)', () => {
     }
   })
 
-  it('the picker lists the four looks after classic and every one supports every size', () => {
+  it('the four released looks keep their released hashes (025 NFR-04)', () => {
+    for (const id of [
+      'product-showcase@1',
+      'product-showcase@2',
+      'editorial-split@1',
+      'editorial-split@2',
+      'full-bleed-scene@1',
+      'spotlight@1',
+    ]) {
+      const [key, v] = id.split('@')
+      expect(hash(archetypes[key].versions[Number(v)]), id).toBe(HASHES[id])
+    }
+  })
+
+  it('device-screen v1 rows equal the 025 FR-02 table and each screen is 16:10 in canvas px', () => {
+    const a = archetypes['device-screen']
+    expect([a.label, a.summary, a.status, a.current, a.requires]).toEqual([
+      'Product screen',
+      'A laptop showing your own product screenshot, with the text above it.',
+      'active',
+      1,
+      'composite-source',
+    ])
+    const c = a.versions[1]
+    expect(c.textTone).toBe('light')
+    const subject =
+      'a modern laptop seen straight on, centred, its screen exactly filling the screen area, on a plain dark surface with soft light'
+    const table = {
+      SQUARE: { text: [0, 0, 100, 34], screen: [14, 42, 72, 45], px: [777.6, 486] },
+      PORTRAIT: { text: [0, 0, 100, 36], screen: [10, 45, 80, 40], px: [864, 540] },
+      STORY: { text: [0, 0, 100, 34], screen: [8, 44, 84, 29.5], px: [907.2, 567] },
+    } as const
+    for (const size of ['SQUARE', 'PORTRAIT', 'STORY'] as const) {
+      const sc = c.sizes[size]!
+      const t = table[size]
+      expect(sc.subject).toBe(subject)
+      expect(sc.regions).toEqual([
+        { rect: { x: t.text[0], y: t.text[1], w: t.text[2], h: t.text[3] }, purpose: 'text', minAreaPct: 20 },
+        { rect: { x: t.screen[0], y: t.screen[1], w: t.screen[2], h: t.screen[3] }, purpose: 'composite', minAreaPct: 20 },
+      ])
+      const { width, height } = ASPECT_DIMENSIONS[size]
+      const r = sc.regions[1].rect
+      const w = (r.w * width) / 100
+      const h = (r.h * height) / 100
+      // The spec's px column is 16:10 of the width; the percent rows give 566.4
+      // for STORY (29.5% of 1920), 0.6 px under the column, inside the 0.5% rule.
+      expect(w).toBeCloseTo(t.px[0], 6)
+      expect(Math.abs(h - t.px[1])).toBeLessThan(1)
+      expect(Math.abs(w / h - 16 / 10) / (16 / 10), size).toBeLessThan(0.005)
+      expect(compositeRegionOf(sc)).toBe(sc.regions[1])
+    }
+    expect(compositeRegionOf(archetypes.spotlight.versions[1].sizes.SQUARE!)).toBeNull()
+  })
+
+  it('the picker lists the five looks after classic and every one supports every size', () => {
     expect(IMAGE_STYLES.map((s) => s.key)).toEqual(['classic', ...COMMITTED_KEYS])
     for (const size of ['SQUARE', 'PORTRAIT', 'STORY'] as const) {
       expect(imageStyleOptions(size).every((o) => o.supported)).toBe(true)
@@ -109,7 +169,14 @@ describe('the shipped dataset (AC-01, AC-02)', () => {
 
 // ── Fixture datasets: each FR-03 rule fails with its own message ─────────────
 
-const region = (x: number, y: number, w: number, h: number, purpose: 'text' | 'clear' = 'text', minAreaPct = 20) => ({
+const region = (
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  purpose: 'text' | 'clear' | 'composite' = 'text',
+  minAreaPct = 20,
+) => ({
   rect: { x, y, w, h },
   purpose,
   minAreaPct,
@@ -235,6 +302,60 @@ describe('lookDatasetProblems (AC-02)', () => {
   it('the prefix rule: a key that extends another key must be its variant', () => {
     const problems = lookDatasetProblems(dataset(look('alpha'), look('alpha-extra'))).join('\n')
     expect(problems).toContain('alpha-extra: starts with "alpha-"')
+  })
+})
+
+describe('the composite rules (025 FR-03): each fails on its own fixture', () => {
+  const sized = (regions: ReturnType<typeof region>[]) =>
+    contract({ sizes: { SQUARE: { subject: 's', regions } } })
+  const text = region(0, 0, 100, 30)
+  const screenRegion = region(10, 40, 80, 45, 'composite')
+
+  it('a requires look with exactly one composite region and no overlap is valid', () => {
+    const ok = look('alpha', { requires: 'composite-source', versions: { 1: sized([text, screenRegion]) } })
+    expect(lookDatasetProblems(dataset(ok))).toEqual([])
+  })
+
+  it('more than one composite region', () => {
+    const two = look('alpha', {
+      requires: 'composite-source',
+      versions: { 1: sized([text, screenRegion, region(10, 86, 80, 14, 'composite', 10)]) },
+    })
+    expect(lookDatasetProblems(dataset(two))).toEqual(
+      expect.arrayContaining(['alpha@1:SQUARE: more than one composite region']),
+    )
+  })
+
+  it('a requires look with no composite region', () => {
+    const none = look('alpha', { requires: 'composite-source', versions: { 1: sized([text]) } })
+    expect(lookDatasetProblems(dataset(none))).toEqual([
+      'alpha@1:SQUARE: requires composite-source but has 0 composite regions',
+    ])
+  })
+
+  it('a look without requires has no composite region', () => {
+    const stray = look('alpha', { versions: { 1: sized([text, screenRegion]) } })
+    expect(lookDatasetProblems(dataset(stray))).toEqual([
+      'alpha@1:SQUARE: has a composite region but no requires',
+    ])
+  })
+
+  it('a composite region does not overlap a text region', () => {
+    const overlap = look('alpha', {
+      requires: 'composite-source',
+      versions: { 1: sized([region(0, 0, 100, 50), screenRegion]) },
+    })
+    expect(lookDatasetProblems(dataset(overlap))).toEqual([
+      'alpha@1:SQUARE: composite region overlaps a text region',
+    ])
+  })
+
+  it('touching edges do not overlap', () => {
+    const touching = look('alpha', {
+      requires: 'composite-source',
+      versions: { 1: sized([region(0, 0, 100, 40), screenRegion]) },
+    })
+    expect(lookDatasetProblems(dataset(touching))).toEqual([])
   })
 })
 

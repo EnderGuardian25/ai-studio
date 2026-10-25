@@ -425,6 +425,8 @@ export const HERO_MOCK_SENTINELS = {
   contrast: '__MOCK_HERO_CONTRAST__',
   checkError: '__MOCK_HERO_CHECK_ERROR__',
   layout: '__MOCK_HERO_LAYOUT__',
+  // 025: only the composite (screen) regions are busy; text regions stay calm.
+  screen: '__MOCK_HERO_SCREEN__',
 } as const
 
 const HERO_SAMPLE_COUNT = 256
@@ -440,6 +442,7 @@ const samplesOf = (region: Region, lum: (i: number) => number): RegionSample => 
  * light for __MOCK_HERO_BUSY__ (high lightness variance), flat and on the wrong
  * side of the text colour for __MOCK_HERO_CONTRAST__, and a thrown error for
  * __MOCK_HERO_CHECK_ERROR__ (the caller settles any throw to check-error).
+ * __MOCK_HERO_SCREEN__ makes only the composite regions busy (025).
  * null when MOCK_AI is off.
  */
 export function mockRegionSamples(
@@ -459,7 +462,12 @@ export function mockRegionSamples(
     return regions.map((r) => samplesOf(r, () => flat))
   }
   const calm = textTone === 'light' ? 0.02 : 0.8
-  return regions.map((r) => samplesOf(r, (i) => calm + (i % 2 === 0 ? 0.001 : -0.001)))
+  const screenBusy = seamText.includes(HERO_MOCK_SENTINELS.screen)
+  return regions.map((r) =>
+    screenBusy && r.purpose === 'composite'
+      ? samplesOf(r, (i) => (i % 2 === 0 ? 0.02 : 0.6))
+      : samplesOf(r, (i) => calm + (i % 2 === 0 ? 0.001 : -0.001)),
+  )
 }
 
 // First cell of a fixed 6 x 6 grid (2% start, 8% step, left to right, top to

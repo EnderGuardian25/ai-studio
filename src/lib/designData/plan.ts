@@ -3,7 +3,7 @@
 import type { AspectRatio } from '@prisma/client'
 import type { ImageTier } from '@/providers/imageCapabilities'
 import { archetypes, getArchetype, type ArchetypeMap, type Contract, type SizeContract } from './composition'
-import { compositionStampSchema, type CompositionStamp } from './stamp'
+import { compositionStampSchema, type CompositeEntry, type CompositionStamp } from './stamp'
 
 export interface HeroPlan {
   kind: 'hero'
@@ -19,12 +19,20 @@ export interface ClassicPlan {
   kind: 'classic'
   requestedArchetype: string
   // Absent for `imageStyle: 'classic'`.
-  fallbackReason?: 'unknown-archetype' | 'unsupported-size'
+  fallbackReason?: 'unknown-archetype' | 'unsupported-size' | 'composite-source-missing'
 }
 export type CompositionPlan = HeroPlan | ClassicPlan
 
 // The sampler's outcome for a hero image, as `runBackgroundStep` reports it.
-export type HeroCheckResult = { ok: true } | { ok: false; reason: 'busy' | 'contrast' | 'region-invalid' | 'check-error' }
+export type HeroCheckResult =
+  | { ok: true }
+  | { ok: false; reason: 'busy' | 'contrast' | 'region-invalid' | 'check-error' | 'composite-not-blank' }
+
+// The outcome of placing the author's screenshot (025), passed by the caller
+// that did the placing. Only settleComposition writes `composites`.
+export type CompositeOutcome =
+  | { ok: true; source: CompositeEntry['source'] }
+  | { ok: false; reason: 'composite-not-rendered' | 'composite-source-missing' }
 
 // What settle needs from the background step. A skip variant has no url.
 export interface SettleBackground {
@@ -38,7 +46,7 @@ export interface SettleBackground {
 // size the active archetype's current contract does not declare is
 // `unsupported-size`. `source` is injectable for tests only.
 export function planComposition(
-  input: { imageStyle: string | null | undefined; aspectRatio: AspectRatio },
+  input: { imageStyle: string | null | undefined; aspectRatio: AspectRatio; hasCompositeSource?: boolean },
   source: ArchetypeMap = archetypes
 ): CompositionPlan {
   const requested = typeof input.imageStyle === 'string' && input.imageStyle !== '' ? input.imageStyle : 'classic'
@@ -51,6 +59,10 @@ export function planComposition(
   const sizeContract = contract?.sizes[input.aspectRatio]
   if (!contract || !sizeContract) {
     return { kind: 'classic', requestedArchetype: requested, fallbackReason: 'unsupported-size' }
+  }
+  // A look that needs an input the caller did not supply is classic (025).
+  if (archetype.requires && !input.hasCompositeSource) {
+    return { kind: 'classic', requestedArchetype: requested, fallbackReason: 'composite-source-missing' }
   }
   return {
     kind: 'hero',
@@ -68,10 +80,13 @@ export function planComposition(
 // check result fails closed as check-error.
 export function settleComposition(
   plan: CompositionPlan,
-  background: SettleBackground | null | undefined
+  background: SettleBackground | null | undefined,
+  composite?: CompositeOutcome
 ): CompositionStamp {
   const imageQuality = background?.quality ?? 'default'
-  const stamp = (rest: Pick<CompositionStamp, 'appliedArchetype' | 'contractVersion' | 'fallbackReason'>) =>
+  const stamp = (
+    rest: Pick<CompositionStamp, 'appliedArchetype' | 'contractVersion' | 'fallbackReason' | 'composites'>
+  ) =>
     compositionStampSchema.parse({
       requestedArchetype: plan.requestedArchetype,
       imageQuality,
@@ -79,6 +94,7 @@ export function settleComposition(
       contractVersion: rest.contractVersion,
       // Omitted, not undefined, when there is no reason.
       ...(rest.fallbackReason ? { fallbackReason: rest.fallbackReason } : {}),
+      ...(rest.composites ? { composites: rest.composites } : {}),
     })
 
   if (plan.kind === 'classic') {
@@ -89,6 +105,22 @@ export function settleComposition(
   }
   const check = background.check
   if (check && check.ok === true) {
+    // A kept look that needs a screenshot is kept only with a placed one.
+    const needs = !!getArchetype(plan.requestedArchetype)?.requires
+    if (composite && composite.ok === false) {
+      return stamp({ appliedArchetype: 'classic', contractVersion: null, fallbackReason: composite.reason })
+    }
+    if (needs && !composite) {
+      return stamp({ appliedArchetype: 'classic', contractVersion: null, fallbackReason: 'composite-source-missing' })
+    }
+    if (composite && composite.ok === true) {
+      return stamp({
+        appliedArchetype: plan.requestedArchetype,
+        contractVersion: plan.contractVersion,
+        fallbackReason: undefined,
+        composites: [{ region: 0, source: composite.source }],
+      })
+    }
     return stamp({
       appliedArchetype: plan.requestedArchetype,
       contractVersion: plan.contractVersion,

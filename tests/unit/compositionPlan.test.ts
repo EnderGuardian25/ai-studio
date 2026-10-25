@@ -77,7 +77,7 @@ describe('planComposition (AC-03)', () => {
 
   it('a kept plan version is read from archetypes[key].current, and STORY is a hero plan', () => {
     for (const key of Object.keys(archetypes)) {
-      const plan = planComposition({ imageStyle: key, aspectRatio: 'STORY' }) as HeroPlan
+      const plan = planComposition({ imageStyle: key, aspectRatio: 'STORY', hasCompositeSource: true }) as HeroPlan
       expect(plan.kind).toBe('hero')
       expect(plan.contractVersion).toBe(archetypes[key].current)
     }
@@ -192,5 +192,91 @@ describe('settleComposition: every row of the fallback table (AC-06, AC-12)', ()
       { url: 'u', check: { ok: 'yes' } },
     ] as Parameters<typeof settleComposition>[1][]
     for (const b of backgrounds) expect(settleComposition(plan, b).appliedArchetype).toBe('classic')
+  })
+})
+
+describe('device-screen availability and the composite argument (025 FR-08, design section 4)', () => {
+  const key = 'screenshots/team-1/user-1/1700000000-abc.png'
+  const source = { kind: 'brief-upload' as const, key }
+  const screenPlan = (size: 'SQUARE' | 'PORTRAIT' | 'STORY' = 'SQUARE'): HeroPlan => {
+    const plan = planComposition({ imageStyle: 'device-screen', aspectRatio: size, hasCompositeSource: true })
+    if (plan.kind !== 'hero') throw new Error('expected a hero plan')
+    return plan
+  }
+
+  it('a requires look with no source is classic with composite-source-missing', () => {
+    for (const size of ['SQUARE', 'PORTRAIT', 'STORY'] as const) {
+      expect(planComposition({ imageStyle: 'device-screen', aspectRatio: size })).toEqual({
+        kind: 'classic',
+        requestedArchetype: 'device-screen',
+        fallbackReason: 'composite-source-missing',
+      })
+      expect(planComposition({ imageStyle: 'device-screen', aspectRatio: size, hasCompositeSource: false })).toMatchObject({
+        kind: 'classic',
+        fallbackReason: 'composite-source-missing',
+      })
+    }
+  })
+
+  it('the flag changes nothing for the four looks that need no input', () => {
+    for (const key of ['product-showcase', 'editorial-split', 'full-bleed-scene', 'spotlight']) {
+      expect(planComposition({ imageStyle: key, aspectRatio: 'SQUARE', hasCompositeSource: true })).toEqual(
+        planComposition({ imageStyle: key, aspectRatio: 'SQUARE' }),
+      )
+    }
+  })
+
+  it('the third argument: ok adds composites to a kept stamp', () => {
+    expect(settleComposition(screenPlan(), { url: 'u', check: { ok: true } }, { ok: true, source })).toEqual({
+      requestedArchetype: 'device-screen',
+      appliedArchetype: 'device-screen',
+      contractVersion: 1,
+      imageQuality: 'default',
+      composites: [{ region: 0, source }],
+    })
+  })
+
+  it.each(['composite-not-rendered', 'composite-source-missing'] as const)(
+    'the third argument: not ok (%s) turns a kept plan into classic with that reason and no composites',
+    (reason) => {
+      expect(settleComposition(screenPlan('STORY'), { url: 'u', check: { ok: true } }, { ok: false, reason })).toEqual({
+        requestedArchetype: 'device-screen',
+        appliedArchetype: 'classic',
+        contractVersion: null,
+        fallbackReason: reason,
+        imageQuality: 'default',
+      })
+    },
+  )
+
+  it('composite-not-blank from the check settles to classic with no composites, and the third argument is ignored', () => {
+    for (const composite of [undefined, { ok: true as const, source }]) {
+      const stamp = settleComposition(screenPlan(), { url: 'u', check: { ok: false, reason: 'composite-not-blank' } }, composite)
+      expect(stamp).toEqual({
+        requestedArchetype: 'device-screen',
+        appliedArchetype: 'classic',
+        contractVersion: null,
+        fallbackReason: 'composite-not-blank',
+        imageQuality: 'default',
+      })
+    }
+  })
+
+  it('a kept requires look with no composite outcome fails closed to composite-source-missing', () => {
+    expect(settleComposition(screenPlan(), { url: 'u', check: { ok: true } })).toMatchObject({
+      appliedArchetype: 'classic',
+      fallbackReason: 'composite-source-missing',
+    })
+  })
+
+  it('an existing look keeps its stamp when no third argument is given', () => {
+    expect(settleComposition(heroPlan(), { url: 'u', check: { ok: true } })).not.toHaveProperty('composites')
+  })
+
+  it('a missing image is still no-image, whatever the third argument says', () => {
+    expect(settleComposition(screenPlan(), { url: null }, { ok: true, source })).toMatchObject({
+      appliedArchetype: 'classic',
+      fallbackReason: 'no-image',
+    })
   })
 })

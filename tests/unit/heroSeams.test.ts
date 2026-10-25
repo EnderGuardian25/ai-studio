@@ -415,6 +415,57 @@ describe('the __MOCK_HERO_* seams drive the real planner and evaluators', () => 
     expect(settleComposition(heroPlanFor(brief), result).fallbackReason).toBe('no-image')
   })
 
+  it('025: __MOCK_HERO_SCREEN__ makes only the composite region busy: the REAL evaluateRegions says composite-not-blank', async () => {
+    const { hooks } = await loadFresh({ MOCK_AI: 'true' })
+    expect(hooks.HERO_MOCK_SENTINELS.screen).toBe('__MOCK_HERO_SCREEN__')
+    for (const size of ['SQUARE', 'PORTRAIT', 'STORY'] as const) {
+      const sc = archetypes['device-screen'].versions[1].sizes[size]!
+      const regions = [...sc.regions]
+      const samples = hooks.mockRegionSamples('x __MOCK_BG__ __MOCK_HERO_SCREEN__', regions, 'light')!
+      expect(evaluateRegions(samples, regions, 'light'), size).toMatchObject({
+        ok: false,
+        reason: 'composite-not-blank',
+        region: regions[1],
+      })
+      // Text regions stay calm: with the composite region left out the check passes.
+      expect(evaluateRegions([samples[0]], [regions[0]], 'light'), size).toEqual({ ok: true })
+      // Without the sentinel the whole contract passes, composite included.
+      const calmSamples = hooks.mockRegionSamples('x __MOCK_BG__', regions, 'light')!
+      expect(evaluateRegions(calmSamples, regions, 'light'), size).toEqual({ ok: true })
+    }
+  })
+
+  it('025: the existing sentinels behave as before on a contract with a composite region', async () => {
+    const { hooks } = await loadFresh({ MOCK_AI: 'true' })
+    const regions = [...archetypes['device-screen'].versions[1].sizes.SQUARE!.regions]
+    // Text comes first in the dataset, so busy still reports on the text region.
+    expect(evaluateRegions(hooks.mockRegionSamples('__MOCK_BG__ __MOCK_HERO_BUSY__', regions, 'light')!, regions, 'light')).toMatchObject({
+      ok: false,
+      reason: 'busy',
+      region: regions[0],
+    })
+    expect(evaluateRegions(hooks.mockRegionSamples('__MOCK_BG__ __MOCK_HERO_CONTRAST__', regions, 'light')!, regions, 'light')).toMatchObject({
+      ok: false,
+      reason: 'contrast',
+      region: regions[0],
+    })
+  })
+
+  it('025: the per-region samples for every old sentinel equal what the old code returned (same arrays per region)', async () => {
+    const { hooks } = await loadFresh({ MOCK_AI: 'true' })
+    const regions = regionsOf(mkBrief({ imageStyle: 'spotlight', aspectRatio: 'SQUARE' }))
+    const lum = (seam: string, tone: 'light' | 'dark') => hooks.mockRegionSamples(seam, regions, tone)!.map((s) => s.luminance)
+    // every region gets the same series, and it is calm for the default
+    for (const tone of ['light', 'dark'] as const) {
+      const calm = tone === 'light' ? 0.02 : 0.8
+      expect(lum('x', tone)[0][0]).toBeCloseTo(calm + 0.001, 9)
+      expect(lum('x', tone)[0][1]).toBeCloseTo(calm - 0.001, 9)
+      expect(lum('x', tone)[0]).toEqual(lum('x', tone)[1])
+      expect(lum('__MOCK_HERO_BUSY__', tone)[0].slice(0, 2)).toEqual([0.02, 0.6])
+      expect(new Set(lum('__MOCK_HERO_CONTRAST__', tone)[0])).toEqual(new Set([tone === 'light' ? 0.4 : 0.05]))
+    }
+  })
+
   it('layout boxes are inside the regions by default and one box is outside for __MOCK_HERO_LAYOUT__ (real evaluateLayout)', async () => {
     const { hooks } = await loadFresh({ MOCK_AI: 'true' })
     for (const [style, size] of [['product-showcase', 'SQUARE'], ['product-showcase', 'PORTRAIT'], ['editorial-split', 'SQUARE'], ['editorial-split', 'PORTRAIT']] as const) {

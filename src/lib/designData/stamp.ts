@@ -3,6 +3,10 @@
 // and its invariants run at every write; a stored value that fails to parse
 // reads as null), because a vocabulary that grows needs no migration.
 import { z } from 'zod'
+import { getArchetype } from './composition'
+
+// A stored screenshot object key: screenshots/<teamId>/<userId>/<file> (025).
+export const SCREENSHOT_KEY_RE = /^screenshots\/[^/]+\/[^/]+\/[^/]+$/
 
 export const FALLBACK_REASONS = [
   'busy',
@@ -13,11 +17,24 @@ export const FALLBACK_REASONS = [
   'unknown-archetype',
   'unsupported-size',
   'refine-replaced-image',
+  'composite-not-blank',
+  'composite-not-rendered',
+  'composite-source-missing',
 ] as const
 export const OBSERVATIONS = ['layout-violation'] as const
 export const IMAGE_QUALITIES = ['default', 'standard', 'high'] as const
 
 export type FallbackReason = (typeof FALLBACK_REASONS)[number]
+
+const compositeEntry = z
+  .object({
+    region: z.literal(0),
+    source: z
+      .object({ kind: z.literal('brief-upload'), key: z.string().regex(SCREENSHOT_KEY_RE) })
+      .strict(),
+  })
+  .strict()
+export type CompositeEntry = z.infer<typeof compositeEntry>
 
 export const compositionStampSchema = z
   .object({
@@ -27,6 +44,7 @@ export const compositionStampSchema = z
     fallbackReason: z.enum(FALLBACK_REASONS).optional(),
     observations: z.array(z.enum(OBSERVATIONS)).optional(),
     imageQuality: z.enum(IMAGE_QUALITIES),
+    composites: z.array(compositeEntry).length(1).optional(),
   })
   .superRefine((s, ctx) => {
     const issue = (message: string) => ctx.addIssue({ code: z.ZodIssueCode.custom, message })
@@ -40,6 +58,12 @@ export const compositionStampSchema = z
       if (s.requestedArchetype === 'classic' && s.fallbackReason !== undefined) {
         issue('a classic request has no fallbackReason')
       }
+      if (s.composites !== undefined) issue('a classic applied archetype has no composites')
+    }
+    const requires = s.appliedArchetype === 'classic' ? undefined : getArchetype(s.appliedArchetype)?.requires
+    if (s.appliedArchetype !== 'classic') {
+      if (s.composites !== undefined && !requires) issue('composites need a look that requires a composite source')
+      if (s.composites === undefined && requires) issue('a look that requires a composite source needs composites')
     }
   })
 

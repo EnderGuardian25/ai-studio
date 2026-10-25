@@ -27,6 +27,24 @@ export function lookDatasetProblems(source: ArchetypeMap): string[] {
         if (!sc) continue
         const where = `${key}@${v}:${size}`
         if (!sc.regions.some((r) => r.purpose === 'text')) problems.push(`${where}: no text region`)
+        const composites = sc.regions.filter((r) => r.purpose === 'composite')
+        if (composites.length > 1) problems.push(`${where}: more than one composite region`)
+        if (a.requires && composites.length !== 1)
+          problems.push(
+            `${where}: requires ${a.requires} but has ${composites.length} composite regions`,
+          )
+        if (!a.requires && composites.length > 0)
+          problems.push(`${where}: has a composite region but no requires`)
+        for (const c of composites) {
+          for (const t of sc.regions.filter((r) => r.purpose === 'text')) {
+            const overlaps =
+              c.rect.x < t.rect.x + t.rect.w &&
+              t.rect.x < c.rect.x + c.rect.w &&
+              c.rect.y < t.rect.y + t.rect.h &&
+              t.rect.y < c.rect.y + c.rect.h
+            if (overlaps) problems.push(`${where}: composite region overlaps a text region`)
+          }
+        }
         for (const r of sc.regions) {
           const { x, y, w, h } = r.rect
           const inRange = x >= 0 && y >= 0 && x <= 100 && y <= 100 && x + w <= 100 && y + h <= 100

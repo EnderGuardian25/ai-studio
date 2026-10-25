@@ -28,6 +28,9 @@ describe('vocabularies', () => {
       'unknown-archetype',
       'unsupported-size',
       'refine-replaced-image',
+      'composite-not-blank',
+      'composite-not-rendered',
+      'composite-source-missing',
     ])
     expect([...OBSERVATIONS]).toEqual(['layout-violation'])
     expect([...IMAGE_QUALITIES]).toEqual(['default', 'standard', 'high'])
@@ -128,5 +131,65 @@ describe('helpers', () => {
     expect(refineReplacedStamp(fallen)).toBe(fallen)
     const c = classicStamp()
     expect(refineReplacedStamp(c)).toBe(c)
+  })
+})
+
+describe('the composites field (025 FR-06)', () => {
+  const key = 'screenshots/team-1/user-1/1700000000-abc.png'
+  const entry = { region: 0, source: { kind: 'brief-upload', key } }
+  const screenKept = {
+    requestedArchetype: 'device-screen',
+    appliedArchetype: 'device-screen',
+    contractVersion: 1,
+    imageQuality: 'default',
+    composites: [entry],
+  }
+  const classicFallback = {
+    requestedArchetype: 'device-screen',
+    appliedArchetype: 'classic',
+    contractVersion: null,
+    fallbackReason: 'composite-not-rendered',
+    imageQuality: 'default',
+  }
+  const bad = (s: unknown) => expect(compositionStampSchema.safeParse(s).success).toBe(false)
+
+  it('a kept device-screen stamp with one composite parses', () => {
+    expect(compositionStampSchema.parse(screenKept)).toEqual(screenKept)
+  })
+
+  it('each invariant fails alone', () => {
+    // a kept look that requires a source must have composites
+    const { composites: _c, ...noComposites } = screenKept
+    void _c
+    bad(noComposites)
+    // composites on a classic fallback fails
+    bad({ ...classicFallback, composites: [entry] })
+    // composites on a look without requires fails
+    bad({ ...kept, composites: [entry] })
+    // length exactly 1
+    bad({ ...screenKept, composites: [] })
+    bad({ ...screenKept, composites: [entry, entry] })
+    // region is 0
+    bad({ ...screenKept, composites: [{ ...entry, region: 1 }] })
+    // a key that is not screenshots/<team>/<user>/<file>
+    for (const badKey of [
+      'screenshots/team-1/file.png',
+      'screenshots/team-1/user-1/a/b.png',
+      'exports/team-1/user-1/a.png',
+      'screenshots//user-1/a.png',
+      'https://host/screenshots/team-1/user-1/a.png',
+    ]) {
+      bad({ ...screenKept, composites: [{ region: 0, source: { kind: 'brief-upload', key: badKey } }] })
+    }
+    // an unknown source kind, an extra field
+    bad({ ...screenKept, composites: [{ region: 0, source: { kind: 'url', key } }] })
+    bad({ ...screenKept, composites: [{ ...entry, extra: 1 }] })
+  })
+
+  it('the classic fallback without composites parses, and refineReplacedStamp drops composites', () => {
+    expect(compositionStampSchema.safeParse(classicFallback).success).toBe(true)
+    const replaced = refineReplacedStamp(compositionStampSchema.parse(screenKept))
+    expect(replaced).not.toHaveProperty('composites')
+    expect(replaced.fallbackReason).toBe('refine-replaced-image')
   })
 })

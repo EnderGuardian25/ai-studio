@@ -13,6 +13,10 @@
 //    the hyphens in its key (validate.ts);
 //  - a post-style version that names a retired look resolves to classic with
 //    the note `retired-classic` (postStyles/resolve.ts).
+// PERMANENT NAMES (025): the purpose `composite`, the archetype field
+// `requires`, the input name `composite-source`, and the fallback reasons
+// `composite-not-blank`, `composite-not-rendered` and `composite-source-missing`
+// are stored in stamps and hashes; they are never renamed or reused.
 // THE VERSION RULE: a released version is never edited. A change adds
 // versions[n+1] and moves `current`. "Released" = the change that adds it is
 // VERIFIED PASS. tests/unit/lookDataset.test.ts pins a hash per (key, version).
@@ -22,9 +26,16 @@
 import type { AspectRatio } from '@prisma/client'
 
 export type TextTone = 'light' | 'dark'
-// 'composite' arrives with Phase 2 as a new literal here: no schema change.
-export type Purpose = 'text' | 'clear'
-export type ArchetypeKey = 'product-showcase' | 'editorial-split' | 'full-bleed-scene' | 'spotlight'
+// 'composite' (025): a region code fills with the author's own screenshot.
+export type Purpose = 'text' | 'clear' | 'composite'
+export type ArchetypeKey =
+  | 'product-showcase'
+  | 'editorial-split'
+  | 'full-bleed-scene'
+  | 'spotlight'
+  | 'device-screen'
+// An input a look needs before it can be used (025). Only one exists.
+export type LookInput = 'composite-source'
 
 // Canvas percent, 0 to 100.
 export interface Rect {
@@ -60,6 +71,8 @@ export interface Archetype {
   summary: string
   status: 'active' | 'retired'
   current: number
+  // An input the look cannot be used without (025); absent for the first four.
+  requires?: LookInput
   // Immutable: deep-frozen at module load. A change adds versions[n+1] and
   // moves `current`; an existing version is never edited.
   versions: Readonly<Record<number, Contract>>
@@ -84,6 +97,16 @@ const band = (x: number, y: number, w: number, h: number, use: string): Region =
   ...textRegion(x, y, w, h),
   use,
 })
+
+// A composite region: the area code fills with a screenshot (025).
+const screen = (x: number, y: number, w: number, h: number): Region => ({
+  rect: { x, y, w, h },
+  purpose: 'composite',
+  minAreaPct: 20,
+})
+
+const DEVICE_SCREEN_SUBJECT =
+  'a modern laptop seen straight on, centred, its screen exactly filling the screen area, on a plain dark surface with soft light'
 
 // Every look is light text over an intended dark backdrop. Version 1 of the two
 // original looks has no STORY; version 2 adds it. The PORTRAIT rows are stacked
@@ -247,7 +270,41 @@ export const archetypes: ArchetypeMap = deepFreeze({
       },
     },
   },
+  'device-screen': {
+    key: 'device-screen',
+    label: 'Product screen',
+    summary: 'A laptop showing your own product screenshot, with the text above it.',
+    status: 'active',
+    current: 1,
+    requires: 'composite-source',
+    versions: {
+      1: {
+        role: 'hero',
+        textTone: 'light',
+        sizes: {
+          SQUARE: {
+            subject: DEVICE_SCREEN_SUBJECT,
+            regions: [textRegion(0, 0, 100, 34), screen(14, 42, 72, 45)],
+          },
+          PORTRAIT: {
+            subject: DEVICE_SCREEN_SUBJECT,
+            regions: [textRegion(0, 0, 100, 36), screen(10, 45, 80, 40)],
+          },
+          STORY: {
+            subject: DEVICE_SCREEN_SUBJECT,
+            regions: [textRegion(0, 0, 100, 34), screen(8, 44, 84, 29.5)],
+          },
+        },
+      },
+    },
+  },
 } satisfies Record<ArchetypeKey, Archetype>)
+
+// The one composite region of a size contract, or null (025). Code outside the
+// dataset gets the screenshot rect only through this.
+export function compositeRegionOf(size: SizeContract): Region | null {
+  return size.regions.find((r) => r.purpose === 'composite') ?? null
+}
 
 const has = (o: object, k: string) => Object.prototype.hasOwnProperty.call(o, k)
 

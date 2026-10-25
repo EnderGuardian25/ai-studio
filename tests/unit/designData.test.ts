@@ -23,8 +23,9 @@ import {
 const ASPECTS = Object.keys(ASPECT_DIMENSIONS) as Array<keyof typeof ASPECT_DIMENSIONS>
 
 describe('designData: dataset invariants (AC-02)', () => {
-  it('exposes the composition section with the four looks', () => {
+  it('exposes the composition section with the five looks', () => {
     expect(Object.keys(designData.composition.archetypes).sort()).toEqual([
+      'device-screen',
       'editorial-split',
       'full-bleed-scene',
       'product-showcase',
@@ -150,9 +151,13 @@ describe('designData: lookups and picker', () => {
       'editorial-split',
       'full-bleed-scene',
       'spotlight',
+      // 025: active, so it is listed; imageStyleOptions marks it unsupported
+      // without a screenshot in T2.
+      'device-screen',
     ])
     expect(Object.isFrozen(IMAGE_STYLES)).toBe(true)
     expect(IMAGE_STYLES.every((s) => Object.isFrozen(s))).toBe(true)
+    // device-screen is size-supported at every size too (T2 adds the source rule).
     expect(imageStyleOptions('SQUARE').every((o) => o.supported)).toBe(true)
     expect(imageStyleOptions('STORY').every((o) => o.supported)).toBe(true)
     expect(imageStyleOptions('PORTRAIT').every((o) => o.supported)).toBe(true)
@@ -184,9 +189,9 @@ describe('designData: purity guard (AC-02)', () => {
   const dir = join(process.cwd(), 'src', 'lib', 'designData')
   const files = readdirSync(dir).filter((f) => f.endsWith('.ts'))
 
-  it('finds the nine module files', () => {
+  it('finds the ten module files', () => {
     expect(files.sort()).toEqual(
-      ['composition', 'evaluate', 'index', 'layout', 'plan', 'promptText', 'regions', 'stamp', 'validate'].map((n) => `${n}.ts`)
+      ['composite', 'composition', 'evaluate', 'index', 'layout', 'plan', 'promptText', 'regions', 'stamp', 'validate'].map((n) => `${n}.ts`)
     )
   })
 

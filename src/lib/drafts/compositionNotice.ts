@@ -45,6 +45,21 @@ export function compositionNoticeFor(stamp: CompositionStamp | null): Compositio
         reason: 'refine-replaced-image',
         message: `The new background replaced the ${unknown ? '' : `${label} `}image, so the classic style now applies.`,
       }
+    case 'composite-not-blank':
+      return {
+        reason: 'composite-not-blank',
+        message: `${subject} could not be used for this post (the screen area of the image was not blank, so your screenshot could not be placed on it), ${classic}`,
+      }
+    case 'composite-not-rendered':
+      return {
+        reason: 'composite-not-rendered',
+        message: `${subject} could not be used for this post (your product screenshot could not be placed on the screen), so the post uses the classic style without the hero image.`,
+      }
+    case 'composite-source-missing':
+      return {
+        reason: 'composite-source-missing',
+        message: `${subject} could not be used for this post (your product screenshot was not available), so the post uses the classic style without the hero image.`,
+      }
     default:
       break
   }
