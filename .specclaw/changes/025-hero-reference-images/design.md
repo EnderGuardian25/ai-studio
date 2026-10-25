@@ -373,6 +373,18 @@ The egress allowlist is unchanged; `data:` is already allowed.
 | A caller forgets `composites`                            | The required argument; NFR-05's grep; AC-14                                                                  |
 | `mockRegionSamples` change alters 009 cases              | A new sentinel keeps the old busy-text meaning; the 009 suites run in the T4 gate                            |
 
+## 21. Amendment A1: screen detection (2026-10-25, after OP-025 attempts 1 to 4)
+
+Spec "Amendment A1" is the requirement; this is the shape.
+
+- **Sampler (`puppeteer.ts`):** `sampleLuminanceGrid(dataUrl, window, canvas)` maps the window (canvas percent) to the image with the existing cover-fit mapping (`mapRegionToImage`), draws it on a canvas with smoothing off at one point per 2 canvas px, and returns `{ cols, rows, x0, y0, step, values }` in canvas px with L\*/100 values. Same network-blocked page, timeout and `HeroCheckError` rules as `sampleRegionLuminance`; under `MOCK_PUPPETEER` it returns a synthetic grid (below).
+- **Detector (`designData/composite.ts`, pure):** `detectScreenRect(grid, region, textRegions, canvas)` returns `{ ok: true, rect }` or `{ ok: false, detail }`, with the constants `DETECT_MARGIN_PCT`, `SCREEN_EDGE_DELTA`, `MIN_SCREEN_AREA_RATIO` beside `BLANK_STDDEV_MAX`. `detectionWindow(region, canvas)` gives the window. `detail` names the failed rule for logs and tests; the reason is always `composite-not-blank`.
+- **The check:** the hero check samples the text regions as today and, for the composite region, the grid. `evaluateRegions` keeps its text-region behaviour; the composite branch moves to the detector. `HeroCheckResult`'s ok form gains `composites?: Array<{ region: number; rect: Rect }>`, and `settleComposition` copies the rect into the stamp's `composites` entry (with the source from its third argument).
+- **Stamp:** `composites[].rect` and the FR-06 invariants (required, inside the canvas, 16:10 within 5%, no text-region intersection).
+- **Mock seams:** under `MOCK_PUPPETEER`/`MOCK_AI` the grid has a flat screen exactly on the region and a dark surround, so the existing sentinels keep their meaning; `__MOCK_HERO_SCREEN__` makes the seed patch textured (still `composite-not-blank`); a new `__MOCK_HERO_SCREEN_OFFSET__` moves the flat screen within the margin, so the stamp's rect differs from the region (for the Group B E2E).
+- **Probe and runner:** the probe response adds `rect`. `run-look-check.mjs --probe --recheck` re-runs the shipped detector on each saved render (no network, no image call: it decodes the PNG and runs the same grid and detector in Node via the compiled module or a small `tsx` entry), writes `recheck` into each result, and prints a verdict page path with the detected rect drawn on each render.
+- **Group B:** T8 inserts at the stamped rect; T9's re-render paths read it from the stamp.
+
 ## 20. Grounding sources
 
 - `CLAUDE.md`: "**A prompt rule is not an invariant.** 'No commentary' is a request; the parse boundary is the only place that can enforce it." This drives code-owned placement (decision 2).

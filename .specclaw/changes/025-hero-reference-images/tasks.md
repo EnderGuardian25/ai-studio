@@ -114,6 +114,25 @@ This change has **12 tasks in 6 waves**:
     - **e2e-test-plan:** section AG with TC-SHOT-01; the rest are planned.
     - **Gate:** stop stray node processes (ask about :3002), `rm -rf .next`, drop and recreate `bistec_studio_test`, then `npm run test:e2e:serve` and `npm run test:e2e:mock` (0 failed, 0 flaky, at least 530 passed), tsc, lint, unit, `npm run test:render`, build, `rm -rf .next`. Push `v2` (never `main`) and watch `gh run list --branch v2` until green.
 
+- [ ] `T13` — Amendment A1: screen detection, the stamp rect, fixtures and `--recheck`
+  - Files: `src/lib/designData/{composite,evaluate,plan,stamp,index}.ts`, `src/lib/renderer/puppeteer.ts` (`sampleLuminanceGrid` only), `src/lib/agent/background.ts` (the check wiring only), `src/lib/testHooks.ts` (the grid seam, `__MOCK_HERO_SCREEN_OFFSET__`), `src/lib/drafts/compositionNotice.ts` (the `composite-not-blank` wording), `src/app/api/admin/look-probe/route.ts` (`rect` in the response), `scripts/look-check/{lookCheck,run-look-check}.mjs` (`--recheck`), `tests/unit/{compositeFacts,compositionStamp,compositionPlan,heroSeams,lookProbe,lookCheck,compositionNotice}.test.ts`, `tests/unit/screenDetect.test.ts` (new), `tests/render/{lookFixtureTable,lookFixtures,look-fixtures.test}.ts`, `tests/unit/lookFixtureCompleteness.test.ts`
+  - Estimate: large
+  - Kind: impl
+  - Model: sonnet
+  - Depends: T1, T2, T3, T4, T5
+  - Notes:
+    - **Covers:** spec Amendment A1 (FR-04 composite branch, FR-06 rect, AC-03, AC-08 as amended); design section 21.
+    - The four released contracts, their hashes, `BUSY_STDDEV_MAX` and `BLANK_STDDEV_MAX` are unchanged. The `device-screen@1` rows are unchanged.
+    - `--recheck` makes no network call and no image call. The orchestrator runs it on the 4 saved renders; it must reproduce the prototype verdicts in spec A1 (SQUARE 1 fail; SQUARE 2, PORTRAIT 1 and STORY 1 pass).
+    - **Gate:** tsc, lint, unit, `npm run test:render` twice, then the targeted E2E (TC-SHOT-01, `image-looks`, `hero-image`, `post-styles`) on a fresh `:3001`.
+- [ ] `T14` — Amendment A1 docs (handoff, CLAUDE.md, e2e plan)
+  - Files: `docs/handoff.md`, `CLAUDE.md`, `docs/e2e-test-plan.md`
+  - Estimate: small
+  - Kind: docs
+  - Model: haiku
+  - Depends: T13
+  - Notes: the A1 decision, the detector, the OP-025 recheck procedure and state. Then OP-025 resumes on the user's go (re-judge, verdicts, remaining attempts).
+
 ### Wave 4: Group B setup (after an OP-025 go)
 
 - [ ] `T6` — Apply the OP-025 result to `device-screen` v1
@@ -121,7 +140,7 @@ This change has **12 tasks in 6 waves**:
   - Estimate: small
   - Kind: impl
   - Model: haiku
-  - Depends: T5, OP-025
+  - Depends: T14, OP-025
   - Deferred-Reason: blocked on OP-025, the operator's probe (spec FR-09). It runs only after the user has recorded a verdict for every attempt and `ledger.jsonl` and `results.json` are committed under `.specclaw/changes/025-hero-reference-images/look-check/`. If no size passed, the change stops: T6 instead removes `device-screen` from the dataset (it was never released), and T7 to T12 are cancelled.
   - Notes:
     - Remove each size that failed from v1; commit the final hash; drop its fixture rows. Record the per-size verdicts in the handoff.

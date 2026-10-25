@@ -63,9 +63,9 @@ File map (details in [design.md](design.md)):
 
   The four released looks pass unchanged.
 
-- **FR-04: the blank check.** `evaluateRegions` treats a `composite` region as follows: invalid first, then **blank**. Blank means the standard deviation of L\*/100 is at most `BLANK_STDDEV_MAX = 0.04`, a third of the busy bar. There is no contrast test. A failure returns `{ ok: false, reason: 'composite-not-blank', region }`. Text regions are unchanged. `HeroCheckResult` and `settleComposition` carry the new reason through to the stamp.
+- **FR-04: the blank check.** _(Amended by A1, below.)_ `evaluateRegions` treats a `composite` region as follows: invalid first, then **blank**. Blank means the standard deviation of L\*/100 is at most `BLANK_STDDEV_MAX = 0.04`, a third of the busy bar. There is no contrast test. A failure returns `{ ok: false, reason: 'composite-not-blank', region }`. Text regions are unchanged. `HeroCheckResult` and `settleComposition` carry the new reason through to the stamp.
 - **FR-05: fallback reasons.** `FALLBACK_REASONS` gains `composite-not-blank`, `composite-not-rendered` and `composite-source-missing`, appended after the existing eight. Each has its own `compositionNoticeFor` message naming the screenshot. For the last two, the message says the post uses the classic style without the hero image.
-- **FR-06: the `composites` stamp field.** `compositionStampSchema` gains `composites?: Array<{ region: number; source: { kind: 'brief-upload'; key: string } }>`, with invariants:
+- **FR-06: the `composites` stamp field.** _(Amended by A1, below.)_ `compositionStampSchema` gains `composites?: Array<{ region: number; source: { kind: 'brief-upload'; key: string } }>`, with invariants:
   - present (length exactly 1) only when the applied archetype is a look with `requires`;
   - absent on every classic stamp, a fallback included;
   - `key` matches `^screenshots/[^/]+/[^/]+/[^/]+$`.
@@ -104,7 +104,7 @@ File map (details in [design.md](design.md)):
   - **Readers:** regenerate-design and refine read it through the brief.
   - **Autosave:** the brief-draft payload carries it, so Resume keeps the pick. Discard, eviction and expiry delete the object, and a successful generate keeps it (002 rules, extended to the private prefix).
   - **Draft delete:** an admin draft delete that removes the orphaned brief also deletes the object.
-- **FR-12: insertion (code-owned).** `insertComposite(html, region, canvas)` is pure and idempotent:
+- **FR-12: insertion (code-owned).** _(Amended by A1, below.)_ `insertComposite(html, region, canvas)` is pure and idempotent:
   - it removes every element carrying `data-composite`;
   - it inserts one canonical element as the last child of `<body>`: `<div data-composite="0">` positioned `fixed` at the rect in canvas pixels, `z-index: 2147483647`, background `#0b0b0b`, `overflow: hidden`;
   - inside it goes `<img src="__COMPOSITE_0__">` with `object-fit: contain`, so the whole screenshot shows, letterboxed in black.
@@ -112,7 +112,7 @@ File map (details in [design.md](design.md)):
   `stripComposite(html)` removes the element. The token is the only reference ever stored.
 
 - **FR-13: resolution at render.** `renderHtmlToPng` and `evaluateInRenderedPage` take a **required** `composites: CompositeRender | null` argument. When it is set, the renderer replaces the token with a `data:` URI built from the object's bytes (`getObjectBytes`, new in `minio.ts`) just before `setContent`; the stored string is never changed. `compositeRenderFor(stamp, teamId)` builds the argument from a stamp's `composites`, and refuses a key outside `screenshots/<teamId>/` with `composite-source-missing`.
-- **FR-14: the render check.** When `composites` is set, the renderer measures in the page, before the screenshot:
+- **FR-14: the render check.** _(Amended by A1, below.)_ When `composites` is set, the renderer measures in the page, before the screenshot:
   - the `<img>` is complete and has `naturalWidth > 0`;
   - the element's box is within `COMPOSITE_TOLERANCE_PX = 2` CSS px of the rect on every edge;
   - `elementFromPoint` at the centre and at four points inset 10% from the corners returns the composite element or its child.
@@ -156,19 +156,19 @@ Group A (verified at the Group A gate, re-run at final verify):
 
 - **AC-01 (FR-01, FR-02, NFR-04): the dataset.** Unit: five active looks; `device-screen` rows equal the FR-02 table; every screen rect is 16:10 in canvas px within 0.5%; the four released hashes are unchanged; `device-screen@1` matches its committed hash.
 - **AC-02 (FR-03): validation.** `lookDatasetProblems(archetypes)` is `[]`. Each FR-03 rule fails on its own fixture dataset with its own message.
-- **AC-03 (FR-04): the blank check.** Unit: a `composite` region with L\* standard deviation 0.039 passes and 0.041 fails as `composite-not-blank`; a text region keeps its old behaviour. Render: one pass fixture and one "screen not blank" fixture per `device-screen` size, with the real sampler and the real `evaluateRegions`.
+- **AC-03 (FR-04): the blank check.** _(Amended by A1, below.)_ Unit: a `composite` region with L\* standard deviation 0.039 passes and 0.041 fails as `composite-not-blank`; a text region keeps its old behaviour. Render: one pass fixture and one "screen not blank" fixture per `device-screen` size, with the real sampler and the real `evaluateRegions`.
 - **AC-04 (FR-05, FR-06): reasons and the stamp.** Unit: `FALLBACK_REASONS` is the 11-item list; each reason has a unique notice message of at least 20 characters; each FR-06 invariant fails on its own bad stamp; a classic fallback stamp with `composites` fails to parse.
 - **AC-05 (FR-07): prompts.** Golden text for the image, design and refine prompts of all three sizes; every existing golden is unchanged.
 - **AC-06 (FR-08): unavailable without a source.** Unit: the picker marks `device-screen` unsupported without a source, with the reason; `resolvePostStyle` gives `missing-input-classic` on wizard and briefs-api; `planComposition` gives `composite-source-missing`. E2E: `POST /api/briefs` with `device-screen` and no source is 400 `IMAGE_STYLE_NEEDS_SCREENSHOT`.
 - **AC-07 (FR-09): the probe.** Unit (`lookProbe.test.ts`, `lookCheck.test.ts`): the probe route is 404 in production and 403 for a non-super-admin; under `MOCK_AI` it returns a verdict and writes no row; the runner's `--probe --dry-run` lists three slots, a cap of 9, and a ledger line shape with the keys `threshold` and `promptHash` as null (written before the request; the real values are recorded per attempt in `results.json`) (amended at T5 after the T4 review); the 028 slots and cap are unchanged.
-- **AC-08 (fixtures).** `lookFixtureCompleteness.test.ts` passes with 36 + 12 rows (pass, busy, contrast and screen-blank-fail for each `device-screen` size).
+- **AC-08 (fixtures).** _(Amended by A1, below.)_ `lookFixtureCompleteness.test.ts` passes with 36 + 12 rows (pass, busy, contrast and screen-blank-fail for each `device-screen` size).
 
 Group B:
 
 - **AC-09 (FR-10, NFR-06): upload.** Unit: the header parser reads PNG, JPEG and WebP (VP8, VP8L, VP8X) dimensions and refuses a renamed SVG, a GIF and a truncated file. E2E: a PNG uploads and returns a key, not a URL; an SVG named `.png` is 400; 600×400 is 400; another team's key on the preview route is 404.
 - **AC-10 (FR-11): the brief.** E2E: each 400 of FR-11; a valid brief stores `compositeSource`; Resume of an autosaved brief keeps it; Discard deletes the object (asserted against MinIO, as §P does).
-- **AC-11 (FR-12): insertion.** Unit: idempotent (insert twice equals once); removes a model-written `data-composite`; the element's px box equals the rect at each size; `stripComposite` then `insertComposite` round-trips.
-- **AC-12 (FR-13, FR-14): pixel-exact.** Render harness (real Chromium): a 16:10 test pattern (four coloured quadrants and a 1 px grid) is rendered through the composite at each size. The sampled colour at each quadrant centre in the PNG matches the source within ΔE 3, and the element's box is within 2 px. A missing object, a covering element and a moved element each throw `CompositeRenderError` with the right reason.
+- **AC-11 (FR-12): insertion.** _(Amended by A1, below.)_ Unit: idempotent (insert twice equals once); removes a model-written `data-composite`; the element's px box equals the rect at each size; `stripComposite` then `insertComposite` round-trips.
+- **AC-12 (FR-13, FR-14): pixel-exact.** _(Amended by A1, below.)_ Render harness (real Chromium): a 16:10 test pattern (four coloured quadrants and a 1 px grid) is rendered through the composite at each size. The sampled colour at each quadrant centre in the PNG matches the source within ΔE 3, and the element's box is within 2 px. A missing object, a covering element and a moved element each throw `CompositeRenderError` with the right reason.
 - **AC-13 (FR-15): generation.** E2E (`MOCK_AI`, `__MOCK_BG__`): a kept `device-screen` draft stores HTML with exactly one canonical element and the token, no URL to the object, and a stamp with `composites` of length 1. With `__MOCK_COMPOSITE_FAIL__` the draft is EXPORTED, classic, `composite-not-rendered`, with the notice and no `composites`. With `__MOCK_HERO_SCREEN__` (new: only the screen region is busy) it is `composite-not-blank`.
 - **AC-14 (FR-16): re-renders.** E2E: a refine on a `device-screen` draft keeps the canonical element and `composites`; an inline edit that deletes or moves the element is saved with the canonical element restored; a refine with `__MOCK_COMPOSITE_FAIL__` fails with the named error and writes no revision; a refine that replaces the image gives `refine-replaced-image` and no element.
 - **AC-15 (FR-17, NFR-09): the wizard.** E2E: the field appears for Path B, `device-screen` is disabled until a screenshot is uploaded, the advisory line shows for a 1:1 screenshot, and the submit body carries `compositeSource`. Screenshots at 390 px and 1440 px, light and dark.
@@ -202,6 +202,32 @@ Every upheld finding is mapped in the proposal's "Panel resolution" table. In th
 - A3. `BLANK_STDDEV_MAX = 0.04` is a starting value, tuned on fixtures in Group A and fixed before OP-025. Its value is recorded in every ledger line.
 - A4. Fit is `contain` on black, so a dashboard is never cropped. The corner radius is 0.
 - A5. OP-025 runs on the scratch database `bistec_studio_op1` at `:3002`, with the user's OpenAI key, as OP-1 and OP-028 did.
+
+## Amendment A1 (2026-10-25, the user's decision after OP-025 attempts 1 to 4): screen detection
+
+**Why.** OP-025 spent 4 of its 9 attempts. Every render drew a clean, blank, 16:10 laptop screen with room for text above it, but none placed the screen exactly on the contract rect: the screen was 2 to 7% of the canvas off on at least one edge, so the fixed rect always took in bezel or keyboard and `composite-not-blank` failed it. The first attempt also showed the art-director paraphrasing the region lines, which the geometry pin (`imageGeometryPin`, commit `264b313`) now fixes. A placed screenshot cannot use a rect the image model does not hit, so code **finds** the screen in the image and the screenshot goes where the screen is.
+
+**What changes (supersedes the named parts; everything else stands):**
+
+- **FR-04, the composite branch (superseded).** For a `composite` region the check runs `detectScreenRect` (pure, `designData/composite.ts`) on a luminance grid that the sampler reads over a search window: the region widened by `DETECT_MARGIN_PCT = 12` (percent of the canvas dimension) on each side, clipped to the canvas, sampled at one point per 2 canvas px.
+  - **Seed:** the centre patch of the region (5% by 5% of the canvas). Its L\*/100 standard deviation must be at most `BLANK_STDDEV_MAX`; its median is the screen level `L0`.
+  - **Edges:** from the centre, five lines per axis (at -30, -15, 0, 15 and 30% of the region's size) scan outward until |L\* - L0| > `SCREEN_EDGE_DELTA = 0.10`. Each side is the median of its five scans. A scan that reaches the window edge fails.
+  - **Accept** only when all hold: the interior, inset 3%, has L\*/100 standard deviation at most `BLANK_STDDEV_MAX`; the aspect is 16:10 within 5%; the area is at least `MIN_SCREEN_AREA_RATIO = 0.6` of the region's area; the rect does not intersect any `text` region of the contract.
+  - A pass returns the detected rect in canvas percent (two decimals). Any failure returns `{ ok: false, reason: 'composite-not-blank', region }`. The reason name is unchanged (permanent names, FR-05); its notice says no clear blank screen was found.
+  - The contract's composite region stays the target the prompts name (FR-07 and the pin) and the seed of the search. It is no longer the insertion rect.
+- **FR-06 (amended).** Each `composites` entry gains `rect: { x, y, w, h }`, the detected screen in canvas percent. The stamp invariants gain: `rect` is required, inside the canvas, 16:10 within 5%, and does not intersect a text region of the stamped contract.
+- **FR-12, FR-14 (amended).** `insertComposite(html, rect, canvas)` and the render check use the stamped `rect`, not the contract region. Every re-render path (FR-16) reads the rect from the stamp; nothing re-detects.
+- **AC-03 (amended).** Unit: `detectScreenRect` on synthetic grids finds an offset screen exactly (within one grid step), and fails on: a textured seed, a screen touching the window edge, a 4:3 screen, a screen under 60% of the region, a screen that intersects the text band, and a busy interior. The 0.039 / 0.041 blank boundary still holds on the seed and the interior.
+- **AC-08 (amended).** The `device-screen` fixtures add, per size: a pass fixture with the screen offset from the region (within the margin), and fail fixtures for text-band overlap and for a small screen. The completeness rule covers the new kinds.
+- **AC-11, AC-12 (amended).** Insertion and the pixel-exact render test use a stamped rect that differs from the contract region.
+- **OP-025 (amended).**
+  - The ledger and its cap of 9 stand. The 4 spent attempts stay in the ledger.
+  - Their renders are re-judged offline with the shipped detector (`run-look-check.mjs --probe --recheck`, no image call). Each result gains `recheck: { styleKept, fallbackReason, rect }`, and for attempts 1 to 4 the pass rule reads `recheck.styleKept`.
+  - The user then gives a verdict on each re-judged render that kept the look, looking at the detected rect drawn on it.
+  - The remaining attempts run only as far as the pass rule still needs.
+  - The probe response and `results.json` carry the detected rect.
+
+**Measured offline on the 4 renders (prototype, 2026-10-25).** SQUARE 1 (before the pin): screen top at 27.5%, inside the text band: fail. SQUARE 2: x 18.6 to 81.3, y 39.6 to 77.5, aspect 1.655, interior 0.010: pass. PORTRAIT 1: x 9.1 to 90.7, y 39.0 to 80.1, aspect 1.586, interior 0.002: pass. STORY 1: x 6.2 to 92.5, y 42.0 to 72.8, aspect 1.577, interior 0.005: pass. The shipped detector must reproduce these verdicts.
 
 ## Known limits
 
