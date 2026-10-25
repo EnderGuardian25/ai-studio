@@ -26,10 +26,12 @@ import {
   knownStyleKey,
   resolveWizardStyle,
   resumeWizardStyle,
-  styleAfterSizeChange,
+  styleAfterInputChange,
   styleRequestFields,
   DEFAULT_POST_STYLE,
 } from '@/lib/brief/wizardStyleState'
+import { getArchetype } from '@/lib/designData'
+import { parseCompositeSource, type CompositeSource } from '@/lib/brief/compositeSource'
 import { DEFAULT_CHANNELS } from './constants'
 import type { DesignMode, ResolvedKit, UploadedImage } from './types'
 import {
@@ -89,6 +91,14 @@ export interface UseBriefWizardResult {
   designMode: DesignMode
   /** Also resets a design model the new path can't run (008 FR-19). */
   setDesignMode: (mode: DesignMode) => void
+  /** 025 FR-17: the uploaded product screenshot (Path B), or null. */
+  compositeSource: CompositeSource | null
+  screenshotUploading: boolean
+  /** The server's refusal of the last upload, shown on the field. */
+  screenshotError: string | null
+  screenshotInputRef: React.RefObject<HTMLInputElement | null>
+  onScreenshotPicked: (files: FileList | null) => Promise<void>
+  removeScreenshot: () => void
   templateId: string
   setTemplateId: React.Dispatch<React.SetStateAction<string>>
   referenceTemplateId: string
@@ -172,6 +182,12 @@ export function useBriefWizard(): UseBriefWizardResult {
   const [designMode, setDesignModeState] = useState<DesignMode>('TEMPLATE')
   const [templateId, setTemplateId] = useState('')
   const [referenceTemplateId, setReferenceTemplateId] = useState('')
+  // 025 FR-17: the per-post product screenshot a `requires` look composites in.
+  const [compositeSource, setCompositeSource] = useState<CompositeSource | null>(null)
+  const [screenshotUploading, setScreenshotUploading] = useState(false)
+  const [screenshotError, setScreenshotError] = useState<string | null>(null)
+  const screenshotInputRef = useRef<HTMLInputElement>(null)
+  const hasCompositeSource = compositeSource !== null
 
   // Step 4 — model picks (008 FR-19). undefined = untouched: the field is left
   // out of the POST and the autosave, and the server resolves the default (A5).
@@ -197,7 +213,40 @@ export function useBriefWizard(): UseBriefWizardResult {
   // declares every size, so on today's dataset this never resets.
   function setAspectRatio(ratio: AspectRatio) {
     setAspectRatioState(ratio)
-    if (styleAfterSizeChange(imageStyleValue, ratio).reset) resetImageStyle()
+    if (styleAfterInputChange(imageStyleValue, ratio, undefined, { hasCompositeSource }).reset) resetImageStyle()
+  }
+
+  // 025 FR-17: the upload goes to the private store and answers a key, never a
+  // URL. A refusal (type, size, dimensions) is the server's own message.
+  async function onScreenshotPicked(files: FileList | null) {
+    const file = files?.[0]
+    if (!file) return
+    setScreenshotUploading(true)
+    setScreenshotError(null)
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      const up = await apiFetch<{ key: string; width: number; height: number }>('/api/briefs/screenshots', {
+        method: 'POST',
+        body: fd,
+      })
+      setCompositeSource({ kind: 'brief-upload', key: up.key, width: up.width, height: up.height })
+    } catch (e) {
+      setScreenshotError(e instanceof Error ? e.message : 'Screenshot upload failed')
+    } finally {
+      setScreenshotUploading(false)
+      if (screenshotInputRef.current) screenshotInputRef.current.value = ''
+    }
+  }
+
+  // Removing the screenshot while a look that needs it is picked drops the pick,
+  // so the field follows the post style again.
+  function removeScreenshot() {
+    setCompositeSource(null)
+    setScreenshotError(null)
+    if (styleAfterInputChange(imageStyleValue, aspectRatio, undefined, { hasCompositeSource: false }).reset) {
+      resetImageStyle()
+    }
   }
 
   function resetImageStyle() {
@@ -224,7 +273,11 @@ export function useBriefWizard(): UseBriefWizardResult {
   function setDesignMode(mode: DesignMode) {
     if (mode === designMode) return
     setDesignModeState(mode)
-    if (mode === 'TEMPLATE') resetImageStyle()
+    if (mode === 'TEMPLATE') {
+      resetImageStyle()
+      setCompositeSource(null)
+      setScreenshotError(null)
+    }
     const next = designPickForPath(designModel, mode)
     setDesignModel(next.pick) // clears the previous path's note and refusal
     if (next.note) setDesignModelNote(next.note)
@@ -251,6 +304,7 @@ export function useBriefWizard(): UseBriefWizardResult {
     toneTouched,
     imageStyle: imageStyleValue,
     imageStyleTouched,
+    hasCompositeSource,
   }
   const styleView = resolveWizardStyle(styleInput)
   const tone = styleView.tone
@@ -328,6 +382,8 @@ export function useBriefWizard(): UseBriefWizardResult {
       designModel,
       // Classic is the default: left out, like an untouched model pick.
       imageStyle: imageStyle === CLASSIC_STYLE ? undefined : imageStyle,
+      // 025 FR-17: the screenshot, only on Path B (a Path A brief never carries one).
+      compositeSource: designMode === 'GENERATE' && compositeSource ? compositeSource : undefined,
     }
     if (autosaveStoppedRef.current) return
     if (isTrivialBriefDraft(latestPayloadRef.current)) return
@@ -350,6 +406,7 @@ export function useBriefWizard(): UseBriefWizardResult {
     captionModel,
     designModel,
     imageStyle,
+    compositeSource,
   ])
 
   // Resume: /brief?resume=<id> rehydrates the saved row and continues saving
@@ -398,8 +455,15 @@ export function useBriefWizard(): UseBriefWizardResult {
         // An unknown or retired stored value resumes as classic; so does a style
         // the stored size or path can't run.
         const resumedImageStyle = resumeImageStyle(p.imageStyle)
+        // 025: the screenshot comes back with a Path B draft, and a look that needs
+        // one is kept only if it did.
+        const storedSource = p.designMode === 'GENERATE' ? parseCompositeSource(p.compositeSource) : null
+        setCompositeSource(storedSource)
         const storedImageStyle =
-          p.designMode === 'TEMPLATE' || styleAfterSizeChange(resumedImageStyle, p.aspectRatio).reset
+          p.designMode === 'TEMPLATE' ||
+          styleAfterInputChange(resumedImageStyle, p.aspectRatio, undefined, {
+            hasCompositeSource: storedSource !== null,
+          }).reset
             ? CLASSIC_STYLE
             : resumedImageStyle
         // 027 FR-07: an unknown stored style opens as General; a stored tone or
@@ -632,6 +696,15 @@ export function useBriefWizard(): UseBriefWizardResult {
         // 006 FR-08: whether the brief came from a resumed brief draft (read by
         // the route for brief.submitted only; not stored).
         resumed: resumedRef.current || undefined,
+        // 025 FR-17: with a look that `requires` it, and only then: the server
+        // refuses a screenshot sent with any other look.
+        compositeSource:
+          designMode === 'GENERATE' &&
+          compositeSource &&
+          styleRequest.imageStyle &&
+          getArchetype(styleRequest.imageStyle)?.requires
+            ? compositeSource
+            : undefined,
       }
 
       const brief = await apiFetch<{ id: string }>('/api/briefs', {
@@ -720,6 +793,12 @@ export function useBriefWizard(): UseBriefWizardResult {
     brandKitOptions,
     designMode,
     setDesignMode,
+    compositeSource,
+    screenshotUploading,
+    screenshotError,
+    screenshotInputRef,
+    onScreenshotPicked,
+    removeScreenshot,
     templateId,
     setTemplateId,
     referenceTemplateId,

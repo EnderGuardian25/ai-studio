@@ -14,6 +14,7 @@ import {
   type BriefModelField,
 } from '@/lib/brief/modelPicks'
 import { styleLabel } from '@/lib/designData'
+import type { CompositeSource } from '@/lib/brief/compositeSource'
 import { getStyle } from '@/lib/postStyles'
 import type { DesignMode, UploadedImage } from './types'
 import { ReviewRow, type ReviewRowProps } from './ReviewRow'
@@ -32,6 +33,8 @@ interface ReviewStepProps {
   /** True when the image style is the post style's own default (027 FR-07). */
   imageStyleFromStyle?: boolean
   imageStyle: string
+  /** 025 FR-17: the product screenshot, when one is attached (Path B). */
+  compositeSource?: CompositeSource | null
   designMode: DesignMode
   selectedTemplate: TemplateSummary | null
   selectedRefTemplate: TemplateSummary | null
@@ -61,6 +64,7 @@ export function ReviewStep({
   postStyle,
   imageStyleFromStyle,
   imageStyle,
+  compositeSource,
   designMode,
   selectedTemplate,
   selectedRefTemplate,
@@ -104,6 +108,9 @@ export function ReviewStep({
         (imageStyle === 'classic' ? 'Classic' : styleLabel(imageStyle)) +
         (imageStyleFromStyle ? ' (from the post style)' : ''),
     },
+    ...(designMode === 'GENERATE' && compositeSource
+      ? [{ label: 'Product screenshot', value: `${compositeSource.width}×${compositeSource.height}` }]
+      : []),
     {
       label: 'Template',
       value:

@@ -6,7 +6,9 @@ import {
   knownStyleKey,
   resolveWizardStyle,
   resumeWizardStyle,
+  styleAfterInputChange,
   styleAfterSizeChange,
+  screenshotWillLetterbox,
   styleRequestFields,
   type WizardStyleInput,
 } from '@/lib/brief/wizardStyleState'
@@ -164,5 +166,59 @@ describe('device-screen in the wizard (025 FR-08)', () => {
 
   it('a size change and a resume both drop device-screen', () => {
     expect(styleAfterSizeChange('device-screen', 'SQUARE')).toEqual({ imageStyle: 'classic', reset: true })
+  })
+})
+
+describe('device-screen with a product screenshot (025 FR-17)', () => {
+  it('styleAfterInputChange keeps device-screen only while a screenshot is held', () => {
+    const held = { hasCompositeSource: true }
+    for (const size of ['SQUARE', 'PORTRAIT', 'STORY'] as const) {
+      expect(styleAfterInputChange('device-screen', size, undefined, held)).toEqual({
+        imageStyle: 'device-screen',
+        reset: false,
+      })
+      // Removing the screenshot while the look is picked resets the pick.
+      expect(styleAfterInputChange('device-screen', size, undefined, { hasCompositeSource: false })).toEqual({
+        imageStyle: 'classic',
+        reset: true,
+      })
+    }
+    // Another look is unaffected by the screenshot either way.
+    expect(styleAfterInputChange('spotlight', 'SQUARE', undefined, held).reset).toBe(false)
+    expect(styleAfterInputChange('spotlight', 'SQUARE').reset).toBe(false)
+  })
+
+  it('the size-change wrapper still assumes no screenshot', () => {
+    expect(styleAfterSizeChange('device-screen', 'STORY').reset).toBe(true)
+  })
+
+  it('a touched device-screen is kept by the resolver only when the flag is set', () => {
+    const touched = { ...base, imageStyle: 'device-screen', imageStyleTouched: true }
+    expect(resolveWizardStyle(touched).imageStyle).toBe('classic')
+    expect(resolveWizardStyle({ ...touched, hasCompositeSource: true }).imageStyle).toBe('device-screen')
+  })
+
+  it('the request carries a touched device-screen as the look key', () => {
+    const r = styleRequestFields({ ...base, imageStyle: 'device-screen', imageStyleTouched: true, hasCompositeSource: true })
+    expect(r.imageStyle).toBe('device-screen')
+  })
+
+  it('advises letterboxing when the aspect differs from the screen by more than 10%', () => {
+    // SQUARE screen: 72% x 45% of 1080 = 777.6 x 486 px = 1.6.
+    expect(screenshotWillLetterbox('SQUARE', { width: 1000, height: 1000 })).toBe(true)
+    expect(screenshotWillLetterbox('SQUARE', { width: 1600, height: 1000 })).toBe(false)
+    // Inside 10% either way: no advisory; just outside: advisory.
+    expect(screenshotWillLetterbox('SQUARE', { width: 1740, height: 1000 })).toBe(false)
+    expect(screenshotWillLetterbox('SQUARE', { width: 1780, height: 1000 })).toBe(true)
+    expect(screenshotWillLetterbox('SQUARE', { width: 1450, height: 1000 })).toBe(false)
+    expect(screenshotWillLetterbox('SQUARE', { width: 1420, height: 1000 })).toBe(true)
+    // A degenerate size is never advised.
+    expect(screenshotWillLetterbox('SQUARE', { width: 0, height: 0 })).toBe(false)
+  })
+
+  it('uses the screen of the picked size (STORY is wider than the square screen)', () => {
+    // STORY screen: 84% x 29.5% of 1080x1920 = 907.2 x 566.4 = 1.6017.
+    expect(screenshotWillLetterbox('STORY', { width: 1600, height: 1000 })).toBe(false)
+    expect(screenshotWillLetterbox('STORY', { width: 1000, height: 1000 })).toBe(true)
   })
 })

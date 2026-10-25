@@ -71,6 +71,12 @@ export default function NewBriefPage() {
             referenceTemplateId={wizard.referenceTemplateId}
             setReferenceTemplateId={wizard.setReferenceTemplateId}
             visibleTemplates={wizard.visibleTemplates}
+            compositeSource={wizard.compositeSource}
+            screenshotUploading={wizard.screenshotUploading}
+            screenshotError={wizard.screenshotError}
+            screenshotInputRef={wizard.screenshotInputRef}
+            onScreenshotPicked={wizard.onScreenshotPicked}
+            removeScreenshot={wizard.removeScreenshot}
           />
         )}
 
@@ -108,6 +114,7 @@ export default function NewBriefPage() {
             postStyle={wizard.postStyle}
             imageStyleFromStyle={wizard.imageStyleFromStyle}
             imageStyle={wizard.imageStyle}
+            compositeSource={wizard.compositeSource}
             designMode={wizard.designMode}
             selectedTemplate={wizard.selectedTemplate}
             selectedRefTemplate={wizard.selectedRefTemplate}

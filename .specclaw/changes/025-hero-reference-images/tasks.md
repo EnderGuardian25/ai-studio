@@ -188,7 +188,7 @@ This change has **12 tasks in 6 waves**:
     - Add the NFR-05 unit guard (no writer stores an `http` URL with `screenshots/`).
     - **Gate:** tsc, lint, unit, build, `agui-refinement`, `async-actions`, `inline-edit` (as named in the repo), `regression` H7, and the listed TC-SHOT cases alone.
 
-- [ ] `T10` — The wizard: the screenshot field, the picker, review, autosave and resume
+- [x] `T10` — The wizard: the screenshot field, the picker, review, autosave and resume
   - Files: `src/components/brief/{SizeDesignStep,ReviewStep}.tsx`, `src/components/brief/useBriefWizard.ts`, `src/lib/brief/wizardStyleState.ts`, `tests/unit/postStylesWizard.test.ts`, `tests/e2e/product-screenshots.test.ts` (TC-SHOT-13)
   - Estimate: medium
   - Kind: impl

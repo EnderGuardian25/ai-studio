@@ -1,11 +1,15 @@
 'use client'
 
 import React from 'react'
-import { Sparkles, Check } from 'lucide-react'
+import { Sparkles, Check, Upload, Loader2 } from 'lucide-react'
 import { Select } from '@/components/ui/Select'
+import { Button } from '@/components/ui/Button'
+import { Notice } from '@/components/ui/Notice'
 import type { AspectRatio } from '@prisma/client'
 import { ASPECT_LABELS } from '@/lib/aspectRatio'
-import { imageStyleOptions } from '@/lib/designData'
+import { imageStyleOptions, getArchetype } from '@/lib/designData'
+import type { CompositeSource } from '@/lib/brief/compositeSource'
+import { screenshotWillLetterbox } from '@/lib/brief/wizardStyleState'
 import type { Campaign, TemplateSummary } from '@/lib/api-types'
 import { ASPECT_OPTIONS, SOURCE_LABEL } from './constants'
 import type { DesignMode, ResolvedKit } from './types'
@@ -40,6 +44,13 @@ interface SizeDesignStepProps {
   referenceTemplateId: string
   setReferenceTemplateId: (id: string) => void
   visibleTemplates: TemplateSummary[]
+  /** 025 FR-17: the per-post product screenshot (Path B). */
+  compositeSource: CompositeSource | null
+  screenshotUploading: boolean
+  screenshotError: string | null
+  screenshotInputRef: React.RefObject<HTMLInputElement | null>
+  onScreenshotPicked: (files: FileList | null) => Promise<void>
+  removeScreenshot: () => void
 }
 
 // One field group per section, ruled apart on --line-subtle (DESIGN_SYSTEM.md §6).
@@ -68,7 +79,17 @@ export function SizeDesignStep({
   referenceTemplateId,
   setReferenceTemplateId,
   visibleTemplates,
+  compositeSource,
+  screenshotUploading,
+  screenshotError,
+  screenshotInputRef,
+  onScreenshotPicked,
+  removeScreenshot,
 }: SizeDesignStepProps) {
+  // 025 FR-17: a look that needs a screenshot, picked with none held, makes the
+  // field required. The advisory is never a refusal.
+  const needsScreenshot = !!getArchetype(imageStyle)?.requires && !compositeSource
+  const letterbox = compositeSource ? screenshotWillLetterbox(aspectRatio, compositeSource) : false
   return (
     <div>
       <StepHead title={<>Size &amp; Design</>}>
@@ -182,7 +203,7 @@ export function SizeDesignStep({
             </p>
           )}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            {imageStyleOptions(aspectRatio).map(opt => {
+            {imageStyleOptions(aspectRatio, undefined, { hasCompositeSource: compositeSource !== null }).map(opt => {
               const selected = imageStyle === opt.key
               return (
                 <button
@@ -208,6 +229,89 @@ export function SizeDesignStep({
               )
             })}
           </div>
+        </div>
+      )}
+
+      {/* Product screenshot — Path B (025 FR-17). Outside the image-style section so
+          the look cards stay the only pressed buttons there. */}
+      {designMode === 'GENERATE' && (
+        <div className={SECTION} data-testid="screenshot-section">
+          <FieldLabel as="span" id="screenshot-label" className="mb-1">
+            Product screenshot{' '}
+            <span className="font-normal text-fg-muted">{needsScreenshot ? '(required)' : '(optional)'}</span>
+          </FieldLabel>
+          <p id="screenshot-help" className="text-ui-xs text-fg-muted mb-3">
+            Needed for the Product screen image style, which shows it on a laptop. PNG, JPEG or WebP, up to 10 MB, at
+            least 640×400 px. It is private to you and your team.
+          </p>
+          <input
+            ref={screenshotInputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            className="hidden"
+            aria-label="Product screenshot file"
+            data-testid="screenshot-input"
+            tabIndex={-1}
+            onChange={e => onScreenshotPicked(e.target.files)}
+          />
+          {compositeSource ? (
+            <div className="flex items-center gap-3" data-testid="screenshot-preview">
+              <span className="h-16 w-24 flex-shrink-0 overflow-hidden rounded-ui-sm border border-line-subtle bg-surface flex items-center justify-center">
+                {/* The user's own screenshot, shown as uploaded: never token-styled. */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={`/api/briefs/screenshots?key=${encodeURIComponent(compositeSource.key)}`}
+                  alt="Product screenshot preview"
+                  className="h-full w-full object-contain"
+                />
+              </span>
+              <span className="min-w-0 flex-1 font-mono text-ui-xs text-fg-muted">
+                {compositeSource.width}×{compositeSource.height} px
+              </span>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={removeScreenshot}
+                aria-label="Remove product screenshot"
+                data-testid="screenshot-remove"
+              >
+                Remove
+              </Button>
+            </div>
+          ) : (
+            <Button
+              variant="secondary"
+              onClick={() => screenshotInputRef.current?.click()}
+              disabled={screenshotUploading}
+              aria-describedby="screenshot-help"
+              data-testid="screenshot-add"
+            >
+              {screenshotUploading ? (
+                <><Loader2 {...ICON} aria-hidden className="animate-spin" /> Uploading…</>
+              ) : (
+                <><Upload {...ICON} aria-hidden /> Add screenshot</>
+              )}
+            </Button>
+          )}
+          {/* One persistent live region, so the advisory and the required state are announced. */}
+          <div role="status" className="mt-2 space-y-2" data-testid="screenshot-status">
+            {letterbox && (
+              <p className="text-ui-xs text-fg-muted" data-testid="screenshot-advisory">
+                Will be letterboxed: this screenshot&apos;s shape differs from the laptop screen, so it is fitted inside
+                it with bars at the sides or the top and bottom.
+              </p>
+            )}
+            {needsScreenshot && !screenshotUploading && (
+              <p className="text-ui-xs text-status-failed" data-testid="screenshot-required">
+                Add a product screenshot to use the Product screen style.
+              </p>
+            )}
+          </div>
+          {screenshotError && (
+            <Notice tone="error" role="alert" className="mt-2" data-testid="screenshot-error">
+              {screenshotError}
+            </Notice>
+          )}
         </div>
       )}
 

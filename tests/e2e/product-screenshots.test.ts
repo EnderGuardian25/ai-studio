@@ -1,6 +1,6 @@
-import { test, expect, type APIRequestContext } from '@playwright/test'
+import { test, expect, type APIRequestContext, type Page } from '@playwright/test'
 import { loginAs, waitForAction, waitForDraft } from '../helpers/api'
-import { ADMIN_EMAIL, ADMIN_PASSWORD } from '../helpers/ui'
+import { ADMIN_EMAIL, ADMIN_PASSWORD, briefDraftIds, pageLogin } from '../helpers/ui'
 import { prisma, dbAvailable, NO_DB_MSG } from '../helpers/db'
 import { DOCS_BUCKET, objectExists, removeObject } from '../helpers/minio'
 import { GIF_BYTES, SVG_AS_PNG, makePng } from '../helpers/images'
@@ -512,5 +512,138 @@ test.describe('§AG product screenshots: re-renders (T9)', () => {
       expect(replaced.compositionNotice).toMatchObject({ reason: 'refine-replaced-image' })
       await removeObject(DOCS_BUCKET, up.key)
     })
+  })
+})
+
+// ── T10: the wizard (TC-SHOT-13, AC-15) ──────────────────────────────────────
+
+test.describe('§AG product screenshots: the wizard', () => {
+  let api: Awaited<ReturnType<typeof loginAs>>
+  let before: Set<string>
+  let kitId = ''
+  const keys: string[] = []
+  test.beforeEach(async ({ request }) => {
+    api = await loginAs(request, ADMIN_EMAIL, ADMIN_PASSWORD)
+    before = new Set(await briefDraftIds(api))
+    kitId = (await (await api.post('/api/admin/brandkits', { name: `Shot Wizard Kit ${Date.now()}`, colors: ['#8c4812'] })).json()).id
+  })
+  test.afterEach(async () => {
+    for (const id of await briefDraftIds(api)) if (!before.has(id)) await api.del(`/api/brief-drafts/${id}`)
+    for (const key of keys.splice(0)) await removeObject(DOCS_BUCKET, key).catch(() => undefined)
+    if (kitId) await api.del(`/api/admin/brandkits/${kitId}`)
+    await api.dispose()
+  })
+
+  const option = (page: Page, key: string) => page.getByTestId(`image-style-${key}`)
+  const summary = (page: Page, label: string) =>
+    page.getByRole('term').filter({ hasText: new RegExp(`^${label}$`) }).locator('xpath=following-sibling::dd[1]')
+
+  async function toSizeStep(page: Page) {
+    await pageLogin(page)
+    await page.goto('/brief')
+    await expect(page.getByRole('heading', { name: 'Select Campaign' })).toBeVisible({ timeout: 20_000 })
+    await page.getByRole('button', { name: /continue/i }).click()
+    await expect(page.getByRole('heading', { name: 'Size & Design' })).toBeVisible()
+    const kit = page.getByRole('combobox', { name: 'Brand Kit' })
+    await expect(kit.locator(`option[value="${kitId}"]`)).toBeAttached()
+    await kit.selectOption(kitId)
+  }
+
+  // The upload response is awaited from before the file is set (the 023 lesson).
+  async function upload(page: Page, buffer: Buffer) {
+    const done = page.waitForResponse(
+      (r) => r.request().method() === 'POST' && new URL(r.url()).pathname === '/api/briefs/screenshots',
+    )
+    await page.getByTestId('screenshot-input').setInputFiles({ name: 'screen.png', mimeType: 'image/png', buffer })
+    return done
+  }
+
+  test('TC-SHOT-13: the field is Path B only; device-screen is disabled until an upload, then enabled; the advisory shows for 1:1; the body carries compositeSource; Remove resets the pick; the draft resumes with it', async ({ page }) => {
+    await toSizeStep(page)
+
+    // Path A: no field. Path B: the field, with the look disabled and its reason.
+    await expect(page.getByTestId('screenshot-section')).toHaveCount(0)
+    await page.getByRole('button', { name: /Path B — Freeform/ }).click()
+    const section = page.getByTestId('screenshot-section')
+    await expect(section).toBeVisible()
+    await expect(section.getByText('Product screenshot').first()).toBeVisible()
+    await expect(option(page, 'device-screen')).toBeDisabled()
+    await expect(option(page, 'device-screen')).toContainText('Needs a product screenshot')
+
+    // A refused upload shows the server's own message and leaves the look disabled.
+    const refused = await upload(page, makePng(600, 400))
+    expect(refused.status()).toBe(400)
+    await expect(page.getByTestId('screenshot-error')).toContainText(/at least 640 by 400/)
+    await expect(option(page, 'device-screen')).toBeDisabled()
+
+    // A 1:1 screenshot uploads: the thumbnail, the advisory, the look enabled.
+    const ok = await upload(page, makePng(1000, 1000))
+    expect(ok.status()).toBe(200)
+    const shot = (await ok.json()) as { key: string; width: number; height: number }
+    keys.push(shot.key)
+    await expect(page.getByTestId('screenshot-error')).toHaveCount(0)
+    await expect(page.getByRole('img', { name: 'Product screenshot preview' })).toBeVisible()
+    await expect(page.getByTestId('screenshot-advisory')).toContainText('Will be letterboxed')
+    await expect(option(page, 'device-screen')).toBeEnabled()
+
+    // Remove while device-screen is picked resets the pick to the style's own.
+    await option(page, 'device-screen').click()
+    await expect(option(page, 'device-screen')).toHaveAttribute('aria-pressed', 'true')
+    await page.getByRole('button', { name: 'Remove product screenshot' }).click()
+    await expect(page.getByTestId('screenshot-preview')).toHaveCount(0)
+    await expect(page.getByTestId('screenshot-advisory')).toHaveCount(0)
+    await expect(option(page, 'device-screen')).toBeDisabled()
+    await expect(option(page, 'device-screen')).toHaveAttribute('aria-pressed', 'false')
+    await expect(option(page, 'classic')).toHaveAttribute('aria-pressed', 'true')
+
+    // A 16:10 screenshot gives no advisory.
+    const wide = await upload(page, makePng(1600, 1000))
+    keys.push(((await wide.json()) as { key: string }).key)
+    await expect(page.getByRole('img', { name: 'Product screenshot preview' })).toBeVisible()
+    await expect(page.getByTestId('screenshot-advisory')).toHaveCount(0)
+    await page.getByRole('button', { name: 'Remove product screenshot' }).click()
+
+    // Upload again, pick the look, and go forward; the autosave carries the source.
+    const again = await upload(page, makePng(1000, 1000))
+    const picked = (await again.json()) as { key: string; width: number; height: number }
+    keys.push(picked.key)
+    await option(page, 'device-screen').click()
+    const cont = page.getByRole('button', { name: /continue/i })
+    await cont.click()
+    await expect(page.getByRole('heading', { name: 'Brief & Caption Direction' })).toBeVisible()
+    await page.getByPlaceholder('e.g. Q3 product launch').fill('Shot wizard topic')
+    await page.locator('textarea').fill('Show the new dashboard on a laptop with a short call to action.')
+    await cont.click()
+    await expect(page.getByRole('heading', { name: /Images/ })).toBeVisible()
+    const saved = page.waitForResponse((r) => {
+      if (r.request().method() !== 'PUT' || new URL(r.url()).pathname !== '/api/brief-drafts') return false
+      const payload = (r.request().postDataJSON() as { payload: { step?: number; compositeSource?: { key?: string } } }).payload
+      return payload.step === 4 && payload.compositeSource?.key === picked.key
+    })
+    await cont.click()
+    await expect(page.getByRole('heading', { name: 'Review & Generate' })).toBeVisible()
+    await expect(summary(page, 'Image style')).toHaveText('Product screen')
+    await expect(summary(page, 'Product screenshot')).toHaveText('1000×1000')
+    const draftId = ((await (await saved).json()) as { id: string }).id
+
+    // The submit body carries the source (the POST is stubbed so nothing generates).
+    let body: Record<string, unknown> = {}
+    await page.route('**/api/briefs', async (route) => {
+      if (route.request().method() !== 'POST') return route.fallback()
+      body = route.request().postDataJSON() as Record<string, unknown>
+      await route.fulfill({ status: 400, contentType: 'application/json', body: JSON.stringify({ error: 'stubbed' }) })
+    })
+    const posted = page.waitForRequest((r) => r.method() === 'POST' && new URL(r.url()).pathname === '/api/briefs')
+    await page.getByRole('button', { name: 'Generate Post' }).click()
+    await posted
+    expect(body.imageStyle).toBe('device-screen')
+    expect(body.compositeSource).toEqual({ kind: 'brief-upload', key: picked.key, width: picked.width, height: picked.height })
+    await page.unroute('**/api/briefs')
+
+    // Resume keeps the screenshot and the look.
+    await page.goto(`/brief?resume=${draftId}`)
+    await expect(page.getByRole('heading', { name: 'Review & Generate' })).toBeVisible({ timeout: 20_000 })
+    await expect(summary(page, 'Image style')).toHaveText('Product screen')
+    await expect(summary(page, 'Product screenshot')).toHaveText('1000×1000')
   })
 })
