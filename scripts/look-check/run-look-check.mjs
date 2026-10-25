@@ -187,7 +187,7 @@ async function runProbe() {
     console.log(totalLine(entries.length + 1, pcap))
     log('started', slot, `attempt ${p.attempt}`)
     const [key, size] = slot.split(':')
-    const result = { slot, attempt: p.attempt, runId, styleKept: false, fallbackReason: null, threshold: null, promptHash: null, render: null, error: null, accepted: null }
+    const result = { slot, attempt: p.attempt, runId, styleKept: false, fallbackReason: null, threshold: null, promptHash: null, rect: null, render: null, error: null, accepted: null }
     try {
       const r = await call('/api/admin/look-probe', { method: 'POST', body: JSON.stringify({ key, size }) })
       if (r.status !== 200) throw new Error(`probe ${r.status}: ${JSON.stringify(r.body).slice(0, 300)}`)
@@ -195,6 +195,7 @@ async function runProbe() {
       result.fallbackReason = r.body.fallbackReason ?? null
       result.threshold = r.body.threshold ?? null
       result.promptHash = r.body.promptHash ?? null
+      result.rect = r.body.rect ?? null
       const m = /^data:[^;]+;base64,(.+)$/s.exec(String(r.body.image ?? ''))
       if (m) {
         const name = `${key}_${size}_${p.attempt}.png`

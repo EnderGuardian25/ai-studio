@@ -234,6 +234,12 @@ describe('look-check probe mode (025 AC-07)', () => {
     expect(readFileSync('scripts/look-check/recheck.ts', 'utf8')).toContain('runHeroCheck')
   })
 
+  it('025 A1: a live probe result records the detected rect from the response', () => {
+    const runner = readFileSync('scripts/look-check/run-look-check.mjs', 'utf8')
+    expect(runner).toContain('rect: null, render: null')
+    expect(runner).toContain('result.rect = r.body.rect ?? null')
+  })
+
   it('counts the latest result per attempt number', () => {
     const v = pv([pres(1, { accepted: false }), pres(1, { accepted: true }), pres(2, { accepted: true })])
     expect(v[P].passed).toBe(true)
