@@ -135,7 +135,7 @@ This change has **12 tasks in 6 waves**:
 
 ### Wave 4: Group B setup (after an OP-025 go)
 
-- [ ] `T6` — Apply the OP-025 result to `device-screen` v1
+- [x] `T6` — Apply the OP-025 result to `device-screen` v1
   - Files: `src/lib/designData/composition.ts`, `tests/unit/lookDataset.test.ts` (hash), `tests/render/lookFixtureTable.ts`, `tests/unit/lookFixtureCompleteness.test.ts`, `docs/handoff.md`
   - Estimate: small
   - Kind: impl
