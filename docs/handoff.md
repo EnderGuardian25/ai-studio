@@ -1,74 +1,65 @@
 # bistec-studio — Session Handoff
 
-**Date:** 2026-10-26 (latest: **025 OP-025 PASSED at all three sizes after Amendment A1 (screen detection)**; earlier 2026-10-25: **025 Group A built (T1 to T5)**; **028 image looks (027b) VERIFIED PASS 21/21: OP-028 ran (full-bleed-scene passed, spotlight failed) and T7 moved Event and Hiring; 029 CLI usage-limit message VERIFIED PASS 5/5; CI green at `5db8953`; next is 025**; earlier 2026-10-24: **027a post styles VERIFIED PASS 22/22**; **006 product observability VERIFIED PASS 17/17**; earlier: **007 VERIFIED PASS 22/22; 009 OP-1 PASSED 6 of 6 (local run); 006 planned; 026 VERIFIED PASS 11/11; draft PR #43 closed; 010 dropped**). Earlier 2026-10-23: **024 caption credential route VERIFIED PASS, 17/17 ACs**; gates: unit 3024/3024, render 47/47, E2E 431/3/0/0, CI green at `cd9d411` (runs 39837152549, 39837162772; the PR run passed on one rerun after a CI-runner Chromium launch timeout in the render harness)). 2026-10-21: **009 hero imagery Phase 1 VERIFIED PASS (25/25), commit `d3534e0`; OP-1 is the user's pending step**; before it: **023 scheduler heartbeat VERIFIED PASS**; gates: unit 2947/2947, render 47/47, E2E 422/3/0/0, CI green at `f8f063c` (runs 39604699552, 39604706638)). 2026-10-20: **020 Create post button, 019 claim token, 021 Graphite re-theme, 018 and 022 VERIFIED PASS; the build order is complete**. 2026-10-19: this repo adopted the fork's `v2` on 2026-10-18. The fork-era sections, 2026-10-07 to 2026-10-14, moved to [`fork-history.md`](fork-history.md). Previous: 2026-10-07 (005 verified PASS; 011 planned, wave 1 built). Previous: 2026-10-03 (004 finished and verified PARTIAL, Phase 0 only; 005 built 9/10, waiting on one operator check). Before that: 2026-09-28 (build session — 004 Waves 1–3 built, MinIO → silo, PR #42 + draft PR #43). Before that: 2026-09-23 (later, later the same day: proposal **012** per-channel captions + copy→caption rename, a floating **Create post** button folded into 011, and a launch-video legibility pass. Before that: planning session — proposals 008–011 + roadmap, 004 re-planned to 24 tasks incl. Phase 0, and the deploy pipeline found broken: Coolify 401 since 2026-09-15). Previous: 2026-07-28 (copy-edit status clobber fix).
+**Date:** 2026-10-26 (latest: **025 hero product screenshots BUILT (T1 to T14); verify next**; **025 OP-025 PASSED at all three sizes after Amendment A1 (screen detection)**; earlier 2026-10-25: **025 Group A built (T1 to T5)**; **028 image looks (027b) VERIFIED PASS 21/21: OP-028 ran (full-bleed-scene passed, spotlight failed) and T7 moved Event and Hiring; 029 CLI usage-limit message VERIFIED PASS 5/5; CI green at `5db8953`; next is 025**; earlier 2026-10-24: **027a post styles VERIFIED PASS 22/22**; **006 product observability VERIFIED PASS 17/17**; earlier: **007 VERIFIED PASS 22/22; 009 OP-1 PASSED 6 of 6 (local run); 006 planned; 026 VERIFIED PASS 11/11; draft PR #43 closed; 010 dropped**). Earlier 2026-10-23: **024 caption credential route VERIFIED PASS, 17/17 ACs**; gates: unit 3024/3024, render 47/47, E2E 431/3/0/0, CI green at `cd9d411` (runs 39837152549, 39837162772; the PR run passed on one rerun after a CI-runner Chromium launch timeout in the render harness)). 2026-10-21: **009 hero imagery Phase 1 VERIFIED PASS (25/25), commit `d3534e0`; OP-1 is the user's pending step**; before it: **023 scheduler heartbeat VERIFIED PASS**; gates: unit 2947/2947, render 47/47, E2E 422/3/0/0, CI green at `f8f063c` (runs 39604699552, 39604706638)). 2026-10-20: **020 Create post button, 019 claim token, 021 Graphite re-theme, 018 and 022 VERIFIED PASS; the build order is complete**. 2026-10-19: this repo adopted the fork's `v2` on 2026-10-18. The fork-era sections, 2026-10-07 to 2026-10-14, moved to [`fork-history.md`](fork-history.md). Previous: 2026-10-07 (005 verified PASS; 011 planned, wave 1 built). Previous: 2026-10-03 (004 finished and verified PARTIAL, Phase 0 only; 005 built 9/10, waiting on one operator check). Before that: 2026-09-28 (build session — 004 Waves 1–3 built, MinIO → silo, PR #42 + draft PR #43). Before that: 2026-09-23 (later, later the same day: proposal **012** per-channel captions + copy→caption rename, a floating **Create post** button folded into 011, and a launch-video legibility pass. Before that: planning session — proposals 008–011 + roadmap, 004 re-planned to 24 tasks incl. Phase 0, and the deploy pipeline found broken: Coolify 401 since 2026-09-15). Previous: 2026-07-28 (copy-edit status clobber fix).
 **Repo:** https://github.com/bistec-oss/studio, which `origin` points to. **The repo rules (branches, remotes, the `fork` remote; draft PR #43 was closed on 2026-10-23) are in [`CLAUDE.md`](../CLAUDE.md)'s top entry, which is authoritative.** This file does not repeat them.
 **Branch:** work continues on **`v2`**, pushed to `origin v2`. `main` is `671ad6e9` (PR #42) and deploys to company prod. `v2` → `main` is one PR, merged only on the user's go-ahead and after the pre-merge prod checklist below.
 **Production:** `https://studio.bistecglobal.com` serves company `main`. Its migration head is `20260728120000_heal_copy_edit_clobbered_drafts`. Merges to `main` build but do not deploy until the Coolify token is rotated (see CLAUDE.md).
 
 ---
 
-## ⏸️ 2026-10-26 — PICK UP HERE: 025 Group A built, Amendment A1 built, OP-025 PASSED (all three sizes); Group B next on the user's go
+## ⏸️ 2026-10-26 — PICK UP HERE: 025 hero product screenshots is BUILT (T1 to T14); next is `/specclaw:verify 025-hero-reference-images`
 
-**Latest:** Group A is built: T1 `03389a5`, T2 `159083d`, T3 `cd19491`, T4 `cf00ffb`, T5 `09000ab`. Amendment A1 (screen detection) is built: spec `c110ce3`, T13 `347a34c`. **OP-025 PASSED at all three sizes** (7 of 9 image calls, 2026-10-25/26; the user accepted all six kept renders). The result is in the "OP-025 result" subsection below. T14 is these docs. Gates after T14: unit 4034, render 105, E2E 534/3/0/0; lint 0 errors / 7 warnings; tsc clean; build passes. **Group B (T6 to T12) is next, on the user's go.** T6 is small now: every size passed, so no size is removed; it records the result.
+**Latest:** all of 025 is built. Group A (T1 to T5), Amendment A1 (screen detection, T13) and Group B (T6 to T11, plus these docs as T12) are on `v2`. **OP-025 PASSED at all three sizes** (7 of 9 image calls, 2026-10-25/26; the user accepted all six kept renders). The OP-025 result is in its own subsection below. **Next: `/specclaw:verify 025-hero-reference-images`.** Then the stale-headline badge. Gates: unit 4131/4131, render 119/119, lint 0 errors / 7 warnings, tsc clean, build passes, `test:upgrade` passes, full clean mock E2E 548/3/0/0, CI checked after the T12 push (recorded in the follow-up commit).
 
-**Group A state (per task).**
+**Group A (T1 to T5), built before OP-025.**
 
-| Task | Commit             | Review          | What it built                                                                                                                                                                         |
-| ---- | ------------------ | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| T1   | `03389a5`          | NOTE            | The composite purpose, `device-screen` v1, the blank check, the reasons, the stamp field and the prompt text                                                                          |
-| T2   | `159083d`          | NOTE            | Availability by `requires`: the picker, the resolver, the plan and `POST /api/briefs`                                                                                                 |
-| T3   | `cd19491`          | NOTE            | 12 fixtures for `device-screen` (pass, busy, contrast and screen, per size), 48 rows in all; the screen kind                                                                          |
-| T4   | `cf00ffb`          | WARN (1)        | The probe route `POST /api/admin/look-probe` and `run-look-check.mjs --probe`                                                                                                         |
-| T5   | `09000ab`          | none            | These docs, the spec amendment, the E2E plan §AG, the roadmap and CLAUDE.md                                                                                                           |
-| fix  | `217fa8a`          | —               | The CI note                                                                                                                                                                           |
-| fix  | `dcbe75a`          | —               | The probe runs the background step inside `withClaudeAuth`. CLI mode needs it, and the mock seam had hidden it                                                                        |
-| fix  | `264b313`          | —               | The geometry pin (`imageGeometryPin`): for a size with a composite region, code appends the exact contract lines to the image prompt, because the Haiku art-director paraphrased them |
-| fix  | `e9fc1bf`          | —               | The ledger after 4 attempts (all composite misses)                                                                                                                                    |
-| A1   | `c110ce3`          | —               | Amendment A1: the spec, design §21, and tasks T13 and T14                                                                                                                             |
-| T13  | `347a34c`          | WARN (1), fixed | Screen detection (see Amendment A1 below). The recheck refuses to run under `MOCK_*`                                                                                                  |
-| fix  | `a095256`          | —               | The OP-025 result, and the runner records `rect`                                                                                                                                      |
-| T14  | (this docs commit) | none            | These docs                                                                                                                                                                            |
+- T1 `03389a5`: the composite purpose, `device-screen` v1, the blank check, the reasons, the stamp field and the prompt text.
+- T2 `159083d`: availability by `requires` (the picker, the resolver, the plan and `POST /api/briefs`).
+- T3 `cd19491`: the fixtures for `device-screen` (pass, busy, contrast and screen, per size), 48 rows at that point.
+- T4 `cf00ffb` (review WARN, explained below): the probe route `POST /api/admin/look-probe` and `run-look-check.mjs --probe`.
+- T5 `09000ab`: the docs, the spec amendment, the E2E plan §AG, the roadmap and CLAUDE.md.
+- Fixes made during OP-025: `217fa8a` (CI note), `dcbe75a` (the probe runs the background step inside `withClaudeAuth`; CLI mode needs it), `264b313` (the geometry pin, see below), `e9fc1bf` (the ledger after 4 attempts), `a095256` (the OP-025 result, and the runner records `rect`).
 
-**Gates after T4.** Unit 3989/3989; render 96/96 (two runs at T3); lint 0 errors / 7 warnings; tsc clean; build passes (again at T5). The full clean mock E2E (T5) is 533/3/0/1 (the one flaky was a timing miss in `model-selection.test.ts` §Y, "element(s) not found" under full load; that suite then re-ran clean 3 of 3 with no retries, 57/57), and CI is green at `09000ab` (run 40173711221). No migration and no env var in Group A.
+**Group B (T6 to T11), built on the user's go after OP-025.** T12 is these docs. Each row is one commit, with the review recorded for it.
 
-**Measured in T3.** The screen region's L\*/100 standard deviation: pass 0.0000 at all three sizes; screen 0.4907 at SQUARE, 0.4907 at PORTRAIT and 0.4862 at STORY. `BLANK_STDDEV_MAX` is 0.04. No tuning was needed, and the `device-screen@1` hash is unchanged.
+| Task | Commit    | Review                     | What it built                                                                                                                                                                                                   |
+| ---- | --------- | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T6   | `2c8989b` | none (orchestrator, small) | The OP-025 result recorded. No size was removed, so `device-screen` v1 keeps SQUARE, PORTRAIT and STORY. The guard is `tests/unit/op025Results.test.ts`.                                                        |
+| T7   | `4627251` | NOTE                       | Private storage, the upload and preview routes, `Brief.compositeSource`, brief drafts and draft delete.                                                                                                         |
+| T8   | `8fe11bc` | WARN (1), fixed            | The composite engine, the renderer check and generation. Fixed: an API-mode run that ends in prose with a composite set now throws `composite-not-rendered`, and the fallback deletes every export of that run. |
+| T9   | `3f46f96` | NOTE                       | Refine, Override, inline edit, restore, export, the verifiers and the editor.                                                                                                                                   |
+| T10  | `22a204b` | NOTE                       | The wizard: the screenshot field, the picker, review, autosave and resume.                                                                                                                                      |
+| T11  | `90bbcd6` | none (orchestrator, small) | E2E §AG complete and the NFR-05 end-to-end check.                                                                                                                                                               |
 
-**The T4 review WARN, and why the ledger has nulls.** Each probe attempt writes its ledger line before the request, so `threshold` and `promptHash` are `null` on the ledger line. The real values are recorded per attempt in `results.json`. A second ledger record per attempt would break the cap, because every ledger line counts as an attempt. The spec (FR-09, AC-07) now says this (amended at T5).
+**What 025 does now, end to end.**
 
-- **025 is planned and approved (architectural), committed at `0865ad2`.**
-  - The 2026-10-22 draft was rewritten for OP-1 (passed), 007, 027a and 028.
-  - The deep party panel (5 seats, 2 rounds, 10 runs) returned CHANGES_REQUESTED: 4 BLOCKs, 18 WARNs and 5 NOTEs upheld, 1 withdrawn.
-  - The user answered it on 2026-10-25:
-    - adopt every fix;
-    - screenshots per post, uploaded by the post author;
-    - all three sizes, each gated by OP-025;
-    - demand is "often".
-  - The proposal's "Panel resolution" table maps each finding.
-- **The design in one paragraph.** A new look, `device-screen` v1 (`requires: 'composite-source'`), shows one landscape laptop at SQUARE, PORTRAIT and STORY.
-  - **The screen:** a `composite` region, with a 16:10 rect in canvas px.
-  - **Image check:** the image model must leave the screen blank. The region check fails above `BLANK_STDDEV_MAX = 0.04`, with the reason `composite-not-blank`.
-  - **Design step:** the design model is told to leave the rect empty.
-  - **Insertion:** code (`src/lib/composite/insert.ts`, Group B) inserts one canonical fixed-position element with the token `__COMPOSITE_0__`.
-  - **Render:** the renderer takes a **required** `composites` argument. It resolves the token to a `data:` URI built from the private object (`BUCKET_DOCS`, `screenshots/<teamId>/<userId>/…`), then checks in the page that the image loaded, sits within 2 px of the rect and is topmost. A failure is `composite-not-rendered`.
-  - **Fallback:** generation falls back to classic **without** the hero image; refine and inline edit fail with a named error and write nothing.
-  - **Storage:** the brief stores `compositeSource` in a new nullable JSONB column, migration `20261026120000_composite_source`.
-- **Two refinements of the approved proposal, both in the spec Overview:**
-  - a `data:` URI at render, not a signed URL;
-  - OP-025 via a super-admin probe route (`POST /api/admin/look-probe`, 404 in production) and `run-look-check.mjs --probe`: one image call and one Haiku call per attempt, a cap of 9, a ledger in `.specclaw/changes/025-hero-reference-images/look-check/`, per-attempt verdicts, and 2 accepted attempts per size to pass.
+- **The wizard (step 1, Path B only).** A "Product screenshot" field sits under the image-style cards. The author uploads a PNG, JPEG or WebP. The type is decided by magic bytes. The file is at most 10 MB, at least 640×400, at most 25 MP, and each side is at most 8 000 px. It goes to the private `BUCKET_DOCS` at `screenshots/<teamId>/<userId>/<timestamp>-<random>.<ext>`. The route returns `{ key, width, height }`, never a URL.
+- **The picker.** The `device-screen` card ("Product screen") is enabled only once a screenshot is attached. A "Will be letterboxed" advisory shows when the screenshot's aspect differs from the size's screen by more than 10%. It never refuses. Review shows "Product screenshot: W×H".
+- **Storage.** The brief stores `Brief.compositeSource` (kind `brief-upload`, with `key`, `width` and `height`). Migration `20261026120000_composite_source` adds one nullable JSONB column. No env var.
+- **Generation.** The image model is asked for a blank laptop screen; the geometry pin carries the exact contract lines. `runHeroCheck` detects the screen (Amendment A1) and stamps `composites` with the region, the source and the detected rect. Code then inserts one canonical `<div data-composite="0">` at the detected rect, holding an `<img>` whose `src` is the token `__COMPOSITE_0__`, with `object-fit: contain`. The renderer resolves the token to a `data:` URI from the private object just before `setContent`. It then checks the element in the page: loaded, within 2 px of the rect, and topmost at the centre and four inset points. **The stored HTML only ever holds the token** (NFR-05).
+- **Failures.** A failed render falls back to classic **without** the hero image (no second image call), with `composite-not-rendered`. A screen that is not blank falls back with `composite-not-blank`. A missing or foreign object gives `composite-source-missing`.
+- **Re-renders.** Refine, Override, inline edit, restore and export keep the screenshot from the stamp. Nothing re-detects. A failed placement fails the action with "The product screenshot could not be placed; nothing was changed", and writes nothing.
+- **The editor.** The inline editor shows the screenshot from `GET /api/briefs/screenshots?key=…&draftId=…`. It is not editable and is labelled "Product screenshot (placed automatically)".
+- **Unattended surfaces never use it.** Scheduled, MCP and ACP posts stay classic (`unattended-classic`).
+- **Drafts and cleanup.** Autosave and Resume keep the screenshot. Discard, eviction and expiry delete it. An admin draft delete that removes the orphaned brief deletes it too.
 
-**Resume, in order.**
+**Known limits (from the reviews; none is fixed in this change).**
 
-1. **Group A and Amendment A1 are done** (T1 to T5, T13). The spec, the E2E plan §AG and this section are the record.
-2. **OP-025 is done and PASSED.** The procedure below is kept for a re-run only; it never runs again unless the user asks.
-3. **Group B (T6 to T12) starts on the user's go.** Build it with `/specclaw:build 025-hero-reference-images`, one task at a time, as the Group A tasks were built. Group B inserts and checks at the stamped `composites[0].rect`, never at the contract region.
+1. One author can attach the same uploaded key to two briefs. Deleting the last draft of one brief, or discarding its brief draft, removes the object the other still uses. The other then fails closed with `composite-source-missing`. This is not cross-tenant.
+2. An upload that is removed, replaced or never attached stays in `BUCKET_DOCS` until a discard, eviction or expiry cleanup. There is no per-user quota.
+3. The pure HTML check counts the literal `data-composite` anywhere in the HTML. A stray mention in a comment fails closed with a classic fallback.
+4. `screenshotWillLetterbox` uses the first look with `requires`. Pass the picked key if a second such look ships.
+5. A classic inline edit that pastes an http URL containing `/screenshots/` is refused (the NFR-05 guard).
+6. The editor iframe is checked only through unit tests of its pure parts and the T10 wizard screenshots. The editor itself has no browser-level test.
 
-**Carry-forward notes for Group B (from the T1 to T4 reviews).**
+**Check before the merge.**
 
-- (a) `device-screen` showed in the picker until T2 landed. T2 has landed, so this note is closed.
-- (b) T3 deleted the temporary `!a.requires` filter in `tests/unit/lookFixtureCompleteness.test.ts` and asserts 48 rows. Done in `cd19491`.
-- (c) **T9** must pass `canvas` to `refineContractText`. It is optional now, so the pixel text is left out without it.
-- (d) **T8** adds a test that a composite `ok:true` for a look without `requires` throws at stamp parse.
-- (e) `settleComposition` fails closed. A kept `requires` look with no third argument settles to classic `composite-source-missing`.
+- **025 hero product screenshots (FR-08, NFR-05).** This is a check, not a blocking step.
+  - The migration `20261026120000_composite_source` is additive: one nullable JSONB column, `Brief.compositeSource`. A redeploy applies it.
+  - The previous image runs against it, so an image rollback needs no down script. The manual down script is `prisma/rollback/025-hero-product-screenshots.down.sql`; it discards every stored `compositeSource`.
+  - **No env var.** The `BUCKET_DOCS` bucket already exists (campaign documents).
+  - Each `device-screen` generation makes one image call, as any hero look does.
+  - Scheduled, MCP and ACP posts never use the screenshot, so nothing changes for them.
 
 ### Amendment A1 (2026-10-25, the user's decision): code detects the screen
 
@@ -475,6 +466,9 @@ Run these right after the deploy, before users create new drafts:
   - The previous image runs against it, so an image rollback needs no down script. The manual down script is `prisma/rollback/027-post-styles.down.sql`; it discards every stored style key, stamp and facts-check result. **No env var.**
   - **Release note (mandatory):** queued auto-publish entries created before this change can be held by the facts check on their first run after the deploy. The entry completes with its draft and a `heldReason`, and nothing is published until a person publishes from the draft page or re-runs the entry. After the deploy, look at the campaign queues for a held line.
   - Also in the release notes: a pre-027 `goal` sent without a `postStyle` now picks a style (`hiring` and `announcement` to their own, anything else to `general`) and is ignored when a style is sent; the ACP manifest is `1.2.0`; the Goal picker is gone and the Post style picker is on wizard step 1.
+- **025 hero product screenshots (FR-08, NFR-05).** This is a check, not a blocking step.
+  - The migration `20261026120000_composite_source` is additive: one nullable JSONB column (`Brief.compositeSource`). A redeploy applies it.
+  - The previous image runs against it, so an image rollback needs no down script. The manual down script is `prisma/rollback/025-hero-product-screenshots.down.sql`; it discards every stored `compositeSource`. **No env var.**
 - **026 drop the WhatsApp caption.** This is a check, not a blocking step. There is no migration and no env var. After the deploy, a new draft shows Instagram and LinkedIn captions only, and the Refine Design card sits under the Preview. Old drafts show no WhatsApp panel; their rows are still in `DraftCaption`.
 - **024 caption credential route (FR-13).** This is a check, not a blocking step.
   - The migration `20261023120000_caption_route` is additive: one enum, one nullable column on `Team` and two nullable `TEXT` columns (`Draft.headlineRoute`, `DraftCaption.route`), no rewrite. A redeploy applies it.

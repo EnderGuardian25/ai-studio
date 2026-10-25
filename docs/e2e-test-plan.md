@@ -1,7 +1,7 @@
 # bistec-studio — E2E Test Plan
 
 **Created:** 2026-06-23
-**Status:** ✅ Full §6 catalog implemented **and green**. **Latest full clean mock gate (change 006 T6, 2026-10-24): 473/3/0/1 (the one flaky was a Playwright worker-process crash in `regression.test.ts` H7, not an assertion; that suite then re-ran clean 3 of 3)** (the 026 gate before it was 444 / 3 / 0 / 0; the 009 gate, 2026-10-21, was 422 passed / 3 skipped / 0 failed / 0 flaky) (the 023 gate before it was 405 / 3 / 0 / 0; the 016 gate was 386 / 3 / 0 / 0). The older counts below are history. **Unit as of 2026-07-27 (PR #40): 322/322.** The CI gate (`.github/workflows/e2e.yml`) passed on PRs #38, #39 and #40. Last full _local_ run with recorded counts (2026-07-22, `feature/team-tenancy` branch, post TC-REG-H7a de-flake): **171 passed, 4 skipped, 0 failed** (175 tests total; 0 flaky — TC-REG-H7a's parallel-fire assertion was rewritten to a timing-robust integrity invariant, see below), unit **264/264** at that time.
+**Status:** ✅ Full §6 catalog implemented **and green**. **Latest full clean mock gate (change 025 T12, 2026-10-26): 548/3/0/0.** The 006 T6 gate before it was 473/3/0/1 (the one flaky was a Playwright worker-process crash in `regression.test.ts` H7, not an assertion; that suite then re-ran clean 3 of 3) (the 026 gate before it was 444 / 3 / 0 / 0; the 009 gate, 2026-10-21, was 422 passed / 3 skipped / 0 failed / 0 flaky) (the 023 gate before it was 405 / 3 / 0 / 0; the 016 gate was 386 / 3 / 0 / 0). The older counts below are history. **Unit as of 2026-07-27 (PR #40): 322/322.** The CI gate (`.github/workflows/e2e.yml`) passed on PRs #38, #39 and #40. Last full _local_ run with recorded counts (2026-07-22, `feature/team-tenancy` branch, post TC-REG-H7a de-flake): **171 passed, 4 skipped, 0 failed** (175 tests total; 0 flaky — TC-REG-H7a's parallel-fire assertion was rewritten to a timing-robust integrity invariant, see below), unit **264/264** at that time.
 
 Last full run on `main` (2026-07-13, post brief-draft-recovery §P): **132 passed, 0 failed, 7 skipped** (`npm run test:e2e:mock`; the machine lacked `BISTEC_API_KEYS` in `.env.test`, so 3 §J ACP-auth cases skipped on top of the 4 intentional skips below — CI sets the keys as job env and runs them). The 2026-07-13 feature batch added `async-generation.test.ts` (F1 async + retry), a version back/forward-jump case (F2), F4 auto-scheduling cases in `campaign-scheduling.test.ts`, `brandkit-assistant.test.ts` (F5), and `image-to-template.test.ts` (F6); generation-dependent suites now poll via the `waitForDraft` helper (generation is async). A GitHub Actions gate (`.github/workflows/e2e.yml`) runs the whole suite — including the §K security-fix regressions — on every PR and push to `main`, and is **green as of 2026-07-13** (it had been red for weeks on a bad CI `TOKEN_ENCRYPTION_KEY` — it MUST be a valid 64-char hex string, else `crypto.ts` throws and the credential-encrypting routes 500). Runs on GitHub-hosted `ubuntu-latest` with the actions on the Node 24 runtime.
 
@@ -1112,39 +1112,40 @@ The mock suite proves the mechanism with mock replies; it records no real model 
 
 ### AG. Product screenshots (`product-screenshots.test.ts`, change 025 T2 to T9 — AC-06, AC-09, AC-10, AC-13 to AC-16)
 
-**Status (2026-10-25, end of Group A).** Only **TC-SHOT-01** is implemented, by T2 (`159083d`). It covers AC-06: `device-screen` is unavailable without a screenshot, and the picker card is disabled with "Needs a product screenshot". **TC-SHOT-02 to TC-SHOT-14 are planned for Group B** (T6 to T12), and they run only after an OP-025 go. Their scope is copied from the spec ("Mock E2E plan") and the design (section 16).
+**Status (2026-10-26, Group B built).** Every case is implemented: **TC-SHOT-01** by T2 (`159083d`), **TC-SHOT-02 to 06, 14 and 14b** by T7 (`4627251`), **TC-SHOT-07 to 09** by T8 (`8fe11bc`), **TC-SHOT-10 to 12** by T9 (`3f46f96`) and **TC-SHOT-13** by T10 (`22a204b`). T11 (`90bbcd6`) completed the section. The file is `tests/e2e/product-screenshots.test.ts`. Each case's scope is in the spec ("Mock E2E plan") and the design (section 16).
 
-**The seams (planned).** `__MOCK_BG__` (a hero image); `__MOCK_HERO_SCREEN__` (new: only the screen region is busy); `__MOCK_COMPOSITE_FAIL__` (new: the pure HTML check fails); `__MOCK_HERO_SCREEN_OFFSET__` (Amendment A1, new: the synthetic screen is drawn off the contract region, so the stamped `composites[].rect` differs from the region). **Group B E2E (TC-SHOT-07 onwards) must assert the stamped `rect`, not the region:** under `__MOCK_HERO_SCREEN_OFFSET__` the two differ. The mock suite proves the mechanism with mock replies; it makes no real model or image call (NFR-11).
+**The seams.** `__MOCK_BG__` (a hero image); `__MOCK_HERO_SCREEN__` (new: only the screen region is busy); `__MOCK_COMPOSITE_FAIL__` (new: the pure HTML check fails); `__MOCK_HERO_SCREEN_OFFSET__` (Amendment A1, new: the synthetic screen is drawn off the contract region, so the stamped `composites[].rect` differs from the region). **Group B E2E (TC-SHOT-07 onwards) must assert the stamped `rect`, not the region:** under `__MOCK_HERO_SCREEN_OFFSET__` the two differ. The mock suite proves the mechanism with mock replies; it makes no real model or image call (NFR-11).
 
 **TC-LOOK-10 (§AF) now expects six cards** (025 T2): the five existing looks keep their behaviour, and `device-screen` is shown disabled until a screenshot is uploaded.
 
-| Case       | Status            | What it checks                                                                                        |
-| ---------- | ----------------- | ----------------------------------------------------------------------------------------------------- |
-| TC-SHOT-01 | implemented (T2)  | `device-screen` is disabled without a screenshot; the card reads "Needs a product screenshot" (AC-06) |
-| TC-SHOT-02 | planned (Group B) | Upload PNG gives a key (AC-09)                                                                        |
-| TC-SHOT-03 | planned (Group B) | SVG-as-PNG 400                                                                                        |
-| TC-SHOT-04 | planned (Group B) | Too small 400                                                                                         |
-| TC-SHOT-05 | planned (Group B) | Foreign preview 404                                                                                   |
-| TC-SHOT-06 | planned (Group B) | `POST /api/briefs` pairing 400s                                                                       |
-| TC-SHOT-07 | planned (Group B) | Kept generation: one canonical element and the token, stamp, no URL (AC-13, AC-16)                    |
-| TC-SHOT-08 | planned (Group B) | `__MOCK_COMPOSITE_FAIL__` gives classic `composite-not-rendered` and the notice                       |
-| TC-SHOT-09 | planned (Group B) | Busy screen gives `composite-not-blank`                                                               |
-| TC-SHOT-10 | planned (Group B) | Refine keeps the composite (AC-14)                                                                    |
-| TC-SHOT-11 | planned (Group B) | Inline edit canonicalizes (AC-14)                                                                     |
-| TC-SHOT-12 | planned (Group B) | Refine with the fail sentinel gives the named error and no revision (AC-14)                           |
-| TC-SHOT-13 | planned (Group B) | Wizard flow and autosave resume (AC-15)                                                               |
-| TC-SHOT-14 | planned (Group B) | Discard deletes the object in MinIO (AC-10)                                                           |
+| Case        | Status            | What it checks                                                                                                                                      |
+| ----------- | ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| TC-SHOT-01  | implemented (T2)  | `device-screen` is disabled without a screenshot; the card reads "Needs a product screenshot" (AC-06)                                               |
+| TC-SHOT-02  | implemented (T7)  | A PNG uploads to the private bucket and returns a key, never a URL (AC-09)                                                                          |
+| TC-SHOT-03  | implemented (T7)  | An SVG named .png, a GIF and a file over the limits are 400 (AC-09)                                                                                 |
+| TC-SHOT-04  | implemented (T7)  | A 600 by 400 screenshot is 400 and stores nothing (AC-09)                                                                                           |
+| TC-SHOT-05  | implemented (T7)  | Another team's key, and a key that is not yours, are 404 on the preview (AC-09)                                                                     |
+| TC-SHOT-06  | implemented (T7)  | Each 400 of FR-11 on `POST /api/briefs`, and a valid brief stores `compositeSource` (AC-10)                                                         |
+| TC-SHOT-07  | implemented (T8)  | A kept generation stores one canonical element and the token, and a stamp with the detected rect (AC-13, AC-16)                                     |
+| TC-SHOT-08  | implemented (T8)  | A render that fails the composite check is EXPORTED as classic with `composite-not-rendered` and the notice (AC-13)                                 |
+| TC-SHOT-09  | implemented (T8)  | A busy screen gives `composite-not-blank`: classic over the same image, no composites (AC-13)                                                       |
+| TC-SHOT-10  | implemented (T9)  | A refine keeps the canonical element and the composites entry with its rect (AC-14)                                                                 |
+| TC-SHOT-11  | implemented (T9)  | An inline edit that deletes or moves the element is saved with the canonical element restored (AC-14)                                               |
+| TC-SHOT-12  | implemented (T9)  | A failed placement fails the refine with the named error and writes no revision; a refine that replaces the image drops the composite (AC-14)       |
+| TC-SHOT-13  | implemented (T10) | The wizard field is Path B only; `device-screen` is disabled until an upload; the body carries `compositeSource`; the draft resumes with it (AC-15) |
+| TC-SHOT-14  | implemented (T7)  | Resume keeps the screenshot; Discard deletes the object in MinIO; a generate keeps it (AC-10)                                                       |
+| TC-SHOT-14b | implemented (T7)  | Deleting the last draft of a brief deletes its screenshot object (AC-10)                                                                            |
 
 | Criterion                                           | Where it is checked                                                                  |
 | --------------------------------------------------- | ------------------------------------------------------------------------------------ |
 | AC-06 unavailable without a source (FR-08)          | TC-SHOT-01 (implemented); unit tests                                                 |
 | AC-07 the probe and the pass rule (FR-09)           | unit `lookProbe.test.ts`, `lookCheck.test.ts`; OP-025 (operator, outside this suite) |
-| AC-09 upload (FR-10)                                | TC-SHOT-02 to TC-SHOT-05 (planned); unit header parser                               |
-| AC-10 the brief (FR-11)                             | TC-SHOT-06, TC-SHOT-14 (planned)                                                     |
-| AC-13 generation (FR-15)                            | TC-SHOT-07 to TC-SHOT-09 (planned)                                                   |
-| AC-14 re-renders (FR-16)                            | TC-SHOT-10 to TC-SHOT-12 (planned)                                                   |
-| AC-15 the wizard (FR-17, NFR-09)                    | TC-SHOT-13 (planned)                                                                 |
-| AC-16 nothing stored but the token (NFR-05, NFR-08) | TC-SHOT-07 (planned); unit guard (no writer stores a screenshot URL)                 |
+| AC-09 upload (FR-10)                                | TC-SHOT-02 to TC-SHOT-05 (implemented); unit header parser                           |
+| AC-10 the brief (FR-11)                             | TC-SHOT-06, TC-SHOT-14, TC-SHOT-14b (implemented)                                    |
+| AC-13 generation (FR-15)                            | TC-SHOT-07 to TC-SHOT-09 (implemented)                                               |
+| AC-14 re-renders (FR-16)                            | TC-SHOT-10 to TC-SHOT-12 (implemented)                                               |
+| AC-15 the wizard (FR-17, NFR-09)                    | TC-SHOT-13 (implemented)                                                             |
+| AC-16 nothing stored but the token (NFR-05, NFR-08) | TC-SHOT-07 (implemented); unit guard (no writer stores a screenshot URL)             |
 
 ---
 

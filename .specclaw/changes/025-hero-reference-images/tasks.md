@@ -214,7 +214,7 @@ This change has **12 tasks in 6 waves**:
     - Fill any TC-SHOT case not yet written. Add the AC-16 sweep: after generation, refine and inline edit, every `htmlSnapshot` holds `__COMPOSITE_0__` and no `screenshots/` string (through `tests/helpers/db`; skip without DB access).
     - Run the file three times alone against a fresh server. If a src change is needed, stop and report it.
 
-- [ ] `T12` — Docs, the full gate and CI
+- [x] `T12` — Docs, the full gate and CI
   - Files: `docs/handoff.md`, `docs/e2e-test-plan.md`, `CLAUDE.md`, `.specclaw/ROADMAP.md`
   - Estimate: small
   - Kind: docs
