@@ -20,3 +20,5 @@
 {"ev":"stop","span":"W3","at":"2026-10-24T19:47:21Z","ts":1792871241,"status":"ok"}
 {"ev":"stop","span":"T6","at":"2026-10-24T20:33:04Z","ts":1792873984,"status":"ok"}
 {"ev":"start","span":"verify-1792874031","kind":"phase","label":"verify","at":"2026-10-24T20:33:51Z","ts":1792874031}
+{"ev":"start","span":"verify-1792907587","kind":"phase","label":"verify","at":"2026-10-25T05:53:07Z","ts":1792907587}
+{"ev":"stop","span":"verify","at":"2026-10-25T05:57:55Z","ts":1792907875,"status":"ok"}
