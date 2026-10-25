@@ -67,7 +67,7 @@ This change has **12 tasks in 6 waves**:
     - The picker shows the `device-screen` card disabled with "Needs a product screenshot".
     - **Gate:** tsc, lint, unit, build (then `rm -rf .next`), and TC-SHOT-01 plus `post-styles.test.ts` and `image-looks.test.ts` alone against a fresh `:3001` server.
 
-- [ ] `T3` — Fixtures for `device-screen`: 12 rows, the screen kind and the completeness rule
+- [x] `T3` — Fixtures for `device-screen`: 12 rows, the screen kind and the completeness rule
   - Files: `tests/render/{lookFixtureTable,lookFixtures,look-fixtures.test}.ts`, `tests/unit/lookFixtureCompleteness.test.ts`; `src/lib/designData/{composition,evaluate}.ts` and the T1 hash **only** if a row or `BLANK_STDDEV_MAX` must be tuned
   - Estimate: medium
   - Kind: test

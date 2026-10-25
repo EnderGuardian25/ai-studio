@@ -24,7 +24,11 @@ describe.each(LOOK_FIXTURES)('look fixture $id $kind', (spec) => {
     if (spec.kind === 'pass') {
       expect(verdict).toEqual({ ok: true })
     } else if (spec.kind === 'busy') {
-      expect(verdict).toMatchObject({ ok: false, reason: 'busy', region: regions[regions.length - 1] })
+      const lastText = regions.filter((r) => r.purpose === 'text').pop()
+      expect(verdict).toMatchObject({ ok: false, reason: 'busy', region: lastText })
+    } else if (spec.kind === 'screen') {
+      const composite = regions.find((r) => r.purpose === 'composite')
+      expect(verdict).toMatchObject({ ok: false, reason: 'composite-not-blank', region: composite })
     } else {
       expect(verdict).toMatchObject({ ok: false, reason: 'contrast', region: regions[0] })
     }

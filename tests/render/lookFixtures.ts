@@ -46,12 +46,18 @@ export async function lookFixture(spec: FixtureSpec, source: ArchetypeMap = arch
     return `<div style="position:absolute;left:${x / 2}px;top:${y / 2}px;width:${w / 2}px;height:${h / 2}px;${css}"></div>`
   }
 
+  const composite = contract.regions.find((r) => r.purpose === 'composite')
   let inner = ''
+  // An evenly lit blank screen, padded by 1 point; the screen kind overpaints it.
+  if (composite) inner += box(pad(composite.rect, 1), 'background:#dcdcdc')
   for (const r of texts) inner += box(pad(r.rect, 1), BACKDROP_CSS[backdrop])
   if (spec.kind === 'busy') {
     inner += box(pad(texts[texts.length - 1].rect, -1), `background:${STRIPES}`)
   } else if (spec.kind === 'contrast') {
     inner += box(pad(texts[0].rect, 1), CONTRAST_CSS[backdrop])
+  } else if (spec.kind === 'screen') {
+    if (!composite) throw new Error(`screen fixture on a contract with no composite region: ${spec.id}`)
+    inner += box(pad(composite.rect, -1), `background:${STRIPES}`)
   }
   return raster(spec.size, `background:${STRIPES}`, inner)
 }

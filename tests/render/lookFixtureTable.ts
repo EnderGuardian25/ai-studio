@@ -1,11 +1,11 @@
 // The look fixture table (change 028 T3, spec FR-08). Pure data: no renderer
-// import, so a unit test can read it. The 36 rows are written out, not
+// import, so a unit test can read it. The 48 rows are written out, not
 // generated from the dataset, so a size added to the dataset without rows fails
 // fixtureCompletenessProblems.
 import type { AspectRatio } from '@prisma/client'
 import type { ArchetypeMap } from '@/lib/designData'
 
-export type FixtureKind = 'pass' | 'busy' | 'contrast'
+export type FixtureKind = 'pass' | 'busy' | 'contrast' | 'screen'
 export type Backdrop = 'dark' | 'light'
 
 // The backdrop each look is meant to have behind its text. A literal, never
@@ -15,6 +15,7 @@ export const INTENDED_BACKDROP: Record<string, Backdrop> = {
   'editorial-split': 'dark',
   'full-bleed-scene': 'dark',
   spotlight: 'dark',
+  'device-screen': 'dark',
 }
 
 export interface FixtureSpec {
@@ -74,9 +75,23 @@ export const LOOK_FIXTURES: readonly FixtureSpec[] = [
   row('spotlight', 1, 'STORY', 'pass'),
   row('spotlight', 1, 'STORY', 'busy'),
   row('spotlight', 1, 'STORY', 'contrast'),
+  row('device-screen', 1, 'SQUARE', 'pass'),
+  row('device-screen', 1, 'SQUARE', 'busy'),
+  row('device-screen', 1, 'SQUARE', 'contrast'),
+  row('device-screen', 1, 'SQUARE', 'screen'),
+  row('device-screen', 1, 'PORTRAIT', 'pass'),
+  row('device-screen', 1, 'PORTRAIT', 'busy'),
+  row('device-screen', 1, 'PORTRAIT', 'contrast'),
+  row('device-screen', 1, 'PORTRAIT', 'screen'),
+  row('device-screen', 1, 'STORY', 'pass'),
+  row('device-screen', 1, 'STORY', 'busy'),
+  row('device-screen', 1, 'STORY', 'contrast'),
+  row('device-screen', 1, 'STORY', 'screen'),
 ]
 
 const KINDS: readonly FixtureKind[] = ['pass', 'busy', 'contrast']
+// A `screen` row exists exactly for a contract with a composite region (025).
+const KINDS_WITH_SCREEN: readonly FixtureKind[] = [...KINDS, 'screen']
 
 // Problems between the dataset's current contracts and the table: a missing or
 // extra (key, current version, size, kind) row, or a duplicate.
@@ -84,9 +99,10 @@ export function fixtureCompletenessProblems(source: ArchetypeMap, table: readonl
   const problems: string[] = []
   const want = new Set<string>()
   for (const a of Object.values(source)) {
-    const sizes = Object.keys(a.versions[a.current]?.sizes ?? {}) as AspectRatio[]
-    for (const size of sizes) {
-      for (const kind of KINDS) want.add(`${fixtureId(a.key, a.current, size)}#${kind}`)
+    const sizeMap = a.versions[a.current]?.sizes ?? {}
+    for (const size of Object.keys(sizeMap) as AspectRatio[]) {
+      const hasComposite = sizeMap[size]?.regions.some((r) => r.purpose === 'composite') ?? false
+      for (const kind of hasComposite ? KINDS_WITH_SCREEN : KINDS) want.add(`${fixtureId(a.key, a.current, size)}#${kind}`)
     }
   }
   const have = new Map<string, number>()
