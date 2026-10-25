@@ -12,6 +12,14 @@ const h = vi.hoisted(() => ({
   deleteObject: vi.fn(),
   resolveKit: vi.fn(),
   prismaWrite: vi.fn(),
+  claudeAuth: vi.fn(),
+}))
+
+vi.mock('@/lib/agent/userToken', () => ({
+  withClaudeAuth: async (userId: string | null, teamId: string, fn: () => Promise<unknown>) => {
+    h.claudeAuth(userId, teamId)
+    return fn()
+  },
 }))
 
 vi.mock('@/lib/prisma', () => ({
@@ -50,6 +58,7 @@ describe('POST /api/admin/look-probe', () => {
     h.generate.mockReset()
     h.deleteObject.mockReset().mockResolvedValue(undefined)
     h.prismaWrite.mockReset()
+    h.claudeAuth.mockReset()
     h.resolveKit.mockReset().mockResolvedValue({ id: 'kit-1' })
     h.generate.mockImplementation(async (_b, _k, _h, _c, _a, _plan, onPrompt) => {
       onPrompt?.('the image prompt')
@@ -70,6 +79,20 @@ describe('POST /api/admin/look-probe', () => {
     const res = await call({ key: 'device-screen', size: 'SQUARE' })
     expect(res.status).toBe(404)
     expect(h.generate).not.toHaveBeenCalled()
+  })
+
+  it('runs the background step inside the acting user’s Claude auth context', async () => {
+    let ranInside = false
+    h.claudeAuth.mockImplementation(() => {
+      h.generate.mockImplementationOnce(async () => {
+        ranInside = true
+        return { url: IMG_URL, check: { ok: true } }
+      })
+    })
+    const res = await call({ key: 'device-screen', size: 'SQUARE' })
+    expect(res.status).toBe(200)
+    expect(h.claudeAuth).toHaveBeenCalledWith('u1', 'team-A')
+    expect(ranInside).toBe(true)
   })
 
   it('is 403 for a non-super-admin', async () => {

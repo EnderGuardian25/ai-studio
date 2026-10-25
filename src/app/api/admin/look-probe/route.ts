@@ -5,6 +5,7 @@ import type { Brief } from '@prisma/client'
 import { withTeamAuth, parseBody } from '@/lib/api/handler'
 import { resolveBrandKit } from '@/lib/brandkit/resolve'
 import { generateBackgroundForBrief } from '@/lib/agent/background'
+import { withClaudeAuth } from '@/lib/agent/userToken'
 import { planComposition, BLANK_STDDEV_MAX } from '@/lib/designData'
 import { BUCKET_IMAGES, deleteObject } from '@/lib/storage/minio'
 import { MOCK_AI } from '@/lib/testHooks'
@@ -54,16 +55,20 @@ export const POST = withTeamAuth(async (req, _ctx, user) => {
   } as unknown as Brief
 
   let imagePrompt: string | null = null
-  const outcome = await generateBackgroundForBrief(
-    brief,
-    kit,
-    PROBE_TOPIC,
-    null,
-    { userId: user.userId, teamId: user.teamId },
-    plan,
-    (p) => {
-      imagePrompt = p
-    },
+  // The Haiku decision call runs through `claude -p` in CLI mode, which needs the
+  // acting user's credential context, exactly as generation sets it.
+  const outcome = await withClaudeAuth(user.userId, user.teamId, () =>
+    generateBackgroundForBrief(
+      brief,
+      kit,
+      PROBE_TOPIC,
+      null,
+      { userId: user.userId, teamId: user.teamId },
+      plan,
+      (p) => {
+        imagePrompt = p
+      },
+    ),
   )
 
   if (outcome.url === null) {
