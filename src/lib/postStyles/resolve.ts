@@ -14,6 +14,7 @@ export type ResolveNote =
   | 'size-classic'
   | 'campaign-tone-ignored'
   | 'retired-classic'
+  | 'missing-input-classic'
 
 export interface ResolveInput {
   style: string | null | undefined // an explicit key, or absent
@@ -24,6 +25,8 @@ export interface ResolveInput {
   aspectRatio: AspectRatio
   surface: Surface
   version?: number // a pinned version; default = current
+  // 025: whether the post author supplied the input a look `requires`.
+  hasCompositeSource?: boolean
 }
 
 export type ResolveResult =
@@ -91,7 +94,9 @@ export function resolvePostStyle(
   // image style: explicit -> style default -> classic; classic wherever it cannot run
   let imageStyle = input.explicit?.imageStyle || v.defaultImageStyle
   if (imageStyle !== 'classic') {
-    const option = imageStyleOptions(input.aspectRatio, looks).find((o) => o.key === imageStyle)
+    const option = imageStyleOptions(input.aspectRatio, looks, {
+      hasCompositeSource: input.hasCompositeSource,
+    }).find((o) => o.key === imageStyle)
     if (UNATTENDED.has(input.surface)) {
       imageStyle = 'classic'
       notes.push('unattended-classic')
@@ -101,6 +106,9 @@ export function resolvePostStyle(
     } else if (getArchetype(imageStyle, looks)?.status === 'retired') {
       imageStyle = 'classic'
       notes.push('retired-classic')
+    } else if (getArchetype(imageStyle, looks)?.requires && input.hasCompositeSource !== true) {
+      imageStyle = 'classic'
+      notes.push('missing-input-classic')
     } else if (!option) {
       imageStyle = 'classic'
       notes.push('default-unavailable')

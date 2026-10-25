@@ -51,6 +51,8 @@ export function resolveBriefStyle(
     path: brief.designMode === 'TEMPLATE' ? 'A' : 'B',
     aspectRatio: brief.aspectRatio,
     surface: 'regenerate',
+    // 025: no screenshot is stored yet (T7), so a look that needs one is classic.
+    hasCompositeSource: false,
   })
   if (!resolved.ok) throw new Error(`Post style "${brief.postStyle}" is not available`)
   return {

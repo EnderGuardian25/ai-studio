@@ -7,6 +7,7 @@ import { Prisma, DesignMode, type AspectRatio, type Channel } from '@prisma/clie
 import { isPublishableChannel, PUBLISHABLE_CHANNELS } from '@/lib/channels'
 import { isAspectRatio } from '@/lib/aspectRatio'
 import { validateImageStyle } from '@/lib/brief/imageStyle'
+import { compositePairingError } from '@/lib/brief/compositeSource'
 import { isCliMode } from '@/lib/agent/config'
 import { resolveBriefCopyKey } from '@/lib/brief/copyProvider'
 import { IMAGE_PROVIDERS } from '@/providers/imageCapabilities'
@@ -237,6 +238,8 @@ export const POST = withTeamAuth(async (req: NextRequest, _ctx, user) => {
     path: designMode === 'TEMPLATE' ? 'A' : 'B',
     aspectRatio: aspectRatio ?? 'SQUARE',
     surface: 'briefs-api',
+    // 025: this route does not accept a screenshot yet (T7 adds it).
+    hasCompositeSource: false,
   })
   if (!resolved.ok) {
     return NextResponse.json({ error: resolved.message, code: resolved.code }, { status: 400 })
@@ -244,6 +247,14 @@ export const POST = withTeamAuth(async (req: NextRequest, _ctx, user) => {
   // An explicitly sent image style is stored as given (009 FR-03: the size is
   // not checked here); an absent one comes from the style's default.
   const imageStyle = body.imageStyle == null ? resolved.imageStyle : style.value
+  // 025 FR-08: a look that needs a screenshot cannot be created without one.
+  const pairing = compositePairingError(imageStyle, undefined)
+  if (pairing) {
+    return NextResponse.json(
+      { error: 'This image style needs a product screenshot', code: pairing },
+      { status: 400 },
+    )
+  }
 
   // Each pick is checked against the caller's effective set for its surface
   // now (tier 1: a refusal is FR-17's 400), so only an allowed model is

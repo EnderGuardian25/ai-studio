@@ -434,14 +434,17 @@ test.describe('§AF — the wizard picker', () => {
     const styleCard = (key: string) => page.getByTestId(`post-style-${key}`)
     const section = page.getByTestId('image-style-section')
 
-    // Five cards, none disabled, at every size.
+    // Five cards, none disabled, at every size. 025 adds a sixth card, device-screen,
+    // disabled with its reason until the brief carries a product screenshot.
     for (const size of [/1:1 Square/, /4:5/, /9:16 Story/]) {
       await page.getByRole('button', { name: size }).click()
-      await expect(section.locator('button[aria-pressed]')).toHaveCount(LOOK_KEYS.length)
+      await expect(section.locator('button[aria-pressed]')).toHaveCount(LOOK_KEYS.length + 1)
       for (const key of LOOK_KEYS) {
         await expect(option(key), `${key} at ${String(size)}`).toBeEnabled()
         await expect(option(key)).not.toContainText('Not available')
       }
+      await expect(option('device-screen'), `device-screen at ${String(size)}`).toBeDisabled()
+      await expect(option('device-screen')).toContainText('Needs a product screenshot')
     }
     await expectNoAxeViolations(page, 'brief step 1 with five image looks at 9:16', { settle: true })
 

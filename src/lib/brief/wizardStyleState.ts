@@ -56,6 +56,8 @@ export function resolveWizardStyle(i: WizardStyleInput): WizardStyleView {
     path: i.designMode === 'TEMPLATE' ? 'A' : 'B',
     aspectRatio: i.aspectRatio,
     surface: 'wizard',
+    // 025: the wizard cannot take a screenshot yet (T7), so a look that needs one is classic.
+    hasCompositeSource: false,
   })
   if (!r.ok) {
     // knownStyleKey makes this unreachable; fail soft rather than throw in render.

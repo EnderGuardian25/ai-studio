@@ -355,6 +355,9 @@ export interface ImageStyleOption {
   summary: string
 }
 
+// The reason a look that needs a screenshot is unavailable without one (025).
+export const NEEDS_SCREENSHOT_REASON = 'Needs a product screenshot'
+
 // The picker source for a dataset: classic first, then its active looks only.
 export function imageStylesOf(source: ArchetypeMap): ImageStyleOption[] {
   return [
@@ -368,25 +371,32 @@ export function imageStylesOf(source: ArchetypeMap): ImageStyleOption[] {
 // The wizard's picker source: classic first, then the active archetypes only.
 export const IMAGE_STYLES: readonly ImageStyleOption[] = deepFreeze(imageStylesOf(archetypes))
 
-// Each style with whether the chosen size supports it (classic always does).
-export function imageStyleOptions(
-  aspectRatio: AspectRatio,
-  source: ArchetypeMap = archetypes,
-): Array<ImageStyleOption & { supported: boolean }> {
-  return imageStylesOf(source).map((s) => {
-    const current = getArchetype(s.key, source)?.current ?? 0
-    return {
-      ...s,
-      supported: s.key === 'classic' || contractAt(s.key, current, aspectRatio, source) !== null,
-    }
-  })
-}
-
 // True when the look's current contract declares the size (classic always).
+// Independent of any input the look requires (025).
 export function supportsSize(
   key: string,
   size: AspectRatio,
   source: ArchetypeMap = archetypes,
 ): boolean {
-  return imageStyleOptions(size, source).find((o) => o.key === key)?.supported ?? false
+  if (key === 'classic') return true
+  const archetype = getArchetype(key, source)
+  // Only an active look is in the picker, so a retired or unknown one is false.
+  if (!archetype || archetype.status !== 'active') return false
+  return contractAt(key, archetype.current, size, source) !== null
+}
+
+// Each style with whether the chosen size supports it (classic always does). A
+// look that `requires` an input is unsupported, with a reason, until the caller
+// says the input exists (025).
+export function imageStyleOptions(
+  aspectRatio: AspectRatio,
+  source: ArchetypeMap = archetypes,
+  opts: { hasCompositeSource?: boolean } = {},
+): Array<ImageStyleOption & { supported: boolean; reason?: string }> {
+  return imageStylesOf(source).map((s) => {
+    if (getArchetype(s.key, source)?.requires && !opts.hasCompositeSource) {
+      return { ...s, supported: false, reason: NEEDS_SCREENSHOT_REASON }
+    }
+    return { ...s, supported: supportsSize(s.key, aspectRatio, source) }
+  })
 }

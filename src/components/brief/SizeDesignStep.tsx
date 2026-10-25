@@ -201,7 +201,7 @@ export function SizeDesignStep({
                   <div className="mt-1.5 text-ui-xs text-fg-muted">{opt.summary}</div>
                   {!opt.supported && (
                     <div className="mt-1.5 text-ui-xs text-fg-muted">
-                      Not available for the {ASPECT_LABELS[aspectRatio]} size
+                      {opt.reason ?? `Not available for the ${ASPECT_LABELS[aspectRatio]} size`}
                     </div>
                   )}
                 </button>

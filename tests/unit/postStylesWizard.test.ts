@@ -155,3 +155,14 @@ describe('styleAfterSizeChange (028)', () => {
     expect(styleAfterSizeChange('classic', 'STORY', looks).reset).toBe(false)
   })
 })
+
+describe('device-screen in the wizard (025 FR-08)', () => {
+  it('a touched device-screen resolves to classic until a screenshot can be supplied', () => {
+    const v = resolveWizardStyle({ ...base, imageStyle: 'device-screen', imageStyleTouched: true })
+    expect(v.imageStyle).toBe('classic')
+  })
+
+  it('a size change and a resume both drop device-screen', () => {
+    expect(styleAfterSizeChange('device-screen', 'SQUARE')).toEqual({ imageStyle: 'classic', reset: true })
+  })
+})

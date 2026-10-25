@@ -358,3 +358,54 @@ describe('legacyGoalStyle and matchToneOption', () => {
     ])
   })
 })
+
+describe('resolvePostStyle: missing-input-classic (025 FR-08)', () => {
+  // A fixture style whose default look needs a screenshot (the real dataset has none).
+  const needy = structuredClone(styles) as Record<string, PostStyle>
+  needy.launch = {
+    ...needy.launch,
+    versions: {
+      ...needy.launch.versions,
+      [needy.launch.current]: {
+        ...needy.launch.versions[needy.launch.current],
+        defaultImageStyle: 'device-screen',
+      },
+    },
+  }
+  const pick = (over: Partial<ResolveInput>) => {
+    const r = resolvePostStyle(base({ style: 'launch', ...over }), needy)
+    if (!r.ok) throw new Error(r.message)
+    return r
+  }
+
+  it('wizard and briefs-api: a default that needs a screenshot is classic with the note', () => {
+    for (const surface of ['wizard', 'briefs-api'] as Surface[]) {
+      const r = pick({ surface })
+      expect(r.imageStyle).toBe('classic')
+      expect(r.notes).toContain('missing-input-classic')
+    }
+  })
+
+  it('an explicit device-screen is classic with the note; with the flag it is kept', () => {
+    const explicit = { imageStyle: 'device-screen' }
+    expect(ok(base({ explicit })).imageStyle).toBe('classic')
+    expect(ok(base({ explicit })).notes).toContain('missing-input-classic')
+    const kept = ok(base({ explicit, hasCompositeSource: true }))
+    expect(kept.imageStyle).toBe('device-screen')
+    expect(kept.notes).not.toContain('missing-input-classic')
+  })
+
+  it('unattended-classic still wins for queue, mcp and acp', () => {
+    for (const surface of UNATTENDED) {
+      const r = pick({ surface })
+      expect(r.notes).toContain('unattended-classic')
+      expect(r.notes).not.toContain('missing-input-classic')
+    }
+  })
+
+  it('the released looks are not affected', () => {
+    const r = ok(base({ explicit: { imageStyle: 'spotlight' } }))
+    expect(r.imageStyle).toBe('spotlight')
+    expect(r.notes).not.toContain('missing-input-classic')
+  })
+})

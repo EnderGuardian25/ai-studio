@@ -157,10 +157,12 @@ describe('designData: lookups and picker', () => {
     ])
     expect(Object.isFrozen(IMAGE_STYLES)).toBe(true)
     expect(IMAGE_STYLES.every((s) => Object.isFrozen(s))).toBe(true)
-    // device-screen is size-supported at every size too (T2 adds the source rule).
-    expect(imageStyleOptions('SQUARE').every((o) => o.supported)).toBe(true)
-    expect(imageStyleOptions('STORY').every((o) => o.supported)).toBe(true)
-    expect(imageStyleOptions('PORTRAIT').every((o) => o.supported)).toBe(true)
+    // device-screen is size-supported at every size but needs a screenshot (025 T2),
+    // so it is supported only when the caller says a source exists.
+    for (const size of ['SQUARE', 'STORY', 'PORTRAIT'] as const) {
+      expect(imageStyleOptions(size, undefined, { hasCompositeSource: true }).every((o) => o.supported)).toBe(true)
+      expect(imageStyleOptions(size).filter((o) => !o.supported).map((o) => o.key)).toEqual(['device-screen'])
+    }
   })
 })
 

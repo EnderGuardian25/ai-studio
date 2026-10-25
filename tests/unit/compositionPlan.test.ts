@@ -280,3 +280,19 @@ describe('device-screen availability and the composite argument (025 FR-08, desi
     })
   })
 })
+
+describe('planComposition: a look that requires a screenshot (025)', () => {
+  it('without the flag it is classic with composite-source-missing', () => {
+    for (const size of ['SQUARE', 'PORTRAIT', 'STORY'] as const) {
+      expect(planComposition({ imageStyle: 'device-screen', aspectRatio: size })).toEqual({
+        kind: 'classic',
+        requestedArchetype: 'device-screen',
+        fallbackReason: 'composite-source-missing',
+      })
+    }
+  })
+
+  it('with the flag it is a hero plan', () => {
+    expect(planComposition({ imageStyle: 'device-screen', aspectRatio: 'SQUARE', hasCompositeSource: true }).kind).toBe('hero')
+  })
+})

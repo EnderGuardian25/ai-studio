@@ -30,7 +30,6 @@ import {
   styleRequestFields,
   DEFAULT_POST_STYLE,
 } from '@/lib/brief/wizardStyleState'
-import { supportsSize } from '@/lib/designData'
 import { DEFAULT_CHANNELS } from './constants'
 import type { DesignMode, ResolvedKit, UploadedImage } from './types'
 import {
@@ -400,7 +399,7 @@ export function useBriefWizard(): UseBriefWizardResult {
         // the stored size or path can't run.
         const resumedImageStyle = resumeImageStyle(p.imageStyle)
         const storedImageStyle =
-          p.designMode === 'TEMPLATE' || !supportsSize(resumedImageStyle, p.aspectRatio)
+          p.designMode === 'TEMPLATE' || styleAfterSizeChange(resumedImageStyle, p.aspectRatio).reset
             ? CLASSIC_STYLE
             : resumedImageStyle
         // 027 FR-07: an unknown stored style opens as General; a stored tone or

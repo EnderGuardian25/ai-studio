@@ -55,7 +55,7 @@ This change has **12 tasks in 6 waves**:
 
 ### Wave 2: Group A, availability, fixtures and the probe (one at a time)
 
-- [ ] `T2` — Availability by `requires`: picker, resolver, plan and `POST /api/briefs`
+- [x] `T2` — Availability by `requires`: picker, resolver, plan and `POST /api/briefs`
   - Files: `src/lib/designData/{composition,plan}.ts` (`imageStyleOptions` opts, `planComposition` flag), `src/lib/postStyles/{resolve,types}.ts`, `src/lib/brief/compositeSource.ts` (new, pairing rule only), `src/app/api/briefs/route.ts`, `src/lib/agent/briefInput.ts` (pass the flag), `src/lib/brief/wizardStyleState.ts`, `src/components/brief/SizeDesignStep.tsx` (unavailable reason text), `tests/unit/{postStylesResolve,postStylesWizard,briefImageStyle,compositionPlan,compositeSource}.test.ts`, `tests/e2e/product-screenshots.test.ts` (new; TC-SHOT-01 only)
   - Estimate: medium
   - Kind: impl

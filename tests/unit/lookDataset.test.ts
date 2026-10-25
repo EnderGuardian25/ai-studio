@@ -143,7 +143,11 @@ describe('the shipped dataset (AC-01, AC-02)', () => {
   it('the picker lists the five looks after classic and every one supports every size', () => {
     expect(IMAGE_STYLES.map((s) => s.key)).toEqual(['classic', ...COMMITTED_KEYS])
     for (const size of ['SQUARE', 'PORTRAIT', 'STORY'] as const) {
-      expect(imageStyleOptions(size).every((o) => o.supported)).toBe(true)
+      expect(imageStyleOptions(size, undefined, { hasCompositeSource: true }).every((o) => o.supported)).toBe(true)
+      const bare = imageStyleOptions(size)
+      expect(bare.filter((o) => !o.supported).map((o) => o.key)).toEqual(['device-screen'])
+      expect(bare.find((o) => o.key === 'device-screen')?.reason).toBe('Needs a product screenshot')
+      expect(bare.filter((o) => o.key !== 'device-screen').every((o) => o.reason === undefined)).toBe(true)
       for (const k of COMMITTED_KEYS) expect(supportsSize(k, size)).toBe(true)
     }
     expect(supportsSize('classic', 'STORY')).toBe(true)
