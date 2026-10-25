@@ -154,3 +154,41 @@ describe('AC-08: isClaudeUsageLimit — false cases', () => {
     expect(isClaudeUsageLimit(err)).toBe(false)
   })
 })
+
+describe('029: the usage-limit failure names itself', () => {
+  const LINE = "You've hit your weekly limit · resets Oct 27, 10:30am (Asia/Colombo)"
+  const run = async () => (await inAuth(() => runClaudeCli("p", { model: MODEL })).catch((e: unknown) => e)) as InstanceType<typeof ClaudeCliError>
+
+  it('AC-01: the 2.1.310 wording is a usage limit, and the classifier order holds', () => {
+    expect(isClaudeUsageLimit(new ClaudeCliError('x', 1, '', LINE))).toBe(true)
+    expect(isClaudeUsageLimit(new ClaudeCliError('x', 1, '', LINE, { apiErrorStatus: 401 }))).toBe(false)
+    expect(isClaudeUsageLimit(new ClaudeCliError('x', 1, 'Invalid API key · Please run /login', LINE))).toBe(false)
+    expect(isClaudeUsageLimit(new ClaudeCliError('x', 0, '', LINE))).toBe(false)
+  })
+
+  it('AC-02: a limited text-mode run gets the fixed message and keeps stdout out of it', async () => {
+    h.exitCode = 1
+    h.stdout = LINE
+    const err = await run()
+    expect(err.message).toBe(
+      "Claude CLI exited with code 1: Claude usage limit reached. Try again after the plan limit resets, or connect another account's token at /settings.",
+    )
+    for (const s of ['weekly', 'Oct 27', 'Asia/Colombo', '10:30am']) expect(err.message).not.toContain(s)
+    expect(err.stdout).toBe(LINE)
+  })
+
+  it('AC-03: empty stderr with unclassified stdout says there was no stderr', async () => {
+    h.exitCode = 1
+    h.stdout = 'something odd'
+    const err = await run()
+    expect(err.message).toBe('Claude CLI exited with code 1: (no error output on stderr)')
+    expect(err.message).not.toContain('something odd')
+  })
+
+  it('AC-04: a non-empty stderr is quoted as before', async () => {
+    h.exitCode = 1
+    h.stderr = 'boom'
+    const err = await run()
+    expect(err.message).toBe('Claude CLI exited with code 1: boom')
+  })
+})

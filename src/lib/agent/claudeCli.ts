@@ -270,10 +270,11 @@ export function isClaudeAuthFailure(err: unknown): boolean {
 //       - a structured API status decides, as it does for auth: 429 is one,
 //         any other status is not, whatever the text says;
 //       - with no status, a usage-limit phrasing in stderr / stdout.
-// The phrase list is unverified against the pinned CLI 2.1.287 (A11; T2's
-// operator report records what it prints if a limited account was available).
+// Observed on CLI 2.1.310 (2026-10-25): text mode prints
+// "You've hit your weekly limit · resets Oct 27, 10:30am (Asia/Colombo)" on
+// stdout and exits 1 with empty stderr. The other phrasings are not observed.
 const USAGE_LIMIT_RE =
-  /usage limit (reached|exceeded)|claude ai usage limit|\brate[_ ]limit(ed|[_ ]error)?\b|\b429\b/i
+  /usage limit (reached|exceeded)|claude ai usage limit|hit your (weekly |daily |session |usage )?limit|\brate[_ ]limit(ed|[_ ]error)?\b|\b429\b/i
 export function isClaudeUsageLimit(err: unknown): boolean {
   if (err instanceof Anthropic.RateLimitError) return true
   if (!(err instanceof ClaudeCliError)) return false
@@ -616,7 +617,15 @@ interface SpawnResult {
 // otherwise stdout IS the answer.
 function finalizeText({ code, stdout, stderr }: SpawnResult): string {
   if (code !== 0) {
-    throw new ClaudeCliError(`Claude CLI exited with code ${code}: ${stderr.trim().slice(0, 500)}`, code, stderr, stdout)
+    // Classify first, then word the message. stdout is never quoted: it can
+    // hold model text, so the message says only what the class proves.
+    const probe = new ClaudeCliError("", code, stderr, stdout)
+    const detail = isClaudeUsageLimit(probe)
+      ? "Claude usage limit reached. Try again after the plan limit resets, or connect another account's token at /settings."
+      : stderr.trim()
+        ? stderr.trim().slice(0, 500)
+        : "(no error output on stderr)"
+    throw new ClaudeCliError(`Claude CLI exited with code ${code}: ${detail}`, code, stderr, stdout)
   }
   return stdout.trim()
 }

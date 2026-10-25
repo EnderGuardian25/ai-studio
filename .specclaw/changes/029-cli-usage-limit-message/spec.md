@@ -31,7 +31,7 @@ A text-mode `claude -p` run that fails on a plan usage limit must say so. Today 
 ## Acceptance Criteria
 
 - **AC-01 (FR-01, FR-02):** `isClaudeUsageLimit(new ClaudeCliError('x', 1, '', "You've hit your weekly limit · resets Oct 27, 10:30am (Asia/Colombo)"))` is true. The same text with `apiErrorStatus: 401`, or with a 401 auth phrase in stderr, is false. Exit 0 is false.
-- **AC-02 (FR-03, FR-06):** a scripted text-mode run (exit 1, empty stderr, stdout = the 2.1.310 line) through `runClaudeCli` rejects with exactly the FR-03 message. The message does not contain `weekly`, `resets` or `Asia/Colombo`, and the error's `stdout` field still holds the line.
+- **AC-02 (FR-03, FR-06):** a scripted text-mode run (exit 1, empty stderr, stdout = the 2.1.310 line) through `runClaudeCli` rejects with exactly the FR-03 message. The message does not contain `weekly`, `Oct 27` or `Asia/Colombo` (the CLI line's own words; FR-03's fixed text itself says "resets", amended 2026-10-25 at build), and the error's `stdout` field still holds the line.
 - **AC-03 (FR-04):** a scripted run with exit 1, empty stderr and an unclassified stdout (`something odd`) rejects with `Claude CLI exited with code 1: (no error output on stderr)`, and the message does not contain `something odd`.
 - **AC-04 (FR-05):** a scripted run with exit 1 and stderr `boom` rejects with `Claude CLI exited with code 1: boom`.
 - **AC-05 (NFR-01, NFR-02):** tsc, lint (0 errors) and the full unit suite pass. `git diff` touches only the two files in the file map plus this change's folder.
