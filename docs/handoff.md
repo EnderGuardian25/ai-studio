@@ -21,7 +21,7 @@
 | T4   | `cf00ffb`          | WARN (1) | The probe route `POST /api/admin/look-probe` and `run-look-check.mjs --probe`                                |
 | T5   | (this docs commit) | none     | These docs, the spec amendment, the E2E plan §AG, the roadmap and CLAUDE.md                                  |
 
-**Gates after T4.** Unit 3989/3989; render 96/96 (two runs at T3); lint 0 errors / 7 warnings; tsc clean; build passes (again at T5). The full clean mock E2E (T5) is 533/3/0/1 (the one flaky was a timing miss in `model-selection.test.ts` §Y, "element(s) not found" under full load; that suite then re-ran clean 3 of 3 with no retries, 57/57), and CI is checked after the T5 push (see the follow-up commit). No migration and no env var in Group A.
+**Gates after T4.** Unit 3989/3989; render 96/96 (two runs at T3); lint 0 errors / 7 warnings; tsc clean; build passes (again at T5). The full clean mock E2E (T5) is 533/3/0/1 (the one flaky was a timing miss in `model-selection.test.ts` §Y, "element(s) not found" under full load; that suite then re-ran clean 3 of 3 with no retries, 57/57), and CI is green at `09000ab` (run 40173711221). No migration and no env var in Group A.
 
 **Measured in T3.** The screen region's L\*/100 standard deviation: pass 0.0000 at all three sizes; screen 0.4907 at SQUARE, 0.4907 at PORTRAIT and 0.4862 at STORY. `BLANK_STDDEV_MAX` is 0.04. No tuning was needed, and the `device-screen@1` hash is unchanged.
 
