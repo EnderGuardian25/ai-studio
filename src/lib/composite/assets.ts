@@ -49,14 +49,23 @@ export async function compositeRenderForSource(
   }
 }
 
-// The render argument for a stamped draft: its first composite's key and rect.
-// null when the stamp has no composites (a classic or pre-025 draft).
+// The render argument for a stamped draft: its first composite's key and rect,
+// at the canvas the caller renders. null when the stamp has no composites (a
+// classic or pre-025 draft).
+export async function compositeRenderForCanvas(
+  stamp: CompositionStamp | null | undefined,
+  teamId: string,
+  canvas: { width: number; height: number },
+): Promise<CompositeRender | null> {
+  const entry = stamp?.composites?.[0]
+  if (!entry) return null
+  return compositeRenderForSource(entry.source.key, entry.rect, teamId, canvas)
+}
+
 export async function compositeRenderFor(
   stamp: CompositionStamp | null | undefined,
   teamId: string,
   size: AspectRatio,
 ): Promise<CompositeRender | null> {
-  const entry = stamp?.composites?.[0]
-  if (!entry) return null
-  return compositeRenderForSource(entry.source.key, entry.rect, teamId, dimensionsFor(size))
+  return compositeRenderForCanvas(stamp, teamId, dimensionsFor(size))
 }

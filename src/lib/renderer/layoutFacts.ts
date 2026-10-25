@@ -45,7 +45,8 @@ export interface MeasureOptions {
   // URLs never measured even if they appear as an <img> (the background image).
   excludeUrls?: readonly string[]
   // 025: the composite argument for a draft whose HTML carries the screenshot
-  // token (generation passes it; the stamp-driven paths are wired in T9).
+  // token (generation passes it; a stamp-driven caller builds it with
+  // compositeRenderFor). The placed element itself is never measured.
   composites?: CompositeRender | null
 }
 
@@ -86,6 +87,7 @@ export async function measureLayoutBoxes(html: string, opts: MeasureOptions): Pr
         for (let n = walker.nextNode(); n; n = walker.nextNode()) {
           const parent = n.parentElement
           if (!parent || SKIP.has(parent.tagName) || !(n.textContent ?? "").trim()) continue
+          if (parent.closest("[data-composite]")) continue // 025: the placed screenshot is not measured
           if (!visible(parent)) continue
           const range = document.createRange()
           range.selectNodeContents(n)
@@ -95,6 +97,7 @@ export async function measureLayoutBoxes(html: string, opts: MeasureOptions): Pr
           const attr = img.getAttribute("src") ?? ""
           const isLogo = logoSet.has(attr) || logoSet.has(img.src)
           if (!isLogo || excludeSet.has(attr) || excludeSet.has(img.src)) continue
+          if (img.closest("[data-composite]")) continue // 025: the placed screenshot is not measured
           if (!visible(img)) continue
           push(img.getBoundingClientRect())
         }

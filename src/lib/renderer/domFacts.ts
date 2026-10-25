@@ -108,7 +108,9 @@ export async function extractDomFacts(html: string, opts: ExtractDomFactsOptions
     width,
     height,
     collectFacts,
-    // 025: the stamp-driven argument is wired in T9; no caller passes a composite yet.
+    // 025: a document that still carries the screenshot token passes its render
+    // argument (compositeRenderFor). Refine's documents are stripped of it, so
+    // they pass none.
     opts.composites ?? null
   )
   const name = (s: string) => modelFacingSource(s, inlineAssets)
@@ -161,6 +163,8 @@ function collectFacts(page: Page): Promise<StyledDomFacts> {
     let elementCount = 0
 
     for (const el of list) {
+      // 025: the placed screenshot (a data: URI) is not part of the facts.
+      if (el.closest('[data-composite]')) continue
       const cs = getComputedStyle(el)
       if (cs.display === 'none' || (el.parentElement !== null && hidden.has(el.parentElement))) {
         hidden.add(el)

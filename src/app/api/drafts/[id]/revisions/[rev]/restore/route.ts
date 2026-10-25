@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { getDraftAccessInfo } from '@/lib/auth'
 import { withTeamAuth } from '@/lib/api/handler'
 import { canAccessContent } from '@/lib/authz/visibility'
-import { renderHtmlToPng } from '@/lib/renderer/puppeteer'
+import { CompositePlacementError } from '@/lib/composite/render'
 import { uploadObject, resolveExportUrl, exportKey, BUCKET_EXPORTS } from '@/lib/storage/minio'
 import { dimensionsFor } from '@/lib/aspectRatio'
 import { track } from '@/lib/analytics/track'
@@ -12,6 +12,7 @@ import {
   restoreDraftToRevision,
   restoredRenderStamp,
   draftPostStyleStamp,
+  renderDraftHtml,
   DraftBusyError,
 } from '@/lib/drafts/revisions'
 
@@ -66,7 +67,16 @@ export const POST = withTeamAuth<Params>(async (_req, { params }, user) => {
       select: { brief: { select: { aspectRatio: true } } },
     })
     const { width, height } = dimensionsFor(draft?.brief.aspectRatio)
-    const buffer = await renderHtmlToPng(revision.htmlSnapshot, width, height, null) // 025: T9 passes the stamp's composite
+    let buffer: Buffer
+    try {
+      // 025 FR-16: the revision's own stamp decides the screenshot.
+      buffer = await renderDraftHtml(params.id, revision.htmlSnapshot, stamp.composition, width, height)
+    } catch (err) {
+      if (err instanceof CompositePlacementError) {
+        return NextResponse.json({ error: err.message, code: 'composite-not-placed' }, { status: 422 })
+      }
+      throw err
+    }
     key = exportKey('restore', params.id)
     await uploadObject(buffer, BUCKET_EXPORTS, key, 'image/png')
   }

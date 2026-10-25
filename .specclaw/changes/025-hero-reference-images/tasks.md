@@ -175,7 +175,7 @@ This change has **12 tasks in 6 waves**:
     - The fallback deletes the uploaded export and re-runs the design once as classic with no hero image. Assert exactly one image call and two design calls through the model-calls recorder.
     - **Gate:** tsc, lint, unit, `npm run test:render` twice, build, `hero-image.test.ts`, `image-looks.test.ts`, `path-b.test.ts` and the listed TC-SHOT cases alone.
 
-- [ ] `T9` — Refine, override, inline edit, restore, export, the verifiers and the editor
+- [x] `T9` — Refine, override, inline edit, restore, export, the verifiers and the editor
   - Files: `src/app/api/drafts/[id]/{refine/route,inline-edit/route,revisions/[rev]/restore/route}.ts` (paths as found), `src/app/api/generate/export/route.ts`, `src/lib/drafts/{revisions,draftActions}.ts`, `src/lib/agent/refineAttempt.ts`, `src/lib/renderer/{domFacts,layoutFacts}.ts`, `src/components/drafts/InlineEditModal.tsx`, `tests/unit/*` as needed, `tests/e2e/product-screenshots.test.ts` (TC-SHOT-10 to TC-SHOT-12)
   - Estimate: large
   - Kind: impl

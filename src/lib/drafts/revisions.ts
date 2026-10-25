@@ -10,6 +10,8 @@ import type { BackgroundSkipFields } from '@/lib/drafts/backgroundNotice'
 import type { ResolvedModel } from '@/lib/models/resolve'
 import { compositionStampSchema, parseCompositionStamp, type CompositionStamp } from '@/lib/designData'
 import { parsePostStyleStamp, postStyleStampSchema, type PostStyleStamp } from '@/lib/postStyles'
+import { canonicalCompositeHtml } from '@/lib/composite/insert'
+import { CompositePlacementError, CompositeRenderError, type CompositeRender } from '@/lib/composite/render'
 
 // ── The revision chain vs. rejected renders (change 004 Phase 2, T15/T16) ────
 // DraftRevision holds two kinds of row. COMMITTED rows are the chain: numbered
@@ -438,6 +440,45 @@ async function removeUnusedExport(key: string, why: string) {
   }
 }
 
+// 025 FR-16: the render argument for a stamp. null for a stamp with no
+// composites (no DB read). For a composite stamp it reads the draft's team and
+// the screenshot once; any failure to read or place it is a
+// CompositePlacementError ("could not be placed; nothing was changed").
+export async function compositeRenderForDraft(
+  draftId: string,
+  composition: CompositionStamp | null,
+  canvas: { width: number; height: number },
+): Promise<CompositeRender | null> {
+  if (!composition?.composites?.[0]) return null
+  try {
+    const { compositeRenderForCanvas } = await import('@/lib/composite/assets')
+    const owner = await prisma.draft.findUnique({ where: { id: draftId }, select: { teamId: true } })
+    if (!owner) throw new CompositeRenderError('composite-source-missing', 'the draft was not found')
+    return await compositeRenderForCanvas(composition, owner.teamId, canvas)
+  } catch (err) {
+    throw new CompositePlacementError(err)
+  }
+}
+
+// Renders `html` for a draft with this stamp; a failed composite check is a
+// CompositePlacementError and any other error passes through.
+export async function renderDraftHtml(
+  draftId: string,
+  html: string,
+  composition: CompositionStamp | null,
+  width: number,
+  height: number,
+): Promise<Buffer> {
+  const composites = await compositeRenderForDraft(draftId, composition, { width, height })
+  const { renderHtmlToPng } = await import('@/lib/renderer/puppeteer')
+  try {
+    return await renderHtmlToPng(html, width, height, composites)
+  } catch (err) {
+    if (err instanceof CompositeRenderError) throw new CompositePlacementError(err)
+    throw err
+  }
+}
+
 // Shared commit path for refine + inline-edit. Renders the HTML to a PNG when
 // no export key is supplied (the override / inline-edit / verified-refine
 // case), then allocates a revision number and writes the DraftRevision +
@@ -450,7 +491,7 @@ async function removeUnusedExport(key: string, why: string) {
 export async function commitDraftRevision(
   args: CommitRevisionArgs,
 ): Promise<{ revisionId: string; exportKey: string; revisionNumber: number }> {
-  const { draftId, instruction, html, width, height, backgroundImageUrl, backgroundSkip, adoptRejectedRevisionId } = args
+  const { draftId, instruction, width, height, backgroundImageUrl, backgroundSkip, adoptRejectedRevisionId } = args
   const casExpected = args.expectedRevisionNumber
   const cas = casExpected !== undefined
   const claim = args.claim
@@ -469,15 +510,18 @@ export async function commitDraftRevision(
     ? await rejectedRenderStamp(draftId, adoptRejectedRevisionId, args.postStyle)
     : currentRenderStamp(args.model ?? null, args.composition, args.postStyle)
 
+  // 025 FR-16: the stored document is canonical for this stamp (the one
+  // composite element at the stamped rect, or none), whoever wrote it.
+  const html = canonicalCompositeHtml(args.html, stamp.composition, { width, height })
+
   let finalExportKey = args.exportKey
   // Set only when THIS call rendered + uploaded the export — the only object
   // it may remove again (a caller-supplied key belongs to someone else, e.g.
   // the rejected render an adopt reuses).
   let uploadedKey: string | null = null
   if (!finalExportKey) {
-    const { renderHtmlToPng } = await import('@/lib/renderer/puppeteer')
     const { uploadObject, exportKey, BUCKET_EXPORTS } = await import('@/lib/storage/minio')
-    const buffer = await renderHtmlToPng(html, width, height, null) // 025: T9 passes the stamp's composite
+    const buffer = await renderDraftHtml(draftId, html, stamp.composition, width, height)
     finalExportKey = exportKey('refine', draftId)
     await uploadObject(buffer, BUCKET_EXPORTS, finalExportKey, 'image/png')
     uploadedKey = finalExportKey
@@ -822,20 +866,22 @@ export interface RecordRejectedRenderArgs {
 export async function recordRejectedRender(
   args: RecordRejectedRenderArgs,
 ): Promise<{ revisionId: string; exportKey: string | null }> {
-  const { draftId, instruction, html, width, height, claim } = args
+  const { draftId, instruction, width, height, claim } = args
   const diagnostics = rejectionDiagnosticsSchema.omit({ export: true }).parse(args.diagnostics)
   // F3: the rejected row carries the stamp of ITS render, so a later "Use
   // anyway" can reinstate it. The draft's stamp is untouched: its current
   // render did not change. 008: with the attempt's model.
   const stamp = currentRenderStamp(args.model ?? null, args.composition, args.postStyle)
+  // 025 FR-16: canonical for the stamp, like a commit's. An unusable document
+  // (no html) is kept as the model wrote it.
+  const html = args.html ? canonicalCompositeHtml(args.html, stamp.composition, { width, height }) : args.html
 
   let exportKey: string | null = null
   let exported: RejectionDiagnostics['export'] = 'none'
   if (html) {
     try {
-      const { renderHtmlToPng } = await import('@/lib/renderer/puppeteer')
       const { uploadObject, exportKey: mintExportKey, BUCKET_EXPORTS } = await import('@/lib/storage/minio')
-      const buffer = await renderHtmlToPng(html, width, height, null) // 025: T9 passes the stamp's composite
+      const buffer = await renderDraftHtml(draftId, html, stamp.composition, width, height)
       const key = mintExportKey('refine', draftId)
       await uploadObject(buffer, BUCKET_EXPORTS, key, 'image/png')
       exportKey = key

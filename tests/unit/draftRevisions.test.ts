@@ -51,7 +51,9 @@ const fake = vi.hoisted(() => {
     // The draft's revision pointer — the element-edit CAS (expectedRevisionNumber,
     // change 004 T23 fix round 1) guards on it.
     currentRevisionNumber: null as number | null,
-    render: { calls: 0, fail: false },
+    render: { calls: 0, fail: false, composites: [] as unknown[], failWith: null as Error | null },
+    // 025: what compositeRenderForCanvas was asked for.
+    composite: { calls: [] as unknown[], fail: false },
     uploads: [] as string[],
     deletes: [] as string[],
     txOptions: [] as unknown[],
@@ -228,6 +230,8 @@ const fake = vi.hoisted(() => {
           pendingAction: db.pendingAction,
           currentRevisionNumber: db.currentRevisionNumber,
           notAppliedRevisionId: db.notAppliedRevisionId,
+          // 025: the draft's team (compositeRenderForDraft reads it).
+          teamId: 'team-1',
         }
       },
     },
@@ -268,10 +272,22 @@ const db = fake.db
 vi.mock('@/lib/prisma', () => ({ prisma: fake.client }))
 vi.mock('@/lib/renderer/fontSet', () => ({ getFontSetId: () => 'fonts-test' }))
 vi.mock('@/lib/renderer/puppeteer', () => ({
-  renderHtmlToPng: async () => {
+  renderHtmlToPng: async (_html: string, _w: number, _h: number, composites: unknown) => {
     fake.db.render.calls++
+    fake.db.render.composites.push(composites)
+    if (fake.db.render.failWith) throw fake.db.render.failWith
     if (fake.db.render.fail) throw new Error('Chromium crashed')
     return Buffer.from('png')
+  },
+}))
+vi.mock('@/lib/composite/assets', () => ({
+  compositeRenderForCanvas: async (stamp: unknown, teamId: string, canvas: unknown) => {
+    fake.db.composite.calls.push({ stamp, teamId, canvas })
+    if (fake.db.composite.fail) {
+      const { CompositeRenderError } = await import('@/lib/composite/render')
+      throw new CompositeRenderError('composite-source-missing', 'gone')
+    }
+    return { token: '__COMPOSITE_0__', dataUri: 'data:image/png;base64,AA==', rectPx: { left: 1, top: 2, width: 3, height: 4 } }
   },
 }))
 vi.mock('@/lib/storage/minio', () => ({
@@ -356,7 +372,8 @@ beforeEach(() => {
   db.notAppliedRevisionId = null
   db.pendingAction = null
   db.claimId = null
-  db.render = { calls: 0, fail: false }
+  db.render = { calls: 0, fail: false, composites: [], failWith: null }
+  db.composite = { calls: [], fail: false }
   db.uploads = []
   db.deletes = []
   db.currentRevisionNumber = null
@@ -1829,5 +1846,150 @@ describe('027 post-style stamp: every revision writer carries it', () => {
     expect(revisionStampFields(stamp).postStyle).toEqual(STYLE_STAMP)
     expect(draftStampFields(stamp).postStyle).toEqual(STYLE_STAMP)
     expect(postStyleColumn(null)).toBe(Prisma.DbNull)
+  })
+})
+
+// 025 T9 (FR-16, NFR-05, NFR-08): the stamp decides the screenshot on every
+// re-render. The stored document is canonical for the stamp, the render gets the
+// stamp's composite argument, and a failed placement writes nothing.
+describe('025 composite stamp: every re-render writer places the screenshot from the stamp', () => {
+  const RECT = { x: 17, y: 44, w: 72, h: 45 }
+  const DEVICE_STAMP = {
+    requestedArchetype: 'device-screen',
+    appliedArchetype: 'device-screen',
+    contractVersion: 1,
+    imageQuality: 'default' as const,
+    composites: [{ region: 0 as const, rect: RECT, source: { kind: 'brief-upload' as const, key: 'screenshots/team-1/u1/a.png' } }],
+  }
+  const BASE = '<!doctype html><html><body><p>Hello</p></body></html>'
+  const CANVAS = { width: 1080, height: 1080 }
+
+  it('a commit stores the canonical element and renders with the stamp’s composite (rect from the stamp)', async () => {
+    db.rows = [committed('d1', 1)]
+    const { insertComposite } = await import('@/lib/composite/insert')
+    const { revisionId } = await commitDraftRevision({
+      draftId: 'd1', instruction: 'x', html: BASE, width: 1080, height: 1080,
+      composition: DEVICE_STAMP, postStyle: null,
+    })
+    const expected = insertComposite(BASE, RECT, CANVAS)
+    expect(db.rows.find((r) => r.id === revisionId)!.htmlSnapshot).toBe(expected)
+    expect(db.draftUpdates.at(-1)!.data.htmlContent).toBe(expected)
+    expect(expected).toContain('__COMPOSITE_0__')
+    expect(db.composite.calls).toHaveLength(1)
+    expect(db.composite.calls[0]).toMatchObject({ teamId: 'team-1', canvas: CANVAS })
+    expect(db.render.composites).toHaveLength(1)
+    expect(db.render.composites[0]).toMatchObject({ token: '__COMPOSITE_0__' })
+  })
+
+  it('an editor document that lost or moved the element is stored with the canonical one restored', async () => {
+    db.rows = [committed('d1', 1)]
+    const { insertComposite } = await import('@/lib/composite/insert')
+    const moved = insertComposite(BASE, { x: 1, y: 1, w: 10, h: 6 }, CANVAS).replace('__COMPOSITE_0__', '/api/briefs/screenshots?key=k&draftId=d1')
+    for (const html of [BASE, moved]) {
+      const { revisionId } = await commitDraftRevision({
+        draftId: 'd1', instruction: 'x', html, width: 1080, height: 1080,
+        composition: DEVICE_STAMP, postStyle: null,
+      })
+      expect(db.rows.find((r) => r.id === revisionId)!.htmlSnapshot).toBe(insertComposite(BASE, RECT, CANVAS))
+    }
+  })
+
+  it('a classic stamp stores no composite element (a stray one is removed) and renders with null', async () => {
+    db.rows = [committed('d1', 1)]
+    const { insertComposite } = await import('@/lib/composite/insert')
+    const stray = insertComposite(BASE, RECT, CANVAS)
+    const { revisionId } = await commitDraftRevision({
+      draftId: 'd1', instruction: 'x', html: stray, width: 1080, height: 1080,
+      composition: FALLBACK_STAMP, postStyle: null,
+    })
+    expect(db.rows.find((r) => r.id === revisionId)!.htmlSnapshot).toBe(BASE)
+    expect(db.render.composites).toEqual([null])
+    expect(db.composite.calls).toEqual([])
+  })
+
+  it('a failed placement (unreadable screenshot) fails with the named error, writes nothing and uploads nothing', async () => {
+    db.rows = [committed('d1', 1)]
+    db.composite.fail = true
+    await expect(
+      commitDraftRevision({
+        draftId: 'd1', instruction: 'x', html: BASE, width: 1080, height: 1080,
+        composition: DEVICE_STAMP, postStyle: null,
+      }),
+    ).rejects.toMatchObject({
+      name: 'CompositePlacementError',
+      message: 'The product screenshot could not be placed; nothing was changed',
+    })
+    expect(db.rows).toHaveLength(1)
+    expect(db.draftUpdates).toEqual([])
+    expect(db.uploads).toEqual([])
+    expect(db.render.calls).toBe(0)
+  })
+
+  it('a failed composite check in the renderer is the same error, with nothing written or uploaded', async () => {
+    db.rows = [committed('d1', 1)]
+    const { CompositeRenderError } = await import('@/lib/composite/render')
+    db.render.failWith = new CompositeRenderError('composite-not-rendered', 'covered')
+    await expect(
+      commitDraftRevision({
+        draftId: 'd1', instruction: 'x', html: BASE, width: 1080, height: 1080,
+        composition: DEVICE_STAMP, postStyle: null,
+      }),
+    ).rejects.toMatchObject({ message: 'The product screenshot could not be placed; nothing was changed' })
+    expect(db.rows).toHaveLength(1)
+    expect(db.draftUpdates).toEqual([])
+    expect(db.uploads).toEqual([])
+  })
+
+  it('a render error that is not a composite failure passes through unchanged', async () => {
+    db.rows = [committed('d1', 1)]
+    db.render.fail = true
+    await expect(
+      commitDraftRevision({
+        draftId: 'd1', instruction: 'x', html: BASE, width: 1080, height: 1080,
+        composition: DEVICE_STAMP, postStyle: null,
+      }),
+    ).rejects.toThrow('Chromium crashed')
+  })
+
+  it('a stamp that is kept by a classic fallback (refine replaced the image) has no element', async () => {
+    db.rows = [committed('d1', 1)]
+    const { refineReplacedStamp, compositionStampSchema } = await import('@/lib/designData')
+    const replaced = refineReplacedStamp(compositionStampSchema.parse(DEVICE_STAMP))
+    expect(replaced.fallbackReason).toBe('refine-replaced-image')
+    expect(replaced.composites).toBeUndefined()
+    const { insertComposite } = await import('@/lib/composite/insert')
+    const { revisionId } = await commitDraftRevision({
+      draftId: 'd1', instruction: 'new background', html: insertComposite(BASE, RECT, CANVAS), width: 1080, height: 1080,
+      composition: replaced, postStyle: null,
+    })
+    expect(db.rows.find((r) => r.id === revisionId)!.htmlSnapshot).not.toContain('data-composite')
+  })
+
+  it('a rejected render is stored canonical and rendered with the stamp’s composite', async () => {
+    db.rows = [committed('d1', 1)]
+    const { insertComposite } = await import('@/lib/composite/insert')
+    const { revisionId } = await recordHeld(rejectArgs({ html: BASE, composition: DEVICE_STAMP }))
+    expect(db.rows.find((r) => r.id === revisionId)!.htmlSnapshot).toBe(insertComposite(BASE, RECT, { width: 1080, height: 1350 }))
+    expect(db.render.composites[0]).toMatchObject({ token: '__COMPOSITE_0__' })
+  })
+
+  it('a rejected render whose placement fails is recorded without an export, as for any render failure', async () => {
+    db.rows = [committed('d1', 1)]
+    db.composite.fail = true
+    const { exportKey } = await recordHeld(rejectArgs({ html: BASE, composition: DEVICE_STAMP }))
+    expect(exportKey).toBeNull()
+    expect(db.uploads).toEqual([])
+  })
+
+  it('NFR-05: a document that holds a screenshot URL is refused, never stored', async () => {
+    db.rows = [committed('d1', 1)]
+    const leak = '<html><body><img src="https://minio.test/docs/screenshots/team-1/u1/a.png"></body></html>'
+    await expect(
+      commitDraftRevision({
+        draftId: 'd1', instruction: 'x', html: leak, width: 1080, height: 1080,
+        composition: null, postStyle: null,
+      }),
+    ).rejects.toThrow(/screenshot URL/)
+    expect(db.draftUpdates).toEqual([])
   })
 })

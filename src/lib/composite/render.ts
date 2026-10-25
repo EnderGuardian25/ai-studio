@@ -31,3 +31,17 @@ export class CompositeRenderError extends Error {
     this.reason = reason
   }
 }
+
+// 025 FR-16: the one error text a refine, override, inline edit, restore or
+// export shows when the screenshot could not be placed. Nothing was written.
+export const COMPOSITE_PLACEMENT_ERROR = 'The product screenshot could not be placed; nothing was changed'
+
+export class CompositePlacementError extends Error {
+  // The render failure that caused it (a CompositeRenderError).
+  readonly detail: string
+  constructor(cause?: unknown) {
+    super(COMPOSITE_PLACEMENT_ERROR)
+    this.name = 'CompositePlacementError'
+    this.detail = cause instanceof Error ? cause.message : cause ? String(cause) : ''
+  }
+}

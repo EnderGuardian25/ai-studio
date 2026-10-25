@@ -36,7 +36,7 @@ export interface RefinePromptOptions {
   backgroundImageUrl?: string | null
   // The draft's stamped hero contract (009): the version it was made under, at
   // its size. Absent for a classic draft: the prompt is unchanged.
-  compositionContract?: { label: string; version: number; size: SizeContract }
+  compositionContract?: { label: string; version: number; size: SizeContract; canvas?: { width: number; height: number } }
   // 027 FR-09: the image-scope rules of the draft's STAMPED post style, at the
   // stamped version (a version is immutable). Absent: the prompt is unchanged.
   imageRules?: string

@@ -22,12 +22,11 @@ import {
   type HeroPlan,
   type Rect,
   type Region,
-  type SizeContract,
 } from '@/lib/designData'
 import { observeLayout, type LayoutObservation } from '@/lib/renderer/layoutFacts'
 import { MOCK_PUPPETEER, mockLayoutBoxes } from '@/lib/testHooks'
 import { compositeRenderForSource } from '@/lib/composite/assets'
-import { insertComposite } from '@/lib/composite/insert'
+import { insertComposite, withDetectedScreen } from '@/lib/composite/insert'
 import { CompositeRenderError, type CompositeRender } from '@/lib/composite/render'
 import { parseCompositeSource } from '@/lib/brief/compositeSource'
 import { deleteObject, BUCKET_EXPORTS } from '@/lib/storage/minio'
@@ -80,12 +79,6 @@ async function observeKeptLayout(
     excludeUrls: backgroundImageUrl ? [backgroundImageUrl] : [],
     composites,
   })
-}
-
-// The contract's size with its composite region moved to the screen the check
-// found (025 A1), so the design prompt names the rect the screenshot will fill.
-function withDetectedScreen(size: SizeContract, rect: Rect): SizeContract {
-  return { ...size, regions: size.regions.map((r) => (r.purpose === 'composite' ? { ...r, rect } : r)) }
 }
 
 // Runs the Path B (freeform) design pipeline for a given brief + its on-image

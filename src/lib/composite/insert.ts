@@ -2,7 +2,8 @@
 // design. `insertComposite` writes one canonical element at the given rect (the
 // screen the detector found, in canvas percent) and `stripComposite` removes
 // it. The stored HTML carries only the token. Pure and string-level.
-import type { Rect } from '@/lib/designData/composition'
+import type { Rect, SizeContract } from '@/lib/designData/composition'
+import type { CompositionStamp } from '@/lib/designData/stamp'
 import { COMPOSITE_TOKEN, type CompositeRectPx } from './render'
 
 export { COMPOSITE_TOKEN }
@@ -96,4 +97,34 @@ export function compositeHtmlProblems(html: string, rectPx: CompositeRectPx): st
   const tokens = countOf(html, COMPOSITE_TOKEN)
   if (tokens !== 1) problems.push(`expected one ${COMPOSITE_TOKEN} token, found ${tokens}`)
   return problems
+}
+
+// The contract's size with its composite region moved to the screen the check
+// found (A1), so a prompt names the rect the screenshot fills.
+export function withDetectedScreen(size: SizeContract, rect: Rect): SizeContract {
+  return { ...size, regions: size.regions.map((r) => (r.purpose === 'composite' ? { ...r, rect } : r)) }
+}
+
+// NFR-05: a stored document never holds a URL to a screenshot, only the token.
+// Matches the app's preview route and any http(s) URL with a screenshots/ path.
+const SCREENSHOT_URL_RE = /\/api\/briefs\/screenshots|https?:\/\/[^\s"'<>]*\/screenshots\//i
+
+export function hasScreenshotUrl(html: string): boolean {
+  return SCREENSHOT_URL_RE.test(html)
+}
+
+// The document a writer stores for a draft with this stamp (FR-16): the one
+// canonical composite element at the stamped rect for a composite stamp, no
+// composite element at all otherwise. Idempotent; nothing re-detects. Throws
+// when the result would carry a screenshot URL (a writer bug, never user input
+// that can be silently dropped).
+export function canonicalCompositeHtml(
+  html: string,
+  stamp: CompositionStamp | null | undefined,
+  canvas: { width: number; height: number },
+): string {
+  const rect = stamp?.composites?.[0]?.rect
+  const out = rect ? insertComposite(html, rect, canvas) : stripComposite(html)
+  if (hasScreenshotUrl(out)) throw new Error('refusing to store a document that holds a screenshot URL (NFR-05)')
+  return out
 }

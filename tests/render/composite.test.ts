@@ -14,6 +14,8 @@ import { compositeRectPx, insertComposite } from "@/lib/composite/insert"
 import { COMPOSITE_TOKEN, CompositeRenderError, type CompositeRender } from "@/lib/composite/render"
 import { ASPECT_DIMENSIONS } from "@/lib/aspectRatio"
 import { archetypes, compositeRegionOf, type Rect } from "@/lib/designData"
+import { measureLayoutBoxes } from "@/lib/renderer/layoutFacts"
+import { extractDomFacts } from "@/lib/renderer/domFacts"
 import { encodePng, toDataUrl } from "./heroFixtures"
 import { decodePng } from "../../scripts/glyph-check/glyphCoverage.mjs"
 
@@ -242,5 +244,37 @@ describe("the cost of a 10 MB screenshot (NFR-07)", () => {
     )
     expect(png.length).toBeGreaterThan(9.5 * 1024 * 1024)
     expect(loadMs).toBeLessThan(30_000)
+  })
+})
+
+describe("the placed screenshot is not measured (FR-16)", () => {
+  const size: Size = "SQUARE"
+  const canvas = ASPECT_DIMENSIONS[size]
+  const rect = DETECTED[size]
+  const page = () =>
+    insertComposite(
+      `<!doctype html><html><body style="margin:0;width:${canvas.width}px;height:${canvas.height}px"><p style="margin:0;font:40px sans-serif">Headline</p></body></html>`,
+      rect,
+      canvas,
+    )
+
+  it("layout observation measures the text but not the composite element, even if its source is named a logo", async () => {
+    const composites = renderArg(testPattern(), rect, size)
+    const boxes = await measureLayoutBoxes(page(), {
+      width: canvas.width,
+      height: canvas.height,
+      // The render copy's img src is this data URI: without the exclusion it would be a measured logo.
+      logoUrls: [composites.dataUri],
+      composites,
+    })
+    expect(boxes).toHaveLength(1) // the headline only
+    expect(boxes[0].y).toBeLessThan(10)
+  })
+
+  it("DOM facts leave the element and its data: URI out", async () => {
+    const composites = renderArg(testPattern(), rect, size)
+    const facts = await extractDomFacts(page(), { width: canvas.width, height: canvas.height, composites })
+    expect(facts.imageSources).toEqual([])
+    expect(facts.elements.some((e) => e.imageSources.length > 0)).toBe(false)
   })
 })

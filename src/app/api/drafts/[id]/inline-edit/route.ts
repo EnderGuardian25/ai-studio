@@ -6,6 +6,7 @@ import { canAccessContent } from '@/lib/authz/visibility'
 import { dimensionsFor } from '@/lib/aspectRatio'
 import { resolveExportUrl } from '@/lib/storage/minio'
 import { track } from '@/lib/analytics/track'
+import { CompositePlacementError } from '@/lib/composite/render'
 import { commitDraftRevision, draftCompositionStamp, draftModelStamp, draftPostStyleStamp, RevisionConflictError } from '@/lib/drafts/revisions'
 import {
   sanitizeInlineHtml,
@@ -15,6 +16,11 @@ import {
   checkElementBaseRevision,
   elementCommitConflict,
 } from '@/lib/drafts/inlineEdit'
+
+// 025 FR-16: the screenshot could not be placed; nothing was written.
+function compositeNotPlaced(err: CompositePlacementError) {
+  return NextResponse.json({ error: err.message, code: 'composite-not-placed' }, { status: 422 })
+}
 
 // Permissive schema + manual check so the error message stays stable.
 const bodySchema = z.object({}).passthrough()
@@ -73,19 +79,28 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
   const { width, height } = dimensionsFor(draft.brief.aspectRatio)
   const clean = sanitizeInlineHtml(html)
 
-  const { revisionId, exportKey } = await commitDraftRevision({
-    draftId: draft.id,
-    instruction: 'Manual inline edit',
-    html: clean,
-    width,
-    height,
-    // 008 A6: hand-edited HTML is still the current model's output.
-    model: draftModelStamp(draft),
-    // 009: the HTML is still the render its composition stamp describes.
-    composition: draftCompositionStamp(draft),
-    // 027: an edit keeps the rules the draft was made under.
-    postStyle: draftPostStyleStamp(draft),
-  })
+  let committed: Awaited<ReturnType<typeof commitDraftRevision>>
+  try {
+    committed = await commitDraftRevision({
+      draftId: draft.id,
+      instruction: 'Manual inline edit',
+      // 025 FR-16: commitDraftRevision stores the document with the canonical
+      // composite element for the stamp, whatever the editor sent.
+      html: clean,
+      width,
+      height,
+      // 008 A6: hand-edited HTML is still the current model's output.
+      model: draftModelStamp(draft),
+      // 009: the HTML is still the render its composition stamp describes.
+      composition: draftCompositionStamp(draft),
+      // 027: an edit keeps the rules the draft was made under.
+      postStyle: draftPostStyleStamp(draft),
+    })
+  } catch (err) {
+    if (err instanceof CompositePlacementError) return compositeNotPlaced(err)
+    throw err
+  }
+  const { revisionId, exportKey } = committed
   await track('revision.edited', {
     source: 'web',
     teamId: user.teamId,
@@ -206,6 +221,7 @@ async function handleElementEdit(raw: unknown, draftId: string, user: TeamAuthed
       postStyle: draftPostStyleStamp(draft),
     })
   } catch (err) {
+    if (err instanceof CompositePlacementError) return compositeNotPlaced(err)
     if (err instanceof RevisionConflictError) {
       const conflict = elementCommitConflict(err.pendingAction)
       return NextResponse.json({ error: conflict.error, code: conflict.code }, { status: conflict.status })

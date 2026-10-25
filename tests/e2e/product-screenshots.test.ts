@@ -1,12 +1,12 @@
 import { test, expect, type APIRequestContext } from '@playwright/test'
-import { loginAs, waitForDraft } from '../helpers/api'
+import { loginAs, waitForAction, waitForDraft } from '../helpers/api'
 import { ADMIN_EMAIL, ADMIN_PASSWORD } from '../helpers/ui'
 import { prisma, dbAvailable, NO_DB_MSG } from '../helpers/db'
 import { DOCS_BUCKET, objectExists, removeObject } from '../helpers/minio'
 import { GIF_BYTES, SVG_AS_PNG, makePng } from '../helpers/images'
 
 // §AG: product screenshots (change 025). TC-SHOT-01 (T2), TC-SHOT-02 to 06, 14 (T7) and
-// TC-SHOT-07 to 09 (T8); the rest of the suite arrives with T9 and T10. Same MOCK_AI + MOCK_PUPPETEER seams as §AF.
+// TC-SHOT-07 to 09 (T8) and TC-SHOT-10 to 12 (T9); the rest of the suite arrives with T10. Same MOCK_AI + MOCK_PUPPETEER seams as §AF.
 // The request runs in its OWN fresh team, disposed afterwards, so it does not
 // depend on the seeded team's providers.
 
@@ -396,6 +396,120 @@ test.describe('§AG product screenshots: generation (T8)', () => {
       // The image is reused under classic (Phase 1), so it is stored on the draft.
       expect(draft.imageUrl).toBeTruthy()
       expect(draft.htmlContent).not.toContain('data-composite')
+      await removeObject(DOCS_BUCKET, up.key)
+    })
+  })
+})
+
+// ── T9: refine, inline edit and a failed placement ───────────────────────────
+// Every action re-renders from the STAMP: the element and the composites entry
+// (with its rect) survive, and the stored documents hold only the token.
+
+const COMPOSITE_ELEMENT_RE = /<div data-composite="0"[\s\S]*?<\/div>/
+const PLACEMENT_ERROR = 'The product screenshot could not be placed; nothing was changed'
+
+type ActionDraft = ShotDraft & { currentRevisionNumber: number | null; pendingActionError: string | null }
+
+async function refineShot(t: Fresh, draftId: string, instruction: string): Promise<ActionDraft> {
+  // The response listener rule does not apply (API calls): the claim happens before the 202.
+  const res = await t.api.post(`/api/drafts/${draftId}/refine`, { instruction })
+  expect(res.status()).toBe(202)
+  return (await waitForAction(t.api, draftId)) as ActionDraft
+}
+
+async function getShot(t: Fresh, draftId: string): Promise<ActionDraft> {
+  return (await (await t.api.get(`/api/drafts/${draftId}`)).json()) as ActionDraft
+}
+
+async function expectOnlyTheToken(draftId: string, html: string) {
+  expect(html).toContain('__COMPOSITE_0__')
+  expect(html).not.toContain('screenshots/')
+  expect(html).not.toMatch(/data:image\//)
+  if (dbAvailable && prisma) {
+    const rows = await prisma.draftRevision.findMany({ where: { draftId }, select: { htmlSnapshot: true } })
+    expect(rows.length).toBeGreaterThan(0)
+    for (const r of rows) {
+      expect(r.htmlSnapshot).toContain('__COMPOSITE_0__')
+      expect(r.htmlSnapshot).not.toContain('screenshots/')
+    }
+  }
+}
+
+test.describe('§AG product screenshots: re-renders (T9)', () => {
+  test('TC-SHOT-10: a refine keeps the canonical element and the composites entry with its rect', async ({ request }) => {
+    await withFreshTeam(request, async (t) => {
+      await addImageProvider(t.api)
+      const { draft, up } = await generateDeviceScreen(t, `Shot refine __MOCK_BG__ __MOCK_HERO_SCREEN_OFFSET__ ${Date.now()}`)
+      const before = draft.composition!.composites![0]
+      const element = draft.htmlContent.match(COMPOSITE_ELEMENT_RE)![0]
+
+      const after = await refineShot(t, draft.id, 'Make the headline bigger __MOCK_BG_NOT_NEEDED__ __VERIFY_PASS__')
+      expect(after.pendingActionError).toBeNull()
+      expect(after.currentRevisionNumber).toBe((draft.currentRevisionNumber as number) + 1)
+      expect(after.composition!.appliedArchetype).toBe('device-screen')
+      expect(after.composition!.composites).toEqual([before])
+      // The model never wrote the element; the writer put the one canonical element back.
+      expect(after.htmlContent.match(/data-composite="0"/g)).toHaveLength(1)
+      expect(after.htmlContent.match(COMPOSITE_ELEMENT_RE)![0]).toBe(element)
+      await expectOnlyTheToken(draft.id, after.htmlContent)
+      await removeObject(DOCS_BUCKET, up.key)
+    })
+  })
+
+  test('TC-SHOT-11: an inline edit that deletes or moves the element is saved with the canonical element restored', async ({ request }) => {
+    await withFreshTeam(request, async (t) => {
+      await addImageProvider(t.api)
+      const { draft, up } = await generateDeviceScreen(t, `Shot inline __MOCK_BG__ __MOCK_HERO_SCREEN_OFFSET__ ${Date.now()}`)
+      const element = draft.htmlContent.match(COMPOSITE_ELEMENT_RE)![0]
+      const rect = draft.composition!.composites![0].rect
+
+      // Deleted: the editor sends the document without it.
+      const deleted = draft.htmlContent.replace(COMPOSITE_ELEMENT_RE, '').replace('MOCK DESIGN', 'MOCK EDITED')
+      expect(deleted).not.toContain('data-composite')
+      const r1 = await t.api.post(`/api/drafts/${draft.id}/inline-edit`, { html: deleted })
+      expect(r1.status(), await r1.text()).toBe(200)
+      const d1 = await getShot(t, draft.id)
+      expect(d1.htmlContent).toContain('MOCK EDITED')
+      expect(d1.htmlContent.match(/data-composite="0"/g)).toHaveLength(1)
+      expect(d1.htmlContent.match(COMPOSITE_ELEMENT_RE)![0]).toBe(element)
+      expect(d1.composition!.composites![0].rect).toEqual(rect)
+
+      // Moved: the editor sends it at another place, showing the preview URL.
+      const moved = d1.htmlContent
+        .replace(/left:[\d.]+px/, 'left:5px')
+        .replace('__COMPOSITE_0__', `/api/briefs/screenshots?key=${encodeURIComponent(up.key)}&draftId=${draft.id}`)
+      const r2 = await t.api.post(`/api/drafts/${draft.id}/inline-edit`, { html: moved })
+      expect(r2.status(), await r2.text()).toBe(200)
+      const d2 = await getShot(t, draft.id)
+      expect(d2.htmlContent.match(COMPOSITE_ELEMENT_RE)![0]).toBe(element)
+      expect(d2.currentRevisionNumber).toBe((d1.currentRevisionNumber as number) + 1)
+      await expectOnlyTheToken(draft.id, d2.htmlContent)
+      await removeObject(DOCS_BUCKET, up.key)
+    })
+  })
+
+  test('TC-SHOT-12: a failed placement fails the refine with the named error and writes no revision; a refine that replaces the image drops the composite', async ({ request }) => {
+    await withFreshTeam(request, async (t) => {
+      await addImageProvider(t.api)
+      const { draft, up } = await generateDeviceScreen(t, `Shot fail __MOCK_BG__ __MOCK_HERO_SCREEN_OFFSET__ ${Date.now()}`)
+
+      const failed = await refineShot(t, draft.id, 'Make the headline bigger __MOCK_BG_NOT_NEEDED__ __VERIFY_PASS__ __MOCK_COMPOSITE_FAIL__')
+      expect(failed.pendingActionError).toBe(PLACEMENT_ERROR)
+      expect(failed.currentRevisionNumber).toBe(draft.currentRevisionNumber)
+      expect(failed.htmlContent).toBe(draft.htmlContent)
+      expect(failed.composition).toEqual(draft.composition)
+      if (dbAvailable && prisma) {
+        expect(await prisma.draftRevision.count({ where: { draftId: draft.id } })).toBe(1)
+      }
+
+      // A refine that replaces the image: classic, refine-replaced-image, no element.
+      const replaced = await refineShot(t, draft.id, 'Put a city skyline behind it __MOCK_BG__ __VERIFY_PASS__')
+      expect(replaced.pendingActionError).toBeNull()
+      expect(replaced.composition).toMatchObject({ appliedArchetype: 'classic', fallbackReason: 'refine-replaced-image' })
+      expect(replaced.composition).not.toHaveProperty('composites')
+      expect(replaced.htmlContent).not.toContain('data-composite')
+      expect(replaced.htmlContent).not.toContain('__COMPOSITE_0__')
+      expect(replaced.compositionNotice).toMatchObject({ reason: 'refine-replaced-image' })
       await removeObject(DOCS_BUCKET, up.key)
     })
   })

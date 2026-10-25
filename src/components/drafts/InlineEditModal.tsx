@@ -11,6 +11,7 @@ import { apiFetch } from '@/lib/apiFetch'
 import { stripEditingChrome, inlineEditBlockReason, type ElementEditKind } from '@/lib/drafts/inlineEdit'
 import { asciiLower } from '@/lib/drafts/htmlLocator'
 import { dimensionsFor } from '@/lib/aspectRatio'
+import { COMPOSITE_EDITOR_CSS, editorSrcDoc } from '@/lib/composite/editor'
 import type { DraftDetail } from '@/lib/api-types'
 import type { AspectRatio } from '@prisma/client'
 import {
@@ -40,6 +41,10 @@ interface InlineEditModalProps {
   html: string
   baseRevisionNumber: number | null
   aspectRatio: AspectRatio
+  // 025: the key of the draft's stamped product screenshot (null for none). The
+  // editor shows it from the preview route; it is never editable and is never
+  // saved from here (the server puts the canonical element back).
+  compositeKey?: string | null
   onSaved: () => void
 }
 
@@ -78,6 +83,7 @@ const EDITOR_STYLE = `
   [data-inline-edit-chrome="img-wrap"] .inline-replace-btn{
     position:absolute;top:6px;left:6px;z-index:2;font:600 12px system-ui;
     background:rgba(0,0,0,.6);color:#fff;border:0;border-radius:6px;padding:4px 8px;cursor:pointer}
+  ${COMPOSITE_EDITOR_CSS}
 `
 
 // Single-element mode injects nothing into <body>: no contenteditable, no
@@ -85,7 +91,8 @@ const EDITOR_STYLE = `
 // HTML, and the path and fingerprint describe exactly what the server resolves.
 // The only addition is this cursor rule in <head>, which is outside every
 // path. The highlight is drawn by the parent, over the iframe.
-const SELECT_STYLE = '*{cursor:pointer !important}'
+// The placed product screenshot (025) is labelled and cannot be selected.
+const SELECT_STYLE = `*{cursor:pointer !important}${COMPOSITE_EDITOR_CSS}[data-composite]{pointer-events:none !important}`
 
 export function InlineEditModal({
   open,
@@ -94,6 +101,7 @@ export function InlineEditModal({
   html,
   baseRevisionNumber,
   aspectRatio,
+  compositeKey: initialCompositeKey = null,
   onSaved,
 }: InlineEditModalProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null)
@@ -106,6 +114,8 @@ export function InlineEditModal({
   const [loaded, setLoaded] = useState<LoadedDoc>(() => ({ html, revisionNumber: baseRevisionNumber, seq: 0 }))
   // Unsaved whole-document typing. Switching mode reloads the saved design.
   const [dirty, setDirty] = useState(false)
+  // 025: the stamped screenshot key, refreshed with every own read of the draft.
+  const [compositeKey, setCompositeKey] = useState<string | null>(initialCompositeKey)
 
   // Single-element mode.
   const [selection, setSelection] = useState<ElementSelection | null>(null)
@@ -192,6 +202,11 @@ export function InlineEditModal({
     // guarantees ALL text on the page is editable.
     doc.body?.querySelectorAll<HTMLElement>('*').forEach((el) => {
       if (['SCRIPT', 'STYLE', 'IMG'].includes(el.tagName)) return
+      // 025: the placed product screenshot is not editable.
+      if (el.hasAttribute('data-composite')) {
+        el.setAttribute('contenteditable', 'false')
+        return
+      }
       const hasDirectText = Array.from(el.childNodes).some(
         (n) => n.nodeType === Node.TEXT_NODE && (n.textContent ?? '').trim() !== '',
       )
@@ -217,6 +232,7 @@ export function InlineEditModal({
     // the button and image can't be caret-edited or accidentally typed into.
     doc.body?.querySelectorAll('img').forEach((img) => {
       if (img.parentElement?.getAttribute('data-inline-edit-chrome') === 'img-wrap') return
+      if (img.closest('[data-composite]')) return // 025: no Replace photo on the screenshot
       const wrap = doc.createElement('span')
       wrap.setAttribute('data-inline-edit-chrome', 'img-wrap')
       wrap.setAttribute('contenteditable', 'false')
@@ -402,6 +418,7 @@ export function InlineEditModal({
         return failClosed()
       }
       const next = { html: d.htmlContent, revisionNumber: d.currentRevisionNumber }
+      setCompositeKey(d.composition?.composites?.[0]?.source.key ?? null)
       setSelection(null)
       setHoverEl(null)
       setLoaded((prev) => ({ ...next, seq: prev.seq + 1 }))
@@ -638,7 +655,7 @@ export function InlineEditModal({
                 onLoad={onIframeLoad}
                 title="Inline editor"
                 sandbox="allow-same-origin"
-                srcDoc={loaded.html}
+                srcDoc={editorSrcDoc(loaded.html, draftId, compositeKey)}
                 style={{
                   width,
                   height,

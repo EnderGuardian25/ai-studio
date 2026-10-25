@@ -730,6 +730,7 @@ export default function DraftDetailPage() {
           html={draft.htmlContent}
           baseRevisionNumber={draft.currentRevisionNumber}
           aspectRatio={draft.brief.aspectRatio}
+          compositeKey={draft.composition?.composites?.[0]?.source.key ?? null}
           onSaved={refreshAfterChange}
         />
       )}

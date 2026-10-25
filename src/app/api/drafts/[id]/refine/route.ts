@@ -28,6 +28,8 @@ import { claimDraftAction, startDraftAction, touchDraftAction } from '@/lib/draf
 import { runRefineAttempts, settleRefine, summariseAttempt } from '@/lib/drafts/refineAttempt'
 import { VERIFIER_PROMPT_VERSION, verifyRefine } from '@/lib/drafts/refineVerify'
 import { extractDomFacts } from '@/lib/renderer/domFacts'
+import { stripComposite, withDetectedScreen } from '@/lib/composite/insert'
+import { CompositePlacementError } from '@/lib/composite/render'
 
 interface PendingConflict {
   conflictId: string
@@ -148,8 +150,10 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
   // Externalize inline data: assets in the current HTML before the model sees it,
   // so refining an asset-heavy draft (e.g. Hearts Talk, 1.81 MB) stays within the
   // CLI prompt guard and the API context. Restored before render.
+  // 025 FR-16: the model never sees the screenshot element; code puts the
+  // canonical one back at the stamped rect when the revision is committed.
   const { html: slimHtml, assets: inlineAssets } = extractInlineAssets(
-    draft.htmlContent ?? ''
+    stripComposite(draft.htmlContent ?? '')
   )
   const hasInlineAssets = Object.keys(inlineAssets).length > 0
 
@@ -209,14 +213,18 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
     // was made under (versions are immutable). Classic, null and an unresolvable
     // stamp pass nothing: the prompt is then byte-identical to before.
     const prevStamp = draftCompositionStamp(draft)
-    let compositionContract: { label: string; version: number; size: SizeContract } | undefined
+    let compositionContract: { label: string; version: number; size: SizeContract; canvas?: { width: number; height: number } } | undefined
     if (prevStamp && prevStamp.appliedArchetype !== 'classic' && prevStamp.contractVersion !== null) {
       const size = contractAt(prevStamp.appliedArchetype, prevStamp.contractVersion, draft.brief.aspectRatio)
       if (size) {
+        // 025 A1: a composite draft's prompt names the stamped screen rect (the
+        // one the screenshot fills), not the contract's target region.
+        const screen = prevStamp.composites?.[0]?.rect
         compositionContract = {
           label: styleLabel(prevStamp.appliedArchetype),
           version: prevStamp.contractVersion,
-          size,
+          size: screen ? withDetectedScreen(size, screen) : size,
+          canvas: { width, height },
         }
       } else {
         console.warn(
@@ -251,6 +259,8 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
     // The before document is the same on both attempts, so its facts are
     // extracted once — started now, overlapping the first refine call. Never
     // rejects: on failure verifyRefine extracts (and fails closed) itself.
+    // (025: slimHtml has the screenshot element stripped, so it renders with no
+    // composite argument; the before and after documents are compared like for like.)
     const beforeFacts = extractDomFacts(slimHtml, { width, height, inlineAssets }).catch(() => undefined)
 
     const result = await runRefineAttempts<ConflictMarker>(
@@ -422,16 +432,26 @@ async function commitRevision(
   postStyle: PostStyleStamp | null,
   who: { teamId: string; userId: string },
 ) {
-  const { revisionId, exportKey } = await commitDraftRevision({
-    draftId,
-    instruction,
-    html: newHtml,
-    width,
-    height,
-    model,
-    composition,
-    postStyle,
-  })
+  let committed: Awaited<ReturnType<typeof commitDraftRevision>>
+  try {
+    committed = await commitDraftRevision({
+      draftId,
+      instruction,
+      html: newHtml,
+      width,
+      height,
+      model,
+      composition,
+      postStyle,
+    })
+  } catch (err) {
+    // 025 FR-16: the screenshot could not be placed; nothing was written.
+    if (err instanceof CompositePlacementError) {
+      return NextResponse.json({ error: err.message, code: 'composite-not-placed' }, { status: 422 })
+    }
+    throw err
+  }
+  const { revisionId, exportKey } = committed
   // 006 FR-06: the override is a revision with its own event, after the write.
   await track('revision.override', { source: 'web', teamId: who.teamId, userId: who.userId, draftId, outcome: 'ok', payload: {} })
 
