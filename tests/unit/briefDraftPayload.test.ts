@@ -168,3 +168,37 @@ describe('briefDraftPayloadSchema: post style (027)', () => {
     expect(briefDraftPayloadSchema.safeParse({ ...base, postStyle: 'x'.repeat(41) }).success).toBe(false)
   })
 })
+
+describe('briefDraftPayloadSchema: product screenshot (025 FR-11)', () => {
+  const source = { kind: 'brief-upload' as const, key: 'screenshots/t1/u1/1-abc.png', width: 1280, height: 800 }
+
+  it('round-trips compositeSource through JSON', () => {
+    const picked: BriefDraftPayload = { ...base, imageStyle: 'device-screen', compositeSource: source }
+    const parsed = briefDraftPayloadSchema.safeParse(JSON.parse(JSON.stringify(picked)))
+    expect(parsed.success && parsed.data).toStrictEqual(picked)
+  })
+
+  it('an old row with no screenshot parses and has no compositeSource', () => {
+    const parsed = briefDraftPayloadSchema.safeParse(base)
+    expect(parsed.success && 'compositeSource' in parsed.data).toBe(false)
+  })
+
+  it('refuses a traversal key, a key outside screenshots/, a deeper key and a URL', () => {
+    for (const key of [
+      'screenshots/t1/../u2/x.png',
+      'screenshots/t1/u1/../../x.png',
+      'briefs/u1/x.png',
+      'screenshots/t1/u1/a/b.png',
+      'screenshots/t1/x.png',
+      'https://example.com/screenshots/t1/u1/x.png',
+    ]) {
+      expect(briefDraftPayloadSchema.safeParse({ ...base, compositeSource: { ...source, key } }).success, key).toBe(false)
+    }
+  })
+
+  it('refuses a wrong kind, an extra field and a bad size', () => {
+    expect(briefDraftPayloadSchema.safeParse({ ...base, compositeSource: { ...source, kind: 'url' } }).success).toBe(false)
+    expect(briefDraftPayloadSchema.safeParse({ ...base, compositeSource: { ...source, url: 'x' } }).success).toBe(false)
+    expect(briefDraftPayloadSchema.safeParse({ ...base, compositeSource: { ...source, width: 0 } }).success).toBe(false)
+  })
+})

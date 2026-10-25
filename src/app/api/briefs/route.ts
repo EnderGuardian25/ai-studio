@@ -2,12 +2,17 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { withTeamAuth, parseBody } from '@/lib/api/handler'
-import { isAllowedAssetUrl } from '@/lib/storage/minio'
+import { BUCKET_DOCS, headObject, isAllowedAssetUrl } from '@/lib/storage/minio'
 import { Prisma, DesignMode, type AspectRatio, type Channel } from '@prisma/client'
 import { isPublishableChannel, PUBLISHABLE_CHANNELS } from '@/lib/channels'
 import { isAspectRatio } from '@/lib/aspectRatio'
 import { validateImageStyle } from '@/lib/brief/imageStyle'
-import { compositePairingError } from '@/lib/brief/compositeSource'
+import {
+  compositePairingError,
+  compositeSourceSchema,
+  isOwnScreenshotKey,
+  type CompositeSource,
+} from '@/lib/brief/compositeSource'
 import { isCliMode } from '@/lib/agent/config'
 import { resolveBriefCopyKey } from '@/lib/brief/copyProvider'
 import { IMAGE_PROVIDERS } from '@/providers/imageCapabilities'
@@ -53,6 +58,7 @@ export const POST = withTeamAuth(async (req: NextRequest, _ctx, user) => {
     designModel?: unknown
     imageStyle?: unknown
     postStyle?: unknown
+    compositeSource?: unknown
     resumed?: unknown
   }
 
@@ -227,6 +233,21 @@ export const POST = withTeamAuth(async (req: NextRequest, _ctx, user) => {
     return NextResponse.json({ error: 'Brand kit not found' }, { status: 404 })
   }
 
+  // 025 FR-11: the product screenshot, when sent. The shape and the private key
+  // prefix are checked here; the object and the pairing rule after the style is
+  // resolved. A key under another team or user prefix is refused like any bad key.
+  let compositeSource: CompositeSource | null = null
+  if (body.compositeSource != null) {
+    const parsedSource = compositeSourceSchema.safeParse(body.compositeSource)
+    if (!parsedSource.success || !isOwnScreenshotKey(parsedSource.data.key, user.teamId, user.userId)) {
+      return NextResponse.json(
+        { error: 'compositeSource must be a screenshot you uploaded', code: 'INVALID_COMPOSITE_SOURCE' },
+        { status: 400 },
+      )
+    }
+    compositeSource = parsedSource.data
+  }
+
   // 027 FR-06: the one resolution of the post style (explicit key, else the
   // legacy goal, else the campaign default, else General). An unknown key is a
   // 400 and never degrades to "no style".
@@ -238,8 +259,8 @@ export const POST = withTeamAuth(async (req: NextRequest, _ctx, user) => {
     path: designMode === 'TEMPLATE' ? 'A' : 'B',
     aspectRatio: aspectRatio ?? 'SQUARE',
     surface: 'briefs-api',
-    // 025: this route does not accept a screenshot yet (T7 adds it).
-    hasCompositeSource: false,
+    // 025 FR-11: whether the brief carries a screenshot.
+    hasCompositeSource: compositeSource !== null,
   })
   if (!resolved.ok) {
     return NextResponse.json({ error: resolved.message, code: resolved.code }, { status: 400 })
@@ -248,10 +269,22 @@ export const POST = withTeamAuth(async (req: NextRequest, _ctx, user) => {
   // not checked here); an absent one comes from the style's default.
   const imageStyle = body.imageStyle == null ? resolved.imageStyle : style.value
   // 025 FR-08: a look that needs a screenshot cannot be created without one.
-  const pairing = compositePairingError(imageStyle, undefined)
+  const pairing = compositePairingError(imageStyle, compositeSource)
   if (pairing) {
     return NextResponse.json(
-      { error: 'This image style needs a product screenshot', code: pairing },
+      {
+        error:
+          pairing === 'IMAGE_STYLE_NEEDS_SCREENSHOT'
+            ? 'This image style needs a product screenshot'
+            : 'A product screenshot needs an image style that uses one',
+        code: pairing,
+      },
+      { status: 400 },
+    )
+  }
+  if (compositeSource && !(await headObject(BUCKET_DOCS, compositeSource.key))) {
+    return NextResponse.json(
+      { error: 'The product screenshot was not found; upload it again', code: 'INVALID_COMPOSITE_SOURCE' },
       { status: 400 },
     )
   }
@@ -298,6 +331,7 @@ export const POST = withTeamAuth(async (req: NextRequest, _ctx, user) => {
       // (validated to a {url,intent}[] above when present).
       briefImages: briefImages == null ? Prisma.JsonNull : (briefImages as Prisma.InputJsonValue),
       referenceTemplateId: referenceTemplateId ?? null,
+      compositeSource: compositeSource ?? Prisma.JsonNull,
       captionModel: captionPick.value ?? null,
       designModel: designPick.value ?? null,
     },

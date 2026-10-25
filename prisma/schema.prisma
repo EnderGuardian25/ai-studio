@@ -515,6 +515,7 @@ model Brief {
   // so a retired key needs no migration. The default keeps every pre-009 row
   // (and the previous image's brief.create) on the classic plan.
   imageStyle          String             @default("classic")
+  compositeSource     Json?
   // 027: the post style key (TEXT, validated in code, so a retired key needs
   // no migration). Null = before 027: the user's own goal and tone stand.
   postStyle           String?

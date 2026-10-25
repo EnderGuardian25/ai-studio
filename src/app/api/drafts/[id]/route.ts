@@ -5,7 +5,8 @@ import { prisma } from '@/lib/prisma'
 import { withTeamAuth, withTeamAdmin, parseBody } from '@/lib/api/handler'
 import { canAccessContent } from '@/lib/authz/visibility'
 import { resolveBrandKit } from '@/lib/brandkit/resolve'
-import { resolveExportUrl } from '@/lib/storage/minio'
+import { BUCKET_DOCS, deleteObject, resolveExportUrl } from '@/lib/storage/minio'
+import { parseCompositeSource } from '@/lib/brief/compositeSource'
 import { planDraftRecovery, STUCK_ACTION_REASON, STUCK_REASON } from '@/lib/drafts/recovery'
 import { COMMITTED_REVISION, draftCompositionStamp, resolveNotAppliedOutcome } from '@/lib/drafts/revisions'
 import { backgroundSkippedFor } from '@/lib/drafts/backgroundNotice'
@@ -331,7 +332,7 @@ export const DELETE = withTeamAdmin<Params>(async (_req, { params }, user) => {
     return NextResponse.json({ error: 'Draft not found' }, { status: 404 })
   }
 
-  const briefDeleted = await prisma.$transaction(async (tx) => {
+  const { briefDeleted, screenshotKey } = await prisma.$transaction(async (tx) => {
     await tx.post.deleteMany({ where: { draftId: draft.id } })
     // Deliberately UNFILTERED: a hard delete removes every revision row,
     // rejected refine renders included (the FK would otherwise block the draft
@@ -347,11 +348,21 @@ export const DELETE = withTeamAdmin<Params>(async (_req, { params }, user) => {
     // multiple drafts per brief, so count before deleting).
     const remaining = await tx.draft.count({ where: { briefId: draft.briefId } })
     if (remaining === 0) {
+      // 025 FR-11: remember the brief's private screenshot before the row goes.
+      const gone = await tx.brief.findUnique({ where: { id: draft.briefId }, select: { compositeSource: true } })
       await tx.brief.delete({ where: { id: draft.briefId } })
-      return true
+      return { briefDeleted: true, screenshotKey: parseCompositeSource(gone?.compositeSource)?.key ?? null }
     }
-    return false
+    return { briefDeleted: false, screenshotKey: null }
   })
+  // Best-effort and after the commit, scoped to this team's own prefix.
+  if (screenshotKey && screenshotKey.startsWith(`screenshots/${user.teamId}/`) && !screenshotKey.includes('..')) {
+    try {
+      await deleteObject(BUCKET_DOCS, screenshotKey)
+    } catch (e) {
+      console.error(`[drafts] failed to delete screenshot ${screenshotKey}:`, (e as Error).message)
+    }
+  }
 
   return NextResponse.json({ deleted: true, briefDeleted })
 })

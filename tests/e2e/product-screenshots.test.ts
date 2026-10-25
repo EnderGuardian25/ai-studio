@@ -1,8 +1,11 @@
 import { test, expect, type APIRequestContext } from '@playwright/test'
 import { loginAs } from '../helpers/api'
 import { ADMIN_EMAIL, ADMIN_PASSWORD } from '../helpers/ui'
+import { prisma, dbAvailable, NO_DB_MSG } from '../helpers/db'
+import { DOCS_BUCKET, objectExists, removeObject } from '../helpers/minio'
+import { GIF_BYTES, SVG_AS_PNG, makePng } from '../helpers/images'
 
-// §AG: product screenshots (change 025). TC-SHOT-01 only for now (T2); the rest
+// §AG: product screenshots (change 025). TC-SHOT-01 (T2) and TC-SHOT-02 to 06, 14 (T7); the rest
 // of the suite arrives with T10. Same MOCK_AI + MOCK_PUPPETEER seams as §AF.
 // The request runs in its OWN fresh team, disposed afterwards, so it does not
 // depend on the seeded team's providers.
@@ -52,6 +55,212 @@ test.describe('§AG product screenshots', () => {
       })
       expect(res.status()).toBe(400)
       expect((await res.json()).code).toBe('IMAGE_STYLE_NEEDS_SCREENSHOT')
+    })
+  })
+})
+
+// ── T7: upload, preview, the brief's choice, brief drafts, draft delete ──────
+
+const SHOT_BRIEF = {
+  goal: 'awareness',
+  tone: 'professional',
+  channels: ['LINKEDIN'],
+  designMode: 'GENERATE',
+}
+
+type Fresh = { api: Awaited<ReturnType<typeof loginAs>>; kitId: string; copyKey: string }
+
+async function whoAmI(api: Fresh['api']): Promise<{ userId: string; teamId: string }> {
+  const me = await (await api.get('/api/me')).json()
+  return { userId: me.userId as string, teamId: me.activeTeamId as string }
+}
+
+async function uploadShot(api: Fresh['api'], buffer: Buffer, name = 'screen.png', mimeType = 'image/png') {
+  return api.multipart('/api/briefs/screenshots', { file: { name, mimeType, buffer } })
+}
+
+function briefBody(t: Fresh, extra: Record<string, unknown>) {
+  return { ...SHOT_BRIEF, topic: 'Shot brief', copyProviderKey: t.copyKey, brandKitId: t.kitId, ...extra }
+}
+
+test.describe('§AG product screenshots: storage and the brief', () => {
+  test('TC-SHOT-02: a PNG uploads to the private bucket and returns a key, never a URL', async ({ request }) => {
+    await withFreshTeam(request, async (t) => {
+      const { userId, teamId } = await whoAmI(t.api)
+      const res = await uploadShot(t.api, makePng(800, 500))
+      expect(res.status()).toBe(200)
+      const body = await res.json()
+      expect(Object.keys(body).sort()).toEqual(['height', 'key', 'width'])
+      expect(body.width).toBe(800)
+      expect(body.height).toBe(500)
+      expect(body.key).toMatch(new RegExp(`^screenshots/${teamId}/${userId}/\\d+-[0-9a-f]+\\.png$`))
+      expect(JSON.stringify(body)).not.toMatch(/https?:/)
+      expect(await objectExists(DOCS_BUCKET, body.key)).toBe(true)
+
+      // The owner can preview it, and the response is never cached.
+      const preview = await t.api.get(`/api/briefs/screenshots?key=${encodeURIComponent(body.key)}`)
+      expect(preview.status()).toBe(200)
+      expect(preview.headers()['content-type']).toBe('image/png')
+      expect(preview.headers()['cache-control']).toContain('no-store')
+      await removeObject(DOCS_BUCKET, body.key)
+    })
+  })
+
+  test('TC-SHOT-03: an SVG named .png, a GIF and a file over the limits are 400', async ({ request }) => {
+    await withFreshTeam(request, async (t) => {
+      const svg = await uploadShot(t.api, SVG_AS_PNG, 'screen.png', 'image/png')
+      expect(svg.status()).toBe(400)
+      expect((await svg.json()).error).toMatch(/PNG, JPEG or WebP/)
+      expect((await uploadShot(t.api, GIF_BYTES, 'screen.png', 'image/png')).status()).toBe(400)
+      expect((await uploadShot(t.api, makePng(8001, 700))).status()).toBe(400)
+      expect((await t.api.multipart('/api/briefs/screenshots', {})).status()).toBe(400)
+    })
+  })
+
+  test('TC-SHOT-04: a 600 by 400 screenshot is 400 and stores nothing', async ({ request }) => {
+    await withFreshTeam(request, async (t) => {
+      const res = await uploadShot(t.api, makePng(600, 400))
+      expect(res.status()).toBe(400)
+      expect((await res.json()).error).toMatch(/at least 640 by 400/)
+    })
+  })
+
+  test("TC-SHOT-05: another team's key, and a key that is not yours, are 404 on the preview", async ({ request }) => {
+    await withFreshTeam(request, async (t) => {
+      const up = await (await uploadShot(t.api, makePng(800, 500))).json()
+      // The same person, signed in to the seeded team: the key names the other team.
+      const other = await loginAs(request, ADMIN_EMAIL, ADMIN_PASSWORD, { team: 'Bistec' })
+      try {
+        expect((await other.get(`/api/briefs/screenshots?key=${encodeURIComponent(up.key)}`)).status()).toBe(404)
+        // With a draftId the draft must be visible and must carry that key in its stamp.
+        expect((await other.get(`/api/briefs/screenshots?key=${encodeURIComponent(up.key)}&draftId=nope`)).status()).toBe(404)
+      } finally {
+        await other.dispose()
+      }
+      // A missing key, a traversal and a foreign-looking key are all 404.
+      expect((await t.api.get('/api/briefs/screenshots')).status()).toBe(404)
+      const { teamId } = await whoAmI(t.api)
+      for (const key of [`screenshots/${teamId}/someone-else/x.png`, `screenshots/${teamId}/../x.png`, 'briefs/x.png']) {
+        expect((await t.api.get(`/api/briefs/screenshots?key=${encodeURIComponent(key)}`)).status(), key).toBe(404)
+      }
+      // The owner's own key with a draft that does not carry it is also 404.
+      expect((await t.api.get(`/api/briefs/screenshots?key=${encodeURIComponent(up.key)}&draftId=nope`)).status()).toBe(404)
+      await removeObject(DOCS_BUCKET, up.key)
+    })
+  })
+
+  test('TC-SHOT-06: each 400 of FR-11, and a valid brief stores compositeSource', async ({ request }) => {
+    await withFreshTeam(request, async (t) => {
+      const { userId, teamId } = await whoAmI(t.api)
+      const up = await (await uploadShot(t.api, makePng(1280, 800))).json()
+      const source = { kind: 'brief-upload', key: up.key, width: up.width, height: up.height }
+
+      // Another team's, and another user's, prefix, and a traversal.
+      for (const key of [
+        `screenshots/other-team/${userId}/x.png`,
+        `screenshots/${teamId}/other-user/x.png`,
+        `screenshots/${teamId}/${userId}/../x.png`,
+      ]) {
+        const res = await t.api.post('/api/briefs', briefBody(t, { imageStyle: 'device-screen', compositeSource: { ...source, key } }))
+        expect(res.status(), key).toBe(400)
+        expect((await res.json()).code).toBe('INVALID_COMPOSITE_SOURCE')
+      }
+      // The object does not exist.
+      const missing = await t.api.post(
+        '/api/briefs',
+        briefBody(t, {
+          imageStyle: 'device-screen',
+          compositeSource: { ...source, key: `screenshots/${teamId}/${userId}/0-missing.png` },
+        }),
+      )
+      expect(missing.status()).toBe(400)
+      expect((await missing.json()).code).toBe('INVALID_COMPOSITE_SOURCE')
+      // A screenshot on a look with no `requires`, and on classic.
+      for (const imageStyle of ['spotlight', 'classic', undefined]) {
+        const res = await t.api.post('/api/briefs', briefBody(t, { imageStyle, compositeSource: source }))
+        expect(res.status(), String(imageStyle)).toBe(400)
+        expect((await res.json()).code).toBe('SCREENSHOT_NEEDS_IMAGE_STYLE')
+      }
+      // A `requires` look with none is TC-SHOT-01; a malformed shape is 400 too.
+      const bad = await t.api.post('/api/briefs', briefBody(t, { imageStyle: 'device-screen', compositeSource: { key: up.key } }))
+      expect(bad.status()).toBe(400)
+
+      // The valid pair is stored as sent.
+      const ok = await t.api.post('/api/briefs', briefBody(t, { imageStyle: 'device-screen', compositeSource: source }))
+      expect(ok.status()).toBe(201)
+      const brief = await ok.json()
+      expect(brief.imageStyle).toBe('device-screen')
+      expect(brief.compositeSource).toEqual(source)
+      await removeObject(DOCS_BUCKET, up.key)
+    })
+  })
+
+  test('TC-SHOT-14: Resume keeps the screenshot; Discard deletes the object; a generate keeps it', async ({ request }) => {
+    await withFreshTeam(request, async (t) => {
+      const { teamId } = await whoAmI(t.api)
+      const draftPayload = (source: unknown) => ({
+        step: 2,
+        campaignId: '',
+        aspectRatio: 'SQUARE',
+        brandKitId: t.kitId,
+        designMode: 'GENERATE',
+        templateId: '',
+        referenceTemplateId: '',
+        topic: 'Shot draft',
+        prompt: 'A prompt long enough to matter',
+        tone: 'professional',
+        images: [],
+        imageStyle: 'device-screen',
+        compositeSource: source,
+      })
+      const up1 = await (await uploadShot(t.api, makePng(1280, 800))).json()
+      const src1 = { kind: 'brief-upload', key: up1.key, width: up1.width, height: up1.height }
+
+      // A key that is not this person's own is refused at save.
+      const foreign = await t.api.put('/api/brief-drafts', {
+        payload: draftPayload({ ...src1, key: `screenshots/${teamId}/other-user/x.png` }),
+      })
+      expect(foreign.status()).toBe(400)
+
+      // Autosave, then Resume: the payload comes back with the screenshot.
+      const put = await t.api.put('/api/brief-drafts', { payload: draftPayload(src1) })
+      expect(put.status()).toBe(200)
+      const id = (await put.json()).id as string
+      const resumed = await (await t.api.get(`/api/brief-drafts/${id}`)).json()
+      expect(resumed.payload.compositeSource).toEqual(src1)
+      expect(resumed.payload.imageStyle).toBe('device-screen')
+
+      // Discard deletes the private object (asserted against MinIO).
+      expect(await objectExists(DOCS_BUCKET, up1.key)).toBe(true)
+      expect((await t.api.del(`/api/brief-drafts/${id}`)).status()).toBe(200)
+      expect(await objectExists(DOCS_BUCKET, up1.key)).toBe(false)
+
+      // A successful generate removes the row but keeps the object.
+      const up2 = await (await uploadShot(t.api, makePng(1280, 800))).json()
+      const src2 = { kind: 'brief-upload', key: up2.key, width: up2.width, height: up2.height }
+      const id2 = (await (await t.api.put('/api/brief-drafts', { payload: draftPayload(src2) })).json()).id as string
+      expect((await t.api.del(`/api/brief-drafts/${id2}?keepImages=true`)).status()).toBe(200)
+      expect(await objectExists(DOCS_BUCKET, up2.key)).toBe(true)
+      await removeObject(DOCS_BUCKET, up2.key)
+    })
+  })
+
+  test('TC-SHOT-14b: deleting the last draft of a brief deletes its screenshot object', async ({ request }) => {
+    test.skip(!dbAvailable || !prisma, NO_DB_MSG)
+    await withFreshTeam(request, async (t) => {
+      const { teamId } = await whoAmI(t.api)
+      const up = await (await uploadShot(t.api, makePng(1280, 800))).json()
+      const source = { kind: 'brief-upload', key: up.key, width: up.width, height: up.height }
+      const created = await t.api.post('/api/briefs', briefBody(t, { imageStyle: 'device-screen', compositeSource: source }))
+      expect(created.status()).toBe(201)
+      const brief = await created.json()
+      // A draft row for the brief (generation of a composite arrives with T8).
+      const draft = await prisma!.draft.create({ data: { teamId, briefId: brief.id } })
+      expect(await objectExists(DOCS_BUCKET, up.key)).toBe(true)
+      const del = await t.api.del(`/api/drafts/${draft.id}`)
+      expect(del.status()).toBe(200)
+      expect((await del.json()).briefDeleted).toBe(true)
+      expect(await objectExists(DOCS_BUCKET, up.key)).toBe(false)
     })
   })
 })

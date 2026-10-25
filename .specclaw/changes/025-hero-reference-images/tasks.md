@@ -146,7 +146,7 @@ This change has **12 tasks in 6 waves**:
     - Remove each size that failed from v1; commit the final hash; drop its fixture rows. Record the per-size verdicts in the handoff.
     - **Gate:** tsc, lint, unit, `npm run test:render`.
 
-- [ ] `T7` — Private storage, the upload and preview routes, `Brief.compositeSource`, brief drafts and draft delete
+- [x] `T7` — Private storage, the upload and preview routes, `Brief.compositeSource`, brief drafts and draft delete
   - Files: `prisma/schema.prisma`, `prisma/migrations/20261026120000_composite_source/migration.sql` (new), `prisma/rollback/025-hero-product-screenshots.down.sql` (new), `src/lib/storage/minio.ts` (`getObjectBytes`, `headObject`), `src/lib/composite/imageHeader.ts` (new), `src/app/api/briefs/screenshots/route.ts` (new), `src/app/api/briefs/route.ts`, `src/lib/brief/{compositeSource,briefDraftPayload,briefDrafts}.ts`, `src/app/api/drafts/[id]/route.ts` (delete only), `tests/unit/{imageHeader,compositeSource,briefDraftPayload}.test.ts`, `tests/e2e/product-screenshots.test.ts` (TC-SHOT-02 to TC-SHOT-06, TC-SHOT-14)
   - Estimate: large
   - Kind: migration
