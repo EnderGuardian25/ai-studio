@@ -94,7 +94,7 @@ This change has **12 tasks in 6 waves**:
 
 ### Wave 3: Group A docs and gate
 
-- [ ] `T5` — Group A docs, the gate and CI
+- [x] `T5` — Group A docs, the gate and CI
   - Files: `docs/handoff.md`, `docs/e2e-test-plan.md`, `CLAUDE.md`, `.specclaw/ROADMAP.md`
   - Estimate: small
   - Kind: docs

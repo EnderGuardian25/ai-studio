@@ -1,17 +1,31 @@
 # bistec-studio — Session Handoff
 
-**Date:** 2026-10-25 (latest: **028 image looks (027b) VERIFIED PASS 21/21: OP-028 ran (full-bleed-scene passed, spotlight failed) and T7 moved Event and Hiring; 029 CLI usage-limit message VERIFIED PASS 5/5; CI green at `5db8953`; next is 025**; earlier 2026-10-24: **027a post styles VERIFIED PASS 22/22**; **006 product observability VERIFIED PASS 17/17**; earlier: **007 VERIFIED PASS 22/22; 009 OP-1 PASSED 6 of 6 (local run); 006 planned; 026 VERIFIED PASS 11/11; draft PR #43 closed; 010 dropped**). Earlier 2026-10-23: **024 caption credential route VERIFIED PASS, 17/17 ACs**; gates: unit 3024/3024, render 47/47, E2E 431/3/0/0, CI green at `cd9d411` (runs 39837152549, 39837162772; the PR run passed on one rerun after a CI-runner Chromium launch timeout in the render harness)). 2026-10-21: **009 hero imagery Phase 1 VERIFIED PASS (25/25), commit `d3534e0`; OP-1 is the user's pending step**; before it: **023 scheduler heartbeat VERIFIED PASS**; gates: unit 2947/2947, render 47/47, E2E 422/3/0/0, CI green at `f8f063c` (runs 39604699552, 39604706638)). 2026-10-20: **020 Create post button, 019 claim token, 021 Graphite re-theme, 018 and 022 VERIFIED PASS; the build order is complete**. 2026-10-19: this repo adopted the fork's `v2` on 2026-10-18. The fork-era sections, 2026-10-07 to 2026-10-14, moved to [`fork-history.md`](fork-history.md). Previous: 2026-10-07 (005 verified PASS; 011 planned, wave 1 built). Previous: 2026-10-03 (004 finished and verified PARTIAL, Phase 0 only; 005 built 9/10, waiting on one operator check). Before that: 2026-09-28 (build session — 004 Waves 1–3 built, MinIO → silo, PR #42 + draft PR #43). Before that: 2026-09-23 (later, later the same day: proposal **012** per-channel captions + copy→caption rename, a floating **Create post** button folded into 011, and a launch-video legibility pass. Before that: planning session — proposals 008–011 + roadmap, 004 re-planned to 24 tasks incl. Phase 0, and the deploy pipeline found broken: Coolify 401 since 2026-09-15). Previous: 2026-07-28 (copy-edit status clobber fix).
+**Date:** 2026-10-25 (latest: **025 Group A built (T1 to T5); OP-025 waits on the user's go**; **028 image looks (027b) VERIFIED PASS 21/21: OP-028 ran (full-bleed-scene passed, spotlight failed) and T7 moved Event and Hiring; 029 CLI usage-limit message VERIFIED PASS 5/5; CI green at `5db8953`; next is 025**; earlier 2026-10-24: **027a post styles VERIFIED PASS 22/22**; **006 product observability VERIFIED PASS 17/17**; earlier: **007 VERIFIED PASS 22/22; 009 OP-1 PASSED 6 of 6 (local run); 006 planned; 026 VERIFIED PASS 11/11; draft PR #43 closed; 010 dropped**). Earlier 2026-10-23: **024 caption credential route VERIFIED PASS, 17/17 ACs**; gates: unit 3024/3024, render 47/47, E2E 431/3/0/0, CI green at `cd9d411` (runs 39837152549, 39837162772; the PR run passed on one rerun after a CI-runner Chromium launch timeout in the render harness)). 2026-10-21: **009 hero imagery Phase 1 VERIFIED PASS (25/25), commit `d3534e0`; OP-1 is the user's pending step**; before it: **023 scheduler heartbeat VERIFIED PASS**; gates: unit 2947/2947, render 47/47, E2E 422/3/0/0, CI green at `f8f063c` (runs 39604699552, 39604706638)). 2026-10-20: **020 Create post button, 019 claim token, 021 Graphite re-theme, 018 and 022 VERIFIED PASS; the build order is complete**. 2026-10-19: this repo adopted the fork's `v2` on 2026-10-18. The fork-era sections, 2026-10-07 to 2026-10-14, moved to [`fork-history.md`](fork-history.md). Previous: 2026-10-07 (005 verified PASS; 011 planned, wave 1 built). Previous: 2026-10-03 (004 finished and verified PARTIAL, Phase 0 only; 005 built 9/10, waiting on one operator check). Before that: 2026-09-28 (build session — 004 Waves 1–3 built, MinIO → silo, PR #42 + draft PR #43). Before that: 2026-09-23 (later, later the same day: proposal **012** per-channel captions + copy→caption rename, a floating **Create post** button folded into 011, and a launch-video legibility pass. Before that: planning session — proposals 008–011 + roadmap, 004 re-planned to 24 tasks incl. Phase 0, and the deploy pipeline found broken: Coolify 401 since 2026-09-15). Previous: 2026-07-28 (copy-edit status clobber fix).
 **Repo:** https://github.com/bistec-oss/studio, which `origin` points to. **The repo rules (branches, remotes, the `fork` remote; draft PR #43 was closed on 2026-10-23) are in [`CLAUDE.md`](../CLAUDE.md)'s top entry, which is authoritative.** This file does not repeat them.
 **Branch:** work continues on **`v2`**, pushed to `origin v2`. `main` is `671ad6e9` (PR #42) and deploys to company prod. `v2` → `main` is one PR, merged only on the user's go-ahead and after the pre-merge prod checklist below.
 **Production:** `https://studio.bistecglobal.com` serves company `main`. Its migration head is `20260728120000_heal_copy_edit_clobbered_drafts`. Merges to `main` build but do not deploy until the Coolify token is rotated (see CLAUDE.md).
 
 ---
 
-## ⏸️ 2026-10-25 (later) — PICK UP HERE: 025 hero product screenshots is planned and building (T1 done, next T2)
+## ⏸️ 2026-10-25 (later) — PICK UP HERE: 025 Group A is built (T1 to T5); OP-025 waits on the user's go
 
-**Latest:** T1 is DONE (`03389a5`, review NOTE, unit 3960/3960, render 84/84, lint 0/7). **Next is T2.** Carry these T1 review notes forward: (a) `device-screen` shows in the picker until T2 lands, so do not push `v2` between T1 and T2 without T2; (b) **T3** must delete the temporary `!a.requires` filter in `tests/unit/lookFixtureCompleteness.test.ts` and assert 48 rows; (c) **T9** must pass `canvas` to `refineContractText` (it is optional now, so the pixel text is left out without it); (d) **T8** adds a test that a composite `ok:true` for a look without `requires` throws at stamp parse; (e) `settleComposition` fails closed: a kept `requires` look with no third argument settles to classic `composite-source-missing`.
+**Latest:** Group A is built: T1 `03389a5`, T2 `159083d`, T3 `cd19491`, T4 `cf00ffb`, and T5 is these docs. **OP-025 has not run.** It spends up to 9 image calls and 9 Haiku calls, so it runs only on the user's go. Group B (T6 to T12) runs only after an OP-025 go.
 
-**Where things stand.**
+**Group A state (per task).**
+
+| Task | Commit             | Review   | What it built                                                                                                |
+| ---- | ------------------ | -------- | ------------------------------------------------------------------------------------------------------------ |
+| T1   | `03389a5`          | NOTE     | The composite purpose, `device-screen` v1, the blank check, the reasons, the stamp field and the prompt text |
+| T2   | `159083d`          | NOTE     | Availability by `requires`: the picker, the resolver, the plan and `POST /api/briefs`                        |
+| T3   | `cd19491`          | NOTE     | 12 fixtures for `device-screen` (pass, busy, contrast and screen, per size), 48 rows in all; the screen kind |
+| T4   | `cf00ffb`          | WARN (1) | The probe route `POST /api/admin/look-probe` and `run-look-check.mjs --probe`                                |
+| T5   | (this docs commit) | none     | These docs, the spec amendment, the E2E plan §AG, the roadmap and CLAUDE.md                                  |
+
+**Gates after T4.** Unit 3989/3989; render 96/96 (two runs at T3); lint 0 errors / 7 warnings; tsc clean; build passes (again at T5). The full clean mock E2E (T5) is 533/3/0/1 (the one flaky was a timing miss in `model-selection.test.ts` §Y, "element(s) not found" under full load; that suite then re-ran clean 3 of 3 with no retries, 57/57), and CI is checked after the T5 push (see the follow-up commit). No migration and no env var in Group A.
+
+**Measured in T3.** The screen region's L\*/100 standard deviation: pass 0.0000 at all three sizes; screen 0.4907 at SQUARE, 0.4907 at PORTRAIT and 0.4862 at STORY. `BLANK_STDDEV_MAX` is 0.04. No tuning was needed, and the `device-screen@1` hash is unchanged.
+
+**The T4 review WARN, and why the ledger has nulls.** Each probe attempt writes its ledger line before the request, so `threshold` and `promptHash` are `null` on the ledger line. The real values are recorded per attempt in `results.json`. A second ledger record per attempt would break the cap, because every ledger line counts as an attempt. The spec (FR-09, AC-07) now says this (amended at T5).
 
 - **025 is planned and approved (architectural), committed at `0865ad2`.**
   - The 2026-10-22 draft was rewritten for OP-1 (passed), 007, 027a and 028.
@@ -36,21 +50,51 @@
 
 **Resume, in order.**
 
-1. **T1 is done** (`03389a5`). Its review notes for later tasks are in the "Latest" line above.
-2. **T2** (availability by `requires`), **T3** (12 fixture rows, the `screen` kind), **T4** (the probe route and `--probe`), then **T5** (Group A docs, the full mock E2E and CI on `v2`). One task at a time, following the process in tasks.md.
-3. **Stop before OP-025.** The user decides the spend. The procedure goes in this file at T5.
-4. **Group B (T6 to T12) only after an OP-025 go.** If no size passes, T6 removes the never-released look and the change stops.
+1. **Group A is done** (T1 to T5). The spec, the E2E plan §AG and this section are the record.
+2. **Stop before OP-025.** The user decides the spend. The procedure is below.
+3. **Group B (T6 to T12) only after an OP-025 go.** Build it with `/specclaw:build 025-hero-reference-images`, one task at a time, as the Group A tasks were built. If no size passes, T6 removes the never-released look and the change stops.
 
-**Gotchas.**
+**Carry-forward notes for Group B (from the T1 to T4 reviews).**
 
-- `specclaw-build-context` emits about 500 KB (a docs digest). Give implementers a focused brief like `briefs/T1.md`.
-- Party agent types are `specclaw:party-*`.
-- The untracked `028-image-looks/logs/` and `029-cli-usage-limit-message/logs/` are leftovers.
-- The baselines at `45fae1a` are unit 3903, render 84, lint 0/7 and E2E 529/3/0/0.
+- (a) `device-screen` showed in the picker until T2 landed. T2 has landed, so this note is closed.
+- (b) T3 deleted the temporary `!a.requires` filter in `tests/unit/lookFixtureCompleteness.test.ts` and asserts 48 rows. Done in `cd19491`.
+- (c) **T9** must pass `canvas` to `refineContractText`. It is optional now, so the pixel text is left out without it.
+- (d) **T8** adds a test that a composite `ok:true` for a look without `requires` throws at stamp parse.
+- (e) `settleComposition` fails closed. A kept `requires` look with no third argument settles to classic `composite-source-missing`.
 
-**After 025:** the stale-headline badge (no proposal yet). The user still owns the `v2` → `main` merge go-ahead.
+### OP-025 procedure (the operator's real-image check, on the user's go)
 
----
+The procedure runs on the scratch database, never on `bistec_studio`. It uses the OP-1 and OP-028 setup in `CLAUDE.md` "Gotchas".
+
+**The server.**
+
+- Stop any `:3002` server first. There is one `next dev` per checkout, and they share `.next`.
+- Check the scratch database is at the `v2` head: `DATABASE_URL=<the bistec_studio_op1 url> npx prisma migrate status`. Pass an explicit `DATABASE_URL` every time. Group A adds no migration, so OP-028 should have left it at head.
+- Start it with the env file from `CLAUDE.md` "Gotchas" (the OP-1 environment): `npx dotenv -e <that env file> -- next dev -p 3002`. The file sets `DESIGN_PROVIDER=cli`, the `MOCK_*` flags off, and the scratch `DATABASE_URL`.
+- Sign in as a super admin. The probe route is 404 in production and 403 for anyone who is not a super admin.
+- The probe uses the team's default brand kit (409 if the team has none). It resolves the image provider as generation does for the signed-in user: their personal OpenAI key at `/settings` first, then the team's default IMAGE row. Connect the user's own OpenAI key at `/settings` if it is not already connected.
+
+**The env vars (a run only, never written to a file or the ledger).** `LOOK_CHECK_USERNAME`, `LOOK_CHECK_PASSWORD` and `LOOK_CHECK_TEAM`. The runner refuses a run without all three. Probe mode does not read `LOOK_CHECK_KIT`. The dry run needs none of them.
+
+**The commands (from the repo root, one at a time).**
+
+1. Dry run first. It prints each slot's next attempt or its refusal, the ledger total and the cap, and makes no call:
+   `node scripts/look-check/run-look-check.mjs --probe --base http://localhost:3002 --dry-run`
+2. The run. It takes the three slots in order, `device-screen:SQUARE`, `device-screen:PORTRAIT` and `device-screen:STORY`, one probe call each. `--only device-screen:PORTRAIT` runs one slot:
+   `node scripts/look-check/run-look-check.mjs --probe --base http://localhost:3002`
+   Each probe is one Haiku decision call and one image call. The PNGs land in `look-check/renders/`, which is gitignored.
+3. Look at each render with the user, and record its verdict straight after its render. A verdict makes no call. Record `accept` or `reject` against the slot and attempt number:
+   `node scripts/look-check/run-look-check.mjs --probe --verdict device-screen:SQUARE#1=accept`
+   The `--verdict` command prints the current verdict for every slot. Use the same `--out` directory, which defaults to `.specclaw/changes/025-hero-reference-images/look-check/`.
+4. Re-run the same command as needed. The planner gives each slot at most 3 attempts, and the cap is 9 attempts in all (3 slots times 3). It refuses a slot in these cases: `awaiting-verdict` (an attempt kept its look and has no verdict yet), `already-passed` (2 accepted), `max-attempts` (3 used) and `cannot-pass` (a slot can no longer reach 2 accepts). A refused slot is printed and skipped. The run stops when the cap is reached.
+
+**The ledger and the cap.** `look-check/ledger.jsonl` is the append-only record. Each line is one attempt, written before its request, with `mode: 'probe'`, and it counts towards the cap whether or not the request succeeds. **Never delete `ledger.jsonl`, and use one fixed `--out` directory for every run.** Deleting it resets the cap, and that is not allowed. The ledger lines carry `threshold` and `promptHash` as `null`, because they are written before the request. The real values are in `results.json` for each attempt, with `styleKept`, `fallbackReason`, `render` and the `accepted` verdict. The last result for an attempt counts.
+
+**The pass rule.** A size passes when 2 attempts kept the look (`styleKept`, which is the check's `ok`) and the user accepted both. A fallback is a failed attempt, and a rejection is a failed attempt. A size that does not pass is removed from `device-screen` v1 by T6, because the look was never released. If no size passes, T6 removes the look and T7 to T12 are cancelled, and the change stops there. A size that does pass stays in the look.
+
+**Commit the results.** Once every slot has a passing or failed outcome, commit `look-check/ledger.jsonl` and `results.json` under `.specclaw/changes/025-hero-reference-images/look-check/`. Do not commit `renders/`.
+
+**Reading the results.** Look at the renders for every slot, including the STORY slot. The check measures the screen region only, so a kept look can still show a poor device placement. The user judges that by eye, as the spec's edge case says.
 
 ## ⏸️ 2026-10-23 (end of day; superseded by the 2026-10-25 section above): 007 VERIFIED PASS and 009 OP-1 PASSED; 006 planned; 026 VERIFIED PASS; nothing is mid-build
 
