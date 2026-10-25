@@ -432,6 +432,15 @@ async function expectOnlyTheToken(draftId: string, html: string) {
       expect(r.htmlSnapshot).toContain('__COMPOSITE_0__')
       expect(r.htmlSnapshot).not.toContain('screenshots/')
     }
+    // NFR-05: the stamp and the brief may hold the key, never a URL to it.
+    const d = await prisma.draft.findUnique({
+      where: { id: draftId },
+      select: { composition: true, brief: { select: { compositeSource: true } } },
+    })
+    for (const stored of [d?.composition, d?.brief?.compositeSource]) {
+      expect(JSON.stringify(stored ?? null)).not.toMatch(/https?:\/\/[^"]*screenshots\//)
+      expect(JSON.stringify(stored ?? null)).not.toContain('/api/briefs/screenshots')
+    }
   }
 }
 

@@ -202,7 +202,7 @@ This change has **12 tasks in 6 waves**:
 
 ### Wave 6: Group B E2E, docs and the gate
 
-- [ ] `T11` — E2E §AG complete and the NFR-05 end-to-end check
+- [x] `T11` — E2E §AG complete and the NFR-05 end-to-end check
   - Files: `tests/e2e/product-screenshots.test.ts`
   - Estimate: small
   - Kind: test
