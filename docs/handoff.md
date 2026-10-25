@@ -9,7 +9,7 @@
 
 ## ⏸️ 2026-10-26 — PICK UP HERE: 025 hero product screenshots is BUILT (T1 to T14); next is `/specclaw:verify 025-hero-reference-images`
 
-**Latest:** all of 025 is built. Group A (T1 to T5), Amendment A1 (screen detection, T13) and Group B (T6 to T11, plus these docs as T12) are on `v2`. **OP-025 PASSED at all three sizes** (7 of 9 image calls, 2026-10-25/26; the user accepted all six kept renders). The OP-025 result is in its own subsection below. **Next: `/specclaw:verify 025-hero-reference-images`.** Then the stale-headline badge. Gates: unit 4131/4131, render 119/119, lint 0 errors / 7 warnings, tsc clean, build passes, `test:upgrade` passes, full clean mock E2E 548/3/0/0, CI checked after the T12 push (recorded in the follow-up commit).
+**Latest:** all of 025 is built. Group A (T1 to T5), Amendment A1 (screen detection, T13) and Group B (T6 to T11, plus these docs as T12) are on `v2`. **OP-025 PASSED at all three sizes** (7 of 9 image calls, 2026-10-25/26; the user accepted all six kept renders). The OP-025 result is in its own subsection below. **Next: `/specclaw:verify 025-hero-reference-images`.** Then the stale-headline badge. Gates: unit 4131/4131, render 119/119, lint 0 errors / 7 warnings, tsc clean, build passes, `test:upgrade` passes, full clean mock E2E 548/3/0/0, CI green at `5531d29` (run 40235850520).
 
 **Group A (T1 to T5), built before OP-025.**
 
