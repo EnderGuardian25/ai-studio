@@ -111,6 +111,9 @@ vi.mock('@/lib/renderer/domFacts', () => ({ extractDomFacts: h.extract }))
 vi.mock('@/lib/renderer/puppeteer', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/renderer/puppeteer')>()),
   renderHtmlToPng: vi.fn(async () => Buffer.from('png')),
+  // 030: runDesignAgentCli renders through renderPost. Unmocked, it launched a
+  // real Chromium, which on the CI unit runner did not start inside 5 s.
+  renderPost: vi.fn(async () => ({ png: Buffer.from('png'), headlineCheck: 'painted' as const })),
 }))
 vi.mock('@/lib/storage/minio', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/storage/minio')>()),
