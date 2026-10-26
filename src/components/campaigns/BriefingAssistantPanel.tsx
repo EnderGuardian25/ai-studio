@@ -7,6 +7,8 @@ import { FileText, Loader2, Paperclip, Send, Trash2, ArrowUp, ArrowDown, Calenda
 import { Button } from '@/components/ui/Button'
 import { Drawer } from '@/components/ui/Modal'
 import { FieldLabel } from '@/components/ui/FieldLabel'
+import { Select } from '@/components/ui/Select'
+import { postStyleLabel, postStyleOptions } from '@/components/campaigns/postStyleOptions'
 import { ModelPicker } from '@/components/ui/ModelPicker'
 import { ApiError, apiFetch } from '@/lib/apiFetch'
 import type { ModelKey } from '@/lib/models/catalogue'
@@ -16,7 +18,8 @@ import { COMPACT_FIELD, EYEBROW, FOCUS, ICON, ICON_BUTTON, ICON_SM, SCROLL_FOCUS
 // Shape the model proposes inside a ```schedule block (see briefingAssistant.ts).
 interface SchedulePlanItem {
   topic: string
-  goal: string
+  postStyle: string
+  styleReplaced?: { proposed: string }
   tone: string
   daysFromNow: number
   postAction: 'HOLD' | 'SCHEDULE_PUBLISH' | 'PUBLISH_NOW'
@@ -26,7 +29,9 @@ interface SchedulePlanItem {
 // a datetime-local string ("YYYY-MM-DDTHH:mm") for the native picker.
 interface PlanRow {
   topic: string
-  goal: string
+  postStyle: string
+  /** The key the assistant proposed when it was replaced (031 FR-30). */
+  proposedStyle?: string
   tone: string
   postAction: 'HOLD' | 'SCHEDULE_PUBLISH' | 'PUBLISH_NOW'
   generateAt: string
@@ -183,7 +188,8 @@ export function BriefingAssistantPanel({ campaignId, open, onClose, onApply }: B
         setPlan(
           result.schedulePlan.map(p => ({
             topic: p.topic,
-            goal: p.goal,
+            postStyle: p.postStyle,
+            proposedStyle: p.styleReplaced?.proposed,
             tone: p.tone,
             postAction: p.postAction,
             generateAt: localDateTimeInDays(p.daysFromNow),
@@ -227,11 +233,11 @@ export function BriefingAssistantPanel({ campaignId, open, onClose, onApply }: B
   async function scheduleAll() {
     if (!plan || plan.length === 0) return
     // Channels, size, and design path default here; the AI plan only carries
-    // topic/goal/tone/date/action. Path B (GENERATE) needs no template, so it's
+    // topic/post style/tone/date/action. Path B (GENERATE) needs no template, so it's
     // the safe default — per-entry channel/size edits happen in the queue table.
     const entries = plan.map(r => ({
       topic: r.topic.trim(),
-      goal: r.goal.trim() || 'awareness',
+      postStyle: r.postStyle,
       tone: r.tone.trim() || 'professional',
       channels: CHANNEL_VALUES,
       aspectRatio: 'SQUARE' as const,
@@ -442,10 +448,21 @@ export function BriefingAssistantPanel({ campaignId, open, onClose, onApply }: B
                       onChange={e => updateRow(i, { generateAt: e.target.value })}
                       className={`${COMPACT_FIELD} max-w-full`}
                     />
+                    <Select
+                      aria-label="Post style"
+                      options={postStyleOptions('General', row.postStyle).filter(o => o.value !== '')}
+                      value={row.postStyle}
+                      onChange={e => updateRow(i, { postStyle: e.target.value, proposedStyle: undefined })}
+                    />
                     <span className="break-words text-ui-2xs text-fg-muted">
-                      {row.goal} · {row.tone} · {row.postAction === 'HOLD' ? 'hold for review' : row.postAction.toLowerCase()}
+                      {row.tone} · {row.postAction === 'HOLD' ? 'hold for review' : row.postAction.toLowerCase()}
                     </span>
                   </div>
+                  {row.proposedStyle && (
+                    <p data-testid="style-replaced" className="text-ui-2xs text-fg-muted">
+                      Suggested style {row.proposedStyle} is not available; using {postStyleLabel(row.postStyle) ?? row.postStyle}
+                    </p>
+                  )}
                 </li>
               ))}
             </ul>

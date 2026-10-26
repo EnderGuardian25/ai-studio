@@ -198,7 +198,7 @@
 
 ### Wave 6: F, the assistants
 
-- [ ] `T11` — The briefing assistant schedule with post styles; part of §AL
+- [x] `T11` — The briefing assistant schedule with post styles; part of §AL
   - Files: `src/lib/campaign/briefingAssistant.ts`, `src/components/campaigns/BriefingAssistantPanel.tsx`, `src/lib/testHooks.ts` (mock reply), `tests/unit/schedulePlan.test.ts` (new), `tests/e2e/assistants-031.test.ts` (new), `docs/e2e-test-plan.md` (§AL)
   - Estimate: medium
   - Kind: impl

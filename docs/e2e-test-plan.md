@@ -1288,3 +1288,15 @@ Mock mode (`MOCK_AI` + `MOCK_PUPPETEER`), a fresh campaign per case, serial. The
 | TC-BU-03 | AC-28 | A team editor gets 403 from the route and the recorder has no `briefing-upgrade` entry                                                     |
 | TC-BU-04 | AC-28 | A stale `baseVersion` is 409 `STALE_BASE` with the active version and no recorder entry; the right base is 200                             |
 | TC-BU-05 | AC-28 | One `briefing-upgrade` record on `ASSISTANT_BRIEFING`, and no `kit-upgrade` record                                                         |
+
+### AL. Briefing assistant schedule with post styles (`assistants-031.test.ts`, change 031 T11 — AC-30)
+
+Mock mode (`MOCK_AI` + `MOCK_PUPPETEER`), a fresh campaign per case, serial. The panel is driven at `/campaigns/[id]` ("Draft with AI", then "Please schedule a short series of posts."). The `MOCK_AI` schedule reply has two rows: "Mock scheduled post 1" with the active style `launch`, and "Mock scheduled post 2" with the bad key `flash-sale`, which the parser replaces with the campaign's default style (or General). No model is called. Every `page.waitForResponse` is created before its trigger. TC-AS-04 to TC-AS-06 (the brand-kit assistant) follow in T12.
+
+| Case     | AC    | What it checks                                                                                                                           |
+| -------- | ----- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| TC-AS-01 | AC-30 | Each plan row has a "Post style" select (row 1 reads `launch`), and the plan shows no goal text                                          |
+| TC-AS-02 | AC-30 | With a campaign default of Event, the bad key row shows Event and the line "Suggested style flash-sale is not available; using Event"    |
+| TC-AS-03 | AC-30 | After the user changes the replaced row to Tip, Schedule posts `postStyle` and no `goal`, and the queue entries carry `launch` and `tip` |
+
+Adapted: `campaign-scheduling.test.ts` (F4 chat case) sends `postStyle` instead of `goal`; `briefingAssistant.test.ts` no longer expects a defaulted `goal`.

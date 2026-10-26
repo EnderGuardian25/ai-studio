@@ -29,3 +29,7 @@
 {"ev":"start","span":"T9","kind":"task","label":"Typography entries and kit rules","parent":"W5","model":"sonnet","attempt":"1","at":"2026-10-26T14:51:06Z","ts":1793026266}
 {"ev":"stop","span":"T9","at":"2026-10-26T14:57:28Z","ts":1793026648,"status":"ok"}
 {"ev":"start","span":"T10","kind":"task","label":"Rule upgrade runner, briefing host, AK","parent":"W5","model":"sonnet","attempt":"1","at":"2026-10-26T14:57:31Z","ts":1793026651}
+{"ev":"stop","span":"T10","at":"2026-10-26T15:07:00Z","ts":1793027220,"status":"ok"}
+{"ev":"stop","span":"W5","at":"2026-10-26T15:07:00Z","ts":1793027220,"status":"ok"}
+{"ev":"start","span":"W6","kind":"wave","label":"wave 6","at":"2026-10-26T15:07:05Z","ts":1793027225}
+{"ev":"start","span":"T11","kind":"task","label":"Briefing assistant schedule with post styles","parent":"W6","model":"sonnet","attempt":"1","at":"2026-10-26T15:07:05Z","ts":1793027225}

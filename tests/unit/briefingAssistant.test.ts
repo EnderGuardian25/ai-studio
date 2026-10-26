@@ -105,8 +105,9 @@ describe('extractSchedulePlan (F4)', () => {
     const plan = extractSchedulePlan(text)
     expect(plan).toHaveLength(2)
     expect(plan![0]).toMatchObject({ topic: 'Launch teaser', daysFromNow: 2, postAction: 'HOLD' })
-    // Defaults applied where the model omitted fields.
-    expect(plan![1]).toMatchObject({ topic: 'Feature deep-dive', goal: 'awareness', tone: 'professional', postAction: 'HOLD' })
+    // Defaults applied where the model omitted fields (031: no goal default).
+    expect(plan![1]).toMatchObject({ topic: 'Feature deep-dive', tone: 'professional', postAction: 'HOLD' })
+    expect(plan![1].goal).toBeUndefined()
   })
 
   it('returns null for a missing, empty, or malformed block', () => {

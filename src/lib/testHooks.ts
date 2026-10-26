@@ -202,8 +202,8 @@ export function buildMockBriefingReply(lastUserMessage: string): string {
   if (wantsSchedule) {
     const plan = {
       posts: [
-        { topic: 'Mock scheduled post 1', goal: 'awareness', tone: 'professional', daysFromNow: 1, postAction: 'HOLD' },
-        { topic: 'Mock scheduled post 2', goal: 'engagement', tone: 'casual', daysFromNow: 3, postAction: 'HOLD' },
+        { topic: 'Mock scheduled post 1', postStyle: 'launch', tone: 'professional', daysFromNow: 1, postAction: 'HOLD' },
+        { topic: 'Mock scheduled post 2', postStyle: 'flash-sale', tone: 'casual', daysFromNow: 3, postAction: 'HOLD' },
       ],
     }
     return [
