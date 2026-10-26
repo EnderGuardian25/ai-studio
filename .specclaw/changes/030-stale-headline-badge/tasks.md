@@ -36,7 +36,7 @@
 
 ### Wave 1: The pure module
 
-- [ ] `T1` — `src/lib/renderedText/`: vocabulary, normaliser, stamp, verdict, state rule, mock stand-in, notice text
+- [x] `T1` — `src/lib/renderedText/`: vocabulary, normaliser, stamp, verdict, state rule, mock stand-in, notice text
   - Files: `src/lib/renderedText/{vocab,normalise,stamp,facts,mockCheck,state,noticeText,index}.ts` (new), `tests/unit/renderedText.test.ts` (new)
   - Estimate: medium
   - Kind: impl

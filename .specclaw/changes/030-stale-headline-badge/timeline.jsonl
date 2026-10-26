@@ -2,3 +2,5 @@
 {"ev":"stop","span":"propose","at":"2026-10-26T02:33:08Z","ts":1792981988,"status":"ok"}
 {"ev":"start","span":"plan","kind":"phase","label":"plan","at":"2026-10-26T05:29:39Z","ts":1792992579}
 {"ev":"stop","span":"plan","at":"2026-10-26T05:37:57Z","ts":1792993077,"status":"ok"}
+{"ev":"start","span":"W1","kind":"wave","label":"wave 1","at":"2026-10-26T05:38:42Z","ts":1792993122}
+{"ev":"start","span":"T1","kind":"task","label":"pure module","parent":"W1","model":"sonnet","attempt":"1","at":"2026-10-26T05:38:42Z","ts":1792993122}
