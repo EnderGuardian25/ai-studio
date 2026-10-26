@@ -120,7 +120,7 @@ E2E here means **black-box tests against a running app + real Postgres + real Mi
 
 ### Infrastructure
 
-1. Postgres + MinIO containers up (`docker compose up -d`), MinIO `:9100` published to host.
+1. Postgres + MinIO containers up (`docker compose up -d postgres minio`), MinIO `:9100` published to host.
 2. A **dedicated test database** (`ai_studio_test`) so runs are disposable. Point `DATABASE_URL` at it.
 3. Migrations applied: `npm run db:migrate` (must include `20260623153740_h9_indexes` and `20260623154752_h12_scheduler_claim`).
 4. Seed the baseline: `npm run db:seed` (admin user + Bistec kit + Hearts Talk kit). ~~and `node --env-file=.env.test scripts/seed-cli-provider.mjs` if using CLI mode.~~ **Don't seed the `cli` COPY provider (2026-07-27):** CLI mode needs no COPY provider at all now (PR #30 server-side, PR #40 client-side), and that row **masks provider-gating bugs** — it is exactly why PR #40's dead Generate button never reproduced locally. `.env.test` runs `DESIGN_PROVIDER=claude-html` (API mode) anyway, so it was never needed here.
@@ -1169,7 +1169,7 @@ Mock hooks (§3) are now built, and `.env.test` + the npm scripts below wire eve
 
 ```bash
 # 1. infra — postgres + minio (:9100 published). See docs/cold-start.md §0.
-docker compose up -d
+docker compose up -d postgres minio
 # 2. test DB: drop, create, migrate and seed (admin, Bistec kit, Hearts Talk, cli provider).
 #    Add `-- --reset` for a clean gate; the preflight refuses another clone's stack.
 npm run test:e2e:db -- --reset

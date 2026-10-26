@@ -24,7 +24,7 @@ This repo runs its own Docker stack, so it can run beside another clone of the p
 
 Commands:
 
-- `docker compose up -d` starts the `ai-studio` project (Postgres, MinIO).
+- `docker compose up -d postgres minio` starts the infra of the `ai-studio` project. A bare `docker compose up -d` also builds and starts the `app` and `scheduler` containers, which local dev does not use.
 - `npm run db:migrate` applies the migrations. Never run a bare `npx prisma migrate deploy`: the npm script runs the preflight first.
 - `npm run db:seed` seeds the admin and the demo kit (also behind the preflight).
 - `npm run test:e2e:db -- --reset` drops `ai_studio_test` (with `WITH (FORCE)`; it refuses any name that does not end in `_test`), then creates, migrates and seeds it. Use it for every clean E2E gate. Without `--reset` it keeps the database.

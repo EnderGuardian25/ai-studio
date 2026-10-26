@@ -71,7 +71,7 @@
     - `forkIdentity.test.ts`: one negative case per check (AC-02).
     - AC-04, AC-05, AC-06 greps go in the report.
 
-- [ ] `T4` — W1 gate, stack check, scan and push
+- [x] `T4` — W1 gate, stack check, scan and push
   - Files: `.specclaw/changes/032-fork-folio-restore/reports/pre-push-scan.md`, `reports/T4.md`
   - Estimate: medium (one full E2E run)
   - Kind: test

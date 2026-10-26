@@ -27,3 +27,33 @@ The range contains the company prod hostname `studio.bistecglobal.com`, Coolify 
 ## Decision
 
 No credential found. The user pre-approved the push after the W1 gate (2026-10-27). Re-run the scan over any new range before that push.
+
+---
+
+# Re-scan: `59f3b222..<W1 tip>` (2026-10-27, before the W1 push)
+
+The range is the 032 plan and W1 (T1 to T4), 8 commits, all by the same author. The scan was run on `59f3b222..be013940` before the T4 commit and again on `59f3b222..HEAD` after it (the T4 commit adds only reports, evidence and two doc lines), with the same result.
+
+## Range scan
+
+Same pattern as above, over `git log -p 59f3b222..HEAD`:
+
+| Hit                                               | Where                                                                                                  | Verdict       |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------ | ------------- |
+| `COOLIFY_API_TOKEN`                               | only the name: removed lines of `docker-publish.yml` (T1), prose in moved docs, the scan command above | no value      |
+| `sk-ant-…`                                        | the fixture names quoted in this file's first table                                                    | test fixtures |
+| `ghp_`, `AKIA`, private keys, `bstk_`, `sk-proj-` | none                                                                                                   | —             |
+
+## Local env values
+
+Every value of 12 or more characters in the local `.env` and `.env.test` (copied to the scratchpad before T2; URLs, paths, DB and bucket names excluded) was searched for in the range's patch text with a fixed-string match. **No hit.** Only key names were printed.
+
+## `origin` check
+
+`git remote get-url origin` → `https://github.com/EnderGuardian25/ai-studio.git`.
+
+An `upstream` remote (`bistec-oss/studio`, no fetched refs) reappeared in `.git/config` at 02:52 during the gate run. The user ruled to remove it, and it was removed; it came back at 03:21. The cause is GitHub Desktop (running since 01:50), which adds an `upstream` remote for a fork on refresh; nothing in the repo or its hooks adds it. It has no effect on this push, which names `origin` explicitly. Stopping it for good is a GitHub Desktop setting, left to the user.
+
+## Decision
+
+No credential found. The W1 gate is green (`reports/T4.md`). Push `v2` to `origin` (pre-approved by the user, 2026-10-27).
