@@ -7,7 +7,7 @@
 
 ---
 
-## ⏸️ 2026-10-26 — PICK UP HERE: 031 (v2 final polish) is BUILT (T1 to T19, gates green); next: `/specclaw:verify 031-v2-final-polish`, then the user's go-ahead for the `v2` → `main` merge
+## ⏸️ 2026-10-26 — PICK UP HERE: 031 (v2 final polish) is VERIFIED PASS (46/46 ACs, 2026-10-27; [verify-report](../.specclaw/changes/031-v2-final-polish/verify-report.md)); next: the user's go-ahead for the `v2` → `main` merge, after the pre-merge prod checklist
 
 **State.** Every 031 group is built and committed on `v2`: T1 to T18, plus the CI timeout commit `5621bff`. T19 wrote these docs, recaptured `docs/ui-reference/screen-light.png` and `screen-dark.png` (011 T13's method), and ran the full gate below. Nothing merges to `main`. The plan is in [`.specclaw/changes/031-v2-final-polish/`](../.specclaw/changes/031-v2-final-polish/) (spec, design, tasks, `reports/T1.md` to `T19.md`, `measure/` and `look-check/`).
 
