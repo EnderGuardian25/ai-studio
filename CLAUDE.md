@@ -4,7 +4,19 @@ This repo contains planning documents for **bistec-studio**, an internal marketi
 
 ## ✅ Outstanding work — START HERE (updated 2026-10-26)
 
-- **⏸️ 2026-10-26 — PICK UP HERE: 031 (v2 final polish, the last change before the `v2` → `main` merge) is PROPOSED; the deep party panel returned CHANGES_REQUESTED (43 upheld: 5 BLOCK, 28 WARN, 10 NOTE) and the user answered every BLOCK. Next: ask the user to approve it as architectural, then `/specclaw:plan 031-v2-final-polish`.** The resume steps are in the 031 section at the top of [`docs/handoff.md`](docs/handoff.md). The scope and both sets of user decisions are in [`proposal.md`](.specclaw/changes/031-v2-final-polish/proposal.md); the panel is [`party-report.md`](.specclaw/changes/031-v2-final-polish/party-report.md), and group G is scoped by [`wording-scan.md`](.specclaw/changes/031-v2-final-polish/wording-scan.md) (W-01 to W-41).
+- **⏸️ 2026-10-26 — PICK UP HERE: 031 (v2 final polish, the last change before the `v2` → `main` merge) is PLANNED. Nothing is built. Next: `/specclaw:build 031-v2-final-polish`, starting at T1.**
+  - **Approval:** the user approved the proposal as architectural on 2026-10-26.
+  - **The plan** is in `.specclaw/changes/031-v2-final-polish/`:
+    - [`spec.md`](.specclaw/changes/031-v2-final-polish/spec.md): 50 FR, 9 NFR and 46 AC, with every upheld panel finding mapped to where it is addressed;
+    - [`design.md`](.specclaw/changes/031-v2-final-polish/design.md);
+    - [`tasks.md`](.specclaw/changes/031-v2-final-polish/tasks.md): 19 tasks in 9 waves, in the order H, G, C, B, E, F, A, D, then close.
+  - **The user's answers on the plan (2026-10-26):**
+    - accept the six design choices as written (listed in the handoff 031 section);
+    - T7 runs on opus; every other task on sonnet, and T19 on haiku;
+    - OP-031 (T17) runs on `bistec_studio_op1` with the user's OpenAI key; ask again before applying the migrations there and before any call;
+    - commit and push the plan.
+  - **Resume steps, watch-fors and baselines:** the 031 section at the top of [`docs/handoff.md`](docs/handoff.md).
+- **2026-10-26 (superseded as the pickup point by the entry above) — 031 was PROPOSED; the deep party panel returned CHANGES_REQUESTED (43 upheld: 5 BLOCK, 28 WARN, 10 NOTE) and the user answered every BLOCK.** The resume steps are in the 031 section at the top of [`docs/handoff.md`](docs/handoff.md). The scope and both sets of user decisions are in [`proposal.md`](.specclaw/changes/031-v2-final-polish/proposal.md); the panel is [`party-report.md`](.specclaw/changes/031-v2-final-polish/party-report.md), and group G is scoped by [`wording-scan.md`](.specclaw/changes/031-v2-final-polish/wording-scan.md) (W-01 to W-41).
   - **The groups:**
     - **A**, Apply to image with no model call. It writes through `commitDraftRevision`, refuses `ambiguous`, starts with an 80% re-measure gate and is labelled "beta" below it, and is offered only when the state is `stale`.
     - **B**, the full Google Fonts catalogue snapshot, with a refresh contract, plus script fonts keyed by script (Sinhala only, empty by default) that code puts into the font stacks and the font request. Posts only.

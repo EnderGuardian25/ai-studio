@@ -1,0 +1,12 @@
+{
+  "change": "031-v2-final-polish",
+  "phase": "tasks",
+  "branch": "",
+  "size": "architectural",
+  "phases": {
+    "proposal": { "status": "approved", "at": "2026-10-26T11:05:48Z" },
+    "spec": { "status": "done", "at": "2026-10-26T11:15:49Z" },
+    "design": { "status": "done", "at": "2026-10-26T11:18:02Z" },
+    "tasks": { "status": "done", "at": "2026-10-26T11:19:46Z" }
+  }
+}
