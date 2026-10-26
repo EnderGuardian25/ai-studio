@@ -224,7 +224,7 @@
 
 ### Wave 7: A, Apply to image
 
-- [ ] `T13` — The pure module and the re-measure gate
+- [x] `T13` — The pure module and the re-measure gate
   - Files: `package.json` and `package-lock.json` (`parse5`), `src/lib/applyText/{vocab,candidates,splice,noticeText,index}.ts` (new), `.specclaw/changes/031-v2-final-polish/measure/` (new: script and results), `tests/unit/{applyTextCandidates,applyTextSplice}.test.ts`
   - Estimate: medium
   - Kind: impl
