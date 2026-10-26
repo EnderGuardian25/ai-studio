@@ -8,9 +8,7 @@ name: E2E (security-fix regression gate)
 # This workflow gates every PR and every push to v2 and main: checks only
 # (typecheck, lint, E2E, unit, the upgrade path from main's schema, build, a
 # docker build with no push, and the boot-time env preflight in that image).
-# It publishes and deploys nothing. Deploying is docker-publish.yml's job: it
-# runs on pushes to main only, pushes the image to GHCR, redeploys both Coolify
-# resources and verifies the deployed commit at /api/health.
+# It publishes and deploys nothing; this repo has no deploy workflow yet.
 
 on:
   pull_request:

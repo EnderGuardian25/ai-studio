@@ -58,7 +58,7 @@
     - AC-09: run each preflighted script once with a temporary env file pointing at `localhost:5432/bistec_studio_test`, confirm exit 1 and the refusal, touch no DB.
     - Do not start containers in this task; T4 does.
 
-- [ ] `T3` — Fork docs and the identity guard
+- [x] `T3` — Fork docs and the identity guard
   - Files: `CLAUDE.md`, `docs/history.md` (new), `docs/handoff.md`, `docs/fork-history.md`, `docs/cold-start.md`, `docs/e2e-test-plan.md`, `.claude/launch.json`, `docker-compose.test.yml` (comment only), the seven docs of FR-05 (delete), `tests/unit/forkIdentity.test.ts` (new)
   - Estimate: medium
   - Kind: docs

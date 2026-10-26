@@ -1,5 +1,11 @@
 # bistec-studio — Session Handoff
 
+## Current state lives in `CLAUDE.md`
+
+The current state of this repo, the rules and the change in flight are in [`../CLAUDE.md`](../CLAUDE.md), section "Current state". Nothing here restates them.
+
+> **History. Not instructions.** The company-era entries (2026-10-18 to 2026-10-27) describe `bistec-oss/studio`.
+
 > **⚠️ 2026-10-27: this repo is the fork `EnderGuardian25/ai-studio` again.** Everything below, down to the 2026-10-14 section, was written in the company repo `bistec-oss/studio` (changes 018–031). It does **not** describe this repo's remotes, deploy or rules. The current state and next step are in the **top entry of [`CLAUDE.md`](../CLAUDE.md)**, which is authoritative: change 032 (fork restore) is **planned** (2026-10-27; 12 tasks in 3 waves, [`tasks.md`](../.specclaw/changes/032-fork-folio-restore/tasks.md)), and the next step is `/specclaw:build 032-fork-folio-restore`, starting at T1. The resume steps are in that `CLAUDE.md` entry. 032 T3 rewrites this file.
 
 **Date:** 2026-10-26 (latest: **031 v2 final polish BUILT (T1 to T18; T19 docs done); the gate and `/specclaw:verify` are next**; earlier: **031 PLANNED (approved architectural; spec 50 FR / 46 AC; 19 tasks)**; **031 PROPOSED; deep panel CHANGES_REQUESTED; the user answered every BLOCK**; **030 stale-headline badge VERIFIED PASS 20/20**; earlier: **030 PROPOSED, deep panel answered**; **025 hero product screenshots VERIFIED PASS 18/18**; earlier: **025 BUILT (T1 to T14)**; **025 OP-025 PASSED at all three sizes after Amendment A1 (screen detection)**; earlier 2026-10-25: **025 Group A built (T1 to T5)**; **028 image looks (027b) VERIFIED PASS 21/21: OP-028 ran (full-bleed-scene passed, spotlight failed) and T7 moved Event and Hiring; 029 CLI usage-limit message VERIFIED PASS 5/5; CI green at `5db8953`; next is 025**; earlier 2026-10-24: **027a post styles VERIFIED PASS 22/22**; **006 product observability VERIFIED PASS 17/17**; earlier: **007 VERIFIED PASS 22/22; 009 OP-1 PASSED 6 of 6 (local run); 006 planned; 026 VERIFIED PASS 11/11; draft PR #43 closed; 010 dropped**). Earlier 2026-10-23: **024 caption credential route VERIFIED PASS, 17/17 ACs**; gates: unit 3024/3024, render 47/47, E2E 431/3/0/0, CI green at `cd9d411` (runs 39837152549, 39837162772; the PR run passed on one rerun after a CI-runner Chromium launch timeout in the render harness)). 2026-10-21: **009 hero imagery Phase 1 VERIFIED PASS (25/25), commit `d3534e0`; OP-1 is the user's pending step**; before it: **023 scheduler heartbeat VERIFIED PASS**; gates: unit 2947/2947, render 47/47, E2E 422/3/0/0, CI green at `f8f063c` (runs 39604699552, 39604706638)). 2026-10-20: **020 Create post button, 019 claim token, 021 Graphite re-theme, 018 and 022 VERIFIED PASS; the build order is complete**. 2026-10-19: this repo adopted the fork's `v2` on 2026-10-18. The fork-era sections, 2026-10-07 to 2026-10-14, moved to [`fork-history.md`](fork-history.md). Previous: 2026-10-07 (005 verified PASS; 011 planned, wave 1 built). Previous: 2026-10-03 (004 finished and verified PARTIAL, Phase 0 only; 005 built 9/10, waiting on one operator check). Before that: 2026-09-28 (build session — 004 Waves 1–3 built, MinIO → silo, PR #42 + draft PR #43). Before that: 2026-09-23 (later, later the same day: proposal **012** per-channel captions + copy→caption rename, a floating **Create post** button folded into 011, and a launch-video legibility pass. Before that: planning session — proposals 008–011 + roadmap, 004 re-planned to 24 tasks incl. Phase 0, and the deploy pipeline found broken: Coolify 401 since 2026-09-15). Previous: 2026-07-28 (copy-edit status clobber fix).
@@ -514,7 +520,7 @@ The procedure runs on the scratch database, never on `bistec_studio`. It uses th
 
 ## 🚦 Pre-merge prod checklist: `v2` → `main` (022 FR-08)
 
-`main` deploys to company prod (`studio.bistecglobal.com`), which holds real data: the Hearts Academy team, its kit and the IRP posts. `v2` carries changes 004–031 (22 migrations at `caf0c0b`; regenerate the list at merge time). The DevOps handover is [`devops-deploy-handover.md`](devops-deploy-handover.md). Nothing in this section merges or deploys. **The merge waits on the user's go-ahead and on the three blocking steps below.**
+`main` deploys to company prod (`studio.bistecglobal.com`), which holds real data: the Hearts Academy team, its kit and the IRP posts. `v2` carries changes 004–031 (22 migrations at `caf0c0b`; regenerate the list at merge time). The DevOps handover is the DevOps deploy handover doc (deleted). Nothing in this section merges or deploys. **The merge waits on the user's go-ahead and on the three blocking steps below.**
 
 ### The named waiver
 
@@ -571,7 +577,7 @@ Run these right after the deploy, before users create new drafts:
 - **023 scheduler heartbeat (FR-08).** This is a check, not a blocking step.
   - The migration `20261021120000_worker_heartbeat` is additive: one new table, no change to an existing one. A redeploy applies it.
   - The previous image runs against it, so an image rollback needs no down script. The manual down script is `prisma/rollback/023-scheduler-heartbeat.down.sql`.
-  - **After the deploy, confirm the banner:** with the scheduler resource running, the "Scheduler offline" banner on a campaign's queue panel clears within about a minute of its first tick. A banner that stays means the scheduler resource is not running (B4); read [`scheduler-b4-diagnosis-2026-08-03.md`](scheduler-b4-diagnosis-2026-08-03.md). The banner is also the quick B4 signal.
+  - **After the deploy, confirm the banner:** with the scheduler resource running, the "Scheduler offline" banner on a campaign's queue panel clears within about a minute of its first tick. A banner that stays means the scheduler resource is not running (B4); read the 2026-08-03 scheduler B4 diagnosis (deleted). The banner is also the quick B4 signal.
 - **006 product observability (AC-01, AC-13).** This is a check, not a blocking step.
   - The migration `20261024120000_analytics_events` is additive: two new tables and one enum, no change to an existing table. A redeploy applies it.
   - The previous image runs against it, so an image rollback needs no down script. The manual down script is `prisma/rollback/006-product-observability.down.sql`; it drops both tables and the enum, so it discards every recorded event.
@@ -915,7 +921,7 @@ Stamps need nothing: `DraftCaption.model` and `Draft.headlineModel` are separate
 
 ### 🔴 Urgent ops (Coolify administrator), unchanged and not blocked on any merge
 
-Swap prod MinIO to silo (`docs/minio-silo-migration.md` on the #42 branch; CVE-2026-40344), and rotate `COOLIFY_API_TOKEN` (`deploy` + `read`, created by an Admin/Owner). Details are in the 2026-09-28 section below.
+Swap prod MinIO to silo (the MinIO to silo migration runbook (deleted) on the #42 branch; CVE-2026-40344), and rotate `COOLIFY_API_TOKEN` (`deploy` + `read`, created by an Admin/Owner). Details are in the 2026-09-28 section below.
 
 ---
 
@@ -925,15 +931,15 @@ Swap prod MinIO to silo (`docs/minio-silo-migration.md` on the #42 branch; CVE-2
 
 ### Where things are
 
-| What                                         | Where                                                                                                                                                                                                                                                                                                                                      |
-| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **PR #42** `fix/ci-deploy-pipeline` → `main` | Open, **not merged**. It holds 004 Phase 0 (T2–T5): readable Coolify redeploys, POST `/deploy`, `/api/health` → `{ ok, commit }`, CI verifying the deployed SHA, action majors, Node 22. Plus the **MinIO → silo** switch (`edb20b10`, `f52189e8`) and the admin runbook `docs/minio-silo-migration.md`. Local worktree: `../designer-ci`. |
-| **PR #43** `v2` → `main`                     | **Closed 2026-10-23** (user decision). It existed only so CI ran on `v2`; since 013, `e2e.yml` runs on every `v2` push, so it only duplicated each run. The `v2` → `main` merge will be a new PR, on the user's go-ahead.                                                                                                                  |
-| **`v2`**                                     | Pushed. It holds 004 Waves 2–3 plus the tracking commits.                                                                                                                                                                                                                                                                                  |
-| `main` / prod                                | `main` = `09a38b71`; **prod runs `9ea4c045`**. Deploys have been broken since 2026-09-15 (Coolify 401).                                                                                                                                                                                                                                    |
-| 004 plan and progress                        | `.specclaw/changes/004-design-instruction-fidelity/tasks.md`: task IDs were **renumbered to T1–T24** (old→new table at the top). Each task has its verification report under `reports/`.                                                                                                                                                   |
-| Wave 4 rulings                               | **In `tasks.md` itself**, as "Carried in" notes on T17–T21. Read them before building.                                                                                                                                                                                                                                                     |
-| SDD ledger                                   | `.superpowers/sdd/tasks/progress.md`, which holds every ruling, deferred minor and fix round. **It is gitignored, so it exists on this machine only.** Its binding content was copied into the tasks.md carry notes.                                                                                                                       |
+| What                                         | Where                                                                                                                                                                                                                                                                                                                                                     |
+| -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **PR #42** `fix/ci-deploy-pipeline` → `main` | Open, **not merged**. It holds 004 Phase 0 (T2–T5): readable Coolify redeploys, POST `/deploy`, `/api/health` → `{ ok, commit }`, CI verifying the deployed SHA, action majors, Node 22. Plus the **MinIO → silo** switch (`edb20b10`, `f52189e8`) and the admin runbook the MinIO to silo migration runbook (deleted). Local worktree: `../designer-ci`. |
+| **PR #43** `v2` → `main`                     | **Closed 2026-10-23** (user decision). It existed only so CI ran on `v2`; since 013, `e2e.yml` runs on every `v2` push, so it only duplicated each run. The `v2` → `main` merge will be a new PR, on the user's go-ahead.                                                                                                                                 |
+| **`v2`**                                     | Pushed. It holds 004 Waves 2–3 plus the tracking commits.                                                                                                                                                                                                                                                                                                 |
+| `main` / prod                                | `main` = `09a38b71`; **prod runs `9ea4c045`**. Deploys have been broken since 2026-09-15 (Coolify 401).                                                                                                                                                                                                                                                   |
+| 004 plan and progress                        | `.specclaw/changes/004-design-instruction-fidelity/tasks.md`: task IDs were **renumbered to T1–T24** (old→new table at the top). Each task has its verification report under `reports/`.                                                                                                                                                                  |
+| Wave 4 rulings                               | **In `tasks.md` itself**, as "Carried in" notes on T17–T21. Read them before building.                                                                                                                                                                                                                                                                    |
+| SDD ledger                                   | `.superpowers/sdd/tasks/progress.md`, which holds every ruling, deferred minor and fix round. **It is gitignored, so it exists on this machine only.** Its binding content was copied into the tasks.md carry notes.                                                                                                                                      |
 
 ### What was built (all reviewed by independent task and whole-wave reviews)
 
@@ -958,9 +964,9 @@ Swap prod MinIO to silo (`docs/minio-silo-migration.md` on the #42 branch; CVE-2
 
 1. **Swap prod MinIO to silo now.** MinIO's community edition is dead: Docker Hub deleted it on 2026-09-11, quay.io has refused anonymous pulls since 2026-09-24, and dl.min.io returns 410.
    - Prod's version has **CVE-2026-40344**: anyone holding an access key can write any object. **Our presigned URLs expose the access key.**
-   - The runbook is `docs/minio-silo-migration.md` (PR #42 branch): record the image, tag a rollback copy, back up the volume, change only `image:`, verify, roll back if needed.
+   - The runbook is the MinIO to silo migration runbook (deleted) (PR #42 branch): record the image, tag a rollback copy, back up the volume, change only `image:`, verify, roll back if needed.
    - Tested: data compatibility both ways, and full E2E 180/0 against silo.
-2. **Rotate `COOLIFY_API_TOKEN`** (`docs/coolify-token-rotation.md`). It needs the **`deploy` + `read`** abilities and must be created by a team **Admin/Owner**. Before PR #42 merges, prove the token with the doc's direct POST, **not** by re-running run 34988162569, which still sends GET and gets 405.
+2. **Rotate `COOLIFY_API_TOKEN`** (the Coolify token rotation runbook (deleted)). It needs the **`deploy` + `read`** abilities and must be created by a team **Admin/Owner**. Before PR #42 merges, prove the token with the doc's direct POST, **not** by re-running run 34988162569, which still sends GET and gets 405.
 
 ### Next actions, in order
 
@@ -1055,7 +1061,7 @@ Review proposals 005–012 with the user, then `/specclaw:plan` them in roadmap 
 | `main`                                | untouched at `09a38b71`. **Prod runs `9ea4c045`** (same code; `09a38b71` was docs-only and never deployed, see the CI finding below). |
 | Order + dependencies                  | [`.specclaw/ROADMAP.md`](../.specclaw/ROADMAP.md): read it first                                                                      |
 | Proposals                             | `.specclaw/changes/{004…011}/proposal.md`; **004** also has spec/design/tasks                                                         |
-| Coolify token handoff                 | [`docs/coolify-token-rotation.md`](coolify-token-rotation.md)                                                                         |
+| Coolify token handoff                 | the Coolify token rotation runbook (deleted)                                                                                          |
 | Comparison evidence (ChatGPT vs ours) | `.specclaw/changes/009-hero-image-design/evidence/`                                                                                   |
 
 **Branch rule (user decision):** everything lands on `v2` and merges to `main` **in one go, only once confirmed working and the user says go**. The one exception is **004 Phase 0** (the CI/deploy fix): a small PR to `main` on its own branch, because the deploy steps only run on `main` and can't be proven from `v2`. `main` is what CI auto-deploys, so **nothing on `v2` is ever on prod** until the merge. Confirm features locally.
@@ -1064,13 +1070,13 @@ Review proposals 005–012 with the user, then `/specclaw:plan` them in roadmap 
 
 The post-merge run for PR #41 ([run 34988162569](https://github.com/bistec-oss/studio/actions/runs/34988162569)) built and pushed the image to GHCR, then **Coolify returned `401`** on the redeploy call. `COOLIFY_API_TOKEN` is dead, and the scheduler redeploy step never ran. No harm yet, but **the next code merge will silently not ship**, and the `v2` merge would be that merge. CLAUDE.md's "a green `main` build **does** redeploy prod" is **no longer true** until this is fixed.
 
-- The **token** is rotated by the Coolify administrator (user decision: not the user, not Claude). Send them `docs/coolify-token-rotation.md`.
+- The **token** is rotated by the Coolify administrator (user decision: not the user, not Claude). Send them the Coolify token rotation runbook (deleted).
 - The **code hardening** is 004 **Wave 1** (T2–T6; renumbered 2026-09-27 — was T0b–T0f): readable deploy failures, both redeploys always attempted, a public `/api/health` → `{ ok, commit }` with the SHA baked into the image, CI verifying prod serves the new commit, `docker-publish.yml` actions off Node 20, and `node:20-alpine` → `node:22-alpine`.
 - Not related: the two E2E failures on PR #41 (`Start MinIO`) were already fixed inside that PR. Docker Hub withdrew `minio/minio`; every reference now uses `quay.io`.
 
 ### Next actions, in order
 
-1. **Send the Coolify handoff** to whoever administers Coolify. Ask them to also read the **scheduler** resource's first log lines, which identify the B4 cause (`docs/scheduler-b4-diagnosis-2026-08-03.md`).
+1. **Send the Coolify handoff** to whoever administers Coolify. Ask them to also read the **scheduler** resource's first log lines, which identify the B4 cause (the 2026-08-03 scheduler B4 diagnosis (deleted)).
 2. **Build 004 Phase 0.** `git switch main && git pull && git switch -c fix/ci-deploy-pipeline`, then T2 → T6. Put **T5 (Node 22) in its own commit.** It needs Docker Desktop running for `docker build`, and a real render + `claude --version` inside the image. Open the PR to `main`. Merge only on the user's go-ahead. After merging, **merge `main` into `v2`** so `v2` carries it.
 3. **004 Phases 1 → 3 on `v2`** (Waves 1–4, hard-ordered). Phase 1's font fix (AC-01) is only provable inside the built image, never on Windows (host Chromium has Segoe UI Symbol).
 4. **Review proposals 005–012** with the user (each ends in open questions), then `/specclaw:plan` them one at a time in roadmap order: **011 foundation → 012 → 008 → 009 → 010**, then the rest. _(Revised later on 2026-09-23; see the section above.)_
@@ -1328,9 +1334,9 @@ The prod **Bistec** team had **no brand kits** (they'd been cleaned up), so both
 
 ## ⏸️ 2026-07-24 — the redeploy blocker (RESOLVED — kept for context)
 
-> **Superseded.** The redeploy happened on 2026-07-24 and **B3 is fixed**; **B5** (found in that run) was fixed by **PR #37** `fb8216c3`. **B4** (scheduler worker not running) is the only item here still open. See [`docs/prod-e2e-findings-2026-07-24.md`](prod-e2e-findings-2026-07-24.md) for the post-redeploy run, and the 2026-07-27 section above for the separate migrations gap.
+> **Superseded.** The redeploy happened on 2026-07-24 and **B3 is fixed**; **B5** (found in that run) was fixed by **PR #37** `fb8216c3`. **B4** (scheduler worker not running) is the only item here still open. See the 2026-07-24 prod E2E findings (deleted) for the post-redeploy run, and the 2026-07-27 section above for the separate migrations gap.
 
-**All code is merged to `main`. The one remaining blocker is a VPS/Coolify redeploy** — prod is still running the pre-fix image. Full detail: `docs/prod-e2e-findings-2026-07-23.md`.
+**All code is merged to `main`. The one remaining blocker is a VPS/Coolify redeploy** — prod is still running the pre-fix image. Full detail: the 2026-07-23 prod E2E findings (deleted).
 
 > Reference: **[`docs/mcp-acp-guide.md`](mcp-acp-guide.md)** documents the MCP/ACP machine-access surfaces — `bstk_` API keys, MCP tools + client config (where `MCP_API_KEY` goes), ACP capabilities, team-scoping, and the CLI prompt-injection / SSRF hardening.
 

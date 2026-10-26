@@ -982,6 +982,6 @@ The 2026-10-07 state is kept below for history.
   - B4 (scheduler) and the team Claude tokens **on company prod**;
   - the prod test-data wipe.
 
-  These belong to the company's Coolify admin. The runbooks (`docs/coolify-token-rotation.md`, `docs/minio-silo-migration.md`, `docs/scheduler-b4-diagnosis-2026-08-03.md`) stay in the tree for reference.
+  These belong to the company's Coolify admin. The runbooks (the Coolify token rotation runbook (deleted), the MinIO to silo migration runbook (deleted), the 2026-08-03 scheduler B4 diagnosis (deleted)) stay in the tree for reference.
 
 - **The "`v2` merges to `main` in one go" rule is kept for the fork:** `v2` is the integration branch, and fork `main` moves only on the user's go-ahead. It no longer deploys anything. Once the fork has its own deploy target, write that rule here.

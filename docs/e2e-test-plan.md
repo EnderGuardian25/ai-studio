@@ -83,13 +83,13 @@ This document is the authoritative test design. Implement the cases below as Pla
 
 A Playwright skeleton existed under `tests/e2e/` but was **not functional as written**. All five blockers below are now **RESOLVED** (2026-06-23) — the 6 spec files (19 tests) run and pass. History kept for traceability.
 
-| #   | Problem (original)                                                                                                                                              | Resolution                                                                                                                                            |
-| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1   | **Mock hooks never implemented.** Tests gated on `MOCK_AI`/`MOCK_PUPPETEER`/`MOCK_SOCIAL` but nothing in `src/` read them.                                      | ✅ Implemented in **`src/lib/testHooks.ts`** + 5 seam points (see §3). Dormant unless the flag is `true`.                                             |
-| 2   | **Contract drift — `/api/posts`.** Spec sent `{channels:[…]}`, expected an array.                                                                               | ✅ Spec rewritten to singular `channel`, expects `{postId,status}` (201).                                                                             |
-| 3   | **Contract drift — `/api/generate/assemble-a/-b`.** Spec asserted `draft.htmlContent/status/imageUrl` and **201**. Route returns **200 `{draftId,exportUrl}`**. | ✅ Spec asserts `{draftId,exportUrl}` at 200, then `GET /api/drafts/[id]` for status/htmlContent/imageUrl.                                            |
-| 4   | **Port mismatch** (config `:3001` vs dev `:3000`).                                                                                                              | ✅ Test app runs on **`:3001`** (`npm run test:e2e:serve`), matching the config default.                                                              |
-| 5   | **No DB isolation / teardown.**                                                                                                                                 | ✅ Dedicated **`bistec_studio_test`** DB (`npm run test:e2e:db`); the dev DB is never touched. (Per-run truncation between runs still TODO — see §2.) |
+| #   | Problem (original)                                                                                                                                              | Resolution                                                                                                                                        |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | **Mock hooks never implemented.** Tests gated on `MOCK_AI`/`MOCK_PUPPETEER`/`MOCK_SOCIAL` but nothing in `src/` read them.                                      | ✅ Implemented in **`src/lib/testHooks.ts`** + 5 seam points (see §3). Dormant unless the flag is `true`.                                         |
+| 2   | **Contract drift — `/api/posts`.** Spec sent `{channels:[…]}`, expected an array.                                                                               | ✅ Spec rewritten to singular `channel`, expects `{postId,status}` (201).                                                                         |
+| 3   | **Contract drift — `/api/generate/assemble-a/-b`.** Spec asserted `draft.htmlContent/status/imageUrl` and **201**. Route returns **200 `{draftId,exportUrl}`**. | ✅ Spec asserts `{draftId,exportUrl}` at 200, then `GET /api/drafts/[id]` for status/htmlContent/imageUrl.                                        |
+| 4   | **Port mismatch** (config `:3001` vs dev `:3000`).                                                                                                              | ✅ Test app runs on **`:3001`** (`npm run test:e2e:serve`), matching the config default.                                                          |
+| 5   | **No DB isolation / teardown.**                                                                                                                                 | ✅ Dedicated **`ai_studio_test`** DB (`npm run test:e2e:db`); the dev DB is never touched. (Per-run truncation between runs still TODO — see §2.) |
 
 > **Bottom line (2026-06-23):** the 6 spec files are now green coverage, not drafts. The much larger §6 catalog (RBAC/IDOR, the §K remediation regression suite, §L browser flows) was still to be written at this point.
 >
@@ -98,8 +98,8 @@ A Playwright skeleton existed under `tests/e2e/` but was **not functional as wri
 ### Reproducing the green run
 
 ```bash
-# 0. Containers up (postgres + minio:9000 published) — docs/cold-start.md §0
-npm run test:e2e:db        # create + migrate + seed the bistec_studio_test DB
+# 0. Containers up (postgres + minio:9100 published) — docs/cold-start.md §0
+npm run test:e2e:db -- --reset   # drop, then create + migrate + seed the ai_studio_test DB (a clean gate)
 npm run test:e2e:serve     # terminal A: app on :3001 with .env.test (mocks on)
 npm run test:e2e:mock      # terminal B: run the suite (sets MOCK_* + TEST_BASE_URL)
 ```
@@ -120,9 +120,9 @@ E2E here means **black-box tests against a running app + real Postgres + real Mi
 
 ### Infrastructure
 
-1. Postgres + MinIO containers up (`docker compose up -d`), MinIO `:9000` published to host.
-2. A **dedicated test database** (e.g. `bistec_studio_test`) so runs are disposable. Point `DATABASE_URL` at it.
-3. Migrations applied: `npx prisma migrate deploy` (must include `20260623153740_h9_indexes` and `20260623154752_h12_scheduler_claim`).
+1. Postgres + MinIO containers up (`docker compose up -d`), MinIO `:9100` published to host.
+2. A **dedicated test database** (`ai_studio_test`) so runs are disposable. Point `DATABASE_URL` at it.
+3. Migrations applied: `npm run db:migrate` (must include `20260623153740_h9_indexes` and `20260623154752_h12_scheduler_claim`).
 4. Seed the baseline: `npm run db:seed` (admin user + Bistec kit + Hearts Talk kit). ~~and `node --env-file=.env.test scripts/seed-cli-provider.mjs` if using CLI mode.~~ **Don't seed the `cli` COPY provider (2026-07-27):** CLI mode needs no COPY provider at all now (PR #30 server-side, PR #40 client-side), and that row **masks provider-gating bugs** — it is exactly why PR #40's dead Generate button never reproduced locally. `.env.test` runs `DESIGN_PROVIDER=claude-html` (API mode) anyway, so it was never needed here.
 
 ### Required `.env.test`
@@ -133,11 +133,11 @@ E2E here means **black-box tests against a running app + real Postgres + real Mi
 NEXT_PUBLIC_APP_URL=http://localhost:3001
 BETTER_AUTH_SECRET=<copy from .env>
 BETTER_AUTH_URL=http://localhost:3001
-DATABASE_URL=postgresql://bistec:bistec@localhost:5432/bistec_studio_test
-POSTGRES_DB=bistec_studio_test
+DATABASE_URL=postgresql://bistec:bistec@localhost:5442/ai_studio_test
+POSTGRES_DB=ai_studio_test
 POSTGRES_USER=bistec
 POSTGRES_PASSWORD=bistec
-MINIO_ENDPOINT=http://localhost:9000
+MINIO_ENDPOINT=http://localhost:9100
 MINIO_ACCESS_KEY=minioadmin
 MINIO_SECRET_KEY=minioadmin
 MINIO_ROOT_USER=minioadmin
@@ -1168,10 +1168,11 @@ The mock suite proves the mechanism with mock replies; it records no real model 
 Mock hooks (§3) are now built, and `.env.test` + the npm scripts below wire everything together. `.env.test` carries the test `DATABASE_URL`, `MINIO_*`, secrets, and `MOCK_AI/MOCK_PUPPETEER/MOCK_SOCIAL=true`; it is loaded explicitly via `node --env-file=.env.test` because `next dev` does not auto-load it.
 
 ```bash
-# 1. infra — postgres + minio (:9000 published). See docs/cold-start.md §0.
+# 1. infra — postgres + minio (:9100 published). See docs/cold-start.md §0.
 docker compose up -d
-# 2. test DB: create + migrate + seed (admin, Bistec kit, Hearts Talk, cli provider)
-npm run test:e2e:db
+# 2. test DB: drop, create, migrate and seed (admin, Bistec kit, Hearts Talk, cli provider).
+#    Add `-- --reset` for a clean gate; the preflight refuses another clone's stack.
+npm run test:e2e:db -- --reset
 # 3. start the app on :3001 with .env.test (mock seams active) — leave running
 npm run test:e2e:serve
 # 4. run the suite (sets MOCK_* + TEST_BASE_URL for the runner)
