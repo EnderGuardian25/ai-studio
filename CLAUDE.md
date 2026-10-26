@@ -16,6 +16,17 @@ This repo contains planning documents for **bistec-studio**, an internal marketi
     - **W2:** Folio values (tokens, fonts, wordmark, `atoms.ts`) from `9f829456`, plus the guards.
     - **W3:** restyle the 023–031 screens through `atoms.ts`/`classes.ts`, add the `DESIGN_SYSTEM.md` sections, re-capture the screenshots, then a full E2E.
     - **No new UI work (020, 009, …) until W3 lands.**
+  - **Resume steps (2026-10-27, after planning):**
+    1. Check `origin` (above). `git status` should be clean on `v2`, ahead of `origin/v2` by the synced range plus the 032 commits. Nothing is pushed yet.
+    2. Run `/specclaw:build 032-fork-folio-restore`. Tasks go one at a time, in order T1 → T12. [`tasks.md`](.specclaw/changes/032-fork-folio-restore/tasks.md) "Process / Gates" holds the rules: models per task, the restyle rule, baselines and briefs.
+    3. **T1** is a commit that only deletes `.github/workflows/docker-publish.yml`. Do not push.
+    4. **T2** rewrites the local `.env`/`.env.test`. Copy them to the scratchpad first, and report only key names, never values. It also adds the preflight. Docker is not needed until **T4**.
+    5. **T4** brings up the `ai-studio` stack, seeds it and runs the full gate. It re-scans `59f3b222..HEAD` into `reports/pre-push-scan.md`, then the orchestrator pushes `origin v2` (pre-approved) and checks CI. **Ask the user before starting the company `designer` stack** for AC-07, which checks that both stacks run together.
+  - **Plan decisions to know** (all in [`spec.md`](.specclaw/changes/032-fork-folio-restore/spec.md)):
+    - **A1:** a 021-only file gets its `9f829456` body back, with imports pointed at `atoms.ts`/`classes.ts`/`GateNotice`. `scripts/check-folio-restore.mjs` (built in T5) checks it. `folio.ts` never returns.
+    - **Restyle rule:** for files touched after 021, W3 changes only class strings, atom references and imports. Copy, `aria-*`, `data-testid` and logic stay as they are.
+    - **Guards:** `uiTokenGuard` gets a Graphite deny-list (`rounded-ui-xl`, `tracking-label`, `/12`, `Plus Jakarta`, `BistecStudioLogo`). Files not yet restyled are exempt through a shrinking `PENDING_RESTYLE` list. T12 sets `W3_DONE = true`, after which the list must stay empty.
+    - **Docs:** T3 moves every dated entry below this one into `docs/history.md`. `CLAUDE.md` keeps one short "Current state" section.
   - **⚠️ Until W1 lands, do not run `docker compose`, `npm run test:e2e:db` or any migrate/seed command in the fork.** The local `.env` still points at port 5432 and `bistec_studio`, which is now the company clone's DB.
   - **Local layout (after the user's move script, 2026-10-27):**
     - fork → `D:\ai-studio`;
