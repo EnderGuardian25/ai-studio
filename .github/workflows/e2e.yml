@@ -25,7 +25,9 @@ concurrency:
 jobs:
   e2e:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    # 031 added suites: the run reached 578 passed in 22.4 min and was then cut at
+    # 25 min during teardown (run 40346142128).
+    timeout-minutes: 40
 
     services:
       postgres:
