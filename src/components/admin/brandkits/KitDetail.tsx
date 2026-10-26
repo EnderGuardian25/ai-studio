@@ -15,6 +15,7 @@ import { ASPECT_LABELS, ASPECT_VALUES, dimensionsLabel } from '@/lib/aspectRatio
 import type { AdminBrandKitDetail } from '@/lib/api-types'
 import { ColorEditor } from './ColorEditor'
 import { FontEditor } from './FontEditor'
+import { ScriptFontPicker } from './ScriptFontPicker'
 import { PromptSection } from './PromptSection'
 import { ColorSwatch } from './shared'
 import { BrandKitAssistantPanel } from './BrandKitAssistantPanel'
@@ -52,6 +53,7 @@ export function KitDetail({ kit, onRefresh }: KitDetailProps) {
   const [name, setName] = useState(kit.name)
   const [colors, setColors] = useState<string[]>(kit.colors)
   const [fonts, setFonts] = useState<Array<{ name: string; url: string }>>(kit.fonts)
+  const [sinhalaFont, setSinhalaFont] = useState<string | null>(kit.scriptFonts?.sinhala ?? null)
   const [saving, setSaving] = useState(false)
   const [templateName, setTemplateName] = useState('')
   const [templateHtml, setTemplateHtml] = useState('')
@@ -68,6 +70,7 @@ export function KitDetail({ kit, onRefresh }: KitDetailProps) {
     setName(kit.name)
     setColors(kit.colors)
     setFonts(kit.fonts)
+    setSinhalaFont(kit.scriptFonts?.sinhala ?? null)
   }, [kit])
 
   async function saveEdit() {
@@ -76,7 +79,7 @@ export function KitDetail({ kit, onRefresh }: KitDetailProps) {
       await apiFetch(`/api/admin/brandkits/${kit.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, colors, fonts }),
+        body: JSON.stringify({ name, colors, fonts, scriptFonts: sinhalaFont ? { sinhala: sinhalaFont } : null }),
       })
       setEditing(false)
       onRefresh()
@@ -266,7 +269,7 @@ export function KitDetail({ kit, onRefresh }: KitDetailProps) {
           {editing ? (
             <>
               <Button size="sm" onClick={saveEdit} disabled={saving}>{saving ? 'Saving…' : 'Save'}</Button>
-              <Button variant="ghost" size="sm" onClick={() => { setEditing(false); setName(kit.name); setColors(kit.colors); setFonts(kit.fonts) }}>Cancel</Button>
+              <Button variant="ghost" size="sm" onClick={() => { setEditing(false); setName(kit.name); setColors(kit.colors); setFonts(kit.fonts); setSinhalaFont(kit.scriptFonts?.sinhala ?? null) }}>Cancel</Button>
             </>
           ) : (
             <Button variant="secondary" size="sm" onClick={() => setEditing(true)}>
@@ -377,17 +380,30 @@ export function KitDetail({ kit, onRefresh }: KitDetailProps) {
         <section className={SECTION}>
           <SectionHead level={3} card title="Fonts" className="mb-3" />
           {editing ? (
-            <FontEditor fonts={fonts} onChange={setFonts} />
-          ) : fonts.length === 0 ? (
+            <div className="space-y-4">
+              <FontEditor fonts={fonts} onChange={setFonts} />
+              <ScriptFontPicker value={sinhalaFont} onChange={setSinhalaFont} />
+            </div>
+          ) : fonts.length === 0 && !kit.scriptFonts?.sinhala ? (
             <span className="text-ui-sm text-fg-muted">No fonts added</span>
           ) : (
             <ul className={RULED_LIST}>
-              {fonts.map(f => (
-                <li key={f.name} className="break-words py-2 text-ui-sm text-fg">
-                  {f.name}
+              {fonts.map((f, i) => (
+                <li key={f.name} className="flex flex-wrap items-center gap-2 break-words py-2 text-ui-sm text-fg">
+                  <span>{f.name}</span>
+                  {i < 2 && <span className={TAG}>{i === 0 ? 'Heading' : 'Body'}</span>}
                 </li>
               ))}
+              {kit.scriptFonts?.sinhala && (
+                <li className="flex flex-wrap items-center gap-2 break-words py-2 text-ui-sm text-fg">
+                  <span>{kit.scriptFonts.sinhala}</span>
+                  <span className={TAG}>Sinhala</span>
+                </li>
+              )}
             </ul>
+          )}
+          {kit.fontCatalogueDate && (
+            <p className="mt-3 text-ui-xs text-fg-muted">Font list from {kit.fontCatalogueDate}</p>
           )}
         </section>
 

@@ -577,6 +577,10 @@ export interface AdminBrandKitDetail {
   name: string
   colors: string[]
   fonts: Array<{ name: string; url: string }>
+  // 031 FR-21: { [script]: family }, or null when none is set.
+  scriptFonts?: Record<string, string> | null
+  // 031 FR-25: the date of the font list the picker searches.
+  fontCatalogueDate?: string
   logoUrl: string | null
   isDefault: boolean
   prompts: BrandKitPrompt[]

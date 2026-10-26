@@ -1109,10 +1109,10 @@ test.describe('Brand kits (T11)', () => {
     await expect(kitPanel.getByRole('textbox', { name: 'Kit name' })).toHaveValue(kit.name)
     await expect(kitPanel.getByRole('button', { name: 'Remove color #0b6e4f' })).toBeVisible()
     await expect(kitPanel.getByRole('button', { name: 'Remove font DM Sans' })).toBeVisible()
-    await kitPanel.getByRole('combobox').fill('Ro')
+    await kitPanel.getByRole('combobox', { name: 'Search Google Fonts', exact: true }).fill('Ro')
     await expect(kitPanel.getByRole('listbox', { name: 'Google Fonts matches' })).toBeVisible()
     await expectNoHorizontalScroll(page, 'kit edit mode at 375px')
-    await kitPanel.getByRole('combobox').press('Escape')
+    await kitPanel.getByRole('combobox', { name: 'Search Google Fonts', exact: true }).press('Escape')
     await expect(kitPanel.getByRole('button', { name: 'Save', exact: true })).toBeVisible()
     await kitPanel.getByRole('button', { name: 'Cancel', exact: true }).click()
 

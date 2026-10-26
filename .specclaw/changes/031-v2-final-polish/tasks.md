@@ -159,7 +159,7 @@
     - Model is opus because the CSS tokenizer and the stamp ripple are the riskiest edits in the change.
     - **Gate:** tsc, lint, unit, `npm run test:render`, `npm run test:upgrade`.
 
-- [ ] `T8` — The searchable picker, the Sinhala picker, the snapshot date; delete the list of 100; §AJ
+- [x] `T8` — The searchable picker, the Sinhala picker, the snapshot date; delete the list of 100; §AJ
   - Files: `src/components/admin/brandkits/FontEditor.tsx`, `src/components/admin/brandkits/ScriptFontPicker.tsx` (new), `src/components/admin/brandkits/KitDetail.tsx`, `src/components/admin/brandkits/googleFonts.ts` (deleted), `tests/unit/uiTokenGuard.test.ts` (exemption removed), `src/app/api/admin/brandkits/[id]/route.ts` (GET `fontCatalogueDate`), `tests/e2e/post-fonts.test.ts` (new), `docs/e2e-test-plan.md` (§AJ)
   - Estimate: medium
   - Kind: impl

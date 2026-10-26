@@ -3,7 +3,7 @@ import { Prisma } from '@prisma/client'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { withTeamAdmin, parseBody } from '@/lib/api/handler'
-import { findFamily } from '@/lib/fonts/catalogue'
+import { CATALOGUE_DATE, findFamily } from '@/lib/fonts/catalogue'
 import { validateKitFonts, validateScriptFonts } from '@/lib/fonts/validateKitFonts'
 
 type Params = { id: string }
@@ -21,7 +21,8 @@ export const GET = withTeamAdmin<Params>(async (_req, { params }, user) => {
   if (!kit || kit.isDeleted || kit.teamId !== user.teamId) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 })
   }
-  return NextResponse.json(kit)
+  // 031 FR-25: the date of the font list the picker searches.
+  return NextResponse.json({ ...kit, fontCatalogueDate: CATALOGUE_DATE })
 })
 
 const patchSchema = z.object({

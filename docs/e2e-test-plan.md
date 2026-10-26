@@ -1257,3 +1257,22 @@ Mock mode (`MOCK_AI` + `MOCK_PUPPETEER`), a fresh team per case, serial. The act
 | TC-IK-06 | AC-12 | Disconnect (through the confirm dialog) removes the key; the card returns to "Not connected"                                        |
 
 Locators adapted for the card and `/team` wording: `surfaces.test.ts` ("Image generation key" heading and "Image generation API key" label), `team-image-default.test.ts` ("Teammates without a personal image key ...").
+
+### AJ. Post fonts (`post-fonts.test.ts`, change 031 T8 — AC-17, AC-18, AC-22, AC-23, AC-24)
+
+Mock mode (`MOCK_AI` + `MOCK_PUPPETEER`), a fresh team per case, serial. The acting user is the seeded super admin. The picker is driven at `/admin/brandkits` (Edit; the combobox "Search Google Fonts", the select "Sinhala font"; the date line is "Font list from {date}"). Every `page.waitForResponse` is created before its trigger.
+
+**The seams** (dormant in prod). A font whose name carries `__MOCK_FONT_MISSING__` is let into the font plan under `MOCK_PUPPETEER` only (`src/lib/fonts/plan.ts`), and the mock renderer reports it missing, so the draft page shows `data-testid="font-notice"`. The kit PATCH refuses that name, so TC-PF-06 writes the kit's Sinhala font straight to the test database; so does TC-PF-08 for a non-catalogue (FONT artifact) entry.
+
+| Case     | AC        | What it checks                                                                                                                     |
+| -------- | --------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| TC-PF-01 | AC-24, 18 | Typing "instr" lists Instrument Serif; adding and saving stores it with the computed Google URL; the chips read Heading and Body   |
+| TC-PF-02 | AC-24     | The Sinhala picker lists "None (system font)" then exactly the Sinhala families from `/api/fonts?script=sinhala`; one saves        |
+| TC-PF-03 | AC-24     | The kit page shows "Font list from {date}", the date the kit GET returns                                                           |
+| TC-PF-04 | AC-17     | An unknown family and a Sinhala value whose family lacks the script are 400, and nothing is written                                |
+| TC-PF-05 | AC-22     | A kit with a Sinhala font generates a draft whose stored HTML has the marked `data-post-fonts` link and the stack entry; no notice |
+| TC-PF-06 | AC-23     | `__MOCK_FONT_MISSING__` shows the fallback-font notice on the draft page                                                           |
+| TC-PF-07 | FR-21     | Choosing "None (system font)" and saving clears the Sinhala font                                                                   |
+| TC-PF-08 | AC-17     | A FONT artifact entry (a non-catalogue name and URL) survives a save through the editor unchanged                                  |
+
+Locators adapted: `surfaces.test.ts` (the kit edit case) names the font combobox, because the Sinhala picker is a second combobox in the panel.

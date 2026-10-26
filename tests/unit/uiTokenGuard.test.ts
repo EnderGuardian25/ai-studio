@@ -68,10 +68,9 @@ const PATTERNS: Array<[string, RegExp]> = [
 // repo-relative files it does not apply to (data, not UI), and optionally the
 // path prefixes it is limited to (every file under src/ when absent).
 const FOLIO_PATTERNS: Array<[string, RegExp, string[], string[]?]> = [
-  // 1 (T1). The brand-kit font picker lists Instrument Sans as one of the 100
-  // Google Fonts a kit may use for its posts: data for generated posts, not
-  // the app's face (021 NFR-10), so that one file is excluded.
-  ['Folio font family', /fraunces|instrument[ _]sans/i, ['src/components/admin/brandkits/googleFonts.ts']],
+  // 1 (T1). No file is excluded since 031 T8 deleted the brand-kit font list: the
+  // post-font catalogue is a JSON snapshot read by the server, never UI text.
+  ['Folio font family', /fraunces|instrument[ _]sans/i, []],
   // 2 (T1)
   ['removed font utility', new RegExp(`${START}font-(?:display|text)${END}`), []],
   // 3 (T1)
@@ -353,15 +352,10 @@ describe('Folio deny-list (021 FR-13, AC-05)', () => {
     expect(findFolioLeftovers('src/components/x.tsx', line)).toEqual([])
   })
 
-  it('does not honour ui-exception, and excludes only the brand-kit font list from pattern 1', () => {
+  it('does not honour ui-exception, and excludes no file from pattern 1', () => {
     expect(findFolioLeftovers('src/components/x.tsx', '<p className="font-text" /> // ui-exception: x')).toHaveLength(1)
     const fontList = "  'Lexend','Instrument Sans','Kanit',"
-    expect(findFolioLeftovers('src/components/admin/brandkits/googleFonts.ts', fontList)).toEqual([])
     expect(findFolioLeftovers('src/components/admin/brandkits/FontEditor.tsx', fontList)).toHaveLength(1)
-    // The exclusion is pattern 1's only: the same file still fails pattern 2.
-    expect(
-      findFolioLeftovers('src/components/admin/brandkits/googleFonts.ts', '<p className="font-text" />')
-    ).toHaveLength(1)
   })
 
   // 021 T8: the old module path names the word whole, so 4a and 4b both fire.
