@@ -512,7 +512,7 @@ The procedure runs on the scratch database, never on `bistec_studio`. It uses th
 
 ## 🚦 Pre-merge prod checklist: `v2` → `main` (022 FR-08)
 
-`main` deploys to company prod (`studio.bistecglobal.com`), which holds real data: the Hearts Academy team, its kit and the IRP posts. `v2` carries changes 004–024. Nothing in this section merges or deploys. **The merge waits on the user's go-ahead and on the three blocking steps below.**
+`main` deploys to company prod (`studio.bistecglobal.com`), which holds real data: the Hearts Academy team, its kit and the IRP posts. `v2` carries changes 004–031 (22 migrations at `caf0c0b`; regenerate the list at merge time). The DevOps handover is [`devops-deploy-handover.md`](devops-deploy-handover.md). Nothing in this section merges or deploys. **The merge waits on the user's go-ahead and on the three blocking steps below.**
 
 ### The named waiver
 
