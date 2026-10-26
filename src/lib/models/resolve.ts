@@ -193,7 +193,7 @@ export function decideModel(
     return {
       ok: false,
       code: 'NO_ALLOWED_MODEL',
-      message: `No model is allowed for ${SURFACE_LABELS[surface].phrase} on this team. A team admin can allow one at /team → Models.`,
+      message: `No model is allowed for ${SURFACE_LABELS[surface].phrase} on this team. A team admin can allow one under Team settings > Models.`,
     }
   }
 

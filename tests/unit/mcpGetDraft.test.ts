@@ -255,7 +255,7 @@ describe('generatePost', () => {
 
   it('a team with no Claude credential surfaces the no-credential error from inside the wrap', async () => {
     const noCredential =
-      'No Claude credential available — connect a personal token in Settings or set the team token in Team Settings'
+      'No Claude credential available — connect a personal token in Settings or set the team token in Team settings'
     h.generateDraftForBrief.mockRejectedValue(new Error(noCredential))
     await expect(generatePost(args)).rejects.toThrow(noCredential)
     expect(h.withClaudeAuth).toHaveBeenCalledWith(null, 'team1', expect.any(Function))

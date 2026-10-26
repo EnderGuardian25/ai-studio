@@ -90,10 +90,10 @@ async function expectLabelled(
 // Walk /brief to step 2 (Size & Design), picking the first kit if none is set.
 async function briefStepTwo(page: Page) {
   await page.goto('/brief')
-  await expect(page.getByRole('heading', { name: 'Select Campaign' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Select a campaign' })).toBeVisible()
   await page.getByRole('button', { name: /continue/i }).click()
   await expect(page.getByRole('heading', { name: 'Size & Design' })).toBeVisible()
-  const kit = page.getByRole('combobox', { name: 'Brand Kit' })
+  const kit = page.getByRole('combobox', { name: 'Brand kit' })
   // The kit options load after the step renders: wait for one before choosing.
   await expect(kit.locator('option:not([value=""])').first()).toBeAttached()
   if ((await kit.inputValue()) === '') {
@@ -132,9 +132,9 @@ test.describe('Field labels (T9)', () => {
     // The reference: the brief's "Topic" FieldLabel on step 3.
     await briefStepTwo(page)
     // Path B needs no template, so step 2 can continue.
-    await page.getByRole('button', { name: /Path B — Freeform/ }).click()
+    await page.getByRole('button', { name: /^Freeform/ }).click()
     await page.getByRole('button', { name: /continue/i }).click()
-    await expect(page.getByRole('heading', { name: 'Brief & Caption Direction' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Description & caption direction' })).toBeVisible()
     const reference = await labelStyle(page.locator('label').filter({ hasText: /^Topic$/ }))
     // 021 FR-07: field labels are sentence case at 13 px (no longer small caps).
     expect(reference.textTransform).toBe('none')
@@ -157,7 +157,7 @@ test.describe('Field labels (T9)', () => {
     await pageLogin(page)
     const kit = await briefStepTwo(page)
     await expect(kit).toHaveCount(1)
-    await expectLabelled(page, 'Brand Kit', { tag: 'SELECT' })
+    await expectLabelled(page, 'Brand kit', { tag: 'SELECT' })
   })
 
   test('AC-11 row 14: the template HTML/CSS field is labelled, and "Size" is a group caption', async ({ page }) => {
@@ -166,7 +166,7 @@ test.describe('Field labels (T9)', () => {
     await page.setViewportSize({ width: 1440, height: 900 })
     await pageLogin(page)
     await page.goto('/admin/brandkits')
-    await expect(page.getByRole('heading', { name: 'Brand Kits', level: 1 })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Brand kits', level: 1 })).toBeVisible()
     await page.getByRole('button', { name: new RegExp(`^${kit.name}`) }).click()
     await expect(page.getByRole('heading', { name: kit.name, level: 2 })).toBeVisible()
 
@@ -174,7 +174,7 @@ test.describe('Field labels (T9)', () => {
     // section holds it too, and comes first).
     const templates = page
       .locator('section')
-      .filter({ has: page.getByRole('heading', { name: 'HTML Templates', level: 3 }) })
+      .filter({ has: page.getByRole('heading', { name: 'HTML templates', level: 3 }) })
       .last()
     await templates.getByRole('button', { name: 'Add', exact: true }).click()
     await expectLabelled(templates, 'HTML/CSS', { tag: 'TEXTAREA', placeholder: '<!DOCTYPE html>…' })
@@ -231,7 +231,7 @@ test.describe('Field labels (T9)', () => {
     // The publish dialog, from the draft page.
     await page.goto(`/drafts/${draft.id}`)
     await page.getByRole('button', { name: /^publish$/i }).click()
-    const publish = page.getByRole('dialog', { name: 'Publish Post' })
+    const publish = page.getByRole('dialog', { name: 'Publish post' })
     const publishChannels = publish.getByRole('group', { name: 'Channels', exact: true })
     await expect(publishChannels).toBeVisible()
     await expect(publishChannels.getByRole('checkbox')).toHaveCount(2)
@@ -306,7 +306,7 @@ test.describe('Control heights (T10)', () => {
     await page.setViewportSize({ width: 1440, height: 900 })
     await pageLogin(page)
     await page.goto('/admin/brandkits')
-    await expect(page.getByRole('heading', { name: 'Brand Kits', level: 1 })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Brand kits', level: 1 })).toBeVisible()
     await page.getByRole('button', { name: new RegExp(`^${kit.name}`) }).click()
     await expect(page.getByRole('heading', { name: kit.name, level: 2 })).toBeVisible()
     await page.getByRole('button', { name: 'Edit', exact: true }).click()
@@ -328,7 +328,7 @@ test.describe('Control heights (T10)', () => {
 // Open a kit from the list and wait for its panel (a region named by the kit).
 async function openKit(page: Page, name: string): Promise<Locator> {
   await page.goto('/admin/brandkits')
-  await expect(page.getByRole('heading', { name: 'Brand Kits', level: 1 })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Brand kits', level: 1 })).toBeVisible()
   await page
     .getByRole('region', { name: 'Brand kits', exact: true })
     .getByRole('button', { name: new RegExp(`^${name}`) })
@@ -401,7 +401,7 @@ test.describe('Brand kits (T11)', () => {
     await pageLogin(page)
     const kitPanel = await openKit(page, kit.name)
     await kitPanel.getByRole('button', { name: 'Edit', exact: true }).click()
-    await kitSection(page, 'HTML Templates').getByRole('button', { name: 'Add', exact: true }).click()
+    await kitSection(page, 'HTML templates').getByRole('button', { name: 'Add', exact: true }).click()
     await kitPanel.getByRole('tab', { name: 'New Version' }).click()
     const saveTemplate = kitPanel.getByRole('button', { name: 'Save template' })
     const saveVersion = kitPanel.getByRole('button', { name: 'Save as new version' })
@@ -419,7 +419,7 @@ test.describe('Brand kits (T11)', () => {
     await page.setViewportSize({ width: 1440, height: 900 })
     await pageLogin(page)
     await page.goto('/admin/brandkits')
-    await expect(page.getByRole('heading', { name: 'Brand Kits', level: 1 })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Brand kits', level: 1 })).toBeVisible()
     const list = page.getByRole('region', { name: 'Brand kits', exact: true })
     await expect(list.getByRole('listitem').first()).toBeVisible()
     await expect(list).toHaveAttribute('tabindex', '0')
@@ -560,18 +560,18 @@ test.describe('Labels: login, library, brief (T13)', () => {
     }
   })
 
-  test('AC-11 rows 4 and 5: the brief Topic and Brief fields are labelled', async ({ page, request }) => {
+  test('AC-11 rows 4 and 5: the brief Topic and Description fields are labelled', async ({ page, request }) => {
     const api = await loginAs(request, ADMIN_EMAIL, ADMIN_PASSWORD)
     const before = new Set(await briefDraftIds(api))
     try {
       await page.setViewportSize({ width: 1440, height: 900 })
       await pageLogin(page)
       await briefStepTwo(page)
-      await page.getByRole('button', { name: /Path B — Freeform/ }).click()
+      await page.getByRole('button', { name: /^Freeform/ }).click()
       await page.getByRole('button', { name: /continue/i }).click()
-      await expect(page.getByRole('heading', { name: 'Brief & Caption Direction' })).toBeVisible()
+      await expect(page.getByRole('heading', { name: 'Description & caption direction' })).toBeVisible()
       await expectLabelled(page, 'Topic', { tag: 'INPUT', placeholder: 'e.g. Q3 product launch' })
-      await expectLabelled(page, 'Brief', {
+      await expectLabelled(page, 'Description', {
         tag: 'TEXTAREA',
         placeholder:
           'e.g. Announce our Q3 product launch with excitement. Highlight that it saves the marketing team hours on post creation. Include a CTA to try it.',
@@ -735,7 +735,7 @@ test.describe('Labels: draft page (T15)', () => {
       })
     }
     // Row 27.
-    await expectNamedByHeading(page, 'Refine Design', { tag: 'INPUT', placeholder: 'e.g. Make the logo larger…' })
+    await expectNamedByHeading(page, 'Refine design', { tag: 'INPUT', placeholder: 'e.g. Make the logo larger…' })
   })
 })
 
@@ -760,10 +760,10 @@ test.describe('Labels: team (T16)', () => {
     await page.setViewportSize({ width: 1440, height: 900 })
     await pageLogin(page)
     await page.goto('/team')
-    await expect(page.getByRole('heading', { name: 'AI Providers' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'AI providers' })).toBeVisible()
 
     // Both modes offer COPY and IMAGE with one "API key" field since 024 FR-09.
-    await page.getByRole('button', { name: 'Register Provider', exact: true }).click()
+    await page.getByRole('button', { name: 'Register provider', exact: true }).click()
     await expect(page.getByRole('heading', { name: 'Register new provider', level: 3 })).toBeVisible()
 
     // Row 7. Exact, so the "Show API key" button doesn't also match.
@@ -783,7 +783,7 @@ test.describe('Labels: team (T16)', () => {
     await page.setViewportSize({ width: 1440, height: 900 })
     await pageLogin(page)
     await page.goto('/team')
-    await expect(page.getByRole('heading', { name: 'Social Channels' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Social channels' })).toBeVisible()
 
     for (const [name, idLabel] of [
       ['Instagram', 'Business Account ID'],
@@ -944,7 +944,7 @@ test.describe('ARIA states (T17)', () => {
     // /team with the register form open. Both modes render the slot toggle
     // since 024 FR-09.
     await page.goto('/team')
-    await page.getByRole('button', { name: 'Register Provider', exact: true }).click()
+    await page.getByRole('button', { name: 'Register provider', exact: true }).click()
     await expect(page.getByRole('heading', { name: 'Register new provider', level: 3 })).toBeVisible()
     await expectTablistsNamed(page, ['Provider slot'])
 
@@ -1018,7 +1018,7 @@ test.describe('ARIA states (T17)', () => {
     expect(await crumbs.ariaSnapshot()).not.toContain(project.name)
   })
 
-  test('AC-17: "Discard unfinished brief", "Remove color …" and "Remove font …" are at least 24 × 24', async ({ page }) => {
+  test('AC-17: "Discard unfinished post", "Remove color …" and "Remove font …" are at least 24 × 24', async ({ page }) => {
     const kit = await mintKit()
     const topic = `T17 unfinished ${Date.now()}`
     const put = await api.put('/api/brief-drafts', {
@@ -1044,7 +1044,7 @@ test.describe('ARIA states (T17)', () => {
       await pageLogin(page)
       const row = page.getByRole('row').filter({ hasText: topic })
       await expect(row).toHaveCount(1)
-      await expectAtLeast24(row.getByRole('button', { name: 'Discard unfinished brief', exact: true }), 'Discard unfinished brief')
+      await expectAtLeast24(row.getByRole('button', { name: 'Discard unfinished post', exact: true }), 'Discard unfinished post')
 
       const kitPanel = await openKit(page, kit.name)
       await kitPanel.getByRole('button', { name: 'Edit', exact: true }).click()
@@ -1118,15 +1118,15 @@ test.describe('axe scan (T18)', () => {
   test('AC-19: /brief steps 1, 2 and 3', async ({ page }) => {
     await pageLogin(page)
     await page.goto('/brief')
-    await expect(page.getByRole('heading', { name: 'Select Campaign' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Select a campaign' })).toBeVisible()
     await expectNoAxeViolations(page, '/brief step 1', { settle: true })
 
     await briefStepTwo(page)
     await expectNoAxeViolations(page, '/brief step 2', { settle: true })
 
-    await page.getByRole('button', { name: /Path B — Freeform/ }).click()
+    await page.getByRole('button', { name: /^Freeform/ }).click()
     await page.getByRole('button', { name: /continue/i }).click()
-    await expect(page.getByRole('heading', { name: 'Brief & Caption Direction' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Description & caption direction' })).toBeVisible()
     await expectNoAxeViolations(page, '/brief step 3', { settle: true })
   })
 
@@ -1170,7 +1170,7 @@ test.describe('axe scan (T18)', () => {
     await expectNoAxeViolations(page, '/drafts/[id] with the composition notice', { settle: true })
 
     await briefStepTwo(page)
-    await page.getByRole('button', { name: /Path B — Freeform/ }).click()
+    await page.getByRole('button', { name: /^Freeform/ }).click()
     await expect(page.getByTestId('image-style-section')).toBeVisible()
     await expectNoAxeViolations(page, '/brief step 2 with the image style picker', { settle: true })
   })
@@ -1215,8 +1215,8 @@ test.describe('axe scan (T18)', () => {
   test('AC-19: /team with the register form open', async ({ page }) => {
     await pageLogin(page)
     await page.goto('/team')
-    await expect(page.getByRole('heading', { name: 'AI Providers' })).toBeVisible()
-    await page.getByRole('button', { name: 'Register Provider', exact: true }).click()
+    await expect(page.getByRole('heading', { name: 'AI providers' })).toBeVisible()
+    await page.getByRole('button', { name: 'Register provider', exact: true }).click()
     await expect(page.getByRole('heading', { name: 'Register new provider', level: 3 })).toBeVisible()
     // 008 AC-22: the scan covers /team → Models too. It loads two queries of
     // its own, so wait for its form rather than relying on networkidle.

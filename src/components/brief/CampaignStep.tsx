@@ -71,7 +71,7 @@ export function CampaignStep({
 }: CampaignStepProps) {
   return (
     <div>
-      <StepHead title="Select Campaign">
+      <StepHead title="Select a campaign (optional)">
         Group this post under a campaign. Its brand kit (or the parent project&apos;s) becomes the
         default on the next step — you can still change it.
       </StepHead>

@@ -7,7 +7,7 @@ import { IMAGE_PROVIDERS } from '@/providers/imageCapabilities'
 export const GET = withTeamAuth(async (req: NextRequest, _ctx, user) => {
   const slot = req.nextUrl.searchParams.get('slot')
   if (!slot || !['COPY', 'IMAGE'].includes(slot)) {
-    return NextResponse.json({ error: 'slot must be COPY or IMAGE' }, { status: 400 })
+    return NextResponse.json({ error: 'slot must be COPY (Captions) or IMAGE (Images)' }, { status: 400 })
   }
 
   const providers = await prisma.availableProvider.findMany({

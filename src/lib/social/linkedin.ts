@@ -97,7 +97,7 @@ export async function publish(
   if (!imageResponse.ok) {
     throw new PublishError(
       "LINKEDIN",
-      `Failed to fetch image from exportUrl: HTTP ${imageResponse.status}`,
+      `Failed to fetch the exported image: HTTP ${imageResponse.status}`,
     )
   }
 
@@ -161,14 +161,14 @@ export async function publish(
     } catch {
       reason = `HTTP ${postResponse.status}`
     }
-    throw new PublishError("LINKEDIN", `Failed to create UGC post: ${reason}`)
+    throw new PublishError("LINKEDIN", `Failed to create the LinkedIn post: ${reason}`)
   }
 
   const platformId = postResponse.headers.get("x-restli-id")
   if (!platformId) {
     throw new PublishError(
       "LINKEDIN",
-      "UGC post response did not include x-restli-id header",
+      "LinkedIn did not return a post id",
     )
   }
 

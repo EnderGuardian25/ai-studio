@@ -101,17 +101,17 @@ export function ScheduledQueueSection({ campaignId, resolvedKitId, isTeamAdmin }
       await apiFetch(`/api/campaigns/${campaignId}/queue/${entry.id}`, { method: 'DELETE' })
       await invalidate()
     } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : 'Failed to cancel entry')
+      toast.error(e instanceof Error ? e.message : 'Failed to cancel planned post')
     }
   }
 
   async function rerunEntry(entry: ScheduledGeneration) {
     try {
       await apiFetch(`/api/campaigns/${campaignId}/queue/${entry.id}/rerun`, { method: 'POST' })
-      toast.success('Entry re-armed — it will generate on the next scheduler tick.')
+      toast.success('Planned post re-armed — it will generate on the next scheduler tick.')
       await invalidate()
     } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : 'Failed to re-run entry')
+      toast.error(e instanceof Error ? e.message : 'Failed to re-run planned post')
     }
   }
 

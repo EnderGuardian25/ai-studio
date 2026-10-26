@@ -62,8 +62,8 @@ const NAV_SECTIONS: NavSection[] = [
   {
     label: 'Admin',
     items: [
-      { label: 'Brandkits',     href: '/admin/brandkits', icon: Palette,   adminOnly: true },
-      { label: 'Team Settings', href: '/team',            icon: Building2, adminOnly: true },
+      { label: 'Brand kits',    href: '/admin/brandkits', icon: Palette,   adminOnly: true },
+      { label: 'Team settings', href: '/team',            icon: Building2, adminOnly: true },
       { label: 'Users',         href: '/admin/users',     icon: Users,     superAdminOnly: true },
       { label: 'Teams',         href: '/admin/teams',     icon: Building2, superAdminOnly: true },
       { label: 'Insights',      href: '/admin/insights',  icon: LineChart, superAdminOnly: true },

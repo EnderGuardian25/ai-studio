@@ -28,7 +28,7 @@ export default function NewBriefPage() {
     <div className="max-w-3xl">
       <PageHead
         eyebrow="Create"
-        title="New Brief"
+        title="New post"
         lead="Describe what you want to create and we'll generate an on-brand social post."
         className="mb-6"
       />

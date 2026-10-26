@@ -59,7 +59,7 @@ export async function publish(
     } catch {
       reason = `HTTP ${createResponse.status}`
     }
-    throw new PublishError("INSTAGRAM", `Failed to create media container: ${reason}`)
+    throw new PublishError("INSTAGRAM", `Failed to create the Instagram post: ${reason}`)
   }
 
   const createBody = (await createResponse.json()) as { id?: string }

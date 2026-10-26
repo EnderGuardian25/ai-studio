@@ -315,7 +315,7 @@ test.describe('§W — per-channel captions', () => {
     await page.goto(`/drafts/${draft.id}`)
     await expect(page.getByRole('button', { name: 'View full screen', exact: true })).toBeVisible({ timeout: 20_000 })
     await page.getByRole('button', { name: /^publish$/i }).click()
-    await expectTwoChannels(page.getByRole('dialog', { name: 'Publish Post' }))
+    await expectTwoChannels(page.getByRole('dialog', { name: 'Publish post' }))
 
     await page.goto(`/campaigns/${await suiteCampaign(api)}`)
     await page.getByRole('button', { name: 'Plan a post' }).click()
@@ -689,7 +689,7 @@ test.describe('§W — wave 2: Regenerate all, the headline and the caption pane
     const preview = page.locator('section[aria-label="Preview"]')
     const refine = page
       .locator('section')
-      .filter({ has: page.getByRole('heading', { name: 'Refine Design', exact: true }) })
+      .filter({ has: page.getByRole('heading', { name: 'Refine design', exact: true }) })
       .last()
     const captions = page
       .locator('section')
@@ -715,7 +715,7 @@ test.describe('§W — wave 2: Regenerate all, the headline and the caption pane
       const q = (el: Element | null) => el!
       const p = document.querySelector('section[aria-label="Preview"]')
       const headings = Array.from(document.querySelectorAll('h2'))
-      const rf = headings.find((h) => h.textContent?.trim() === 'Refine Design')!.closest('section')
+      const rf = headings.find((h) => h.textContent?.trim() === 'Refine design')!.closest('section')
       const cp = headings.find((h) => h.textContent?.trim() === 'Captions')!.closest('section')
       const before = (a: Element, b: Element) => !!(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING)
       return before(q(p), q(rf)) && before(q(rf), q(cp))

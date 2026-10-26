@@ -108,7 +108,7 @@ describe('runGenerationJobs — per-job team credentials (Task 14)', () => {
     h.findMany.mockResolvedValue([entry])
     h.briefFindUnique.mockResolvedValue({ id: 'brief-2', teamId: 'team-2' })
     const noCredentialMessage =
-      'No Claude credential available — connect a personal token in Settings or set the team token in Team Settings'
+      'No Claude credential available — connect a personal token in Settings or set the team token in Team settings'
     h.generateDraftForBrief.mockRejectedValue(new Error(noCredentialMessage))
 
     await expect(runGenerationJobs()).resolves.toBeUndefined()
@@ -136,7 +136,7 @@ describe('runGenerationJobs — per-job team credentials (Task 14)', () => {
     }))
     h.generateDraftForBrief.mockImplementation(async (_brief: unknown, actor: { teamId: string }) => {
       if (actor.teamId === 'team-2') {
-        throw new Error('No Claude credential available — connect a personal token in Settings or set the team token in Team Settings')
+        throw new Error('No Claude credential available — connect a personal token in Settings or set the team token in Team settings')
       }
       return { draft: { id: 'draft-1' }, backgroundImageUrl: null }
     })

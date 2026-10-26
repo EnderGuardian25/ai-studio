@@ -100,7 +100,7 @@ export function ReviewStep({
     { label: 'Campaign', value: selectedCampaign?.name ?? 'Uncategorized' },
     { label: 'Brand kit', value: selectedBrandKit?.name ?? '—' },
     { label: 'Size', value: `${ASPECT_LABELS[aspectRatio]} · ${dimensionsLabel(aspectRatio)} px` },
-    { label: 'Path', value: `Path ${designMode === 'TEMPLATE' ? 'A — Template fill' : 'B — Freeform design'}` },
+    { label: 'Design mode', value: designMode === 'TEMPLATE' ? 'Template fill' : 'Freeform design' },
     // Always shown (027 FR-07): Path A, and a size the look does not support, read Classic, whatever the style says.
     {
       label: 'Image style',
@@ -117,7 +117,7 @@ export function ReviewStep({
         designMode === 'TEMPLATE'
           ? selectedTemplate?.name ?? 'None'
           : selectedRefTemplate
-            ? `Style ref: ${selectedRefTemplate.name}`
+            ? `Style reference: ${selectedRefTemplate.name}`
             : 'None',
     },
     ...(captionModelName ? [{ label: 'Caption model', value: captionModelName }] : []),
@@ -131,7 +131,7 @@ export function ReviewStep({
           ? `${images.length} image${images.length > 1 ? 's' : ''} (${images.filter(i => i.intent === 'embed').length} embed, ${images.filter(i => i.intent === 'reference').length} reference)`
           : 'None',
     },
-    { label: 'Prompt', value: prompt || '—' },
+    { label: 'Description', value: prompt || '—' },
   ]
 
   return (

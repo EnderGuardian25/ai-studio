@@ -88,7 +88,7 @@ export function PublishDialog({ draftId, headlineState, onClose, onSuccess }: Pu
       onSuccess()
     } else {
       setError(
-        `${failed.map((ch) => channelLabel(ch)).join(', ')} failed — fix the issue and Confirm to retry ` +
+        `${failed.map((ch) => channelLabel(ch)).join(', ')} failed — fix the issue and Publish to retry ` +
           `(already-published channels won't be re-sent).`
       )
     }
@@ -98,7 +98,7 @@ export function PublishDialog({ draftId, headlineState, onClose, onSuccess }: Pu
     <Modal
       open
       onClose={onClose}
-      title="Publish Post"
+      title="Publish post"
       footer={
         <>
           <Button variant="ghost" size="sm" onClick={onClose} disabled={submitting}>
@@ -110,7 +110,7 @@ export function PublishDialog({ draftId, headlineState, onClose, onSuccess }: Pu
             onClick={handleConfirm}
             disabled={submitting || checkedChannels.length === 0}
           >
-            {submitting ? 'Publishing…' : 'Confirm'}
+            {submitting ? 'Publishing…' : 'Publish'}
           </Button>
         </>
       }

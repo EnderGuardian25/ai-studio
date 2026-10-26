@@ -715,19 +715,19 @@ test.describe('§AD — product observability', () => {
 
   async function walkWizardTo(page: Page, last: number) {
     const cont = page.getByRole('button', { name: /continue/i })
-    await expect(page.getByRole('heading', { name: 'Select Campaign' })).toBeVisible({ timeout: 20_000 })
+    await expect(page.getByRole('heading', { name: 'Select a campaign' })).toBeVisible({ timeout: 20_000 })
     if (last >= 1) {
       await cont.click()
       await expect(page.getByRole('heading', { name: 'Size & Design' })).toBeVisible()
-      const kit = page.getByRole('combobox', { name: 'Brand Kit' })
+      const kit = page.getByRole('combobox', { name: 'Brand kit' })
       await expect.poll(() => kit.locator('option').count()).toBeGreaterThan(1)
       await kit.selectOption({ index: 1 })
-      await page.getByRole('button', { name: /Path B — Freeform/ }).click()
+      await page.getByRole('button', { name: /^Freeform/ }).click()
       await expect(page.getByRole('button', { name: 'No reference' })).toBeVisible()
     }
     if (last >= 2) {
       await cont.click()
-      await expect(page.getByRole('heading', { name: 'Brief & Caption Direction' })).toBeVisible()
+      await expect(page.getByRole('heading', { name: 'Description & caption direction' })).toBeVisible()
       await page.getByPlaceholder('e.g. Q3 product launch').fill(WIZ_TOPIC)
       await page.locator('textarea').fill(WIZ_PROMPT)
     }
@@ -750,7 +750,7 @@ test.describe('§AD — product observability', () => {
     // Back twice and forward twice: the steps were already reported.
     await page.getByRole('button', { name: 'Back' }).click()
     await page.getByRole('button', { name: 'Back' }).click()
-    await expect(page.getByRole('heading', { name: 'Brief & Caption Direction' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Description & caption direction' })).toBeVisible()
     await page.getByRole('button', { name: /continue/i }).click()
     await page.getByRole('button', { name: /continue/i }).click()
     await expect(page.getByRole('heading', { name: 'Review & Generate' })).toBeVisible()

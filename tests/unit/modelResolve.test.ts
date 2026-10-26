@@ -672,7 +672,7 @@ describe('validatePolicy — FR-05 rules 1–4', () => {
       validatePolicy(body({ allowed: ['HAIKU', 'SONNET'], defaults: { DESIGN_FREEFORM: 'OPUS' } })),
     ).toEqual({
       ok: false,
-      message: "The Freeform design (Path B) default, Opus 5.5, isn't in the allowed models",
+      message: "The Freeform design default, Opus 5.5, isn't in the allowed models",
     })
   })
 

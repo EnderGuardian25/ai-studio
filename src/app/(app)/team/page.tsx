@@ -547,7 +547,7 @@ function ProvidersSection() {
         />
       ) : (
         <Button variant="secondary" onClick={() => setShowRegister(true)}>
-          <Plus {...ICON} /> Register Provider
+          <Plus {...ICON} /> Register provider
         </Button>
       )}
     </div>
@@ -630,12 +630,12 @@ export default function TeamSettingsPage() {
         <CaptionRouteCard />
 
         <section className="surface-bezel min-w-0 p-5">
-          <SectionHead title="AI Providers" className="mb-3" />
+          <SectionHead title="AI providers" className="mb-3" />
           <ProvidersSection />
         </section>
 
         <section className="surface-bezel min-w-0 p-5">
-          <SectionHead title="Social Channels" className="mb-3" />
+          <SectionHead title="Social channels" className="mb-3" />
           <ChannelsSection />
         </section>
 

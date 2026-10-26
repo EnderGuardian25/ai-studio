@@ -64,7 +64,7 @@ export function ContentStep({ topic, setTopic, prompt, setPrompt, goal, tone, se
 
   return (
     <div>
-      <StepHead title={<>Brief &amp; Caption Direction</>}>
+      <StepHead title={<>Description &amp; caption direction</>}>
         Give the post a short topic, describe what it&apos;s about, then check the tone.
       </StepHead>
 
@@ -84,7 +84,7 @@ export function ContentStep({ topic, setTopic, prompt, setPrompt, goal, tone, se
       </div>
 
       {/* While the AI suggestion is up there is no textarea, so nothing to point at. */}
-      <FieldLabel htmlFor={enhanceResult ? undefined : briefId} className="mb-2.5">Brief</FieldLabel>
+      <FieldLabel htmlFor={enhanceResult ? undefined : briefId} className="mb-2.5">Description</FieldLabel>
       {enhanceResult ? (
         <div className="space-y-4 mb-6">
           {/* "Before" and "AI suggestion" stay micro-labels: panel captions (021 FR-07). */}

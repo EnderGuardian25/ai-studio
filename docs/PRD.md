@@ -166,10 +166,10 @@ No redeploy is required for any brand kit change.
 
 ### AI image generation
 
-| ID    | Requirement                                                                                                     |
-| ----- | --------------------------------------------------------------------------------------------------------------- |
-| FR-10 | The system can generate a background or hero image from the brief through an image provider (OpenAI or Gemini). |
-| FR-11 | The user can regenerate the image without changing the copy.                                                    |
+| ID    | Requirement                                                                                                                                               |
+| ----- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| FR-10 | The system can generate a background or hero image from the brief through an image provider (OpenAI; Gemini is mock-only, its live call is not verified). |
+| FR-11 | The user can regenerate the image without changing the copy.                                                                                              |
 
 ### Design — Path A (preset brand template)
 
@@ -242,18 +242,18 @@ No redeploy is required for any brand kit change.
 
 ## 7. Non-Functional Requirements
 
-| ID     | Requirement                                                                                                                                                                                                  |
-| ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| NFR-1  | **Self-service:** the end-to-end flow (brief → generate → refine → publish) must be completable by a team member with no brand or channel-publishing expertise. This is the primary design constraint.       |
-| NFR-2  | **Platform:** Next.js + TypeScript web application.                                                                                                                                                          |
-| NFR-3  | **Hosting:** VPS, Docker Compose — Next.js app, PostgreSQL, MinIO, and scheduler worker as separate containers.                                                                                              |
-| NFR-4  | **Brand consistency:** output is brand-consistent by construction. Brand styling comes from the brand kit and its templates, not from user choices.                                                          |
-| NFR-5  | **Security:** all third-party credentials (Claude, OpenAI, Gemini, Instagram, LinkedIn) are stored server-side. Social tokens are encrypted at rest (AES-256-GCM). No secret is ever exposed to the browser. |
-| NFR-6  | **Scheduling reliability:** a scheduled post fires within ±2 minutes of its target time and survives an app restart (persisted queue, not in-memory timers).                                                 |
-| NFR-7  | **Cost control:** generation calls (Claude, image providers) have per-user or per-period limits to control spend. Exact thresholds to be confirmed.                                                          |
-| NFR-8  | **Third-party resilience:** failures from the model, image provider or social APIs are surfaced as clear, actionable errors and never silently drop a post.                                                  |
-| NFR-9  | **Auditability:** publish history is retained and attributable to the user who published or scheduled.                                                                                                       |
-| NFR-11 | **Render integrity:** a failed render never overwrites the draft's current export, and no half-written revision is left behind.                                                                              |
+| ID     | Requirement                                                                                                                                                                                                                                     |
+| ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| NFR-1  | **Self-service:** the end-to-end flow (brief → generate → refine → publish) must be completable by a team member with no brand or channel-publishing expertise. This is the primary design constraint.                                          |
+| NFR-2  | **Platform:** Next.js + TypeScript web application.                                                                                                                                                                                             |
+| NFR-3  | **Hosting:** VPS, Docker Compose — Next.js app, PostgreSQL, MinIO, and scheduler worker as separate containers.                                                                                                                                 |
+| NFR-4  | **Brand consistency:** output is brand-consistent by construction. Brand styling comes from the brand kit and its templates, not from user choices.                                                                                             |
+| NFR-5  | **Security:** all third-party credentials (Claude, OpenAI, Gemini (mock-only, not yet verified live), Instagram, LinkedIn) are stored server-side. Social tokens are encrypted at rest (AES-256-GCM). No secret is ever exposed to the browser. |
+| NFR-6  | **Scheduling reliability:** a scheduled post fires within ±2 minutes of its target time and survives an app restart (persisted queue, not in-memory timers).                                                                                    |
+| NFR-7  | **Cost control:** generation calls (Claude, image providers) have per-user or per-period limits to control spend. Exact thresholds to be confirmed.                                                                                             |
+| NFR-8  | **Third-party resilience:** failures from the model, image provider or social APIs are surfaced as clear, actionable errors and never silently drop a post.                                                                                     |
+| NFR-9  | **Auditability:** publish history is retained and attributable to the user who published or scheduled.                                                                                                                                          |
+| NFR-11 | **Render integrity:** a failed render never overwrites the draft's current export, and no half-written revision is left behind.                                                                                                                 |
 
 ---
 

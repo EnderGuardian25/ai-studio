@@ -58,7 +58,7 @@ export function ImagesStep({
                 <Button variant="secondary" size="sm" onClick={() => toggleIntent(img.id)}>
                   {img.intent === 'embed'
                     ? <><ImageIcon {...ICON} aria-hidden /> Embed</>
-                    : <><LinkIcon {...ICON} aria-hidden /> Style ref</>}
+                    : <><LinkIcon {...ICON} aria-hidden /> Style reference</>}
                 </Button>
                 <button
                   type="button"

@@ -193,16 +193,16 @@ export default async function DashboardPage() {
         <KpiCard label="Drafts Ready" value={data.draftsReady} />
         <KpiCard label="Posts Published" value={data.postsPublished} />
         <KpiCard label="Active Campaigns" value={data.activeCampaigns} />
-        <KpiCard label="AI Providers" value={data.aiProviders} />
+        <KpiCard label="AI providers" value={data.aiProviders} />
       </Panel>
 
       {/* Quick actions */}
       <div className="mt-5 flex flex-wrap gap-2">
-        <QuickAction href="/brief" label="Create Post" icon={<FilePlus2 {...ICON} aria-hidden />} />
-        <QuickAction href="/library" label="View Library" icon={<BookOpen {...ICON} aria-hidden />} />
+        <QuickAction href="/brief" label="New post" icon={<FilePlus2 {...ICON} aria-hidden />} />
+        <QuickAction href="/library" label="View library" icon={<BookOpen {...ICON} aria-hidden />} />
         <QuickAction
           href="/admin/brandkits"
-          label="Manage Brand Kits"
+          label="Manage brand kits"
           icon={<Palette {...ICON} aria-hidden />}
         />
       </div>

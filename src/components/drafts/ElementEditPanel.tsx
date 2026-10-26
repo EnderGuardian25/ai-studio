@@ -155,7 +155,7 @@ function EmptyState({
       <MousePointerClick size={18} strokeWidth={1.4} className="text-fg-muted" aria-hidden />
       <p className="text-ui-lg font-medium text-fg">Select an element</p>
       <p className={MUTED}>
-        Click any part of the design to change its text, colour or size. Each change saves as a new
+        Click any part of the design to change its text, color or size. Each change saves as a new
         revision. With the keyboard, start from the whole design and move with Parent, Child,
         Previous and Next.
       </p>
@@ -309,7 +309,7 @@ function SelectionFields({
         <>
           <ColorField
             kind="color"
-            label="Text colour"
+            label="Text color"
             initial={selection.initial.color}
             disabled={disabled}
             busy={inFlight === 'color'}

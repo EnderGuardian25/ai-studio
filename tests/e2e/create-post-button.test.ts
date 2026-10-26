@@ -2,7 +2,7 @@ import { test, expect, type Locator, type Page, type Route } from '@playwright/t
 import { loginAs, waitForDraft, type ApiClient } from '../helpers/api'
 
 // Floating Create post button (change 011 T1 — AC-01, AC-02, AC-03). The
-// dashboard quick action is named "Create Post", so every lookup here is
+// dashboard quick action is named "New post", so every lookup here is
 // exact (case-sensitive) or goes through the button's test id.
 
 const ADMIN_EMAIL = 'admin@bisteccare.lk'

@@ -71,7 +71,7 @@ export default function BrandKitsPage() {
       <PageHead
         className="mb-6"
         eyebrow="Admin"
-        title="Brand Kits"
+        title="Brand kits"
         lead="Manage brand identities, templates, and voice prompts."
         actions={
           <Button variant={selectedId ? 'secondary' : 'primary'} onClick={() => setAdding(true)}>

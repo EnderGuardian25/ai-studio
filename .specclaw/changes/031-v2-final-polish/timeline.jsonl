@@ -7,3 +7,5 @@
 {"ev":"stop","span":"W1","at":"2026-10-26T12:26:39Z","ts":1793017599,"status":"ok"}
 {"ev":"start","span":"W2","kind":"wave","label":"wave 2","at":"2026-10-26T12:26:40Z","ts":1793017600}
 {"ev":"start","span":"T2","kind":"task","label":"MEDIUM wording items and stale docs","parent":"W2","model":"sonnet","attempt":"1","at":"2026-10-26T12:26:40Z","ts":1793017600}
+{"ev":"stop","span":"T2","at":"2026-10-26T12:44:03Z","ts":1793018643,"status":"ok"}
+{"ev":"start","span":"T3","kind":"task","label":"Glossary, LOW sweep, wording guard, full E2E","parent":"W2","model":"sonnet","attempt":"1","at":"2026-10-26T12:44:16Z","ts":1793018656}

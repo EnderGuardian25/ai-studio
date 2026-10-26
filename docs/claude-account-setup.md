@@ -9,7 +9,7 @@ bistec-studio writes captions and designs posts by calling Claude. In the way we
 There are two kinds of token:
 
 - **Personal token.** Connected at **Settings** (`/settings`). Posts you generate are billed to _your_ Claude subscription. Everyone who generates posts should connect one.
-- **Team token.** Connected at **Team** (`/team`), by **team admins only**. It is used when nobody is signed in to do the work: scheduled posts, and the MCP and ACP connections. It is also the fallback if your personal token is rejected.
+- **Team token.** Connected at **Team** (`/team`), by **team admins only**. It is used when nobody is signed in to do the work: scheduled posts, and the MCP and ACP connections. It is also the fallback if your personal token is rejected. For scheduled posts, MCP and ACP it is the only credential.
 
 The app tries your personal token first, then the team token. If neither exists, generation fails. There is no other fallback, so a team that only uses scheduled posts needs a team token.
 

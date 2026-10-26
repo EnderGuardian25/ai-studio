@@ -575,8 +575,8 @@ test.describe('§T — draft inline edit', () => {
     await ready()
     await expect(frame.locator('#inline-edit-select-style')).toBeAttached()
     await frame.locator('p', { hasText: 'Keep me' }).click()
-    await dialog.getByLabel('Text colour', { exact: true }).fill('#00ff00')
-    await dialog.getByRole('button', { name: 'Apply text colour', exact: true }).click()
+    await dialog.getByLabel('Text color', { exact: true }).fill('#00ff00')
+    await dialog.getByRole('button', { name: 'Apply text color', exact: true }).click()
     await expect.poll(async () => (await current()).currentRevisionNumber, { timeout: 15_000 }).toBe(
       moved.currentRevisionNumber + 1,
     )

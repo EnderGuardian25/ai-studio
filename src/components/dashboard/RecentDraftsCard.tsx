@@ -96,8 +96,8 @@ export function RecentDraftsCard({
 
   async function discardUnfinished(row: UnfinishedBriefRow) {
     const ok = await confirm({
-      title: 'Discard this unfinished brief?',
-      description: `"${row.topic || 'Untitled brief'}" and its uploaded images will be deleted.`,
+      title: 'Discard this unfinished post?',
+      description: `"${row.topic || 'Untitled post'}" and its uploaded images will be deleted.`,
       confirmLabel: 'Discard',
     })
     if (!ok) return
@@ -136,7 +136,7 @@ export function RecentDraftsCard({
         <p className="py-8 text-center text-ui-sm text-fg-muted">
           No drafts yet.{' '}
           <Link href="/brief" className={`${TEXT_LINK} ${FOCUS_ROUNDED}`}>
-            Create your first brief
+            Create your first post
           </Link>
           .
         </p>
@@ -156,8 +156,8 @@ export function RecentDraftsCard({
               <tr className={TABLE_HEAD_ROW}>
                 <th scope="col" className={`${HEAD_CELL} pr-3`}>Topic</th>
                 <th scope="col" className={`${HEAD_CELL} pr-3`}>Campaign</th>
-                <th scope="col" className={`${HEAD_CELL} pr-3`}>Platform</th>
-                <th scope="col" className={`${HEAD_CELL} pr-3`}>Path</th>
+                <th scope="col" className={`${HEAD_CELL} pr-3`}>Channels</th>
+                <th scope="col" className={`${HEAD_CELL} pr-3`}>Design mode</th>
                 <th scope="col" className={`${HEAD_CELL} pr-3`}>Status</th>
                 <th scope="col" className={HEAD_CELL}>Created</th>
               </tr>
@@ -167,7 +167,7 @@ export function RecentDraftsCard({
                 <tr key={`unfinished-${u.id}`} className="group border-b border-line-subtle last:border-b-0">
                   <td className="py-2.5 pr-3">
                     <Link href={`/brief?resume=${u.id}`} className={`${TOPIC_LINK} ${FOCUS_ROUNDED}`}>
-                      {u.topic || 'Untitled brief'}
+                      {u.topic || 'Untitled post'}
                     </Link>
                   </td>
                   <td className="py-2.5 pr-3 text-fg-muted">—</td>
@@ -184,7 +184,7 @@ export function RecentDraftsCard({
                       </Link>
                       <button
                         type="button"
-                        aria-label="Discard unfinished brief"
+                        aria-label="Discard unfinished post"
                         disabled={discarding === u.id}
                         onClick={() => void discardUnfinished(u)}
                         className={`inline-flex h-6 w-6 items-center justify-center rounded-ui-pill text-fg-muted transition-colors duration-fast ease-standard hover:bg-surface-raised hover:text-status-failed disabled:opacity-50 ${FOCUS}`}
@@ -205,7 +205,7 @@ export function RecentDraftsCard({
                   <td className="py-2.5 pr-3 text-fg-muted">{d.brief?.campaign?.name ?? '—'}</td>
                   <td className="py-2.5 pr-3 text-fg-muted">{channelLabel(d.brief?.channels ?? [])}</td>
                   <td className="py-2.5 pr-3 text-fg-muted">
-                    {d.brief?.designMode === 'TEMPLATE' ? 'A' : 'B'}
+                    {d.brief?.designMode === 'TEMPLATE' ? 'Template' : 'Freeform'}
                   </td>
                   <td className="py-2.5 pr-3">
                     <StatusChip status={DRAFT_CHIP[d.status]} />

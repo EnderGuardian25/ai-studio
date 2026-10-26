@@ -87,7 +87,7 @@ function upgrade(api: ApiClient, kitId: string, text: string, baseVersion = 1) {
 async function openKit(page: Page, name: string) {
   await page.goto('/admin/brandkits')
   await page.getByRole('button', { name }).first().click()
-  await expect(page.getByText('Brand Voice Prompt').first()).toBeVisible()
+  await expect(page.getByText('Brand voice prompt').first()).toBeVisible()
 }
 
 const editor = (page: Page) => page.getByLabel('Brand voice prompt')

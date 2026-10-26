@@ -101,7 +101,7 @@ export default function ProjectsPage() {
         className="mb-6"
         eyebrow="Organize"
         title="Projects"
-        lead="Organise campaigns under projects with shared brand kits and tones."
+        lead="Organize campaigns under projects with shared brand kits and tones."
         actions={
           <>
             <Button variant="ghost" size="sm" onClick={() => setShowDeleted(v => !v)}>

@@ -28,7 +28,7 @@ const EFFECTIVE_LABELS: Record<NonNullable<CaptionRouteState['effective']>, stri
   CLI: 'the Claude CLI (OAuth)',
   API_KEY: 'the team’s Anthropic API key',
   SERVER_KEY: 'the server’s Anthropic key',
-  OTHER: 'a registered copy provider',
+  OTHER: 'a registered caption provider',
 }
 
 export function CaptionRouteCard() {

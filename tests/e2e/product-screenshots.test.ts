@@ -550,10 +550,10 @@ test.describe('§AG product screenshots: the wizard', () => {
   async function toSizeStep(page: Page) {
     await pageLogin(page)
     await page.goto('/brief')
-    await expect(page.getByRole('heading', { name: 'Select Campaign' })).toBeVisible({ timeout: 20_000 })
+    await expect(page.getByRole('heading', { name: 'Select a campaign' })).toBeVisible({ timeout: 20_000 })
     await page.getByRole('button', { name: /continue/i }).click()
     await expect(page.getByRole('heading', { name: 'Size & Design' })).toBeVisible()
-    const kit = page.getByRole('combobox', { name: 'Brand Kit' })
+    const kit = page.getByRole('combobox', { name: 'Brand kit' })
     await expect(kit.locator(`option[value="${kitId}"]`)).toBeAttached()
     await kit.selectOption(kitId)
   }
@@ -572,7 +572,7 @@ test.describe('§AG product screenshots: the wizard', () => {
 
     // Path A: no field. Path B: the field, with the look disabled and its reason.
     await expect(page.getByTestId('screenshot-section')).toHaveCount(0)
-    await page.getByRole('button', { name: /Path B — Freeform/ }).click()
+    await page.getByRole('button', { name: /^Freeform/ }).click()
     const section = page.getByTestId('screenshot-section')
     await expect(section).toBeVisible()
     await expect(section.getByText('Product screenshot').first()).toBeVisible()
@@ -619,7 +619,7 @@ test.describe('§AG product screenshots: the wizard', () => {
     await option(page, 'device-screen').click()
     const cont = page.getByRole('button', { name: /continue/i })
     await cont.click()
-    await expect(page.getByRole('heading', { name: 'Brief & Caption Direction' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Description & caption direction' })).toBeVisible()
     await page.getByPlaceholder('e.g. Q3 product launch').fill('Shot wizard topic')
     await page.locator('textarea').fill('Show the new dashboard on a laptop with a short call to action.')
     await cont.click()

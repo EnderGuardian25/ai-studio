@@ -295,7 +295,7 @@ export default function DraftDetailPage() {
         <p className="mb-3 text-ui-sm text-fg">{error ?? 'Draft not found.'}</p>
         <Link href="/library">
           <Button variant="secondary" size="sm">
-            <ArrowLeft {...ICON} /> Back to Library
+            <ArrowLeft {...ICON} /> Back to library
           </Button>
         </Link>
       </Panel>

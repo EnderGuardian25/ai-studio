@@ -620,7 +620,7 @@ export function InlineEditModal({
           <p className="max-w-2xl text-ui-sm text-fg-muted">
             {elementMode ? (
               <>
-                Click an element to select it, then change its text, colour or size. Each change
+                Click an element to select it, then change its text, color or size. Each change
                 saves straight away as a new revision.
               </>
             ) : (

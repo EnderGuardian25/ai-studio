@@ -9,7 +9,7 @@
 
 > Read this before building or changing any page or component. Where a value is given here, use it; do not approximate it. Where this document says nothing, follow the source study, then ask.
 
-The section numbers are the ones the code's comments cite (§1–§11, §8.1–§8.19), kept from the Folio version so those references stay valid (021 A10).
+The section numbers are the ones the code's comments cite (§1–§12, §8.1–§8.19), kept from the Folio version so those references stay valid (021 A10).
 
 ---
 
@@ -764,3 +764,30 @@ the names `GlassInput` and `GlassPanel`, and, as **whole class tokens**, `glow-b
 - **The inline editor's outlines** (`InlineEditModal`'s `EDITOR_STYLE`): CSS injected into the post's own iframe, where the app's variables don't reach, so it carries the light `--fg` as the literal `rgba(24,24,22,…)`.
 
 Anything else that seems to need an exception is a missing token. Raise it rather than writing the raw value.
+
+---
+
+## 12. Words
+
+**The glossary for every word a person reads in the app (031 FR-05).** Routes, API fields, Prisma names, enum values, analytics names and code identifiers do not change; only the words on screen and in user-facing messages do. `tests/unit/uiWordingGuard.test.ts` enforces the retired terms in `src/app/(app)/**` and `src/components/**`; a line opts out only with `// wording-exception: <reason>` (JSX form: `{/* wording-exception: <reason> */}`), and the reason names the code value that is shown verbatim.
+
+| Rule                                                       | Applies to                                                                                                                                                                                | Does not apply to                                                                                                                                                                    |
+| ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **post**, not "brief"                                      | page titles, buttons, lists, toasts, empty states and errors for the thing a user creates (`/brief` page title "New post"; "Create post"); the Content step's text field is "Description" | routes (`/brief`), API fields, Prisma models (`Brief`, `Post`), analytics names, code, docs about code. The publish record is "published post" in the UI where it must be told apart |
+| **Template** / **Freeform**, not "Path A" / "Path B"       | every UI label, column and badge                                                                                                                                                          | `designMode` values, code, docs about code, E2E test names                                                                                                                           |
+| **Brand kit** (sentence case; "brand kits" plural)         | all UI text, the nav item, model-catalogue labels shown in the UI                                                                                                                         | route segments (`/admin/brandkits`), code identifiers                                                                                                                                |
+| **Team settings**                                          | the `/team` page title, nav and every pointer to it ("Team settings > AI providers")                                                                                                      | the route `/team`                                                                                                                                                                    |
+| **Captions** / **Images** for the `COPY` / `IMAGE` slots   | `/team` toggles, tags, headings and server messages shown to users. Helper text: "Captions: writes captions and headlines."                                                               | the enum values `COPY` and `IMAGE`                                                                                                                                                   |
+| **Image generation key**                                   | the personal key card and every pointer to it                                                                                                                                             | the route `/api/me/openai-key`, the table `UserOpenAiKey`                                                                                                                            |
+| **Sentence case** for labels, headings, buttons and titles | all UI                                                                                                                                                                                    | proper nouns and product names (Instagram, LinkedIn, OpenAI, Gemini, Claude)                                                                                                         |
+| **US spelling** (color, organize)                          | all UI text and user-facing messages                                                                                                                                                      | code identifiers already in use, Prisma fields                                                                                                                                       |
+
+**UI to code mapping** (what a UI word means in the code):
+
+- post ↔ `Brief` (the thing a user creates); published post ↔ `Post`
+- Template ↔ `designMode: TEMPLATE`; Freeform ↔ `designMode: GENERATE`
+- Captions ↔ the `COPY` provider slot; Images ↔ the `IMAGE` provider slot
+- Image generation key ↔ `UserOpenAiKey` (route `/api/me/openai-key`)
+- Brand kit ↔ `BrandKit`; Team settings ↔ the `/team` page
+
+The deny-list today: `Path A`, `Path B`, `Brand Kit`(s), `Brandkits`, `Brand-kit`, `copy provider` (any case), `COPY provider`, `colour`(s), `Organise` and `New Brief`. Change 031 task T5 adds `OpenAI key` once the personal key card is renamed.

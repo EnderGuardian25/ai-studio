@@ -708,11 +708,11 @@ const summary = (page: Page, label: string) =>
 async function openStepOne(page: Page, campaignName?: string) {
   await pageLogin(page)
   await page.goto('/brief')
-  await expect(page.getByRole('heading', { name: 'Select Campaign' })).toBeVisible({ timeout: 20_000 })
+  await expect(page.getByRole('heading', { name: 'Select a campaign' })).toBeVisible({ timeout: 20_000 })
   if (campaignName) await page.getByRole('button', { name: new RegExp(campaignName) }).click()
   await page.getByRole('button', { name: /continue/i }).click()
   await expect(page.getByRole('heading', { name: 'Size & Design' })).toBeVisible()
-  const kit = page.getByRole('combobox', { name: 'Brand Kit' })
+  const kit = page.getByRole('combobox', { name: 'Brand kit' })
   await expect(kit.locator(`option[value="${kitId}"]`)).toBeAttached()
   await kit.selectOption(kitId)
 }
@@ -722,7 +722,7 @@ const lookCard = (page: Page, key: string) => page.getByTestId(`image-style-${ke
 
 async function toContentStep(page: Page) {
   await page.getByRole('button', { name: /continue/i }).click()
-  await expect(page.getByRole('heading', { name: 'Brief & Caption Direction' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Description & caption direction' })).toBeVisible()
 }
 
 async function fillContent(page: Page, topic: string) {
@@ -749,7 +749,7 @@ test.describe('The wizard: the post style picker on step 1', () => {
 
     // Above the size choices.
     const pickerBox = (await picker.boundingBox())!
-    const sizeBox = (await page.getByText('Post Size', { exact: true }).boundingBox())!
+    const sizeBox = (await page.getByText('Post size', { exact: true }).boundingBox())!
     expect(pickerBox.y + pickerBox.height).toBeLessThanOrEqual(sizeBox.y)
 
     // One tab stop; the arrow keys move the choice and the focus.
@@ -772,7 +772,7 @@ test.describe('The wizard: the post style picker on step 1', () => {
     await page.setViewportSize({ width: 1440, height: 900 })
 
     // The Content step: Tone, and no Goal.
-    await page.getByRole('button', { name: /Path B — Freeform/ }).click()
+    await page.getByRole('button', { name: /^Freeform/ }).click()
     await toContentStep(page)
     await expect(page.getByRole('combobox', { name: 'Tone' })).toBeVisible()
     await expect(page.getByRole('combobox', { name: 'Goal' })).toHaveCount(0)
@@ -780,7 +780,7 @@ test.describe('The wizard: the post style picker on step 1', () => {
 
   test('TC-PS-31: the image style on step 1 is pre-filled from the style, a look picked by hand is kept (also across 9:16), Path A has none', async ({ page }) => {
     await openStepOne(page)
-    await page.getByRole('button', { name: /Path B — Freeform/ }).click()
+    await page.getByRole('button', { name: /^Freeform/ }).click()
     await expect(lookCard(page, 'classic')).toHaveAttribute('aria-pressed', 'true')
     await expect(page.getByTestId('image-style-from-style')).toHaveCount(0)
 
@@ -812,13 +812,13 @@ test.describe('The wizard: the post style picker on step 1', () => {
     await expect(lookCard(page, 'classic')).toHaveAttribute('aria-pressed', 'true')
 
     // Path A has no image style at all.
-    await page.getByRole('button', { name: /Path A — Template/ }).click()
+    await page.getByRole('button', { name: /^Template/ }).click()
     await expect(page.getByTestId('image-style-section')).toHaveCount(0)
   })
 
   test('TC-PS-32: the style pre-fills the Tone, a Tone changed by hand is kept, and the Review shows the resolved rows', async ({ page }) => {
     await openStepOne(page)
-    await page.getByRole('button', { name: /Path B — Freeform/ }).click()
+    await page.getByRole('button', { name: /^Freeform/ }).click()
     await styleCard(page, 'promotion').click()
     await toContentStep(page)
     const tone = page.getByRole('combobox', { name: 'Tone' })
@@ -852,7 +852,7 @@ test.describe('The wizard: the post style picker on step 1', () => {
 
   test('TC-PS-33: the request carries postStyle always, and tone and imageStyle only when touched', async ({ page }) => {
     await openStepOne(page)
-    await page.getByRole('button', { name: /Path B — Freeform/ }).click()
+    await page.getByRole('button', { name: /^Freeform/ }).click()
     await styleCard(page, 'launch').click()
     await toContentStep(page)
     await fillContent(page, `PS wizard body ${tag()}`)
@@ -893,7 +893,7 @@ test.describe('The wizard: the post style picker on step 1', () => {
 
   test('TC-PS-34: the stored style resumes (an unknown key and an old row open as General)', async ({ page }) => {
     await openStepOne(page)
-    await page.getByRole('button', { name: /Path B — Freeform/ }).click()
+    await page.getByRole('button', { name: /^Freeform/ }).click()
     await styleCard(page, 'event').click()
     await toContentStep(page)
     await fillContent(page, `PS wizard resume ${tag()}`)

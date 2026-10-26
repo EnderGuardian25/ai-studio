@@ -181,7 +181,7 @@ test.describe('Publishing flow', () => {
     await expect(publishBtn).toBeVisible({ timeout: 20_000 })
     await publishBtn.click()
 
-    const dialog = page.getByRole('dialog', { name: 'Publish Post' })
+    const dialog = page.getByRole('dialog', { name: 'Publish post' })
     await expect(dialog).toBeVisible()
     const instagram = dialog.getByRole('checkbox', { name: 'Instagram' })
     const linkedin = dialog.getByRole('checkbox', { name: 'LinkedIn' })
@@ -192,7 +192,7 @@ test.describe('Publishing flow', () => {
       page.waitForResponse(
         (r) => r.url().endsWith('/api/posts') && r.request().method() === 'POST' && r.request().postData()?.includes('INSTAGRAM') === true,
       ),
-      dialog.getByRole('button', { name: /^confirm$/i }).click(),
+      dialog.getByRole('button', { name: /^publish$/i }).click(),
     ])
     expect(igRes.status()).toBe(502)
 

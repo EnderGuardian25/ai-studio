@@ -210,14 +210,14 @@ export function tableDefault(surface: UserSurface, designPath?: DesignPath): Mod
 /** Plain names (FR-14 labels) and the phrase used inside sentences ("isn't available for …"). */
 export const SURFACE_LABELS: Readonly<Record<UserSurface, { name: string; phrase: string }>> = {
   CAPTION: { name: 'Captions', phrase: 'caption writing' },
-  DESIGN_TEMPLATE: { name: 'Template fill (Path A)', phrase: 'template fill' },
-  DESIGN_FREEFORM: { name: 'Freeform design (Path B)', phrase: 'freeform design' },
+  DESIGN_TEMPLATE: { name: 'Template fill', phrase: 'template fill' },
+  DESIGN_FREEFORM: { name: 'Freeform design', phrase: 'freeform design' },
   REFINE: { name: 'Refine', phrase: 'refine' },
   ASSISTANT_BRIEFING: {
     name: 'Campaign briefing assistant',
     phrase: 'the campaign briefing assistant',
   },
-  ASSISTANT_BRANDKIT: { name: 'Brand-kit assistant', phrase: 'the brand-kit assistant' },
+  ASSISTANT_BRANDKIT: { name: 'Brand kit assistant', phrase: 'the brand kit assistant' },
 }
 
 /** The family's short name ('Haiku'), for sentences that name families rather than versions. */

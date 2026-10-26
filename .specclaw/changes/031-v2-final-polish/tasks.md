@@ -84,7 +84,7 @@
     - Report: one row per item handled ("W-nn | file | what changed").
     - **Gate:** tsc, lint, unit, and the touched E2E suites.
 
-- [ ] `T3` — Glossary, the LOW naming sweep, the wording guard, the early full E2E run
+- [x] `T3` — Glossary, the LOW naming sweep, the wording guard, the early full E2E run
   - Files: `docs/ui-reference/DESIGN_SYSTEM.md` (§12), `tests/unit/uiWordingGuard.test.ts` (new), the files of W-15 and W-27 to W-38, E2E files with adapted locators
   - Estimate: large
   - Kind: refactor

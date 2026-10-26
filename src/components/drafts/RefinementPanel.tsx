@@ -241,7 +241,7 @@ export function RefinementPanel({
 
   return (
     <section className="surface-bezel p-5">
-      <SectionHead title="Refine Design" id={headingId} className="mb-3">
+      <SectionHead title="Refine design" id={headingId} className="mb-3">
         {messages.length > 0 && (
           <span className="font-mono text-ui-2xs text-fg-muted">
             {messages.length} {messages.length === 1 ? 'request' : 'requests'}

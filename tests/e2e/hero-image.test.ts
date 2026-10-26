@@ -444,11 +444,11 @@ test.describe('§AA — the wizard picker', () => {
   }) => {
     await pageLogin(page)
     await page.goto('/brief')
-    await expect(page.getByRole('heading', { name: 'Select Campaign' })).toBeVisible({ timeout: 20_000 })
+    await expect(page.getByRole('heading', { name: 'Select a campaign' })).toBeVisible({ timeout: 20_000 })
     const cont = page.getByRole('button', { name: /continue/i })
     await cont.click()
     await expect(page.getByRole('heading', { name: 'Size & Design' })).toBeVisible()
-    const kit = page.getByRole('combobox', { name: 'Brand Kit' })
+    const kit = page.getByRole('combobox', { name: 'Brand kit' })
     await expect(kit.locator(`option[value="${kitId}"]`)).toBeAttached()
     await kit.selectOption(kitId)
 
@@ -457,7 +457,7 @@ test.describe('§AA — the wizard picker', () => {
 
     // Path A (the default): no picker.
     await expect(section).toHaveCount(0)
-    await page.getByRole('button', { name: /Path B — Freeform/ }).click()
+    await page.getByRole('button', { name: /^Freeform/ }).click()
     await expect(section).toBeVisible()
     await expect(option('classic')).toHaveAttribute('aria-pressed', 'true')
     await expect(option('product-showcase')).toBeEnabled()
@@ -481,15 +481,15 @@ test.describe('§AA — the wizard picker', () => {
     await expect(option('product-showcase')).toBeEnabled()
     await option('product-showcase').click()
     await expect(option('product-showcase')).toHaveAttribute('aria-pressed', 'true')
-    await page.getByRole('button', { name: /Path A — Template/ }).click()
+    await page.getByRole('button', { name: /^Template/ }).click()
     await expect(section).toHaveCount(0)
-    await page.getByRole('button', { name: /Path B — Freeform/ }).click()
+    await page.getByRole('button', { name: /^Freeform/ }).click()
     await expect(option('classic')).toHaveAttribute('aria-pressed', 'true')
 
     // The choice that goes forward.
     await option('editorial-split').click()
     await cont.click()
-    await expect(page.getByRole('heading', { name: 'Brief & Caption Direction' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Description & caption direction' })).toBeVisible()
     await page.getByPlaceholder('e.g. Q3 product launch').fill('Hero wizard topic')
     await page.locator('textarea').fill('Announce the hero image styles with a short call to action.')
     await cont.click()

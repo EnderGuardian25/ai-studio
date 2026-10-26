@@ -658,12 +658,12 @@ test.describe('§Y — /team → Models', () => {
     await expect(defaults.getByRole('combobox')).toHaveCount(6)
     const systemDefaults: [string, string][] = [
       ['Captions', 'Haiku 4.5'],
-      ['Template fill (Path A)', 'Haiku 4.5'],
-      ['Freeform design (Path B)', 'Sonnet 5.5'],
+      ['Template fill', 'Haiku 4.5'],
+      ['Freeform design', 'Sonnet 5.5'],
       // 018 FR-02: refine's system default follows the draft's path.
       ['Refine', 'Sonnet 5.5; Haiku 4.5 on template drafts'],
       ['Campaign briefing assistant', 'Sonnet 5.5'],
-      ['Brand-kit assistant', 'Sonnet 5.5'],
+      ['Brand kit assistant', 'Sonnet 5.5'],
     ]
     for (const [name, model] of systemDefaults) {
       const select = defaults.getByRole('combobox', { name, exact: true })
@@ -671,7 +671,7 @@ test.describe('§Y — /team → Models', () => {
       await expect(select.locator('option').first()).toHaveText(`System default (${model})`)
     }
     // Template fill never offers Opus.
-    await expect(defaults.getByRole('combobox', { name: 'Template fill (Path A)', exact: true }).locator('option')).toHaveText([
+    await expect(defaults.getByRole('combobox', { name: 'Template fill', exact: true }).locator('option')).toHaveText([
       'System default (Haiku 4.5)',
       'Haiku 4.5',
       'Sonnet 5.5',
@@ -698,7 +698,7 @@ test.describe('§Y — /team → Models', () => {
     await opus.check()
     await haiku.uncheck()
     await sonnet.uncheck()
-    await expect(defaults.getByRole('combobox', { name: 'Template fill (Path A)', exact: true }).locator('option').first()).toHaveText(
+    await expect(defaults.getByRole('combobox', { name: 'Template fill', exact: true }).locator('option').first()).toHaveText(
       'System default (none allowed)',
     )
     await save.click()
@@ -786,10 +786,10 @@ const summary = (page: Page, label: string) =>
 
 async function choosePath(page: Page, path: 'A' | 'B', template?: string) {
   if (path === 'B') {
-    await page.getByRole('button', { name: /Path B — Freeform/ }).click()
+    await page.getByRole('button', { name: /^Freeform/ }).click()
     await expect(page.getByRole('button', { name: 'No reference' })).toBeVisible()
   } else {
-    await page.getByRole('button', { name: /Path A — Template/ }).click()
+    await page.getByRole('button', { name: /^Template/ }).click()
     await page.getByRole('button', { name: new RegExp(template!) }).click()
   }
 }
@@ -797,7 +797,7 @@ async function choosePath(page: Page, path: 'A' | 'B', template?: string) {
 // From a valid Size & Design step to Review, through Content and Images.
 async function continueToReview(page: Page) {
   const cont = page.getByRole('button', { name: /continue/i })
-  for (const heading of ['Brief & Caption Direction', /Images/, 'Review & Generate']) {
+  for (const heading of ['Description & caption direction', /Images/, 'Review & Generate']) {
     await cont.click()
     await expect(page.getByRole('heading', { name: heading })).toBeVisible()
   }
@@ -808,16 +808,16 @@ async function continueToReview(page: Page) {
 // A Path B walk on `kitId` to the Review step, touching no picker.
 async function walkToReview(page: Page, kitId: string, topic: string) {
   await page.goto('/brief')
-  await expect(page.getByRole('heading', { name: 'Select Campaign' })).toBeVisible({ timeout: 20_000 })
+  await expect(page.getByRole('heading', { name: 'Select a campaign' })).toBeVisible({ timeout: 20_000 })
   const cont = page.getByRole('button', { name: /continue/i })
   await cont.click()
   await expect(page.getByRole('heading', { name: 'Size & Design' })).toBeVisible()
-  const kit = page.getByRole('combobox', { name: 'Brand Kit' })
+  const kit = page.getByRole('combobox', { name: 'Brand kit' })
   await expect(kit.locator(`option[value="${kitId}"]`)).toBeAttached()
   await kit.selectOption(kitId)
   await choosePath(page, 'B')
   await cont.click()
-  await expect(page.getByRole('heading', { name: 'Brief & Caption Direction' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Description & caption direction' })).toBeVisible()
   await page.getByPlaceholder('e.g. Q3 product launch').fill(topic)
   await page.locator('textarea').fill('Announce the model pickers with a short call to action.')
   for (const heading of [/Images/, 'Review & Generate']) {
@@ -1359,7 +1359,7 @@ test.describe('§Y — the pickers (wave 2)', () => {
     await openDraft(page, id)
 
     const refine = picker(page, 'Refine model')
-    const refineSection = page.locator('section').filter({ has: page.getByRole('heading', { name: /Refine Design/ }) })
+    const refineSection = page.locator('section').filter({ has: page.getByRole('heading', { name: /Refine design/ }) })
     const notice = refineSection.getByRole('status').filter({ hasText: TEAM_TOKEN_NOTICE })
     await expect(refine).toHaveValue('SONNET')
     expect(await optionValues(refine)).toEqual(ALL)

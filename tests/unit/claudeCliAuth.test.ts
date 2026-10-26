@@ -54,7 +54,7 @@ type ClaudeCliAuth = import('@/lib/agent/claudeAuth').ClaudeCliAuth
 
 const AUTH_STDERR = 'API Error: 401 OAuth token is invalid'
 const NO_CREDENTIAL_MESSAGE =
-  'No Claude credential available — connect a personal token in Settings or set the team token in Team Settings'
+  'No Claude credential available — connect a personal token in Settings or set the team token in Team settings'
 
 function userAuth(overrides: Partial<ClaudeCliAuth> = {}): ClaudeCliAuth {
   return {

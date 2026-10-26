@@ -118,7 +118,7 @@ export function QueueEntryModal({ campaignId, resolvedKitId, isTeamAdmin, entry,
       }
       onSaved()
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Failed to save entry')
+      setError(e instanceof Error ? e.message : 'Failed to save planned post')
     } finally {
       setSubmitting(false)
     }

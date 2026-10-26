@@ -279,7 +279,7 @@ export function KitDetail({ kit, onRefresh }: KitDetailProps) {
       <div className="space-y-3.5">
         {/* Colors — each swatch shows the kit's own colour (data, not tokens). */}
         <section className={SECTION}>
-          <SectionHead level={3} card title="Color Palette" className="mb-3" />
+          <SectionHead level={3} card title="Color palette" className="mb-3" />
           {editing ? (
             <ColorEditor colors={colors} onChange={setColors} />
           ) : (
@@ -393,7 +393,7 @@ export function KitDetail({ kit, onRefresh }: KitDetailProps) {
 
         {/* Templates */}
         <section className={SECTION}>
-          <SectionHead level={3} card title="HTML Templates" className="mb-3">
+          <SectionHead level={3} card title="HTML templates" className="mb-3">
             <input
               ref={templateImageRef}
               type="file"
@@ -442,7 +442,7 @@ export function KitDetail({ kit, onRefresh }: KitDetailProps) {
                   })}
                 </div>
                 <p className="text-ui-xs text-fg-muted">
-                  The HTML should be sized for the chosen canvas. Briefs only offer this template at the matching size.
+                  The HTML should be sized for the chosen canvas. Posts only offer this template at the matching size.
                 </p>
               </div>
               <div className="flex flex-col gap-1.5">
@@ -491,7 +491,7 @@ export function KitDetail({ kit, onRefresh }: KitDetailProps) {
 
         {/* Brand Voice Prompt */}
         <section className={SECTION}>
-          <SectionHead level={3} card title="Brand Voice Prompt" className="mb-3" />
+          <SectionHead level={3} card title="Brand voice prompt" className="mb-3" />
           <PromptSection kitId={kit.id} prompts={kit.prompts} onRefresh={onRefresh} />
         </section>
 

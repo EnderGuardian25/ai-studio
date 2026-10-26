@@ -53,7 +53,7 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
 
   if (draft.brief.designMode !== 'GENERATE') {
     return NextResponse.json(
-      { code: 'NOT_PATH_B', message: 'Design regeneration is only available for Path B (freeform) drafts.' },
+      { code: 'NOT_PATH_B', message: 'Design regeneration is only available for Freeform drafts.' },
       { status: 400 }
     )
   }

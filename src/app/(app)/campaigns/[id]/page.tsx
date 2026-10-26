@@ -174,7 +174,7 @@ export default function CampaignDetailPage() {
         <aside className="surface min-w-0 divide-y divide-line-subtle p-5">
           {resolved?.kit && (
             <section className={ASIDE_BLOCK}>
-              <h2 className={`${EYEBROW} mb-3`}>Brand Kit</h2>
+              <h2 className={`${EYEBROW} mb-3`}>Brand kit</h2>
               <p className="break-words text-ui-sm font-medium text-fg">{resolved.kit.name}</p>
               {resolved.source && (
                 <p className="mt-0.5 text-ui-xs text-fg-muted">
@@ -279,14 +279,14 @@ export default function CampaignDetailPage() {
           </section>
 
           <section className={ASIDE_BLOCK}>
-            <h2 className={`${EYEBROW} mb-3`}>Briefs ({campaign._count.briefs})</h2>
+            <h2 className={`${EYEBROW} mb-3`}>Posts ({campaign._count.briefs})</h2>
             {campaign._count.briefs === 0 ? (
               <p className="text-ui-sm text-fg-muted">
-                No briefs created under this campaign yet.
+                No posts created under this campaign yet.
               </p>
             ) : (
               <p className="text-ui-sm text-fg-muted">
-                {campaign._count.briefs} brief{campaign._count.briefs !== 1 ? 's' : ''} in this campaign.
+                {campaign._count.briefs} post{campaign._count.briefs !== 1 ? 's' : ''} in this campaign.
               </p>
             )}
           </section>

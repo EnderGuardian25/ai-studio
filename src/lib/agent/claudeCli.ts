@@ -427,7 +427,7 @@ export async function runClaudeCliOnce(
   opts: ClaudeCliOptions,
   tokenOverride: string | undefined,
 ): Promise<string> {
-  assertPromptSize(prompt.length, "This usually means the brand template is too big — use a smaller template or Path B.")
+  assertPromptSize(prompt.length, "This usually means the brand template is too big — use a smaller template or Freeform.")
   const command = claudeCommand()
   const args = [...baseArgs(command.shell), ...claudeModelArgs(opts.model)]
   recordModelCall(modelCallFor(opts.model, "cli", opts.label))
@@ -697,7 +697,7 @@ async function spawnClaude(args: string[], stdinPayload: string, opts: SpawnClau
   const oauthToken = tokenOverride ?? currentClaudeAuth()?.token
   if (!oauthToken) {
     throw new ClaudeCliError(
-      "No Claude credential available — connect a personal token in Settings or set the team token in Team Settings",
+      "No Claude credential available — connect a personal token in Settings or set the team token in Team settings",
       null,
       "",
       "",

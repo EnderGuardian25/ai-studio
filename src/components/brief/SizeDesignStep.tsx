@@ -105,7 +105,7 @@ export function SizeDesignStep({
 
       {/* Post size */}
       <div className={SECTION}>
-        <FieldLabel className="mb-2.5">Post Size</FieldLabel>
+        <FieldLabel className="mb-2.5">Post size</FieldLabel>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {ASPECT_OPTIONS.map(({ value, icon: Icon, sub }) => {
             const selected = aspectRatio === value
@@ -134,7 +134,7 @@ export function SizeDesignStep({
       {/* Brand kit */}
       <div className={SECTION}>
         <Select
-          label="Brand Kit"
+          label="Brand kit"
           options={brandKitOptions}
           value={brandKitId}
           onChange={e => setBrandKitId(e.target.value)}
@@ -151,7 +151,7 @@ export function SizeDesignStep({
 
       {/* Path */}
       <div className={SECTION}>
-        <FieldLabel className="mb-2.5">Generation Path</FieldLabel>
+        <FieldLabel className="mb-2.5">Design mode</FieldLabel>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <button
             type="button"
@@ -163,7 +163,7 @@ export function SizeDesignStep({
             className={cardCls(designMode === 'TEMPLATE', 'p-4')}
           >
             <div className="text-ui-base font-semibold leading-tight text-fg mb-1.5">
-              Path A — Template
+              Template
             </div>
             <div className="text-ui-xs text-fg-muted">
               Fills a pre-built HTML/CSS brand template. Consistent, on-brand output.
@@ -179,7 +179,7 @@ export function SizeDesignStep({
             className={cardCls(designMode === 'GENERATE', 'p-4')}
           >
             <div className="text-ui-base font-semibold leading-tight text-fg mb-1.5">
-              Path B — Freeform
+              Freeform
             </div>
             <div className="text-ui-xs text-fg-muted">
               Designs a new HTML/CSS layout from scratch. Maximum creative flexibility.
@@ -325,7 +325,7 @@ export function SizeDesignStep({
             </div>
           ) : visibleTemplates.length === 0 ? (
             <div className={EMPTY}>
-              This brand kit has no {ASPECT_LABELS[aspectRatio]} templates. Add one under Admin → Brand Kits, change the size or kit, or switch to Path B.
+              This brand kit has no {ASPECT_LABELS[aspectRatio]} templates. Add one under Brand kits, change the size or kit, or switch to Freeform.
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -346,7 +346,7 @@ export function SizeDesignStep({
       {designMode === 'GENERATE' && (
         <div className={SECTION}>
           <FieldLabel className="mb-2.5">
-            Style Reference Template <span className="font-normal text-fg-muted">(optional)</span>
+            Style reference <span className="font-normal text-fg-muted">(optional)</span>
           </FieldLabel>
           <p className="text-ui-xs text-fg-muted mb-3">
             Used for visual inspiration only — it won&apos;t copy the layout exactly.

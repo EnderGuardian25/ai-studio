@@ -34,7 +34,7 @@ export function AddKitModal({ onClose, onCreated }: AddKitModalProps) {
   }
 
   return (
-    <Modal open onClose={onClose} title="New Brand Kit" size="sm">
+    <Modal open onClose={onClose} title="New brand kit" size="sm">
       <form onSubmit={submit} className="space-y-4">
         <Input
           label="Name"

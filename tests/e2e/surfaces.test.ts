@@ -210,7 +210,7 @@ for (const theme of THEMES) {
       await pageLogin(page)
       await page.goto(`/drafts/${draft.id}`)
       await page.getByRole('button', { name: /^publish$/i }).click({ timeout: 20_000 })
-      await expectOpaque(page.getByRole('dialog', { name: 'Publish Post' }), 'publish modal')
+      await expectOpaque(page.getByRole('dialog', { name: 'Publish post' }), 'publish modal')
       await page.keyboard.press('Escape')
     })
 
@@ -454,7 +454,7 @@ test.describe('Dashboard and library (T7)', () => {
     await page.setViewportSize({ width: 1440, height: 900 })
     await pageLogin(page)
     await expect(page.getByRole('heading', { name: 'Dashboard', level: 1 })).toBeVisible()
-    expect(await tabThreeFromMain(page)).toEqual(['Create Post', 'View Library', 'Manage Brand Kits'])
+    expect(await tabThreeFromMain(page)).toEqual(['New post', 'View library', 'Manage brand kits'])
   })
 
   test('AC-17: the library shows a visible focus indicator on its first three stops', async ({ page }) => {
@@ -497,10 +497,10 @@ test.describe('Dashboard and library (T7)', () => {
     await expect(page.getByRole('button', { name: `Delete ${draft.topic}` })).toBeVisible()
 
     await page.getByRole('button', { name: 'Publish', exact: true }).click()
-    const publish = page.getByRole('dialog', { name: 'Publish Post' })
+    const publish = page.getByRole('dialog', { name: 'Publish post' })
     await expect(publish).toBeVisible()
     await expect(publish.getByRole('checkbox')).not.toHaveCount(0)
-    await expect(publish.getByRole('button', { name: 'Confirm' })).toBeVisible()
+    await expect(publish.getByRole('button', { name: 'Publish' })).toBeVisible()
     await expectNoHorizontalScroll(page, 'publish dialog at 375px')
     await publish.getByRole('button', { name: 'Cancel' }).click()
     await expect(publish).toBeHidden()
@@ -571,7 +571,7 @@ test.describe('Brief wizard (T8)', () => {
     await page.setViewportSize({ width: 1440, height: 900 })
     await pageLogin(page)
     await page.goto('/brief')
-    await expect(page.getByRole('heading', { name: 'New Brief', level: 1 })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'New post', level: 1 })).toBeVisible()
     // The stepper's first three steps (numeral + label); the current one is announced.
     expect(await tabThreeFromMain(page)).toEqual(['1Campaign', '2Size & Design', '3Content'])
     await expect(page.locator('[aria-current="step"]')).toHaveCount(1)
@@ -600,7 +600,7 @@ test.describe('Brief wizard (T8)', () => {
     const cont = page.getByRole('button', { name: /continue/i })
 
     // Step 1 — Campaign
-    await expect(page.getByRole('heading', { name: 'Select Campaign' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Select a campaign' })).toBeVisible()
     await expect(page.getByRole('button', { name: /No campaign \(Uncategorized\)/ })).toHaveAttribute('aria-pressed', 'true')
     await expect(page.getByRole('button', { name: 'Back' })).toBeDisabled()
     await expectNoHorizontalScroll(page, 'brief: campaign step at 375px')
@@ -608,10 +608,10 @@ test.describe('Brief wizard (T8)', () => {
 
     // Step 2 — Size & Design, the template picker, then Path B's reference picker
     await expect(page.getByRole('heading', { name: 'Size & Design' })).toBeVisible()
-    for (const name of [/^1:1/, /^4:5/, /^9:16/, /Path A — Template/, /Path B — Freeform/]) {
+    for (const name of [/^1:1/, /^4:5/, /^9:16/, /^Template/, /^Freeform/]) {
       await expect(page.getByRole('button', { name })).toBeVisible()
     }
-    const kit = page.getByRole('combobox', { name: 'Brand Kit' })
+    const kit = page.getByRole('combobox', { name: 'Brand kit' })
     // The kit options load after the step renders: wait for one before choosing
     // (the same race a11y.test.ts's briefStepTwo guards against).
     await expect(kit.locator('option:not([value=""])').first()).toBeAttached()
@@ -619,15 +619,15 @@ test.describe('Brief wizard (T8)', () => {
       const values = await kit.locator('option').evaluateAll((os) => (os as HTMLOptionElement[]).map((o) => o.value).filter(Boolean))
       await kit.selectOption(values[0])
     }
-    await expect(page.getByText('Template', { exact: true })).toBeVisible()
+    await expect(page.locator('label').filter({ hasText: /^Template$/ })).toBeVisible()
     await expectNoHorizontalScroll(page, 'brief: size & design (Path A) at 375px')
-    await page.getByRole('button', { name: /Path B — Freeform/ }).click()
+    await page.getByRole('button', { name: /^Freeform/ }).click()
     await expect(page.getByRole('button', { name: 'No reference' })).toHaveAttribute('aria-pressed', 'true')
     await expectNoHorizontalScroll(page, 'brief: size & design (Path B) at 375px')
     await cont.click()
 
     // Step 3 — Content, with the Enhance with AI before/after
-    await expect(page.getByRole('heading', { name: 'Brief & Caption Direction' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Description & caption direction' })).toBeVisible()
     await page.getByPlaceholder('e.g. Q3 product launch').fill(`T8 wizard ${Date.now()}`)
     await page.locator('textarea').fill('Announce the restyled brief wizard with a short call to action.')
     // The Goal select is gone (027 FR-07): the post style on step 1 sets the goal.
@@ -648,7 +648,7 @@ test.describe('Brief wizard (T8)', () => {
     await page.locator('input[type=file]').setInputFiles({ name: 't8-1px.png', mimeType: 'image/png', buffer: ONE_PX_PNG })
     await expect(page.getByRole('button', { name: 'Remove image' })).toBeVisible({ timeout: 20_000 })
     await page.getByRole('button', { name: 'Embed' }).click()
-    await expect(page.getByRole('button', { name: 'Style ref' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Style reference' })).toBeVisible()
     await expectNoHorizontalScroll(page, 'brief: images step at 375px')
     await cont.click()
 
@@ -668,7 +668,7 @@ test.describe('Brief wizard (T8)', () => {
 
     // The stepper jumps back to a done step (its label is sr-only below sm).
     await page.getByRole('button', { name: 'Campaign', exact: true }).click()
-    await expect(page.getByRole('heading', { name: 'Select Campaign' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Select a campaign' })).toBeVisible()
   })
 })
 
@@ -1023,7 +1023,7 @@ function kitRow(page: Page, name: string): Locator {
 
 async function openKit(page: Page, name: string) {
   await page.goto('/admin/brandkits')
-  await expect(page.getByRole('heading', { name: 'Brand Kits', level: 1 })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Brand kits', level: 1 })).toBeVisible()
   await kitRow(page, name).click()
   await expect(page.getByRole('heading', { name, level: 2 })).toBeVisible()
 }
@@ -1072,7 +1072,7 @@ test.describe('Brand kits (T11)', () => {
     for (const name of ['Extract from references', 'Set default', 'Edit']) {
       await expect(kitPanel.getByRole('button', { name, exact: true })).toBeVisible()
     }
-    for (const name of ['Color Palette', 'Logos', 'Fonts', 'HTML Templates', 'Brand Voice Prompt', 'Artifacts']) {
+    for (const name of ['Color palette', 'Logos', 'Fonts', 'HTML templates', 'Brand voice prompt', 'Artifacts']) {
       await expect(kitPanel.getByRole('heading', { name, level: 3 })).toBeVisible()
     }
     await expect(page.getByRole('button', { name: `Delete brand kit ${kit.name}`, exact: true })).toBeVisible()
@@ -1147,7 +1147,7 @@ test.describe('Brand kits (T11)', () => {
 
     // The Add kit modal.
     await page.getByRole('button', { name: 'Add Kit' }).click()
-    const modal = page.getByRole('dialog', { name: 'New Brand Kit' })
+    const modal = page.getByRole('dialog', { name: 'New brand kit' })
     await expect(modal.getByRole('textbox', { name: 'Name' })).toBeVisible()
     await expect(modal.getByRole('button', { name: 'Create' })).toBeDisabled()
     await expectNoHorizontalScroll(page, 'Add kit modal at 375px')
@@ -1208,7 +1208,7 @@ test.describe('Team, settings and admin (T12)', () => {
     // /team opens on the first provider row's quiet controls; which provider
     // is first depends on the test DB, so only the count is fixed.
     await page.goto('/team')
-    await expect(page.getByRole('heading', { name: 'AI Providers' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'AI providers' })).toBeVisible()
     await expect(page.getByTestId('image-default-state')).toBeVisible()
     expect(await tabThreeFromMain(page)).toHaveLength(3)
 
@@ -1264,7 +1264,7 @@ test.describe('Team, settings and admin (T12)', () => {
     await page.goto('/team')
 
     await expect(page.getByRole('heading', { name: 'Team settings', level: 1 })).toBeVisible()
-    for (const name of ['AI Providers', 'Social Channels', 'Team Claude account', 'API keys', 'Models']) {
+    for (const name of ['AI providers', 'Social channels', 'Team Claude account', 'API keys', 'Models']) {
       await expect(page.getByRole('heading', { name, exact: true, level: 2 })).toBeVisible()
     }
     await expect(page.getByRole('heading', { name: 'Image generation', level: 3 })).toBeVisible()
@@ -1272,7 +1272,7 @@ test.describe('Team, settings and admin (T12)', () => {
     // to the section since 008 added the Models section's own Save to /team.
     const channels = page
       .locator('section')
-      .filter({ has: page.getByRole('heading', { name: 'Social Channels', exact: true, level: 2 }) })
+      .filter({ has: page.getByRole('heading', { name: 'Social channels', exact: true, level: 2 }) })
       .last()
     await expect(channels.getByRole('button', { name: 'Show access token' })).toHaveCount(2)
     await expect(channels.getByRole('button', { name: 'Save', exact: true })).toHaveCount(2)
@@ -1285,7 +1285,7 @@ test.describe('Team, settings and admin (T12)', () => {
     await expectNoHorizontalScroll(page, 'team at 375px')
 
     // The register form (API mode, so COPY and IMAGE are offered).
-    await page.getByRole('button', { name: 'Register Provider' }).click()
+    await page.getByRole('button', { name: 'Register provider' }).click()
     await expect(page.getByRole('heading', { name: 'Register new provider', level: 3 })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Show API key' })).toBeVisible()
     await expect(page.getByRole('tab', { name: 'Captions' })).toBeVisible()
