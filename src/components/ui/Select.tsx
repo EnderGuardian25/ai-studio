@@ -44,7 +44,7 @@ export function Select({
           id={selectId}
           className={cn(
             inputClasses,
-            'appearance-none pr-10',
+            'appearance-none pr-9',
             fieldEdge(error),
             className,
           )}
@@ -61,7 +61,7 @@ export function Select({
         <ChevronDown
           size={14}
           aria-hidden
-          className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-fg-muted"
+          className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-fg-muted"
         />
       </div>
       {error && (

@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import { authClient } from "@/lib/auth-client"
-import { Input, Button, Panel } from "@/components/ui"
+import { Input, Button } from "@/components/ui"
 import { Logo } from "@/components/Logo"
 
 export default function LoginPage() {
@@ -34,16 +34,17 @@ export default function LoginPage() {
     router.refresh()
   }
 
-  // A bezel card on the canvas (021 design.md §5): the Bistec Studio logo
-  // (021 A6), a muted line, the fields and a full-width primary Button.
+  // Folio (DESIGN_SYSTEM.md §2, §6): no box, structure from type and rules.
+  // The "Studio" wordmark at display size, a muted line, then a 2 px --fg rule
+  // opening the form.
   return (
-    <main className="min-h-screen flex items-center justify-center bg-canvas text-fg px-4 py-12">
-      <Panel bezel className="w-full max-w-sm p-8">
-        {/* The page's one h1, for screen readers (014 FR-14): the logo is an img. */}
+    <main className="min-h-screen flex items-center justify-center bg-canvas text-fg font-text px-4 py-12">
+      <div className="w-full max-w-sm">
+        {/* The page's one h1, for screen readers (014 FR-14): the wordmark is an img. */}
         <h1 className="sr-only">Sign in to Studio</h1>
-        <Logo height={48} />
+        <Logo size="2xl" />
         <p className="mt-3 text-ui-sm text-fg-muted">Sign in to continue</p>
-        <form onSubmit={handleSubmit} className="mt-7 space-y-4">
+        <form onSubmit={handleSubmit} className="mt-8 pt-6 border-t-2 border-fg space-y-4">
           <Input
             label="Username"
             type="text"
@@ -69,7 +70,7 @@ export default function LoginPage() {
             {loading ? "Signing in…" : "Sign in"}
           </Button>
         </form>
-      </Panel>
+      </div>
     </main>
   )
 }

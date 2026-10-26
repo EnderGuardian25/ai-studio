@@ -4,7 +4,6 @@ import React from 'react'
 import * as Dialog from '@radix-ui/react-dialog'
 import { X } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { FOCUS, ICON, ICON_BUTTON, SECTION_HEAD } from './atoms'
 
 // Shared overlay for both the centered Modal and the right-side Drawer.
 // Radix gives us focus trap, Escape-to-close, aria-modal, and return-focus
@@ -23,10 +22,12 @@ function Overlay({ className }: { className?: string }) {
   )
 }
 
-// The header's close (X) button, shared by Modal and Drawer: the round quiet
-// icon button (the study's .x). The dialog is already --surface-2, so the
-// hover is the canvas, as the study's menu rows do it.
-const CLOSE_BUTTON = cn(ICON_BUTTON, 'hover:bg-canvas hover:text-fg', FOCUS)
+// The header's close (X) button, shared by Modal and Drawer.
+const CLOSE_BUTTON = cn(
+  'p-1 -m-1 rounded-ui-sm flex-shrink-0 text-fg-muted hover:text-fg',
+  'transition-colors duration-fast ease-standard',
+  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus',
+)
 
 interface BaseProps {
   open: boolean
@@ -79,7 +80,7 @@ export function Modal({
             // Never taller than the viewport: header/footer stay pinned and the
             // body scrolls, so tall forms remain fully usable on short screens.
             'max-h-[calc(100dvh-2rem)] flex flex-col',
-            'surface-overlay p-6 text-ui-base text-fg',
+            'surface-overlay p-6 font-text text-ui-base text-fg',
             // animate-modal-in, not the old scale-in keyframe: the keyframes must carry
             // the centering translate or the animation wipes it (see globals.css).
             'animate-modal-in',
@@ -88,8 +89,8 @@ export function Modal({
           )}
         >
           {!hideHeader && (
-            <div className="flex items-center justify-between gap-4 mb-4 flex-shrink-0">
-              <Dialog.Title className={cn(SECTION_HEAD, 'text-fg')}>
+            <div className="flex items-start justify-between gap-4 mb-4 flex-shrink-0">
+              <Dialog.Title className="font-display text-ui-xl font-medium leading-tight text-fg">
                 {title}
               </Dialog.Title>
               <Dialog.Close asChild>
@@ -97,7 +98,7 @@ export function Modal({
                   aria-label="Close"
                   className={CLOSE_BUTTON}
                 >
-                  <X {...ICON} aria-hidden />
+                  <X size={18} />
                 </button>
               </Dialog.Close>
             </div>
@@ -133,7 +134,7 @@ export function Drawer({
         <Dialog.Content
           className={cn(
             'fixed right-0 top-0 z-50 h-full w-full max-w-md',
-            'surface-overlay rounded-none text-ui-base text-fg',
+            'surface-overlay rounded-none font-text text-ui-base text-fg',
             'flex flex-col',
             'data-[state=open]:animate-slide-in',
             'focus:outline-none',
@@ -141,8 +142,8 @@ export function Drawer({
           )}
         >
           {!hideHeader && (
-            <div className="flex items-center justify-between gap-4 px-5 py-3 border-b border-line-subtle flex-shrink-0">
-              <Dialog.Title className={cn(SECTION_HEAD, 'text-fg')}>
+            <div className="flex items-center justify-between px-5 py-4 border-b border-line-subtle flex-shrink-0">
+              <Dialog.Title className="font-display text-ui-lg font-medium text-fg">
                 {title}
               </Dialog.Title>
               <Dialog.Close asChild>
@@ -150,7 +151,7 @@ export function Drawer({
                   aria-label="Close"
                   className={CLOSE_BUTTON}
                 >
-                  <X {...ICON} aria-hidden />
+                  <X size={16} />
                 </button>
               </Dialog.Close>
             </div>

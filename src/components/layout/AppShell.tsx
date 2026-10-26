@@ -221,7 +221,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               >
                 <Menu {...ICON} aria-hidden="true" />
               </button>
-              <Logo height={32} />
+              <Logo />
             </div>
 
             <ThemeToggle />

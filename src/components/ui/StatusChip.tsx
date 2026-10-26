@@ -1,5 +1,6 @@
 import React from 'react'
 import { cn } from '@/lib/utils'
+import { SMALL_CAPS } from './atoms'
 
 type PostStatus =
   | 'draft'
@@ -12,6 +13,8 @@ type PostStatus =
   | 'generating'
   | 'generated'
   | 'cancelled'
+  // Unfinished (autosaved) brief-wizard sessions on the dashboard:
+  | 'unfinished'
 
 // The tones a free-text chip can take, for states with no `status` entry
 // (Connected, Invalid, Active, Deactivated, Revoked): each reuses a status's
@@ -34,23 +37,23 @@ type StatusChipToneProps = {
 }
 type StatusChipProps = StatusChipStatusProps | StatusChipToneProps
 
-// The status chip (DESIGN_SYSTEM.md §8.5, the study's .chip): a sentence-case
-// pill with a 6 px dot in currentColor, the text in the status colour on a
-// fill of the same colour at 0.12 (in both themes — the --status-* vars
-// switch, and tests/unit/contrast.test.ts measures the text at 0.12, 021 A2).
-// The label is always present: status is never colour alone.
+// Folio status chip (DESIGN_SYSTEM.md §8.5): text in the status colour, a fill
+// of the same colour at 0.10 (in both themes — the --status-* vars switch, and
+// tests/unit/contrast.test.ts measures the text at 0.10), and a 1 px inset ring
+// in currentColor. The label is always present: status is never colour alone.
 // Tailwind can't build class names from template strings, so each status
 // spells its utilities out.
 const statusConfig: Record<PostStatus, { label: string; classes: string }> = {
-  draft: { label: 'Draft', classes: 'bg-status-draft/12 text-status-draft' },
-  exported: { label: 'Exported', classes: 'bg-status-exported/12 text-status-exported' },
-  scheduled: { label: 'Scheduled', classes: 'bg-status-scheduled/12 text-status-scheduled' },
-  published: { label: 'Published', classes: 'bg-status-published/12 text-status-published' },
-  failed: { label: 'Failed', classes: 'bg-status-failed/12 text-status-failed' },
-  queued: { label: 'Queued', classes: 'bg-status-scheduled/12 text-status-scheduled' },
-  generating: { label: 'Generating', classes: 'bg-status-exported/12 text-status-exported' },
-  generated: { label: 'Generated', classes: 'bg-status-published/12 text-status-published' },
-  cancelled: { label: 'Cancelled', classes: 'bg-status-draft/12 text-status-draft' },
+  draft: { label: 'Draft', classes: 'bg-status-draft/10 text-status-draft' },
+  exported: { label: 'Exported', classes: 'bg-status-exported/10 text-status-exported' },
+  scheduled: { label: 'Scheduled', classes: 'bg-status-scheduled/10 text-status-scheduled' },
+  published: { label: 'Published', classes: 'bg-status-published/10 text-status-published' },
+  failed: { label: 'Failed', classes: 'bg-status-failed/10 text-status-failed' },
+  queued: { label: 'Queued', classes: 'bg-status-scheduled/10 text-status-scheduled' },
+  generating: { label: 'Generating', classes: 'bg-status-exported/10 text-status-exported' },
+  generated: { label: 'Generated', classes: 'bg-status-published/10 text-status-published' },
+  cancelled: { label: 'Cancelled', classes: 'bg-status-draft/10 text-status-draft' },
+  unfinished: { label: 'Unfinished', classes: 'bg-status-scheduled/10 text-status-scheduled' },
 }
 
 // Two overloads rather than one union parameter, with the `status` one last:
@@ -65,9 +68,9 @@ export function StatusChip(props: StatusChipProps) {
   return (
     <span
       className={cn(
-        'inline-flex items-center gap-1.5 h-6 pl-2 pr-2.5 rounded-ui-pill text-ui-xs font-semibold whitespace-nowrap flex-shrink-0',
-        // The dot, decorative: a ::before in currentColor.
-        "before:content-[''] before:h-1.5 before:w-1.5 before:flex-shrink-0 before:rounded-full before:bg-current",
+        'inline-flex items-center h-[22px] px-2 rounded-ui-sm flex-shrink-0 whitespace-nowrap',
+        `font-text ${SMALL_CAPS}`,
+        'shadow-[inset_0_0_0_1px_currentColor]',
         config.classes,
         props.className,
       )}

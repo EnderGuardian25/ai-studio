@@ -85,7 +85,7 @@
 
 ### Wave 2: Folio values
 
-- [ ] `T5` — Folio foundation: tokens, fonts, Tailwind, wordmark, helpers, primitives, and the restore check
+- [x] `T5` — Folio foundation: tokens, fonts, Tailwind, wordmark, helpers, primitives, and the restore check
   - Files: `src/app/globals.css`, `src/app/layout.tsx`, `tailwind.config.ts`, `src/components/Logo.tsx`, `public/BistecStudioLogo.png` (delete), `src/components/ui/atoms.ts`, `src/components/ui/GateNotice.tsx`, `src/components/ui/{Button,FieldLabel,ImageLightbox,Input,Modal,Notice,PageHead,Panel,QueryError,SectionHead,SegmentedToggle,Select,StatusChip}.tsx`, `src/components/ui/index.ts`, `src/components/admin/brandkits/classes.ts`, `src/components/campaigns/classes.ts`, `src/components/brief/cardCls.ts`, `scripts/check-folio-restore.mjs` (new)
   - Estimate: medium
   - Kind: refactor

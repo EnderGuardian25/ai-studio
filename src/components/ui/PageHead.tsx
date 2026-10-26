@@ -14,9 +14,9 @@ interface PageHeadProps {
   className?: string
 }
 
-// A page head (DESIGN_SYSTEM.md §6, the study's .page-head): an eyebrow (021
-// A7), the title (always the page's h1), a lead, and actions on the right that
-// drop below the title at 375 px. No outer margin: the caller passes it in className (mb-8, or mb-10
+// A page head (DESIGN_SYSTEM.md §6): an eyebrow, the display title (always the
+// page's h1), a lead, and actions on the right that drop below the title at
+// 375 px. No outer margin: the caller passes it in className (mb-8, or mb-10
 // on /brief).
 export function PageHead({
   eyebrow,

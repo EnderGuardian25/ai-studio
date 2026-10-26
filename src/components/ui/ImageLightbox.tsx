@@ -7,16 +7,13 @@ import { toast } from 'sonner'
 import type { AspectRatio } from '@prisma/client'
 import { dimensionsLabel } from '@/lib/aspectRatio'
 import { Button } from '@/components/ui/Button'
-import { FOCUS, ICON } from './atoms'
 
 // Full-screen lightbox for an exported post image. Radix Dialog gives us the
-// focus trap, Escape-to-close, and click-outside. The treatment
-// (DESIGN_SYSTEM.md §8.11, 021 design.md §4.3): a 0.8 scrim with no blur, the
-// image fitted to the viewport and shown as rendered (never restyled), and
-// opaque .surface-overlay pill chrome — the close button and a caption bar
-// with the topic, dimensions and Download. The content pops in; it is not
-// transform-centred (a flex column fills the viewport), so the pop's transform
-// can't displace it.
+// focus trap, Escape-to-close, and click-outside. Folio treatment
+// (DESIGN_SYSTEM.md §8.11): a 0.8 scrim with no blur, the image fitted to the
+// viewport and shown as rendered (never restyled), and opaque .surface-overlay
+// chrome — the close button and a caption bar with the topic, dimensions and
+// Download.
 
 interface ImageLightboxProps {
   open: boolean
@@ -63,7 +60,7 @@ export function ImageLightbox({ open, onClose, src, topic, aspectRatio }: ImageL
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-50 bg-scrim/80 data-[state=open]:animate-fade-in" />
         <Dialog.Content
-          className="fixed inset-0 z-50 flex flex-col items-center justify-center p-4 sm:p-8 focus:outline-none animate-pop"
+          className="fixed inset-0 z-50 flex flex-col items-center justify-center p-4 sm:p-8 focus:outline-none animate-drop"
           // Clicking the empty space around the image closes, like the overlay.
           onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
         >
@@ -72,9 +69,9 @@ export function ImageLightbox({ open, onClose, src, topic, aspectRatio }: ImageL
           <Dialog.Close asChild>
             <button
               aria-label="Close preview"
-              className={`surface-overlay absolute top-4 right-4 inline-flex h-control-md w-control-md items-center justify-center rounded-ui-pill text-fg-muted hover:text-fg transition-colors duration-fast ease-standard ${FOCUS}`}
+              className="surface-overlay absolute top-4 right-4 p-2 text-fg-muted hover:text-fg transition-colors duration-fast ease-standard focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
             >
-              <X {...ICON} aria-hidden />
+              <X size={20} />
             </button>
           </Dialog.Close>
 
@@ -86,7 +83,7 @@ export function ImageLightbox({ open, onClose, src, topic, aspectRatio }: ImageL
           />
 
           {/* Caption bar */}
-          <div className="surface-overlay mt-4 flex items-center gap-3 rounded-ui-pill py-1.5 pl-5 pr-1.5 max-w-full">
+          <div className="surface-overlay mt-4 flex items-center gap-3 px-4 py-2 max-w-full font-text">
             <p className="text-ui-sm text-fg truncate">
               {topic}
               <span className="ml-2 text-ui-xs tabular-nums text-fg-muted">
