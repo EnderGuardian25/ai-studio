@@ -11,7 +11,7 @@
 
 **State.** Every 031 group is built and committed on `v2`: T1 to T18, plus the CI timeout commit `5621bff`. T19 wrote these docs, recaptured `docs/ui-reference/screen-light.png` and `screen-dark.png` (011 T13's method), and ran the full gate below. Nothing merges to `main`. The plan is in [`.specclaw/changes/031-v2-final-polish/`](../.specclaw/changes/031-v2-final-polish/) (spec, design, tasks, `reports/T1.md` to `T19.md`, `measure/` and `look-check/`).
 
-**Gate (T19).** unit 4553, render 154, lint 0 errors / 7 warnings, tsc clean, full clean mock E2E 598 passed / 3 skipped / 0 failed / 0 flaky (2026-10-26, at `daf120b` plus the T19 docs), `test:upgrade` all 4 scenarios pass; NFR-04 diff since `0f42017` lists only `src/mcp/tools/brandkit.ts`, and under `src/lib/agent/prompts/` only `shared.ts` changed. CI on the T19 push is the last check; `gh run list --branch v2`. CI at `37b1e64` (T1 to T15) was fully green (run 40359025530).
+**Gate (T19).** unit 4553, render 154, lint 0 errors / 7 warnings, tsc clean, full clean mock E2E 598 passed / 3 skipped / 0 failed / 0 flaky (2026-10-26, at `daf120b` plus the T19 docs), `test:upgrade` all 4 scenarios pass; NFR-04 diff since `0f42017` lists only `src/mcp/tools/brandkit.ts`, and under `src/lib/agent/prompts/` only `shared.ts` changed. **CI green at `a511013`** (run 40374348999: unit, build and the full E2E). CI at `37b1e64` (T1 to T15) was fully green (run 40359025530).
 
 **The groups as built** (commit ids from `git log`):
 
