@@ -1,0 +1,12 @@
+{
+  "change": "030-stale-headline-badge",
+  "phase": "tasks",
+  "branch": "",
+  "size": "architectural",
+  "phases": {
+    "proposal": { "status": "approved", "at": "2026-10-26T05:29:39Z" },
+    "spec": { "status": "done", "at": "2026-10-26T05:34:41Z" },
+    "design": { "status": "done", "at": "2026-10-26T05:36:32Z" },
+    "tasks": { "status": "done", "at": "2026-10-26T05:37:21Z" }
+  }
+}
