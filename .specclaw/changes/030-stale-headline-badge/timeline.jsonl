@@ -26,3 +26,4 @@
 {"ev":"start","span":"T6","kind":"task","label":"docs and full gate","parent":"W6","model":"haiku","attempt":"1","at":"2026-10-26T07:18:12Z","ts":1792999091}
 {"ev":"stop","span":"T6","at":"2026-10-26T08:12:43Z","ts":1793002363,"status":"ok"}
 {"ev":"stop","span":"W6","at":"2026-10-26T08:12:43Z","ts":1793002363,"status":"ok"}
+{"ev":"start","span":"verify-1793004109","kind":"phase","label":"verify","at":"2026-10-26T08:41:50Z","ts":1793004110}

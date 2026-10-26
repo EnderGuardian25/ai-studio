@@ -7,7 +7,7 @@
 
 ---
 
-## ⏸️ 2026-10-26 — PICK UP HERE: 030 stale-headline badge is BUILT (T1 to T6); next is `/specclaw:verify 030-stale-headline-badge`
+## ⏸️ 2026-10-26 — PICK UP HERE: 030 stale-headline badge is VERIFIED PASS (20/20 ACs, [verify-report](../.specclaw/changes/030-stale-headline-badge/verify-report.md)); nothing is mid-build. It was BUILT in T1 to T6
 
 **State.** 030 is built on `v2`, T1 to T6, and nothing is mid-build. Its files are in `.specclaw/changes/030-stale-headline-badge/` (the spec has 18 FR, 8 NFR and 20 AC; `reports/` and `reviews/` hold each task's record). The decisions D1 to D5 are under "User Decisions" in [`proposal.md`](../.specclaw/changes/030-stale-headline-badge/proposal.md) and govern the spec. No real model or image call was made.
 
