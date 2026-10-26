@@ -53,7 +53,7 @@
 
 ### Wave 2: The renderer
 
-- [ ] `T2` — `renderPost`, the in-page check, the mock seam, the mock design, the render fixtures
+- [x] `T2` — `renderPost`, the in-page check, the mock seam, the mock design, the render fixtures
   - Files: `src/lib/renderer/puppeteer.ts`, `src/lib/testHooks.ts` (`buildMockHtml` headline and sentinel, `buildMockRefineReply` keeps the element), `tests/unit/renderPost.test.ts` (new), `tests/render/headlineCheck.test.ts` (new) and its fixtures, adapted tests that pin `buildMockHtml` output (list them)
   - Estimate: medium
   - Kind: impl

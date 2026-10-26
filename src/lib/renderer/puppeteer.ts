@@ -19,6 +19,11 @@ import {
   type Region,
   type RegionSample,
 } from "@/lib/designData"
+// Narrow imports, not the index: the stamp and notice modules are not needed here.
+import { HEADLINE_CHECK_TIMEOUT_MS, type HeadlineCheck } from "@/lib/renderedText/vocab"
+import { NORMALISE_HEADLINE_SOURCE } from "@/lib/renderedText/normalise"
+import { evaluateHeadlineFacts, type HeadlineFacts } from "@/lib/renderedText/facts"
+import { mockHeadlineCheck } from "@/lib/renderedText/mockCheck"
 
 const COMMON_LINUX_PATHS = [
   "/usr/bin/chromium-browser",
@@ -172,7 +177,10 @@ async function withRenderedPage<T>(
   width: number,
   height: number,
   fn: (page: Page) => Promise<T>,
-  composites: CompositeRender | null
+  composites: CompositeRender | null,
+  // 030: runs after the composite check and before `fn`, on the same page, so
+  // what it measures is the layout the PNG shows. Existing callers pass nothing.
+  beforeShot?: (page: Page) => Promise<void>
 ): Promise<T> {
   const browser = await getBrowser()
   const page = await browser.newPage()
@@ -194,6 +202,7 @@ async function withRenderedPage<T>(
     const resolved = composites ? html.split(composites.token).join(composites.dataUri) : html
     await page.setContent(resolved, { waitUntil: "networkidle0", timeout: SET_CONTENT_TIMEOUT_MS })
     if (composites) await verifyComposite(page, composites)
+    if (beforeShot) await beforeShot(page)
     return await fn(page)
   } finally {
     // Close only the page; the browser is shared and stays alive.
@@ -243,6 +252,118 @@ async function verifyComposite(page: Page, composites: CompositeRender): Promise
   if (verdict.ok !== true) throw new CompositeRenderError("composite-not-rendered", verdict.detail)
 }
 
+// 030 FR-07: the in-page collector. It rebuilds the one normaliser from its
+// source (so the page and Node compare the same text), finds the innermost
+// elements whose visible text is the headline, and reports facts only; the
+// verdict is the pure evaluateHeadlineFacts. Nothing here decides.
+async function collectHeadlineFacts(page: Pick<Page, "evaluate">, headline: string): Promise<HeadlineFacts> {
+  return page.evaluate(
+    (text: string, normaliseSource: string) => {
+      const norm = new Function("return " + normaliseSource)() as (s: string) => string
+      const want = norm(text)
+      const kept: HTMLElement[] = []
+      if (want) {
+        document.body.querySelectorAll("*").forEach((node) => {
+          const el = node as HTMLElement
+          if (el.closest("script, style, template, noscript")) return
+          if (typeof el.innerText !== "string") return
+          if (norm(el.innerText) === want) kept.push(el)
+        })
+      }
+      const innermost = kept.filter((el) => !kept.some((other) => other !== el && el.contains(other)))
+      const box = (r: DOMRect) => ({ left: r.left, top: r.top, width: r.width, height: r.height })
+      return {
+        candidates: innermost.map((el) => {
+          const range = document.createRange()
+          range.selectNodeContents(el)
+          const rects = Array.from(range.getClientRects())
+            .filter((r) => r.width > 0 && r.height > 0)
+            .map(box)
+          const clipBoxes: Array<{ left: number; top: number; width: number; height: number }> = []
+          for (let a: HTMLElement | null = el; a; a = a.parentElement) {
+            const cs = getComputedStyle(a)
+            if (cs.overflowX !== "visible" || cs.overflowY !== "visible") clipBoxes.push(box(a.getBoundingClientRect()))
+            if (a === document.body) break
+          }
+          const topmost = rects.map((r) => {
+            const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2)
+            return !!hit && el.contains(hit)
+          })
+          return {
+            visible: el.checkVisibility({ opacityProperty: true, visibilityProperty: true }),
+            rects,
+            clipBoxes,
+            topmost,
+          }
+        }),
+      }
+    },
+    headline,
+    NORMALISE_HEADLINE_SOURCE
+  )
+}
+
+// 030 FR-06, NFR-03: bounded and never throwing. A throw or a timeout reads as
+// `not-checked`, is logged once, and the render goes on. `page` is only what
+// the collector needs, so a unit test can hand in a stub that throws or hangs.
+export async function runHeadlineCheck(
+  page: Pick<Page, "evaluate">,
+  headline: string,
+  canvas: { width: number; height: number },
+  timeoutMs: number = HEADLINE_CHECK_TIMEOUT_MS
+): Promise<HeadlineCheck> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    const facts = await Promise.race([
+      collectHeadlineFacts(page, headline),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`timed out after ${timeoutMs} ms`)), timeoutMs)
+      }),
+    ])
+    return evaluateHeadlineFacts(facts, canvas)
+  } catch (err) {
+    console.warn(`[renderer] headline check: ${err instanceof Error ? err.message : String(err)}`)
+    return "not-checked"
+  } finally {
+    if (timer) clearTimeout(timer)
+  }
+}
+
+// 030: one render, and with `check` the verdict on the headline as painted in
+// that same render. `renderHtmlToPng` is this with no check.
+export async function renderPost(
+  html: string,
+  width: number,
+  height: number,
+  composites: CompositeRender | null,
+  check: { headline: string } | null
+): Promise<{ png: Buffer; headlineCheck: HeadlineCheck | null }> {
+  if (composites) assertCompositeHtml(html, composites)
+  // Test seam: skip Chromium entirely and return a fixed PNG. The in-page
+  // check is skipped; the sentinel makes the composite check fail on demand.
+  if (MOCK_PUPPETEER) {
+    if (composites && shouldMockCompositeFail(html)) {
+      throw new CompositeRenderError("composite-not-rendered", "mock composite failure")
+    }
+    return { png: MOCK_PNG_BUFFER, headlineCheck: check ? mockHeadlineCheck(html, check.headline) : null }
+  }
+  return limit(() => {
+    let headlineCheck: HeadlineCheck | null = null
+    return withRenderedPage(
+      html,
+      width,
+      height,
+      async (page) => ({ png: Buffer.from(await page.screenshot({ type: "png" })), headlineCheck }),
+      composites,
+      check
+        ? async (page) => {
+            headlineCheck = await runHeadlineCheck(page, check.headline, { width, height })
+          }
+        : undefined
+    )
+  })
+}
+
 // `composites` is required (025 FR-13): a caller with no composite passes null,
 // so a missed caller is a type error rather than a broken image.
 export async function renderHtmlToPng(
@@ -251,18 +372,7 @@ export async function renderHtmlToPng(
   height: number,
   composites: CompositeRender | null
 ): Promise<Buffer> {
-  if (composites) assertCompositeHtml(html, composites)
-  // Test seam: skip Chromium entirely and return a fixed PNG. The in-page
-  // check is skipped; the sentinel makes the composite check fail on demand.
-  if (MOCK_PUPPETEER) {
-    if (composites && shouldMockCompositeFail(html)) {
-      throw new CompositeRenderError("composite-not-rendered", "mock composite failure")
-    }
-    return MOCK_PNG_BUFFER
-  }
-  return limit(() =>
-    withRenderedPage(html, width, height, async (page) => Buffer.from(await page.screenshot({ type: "png" })), composites)
-  )
+  return (await renderPost(html, width, height, composites, null)).png
 }
 
 // Runs `fn` against the document loaded as a post render loads it (see

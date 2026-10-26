@@ -23,6 +23,7 @@ import type { ImageProvider } from '@/providers/interfaces/ImageProvider'
 import type { CanvasPx, LuminanceGrid, Rect, Region, RegionSample, TextTone } from '@/lib/designData'
 // layout.ts is pure (type-only imports), so this does not pull the dataset in.
 import { LAYOUT_TOLERANCE_PCT } from '@/lib/designData/layout'
+import { MOCK_HEADLINE_HIDDEN } from '@/lib/renderedText/mockCheck'
 import { GRID_STEP_PX } from '@/lib/designData/composite'
 import { CAPTION_CHANNELS, type CaptionTarget } from '@/lib/channels'
 import { HEADLINE_MAX } from '@/lib/captions/headline'
@@ -572,6 +573,9 @@ export function mockLayoutBoxes(seamText: string, textRegions: ReadonlyArray<Reg
   return boxes
 }
 
+const escapeMockHtml = (s: string): string =>
+  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')
+
 // ── 025 FR-14: the composite render failure seam ─────────────────────────────
 export const COMPOSITE_MOCK_SENTINEL = '__MOCK_COMPOSITE_FAIL__'
 
@@ -596,17 +600,23 @@ export const MOCK_PNG_BUFFER = Buffer.from(
  * to the design agent (the colour reaches the agent via the brand-kit system
  * context). Falls back to a neutral colour when none is present.
  */
-export function buildMockHtml(promptContext: string, width = 1080, height = 1080): string {
+export function buildMockHtml(promptContext: string, width = 1080, height = 1080, headline?: string): string {
   const hex = promptContext.match(/#[0-9a-fA-F]{6}/)?.[0] ?? '#0f172a'
   // 025: the composite failure sentinel rides along as a comment.
   const sentinel = promptContext.includes(COMPOSITE_MOCK_SENTINEL) ? `<!-- ${COMPOSITE_MOCK_SENTINEL} -->` : ''
+  // 030: the headline the mock design "paints", and the hidden-headline sentinel
+  // (the mock check reads it from the HTML, like the composite sentinel).
+  const hidden = promptContext.includes(MOCK_HEADLINE_HIDDEN) ? `<!-- ${MOCK_HEADLINE_HIDDEN} -->` : ''
+  const headlineEl = headline
+    ? `<div class="headline" data-mock-headline="true">${escapeMockHtml(headline)}</div>`
+    : ''
   return `<!DOCTYPE html>
-${sentinel}<html>
+${sentinel}${hidden}<html>
 <head><style>
 body { margin: 0; width: ${width}px; height: ${height}px; background: ${hex}; display: flex; align-items: center; justify-content: center; }
 .card { color: #ffffff; font-family: Inter, sans-serif; font-size: 48px; text-align: center; padding: 40px; }
 </style></head>
-<body><div class="card" data-mock="true">MOCK DESIGN</div></body>
+<body><div class="card" data-mock="true">MOCK DESIGN</div>${headlineEl}</body>
 </html>`
 }
 
@@ -884,5 +894,9 @@ export function buildMockRefineReply(args: {
   }
 
   // Default: byte-identical to today's mock design agent — no envelope header.
-  return buildMockHtml(promptContext ?? '', width, height)
+  // 030: a headline element in the current document is carried over, so a
+  // refine that does not touch the headline keeps it.
+  const carried = slimHtml.match(/<div class="headline" data-mock-headline="true">[\s\S]*?<\/div>/)?.[0]
+  const base = buildMockHtml(promptContext ?? '', width, height)
+  return carried ? base.replace('</body>', () => `${carried}</body>`) : base
 }

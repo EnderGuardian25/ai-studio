@@ -182,6 +182,25 @@ describe('evaluateHeadlineFacts (FR-07, FR-08, AC-05)', () => {
     expect(evaluateHeadlineFacts({ candidates: [edge(-1)] }, canvas)).toBe('painted')
     expect(evaluateHeadlineFacts({ candidates: [edge(-1.5)] }, canvas)).toBe('not-visible')
   })
+
+  it('applies the tolerance on the right and bottom canvas edges and on a clip box', () => {
+    const at = (left: number, top: number, clip?: typeof box): CandidateFacts => ({
+      ...good(),
+      clipBoxes: clip ? [clip] : [],
+      rects: [{ left, top, width: 300, height: 50 }],
+    })
+    // right edge: left + 300 = 1081 passes, 1081.5 fails
+    expect(evaluateHeadlineFacts({ candidates: [at(781, 110)] }, canvas)).toBe('painted')
+    expect(evaluateHeadlineFacts({ candidates: [at(781.5, 110)] }, canvas)).toBe('not-visible')
+    // bottom edge: top + 50 = 1081 passes, 1081.5 fails
+    expect(evaluateHeadlineFacts({ candidates: [at(120, 1031)] }, canvas)).toBe('painted')
+    expect(evaluateHeadlineFacts({ candidates: [at(120, 1031.5)] }, canvas)).toBe('not-visible')
+    // clip box 120..420 x 110..160: sticking out by exactly 1 px passes, 1.5 fails
+    const clip = { left: 121, top: 110, width: 299, height: 50 }
+    expect(evaluateHeadlineFacts({ candidates: [at(120, 110, clip)] }, canvas)).toBe('painted')
+    const tight = { left: 121.5, top: 110, width: 298.5, height: 50 }
+    expect(evaluateHeadlineFacts({ candidates: [at(120, 110, tight)] }, canvas)).toBe('not-visible')
+  })
 })
 
 describe('mockHeadlineCheck (FR-10)', () => {
