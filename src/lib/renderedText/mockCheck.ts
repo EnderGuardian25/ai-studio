@@ -6,6 +6,11 @@ import type { HeadlineCheck } from './vocab'
 
 export const MOCK_HEADLINE_HIDDEN = '__MOCK_HEADLINE_HIDDEN__'
 
+// 031 FR-40: Apply's in-render sentinels, read from the rendered HTML.
+export const MOCK_APPLY_NOT_PAINTED = '__MOCK_APPLY_NOT_PAINTED__'
+export const MOCK_APPLY_OLD_PAINTED = '__MOCK_APPLY_OLD_PAINTED__'
+export const MOCK_APPLY_RENDER_FAIL = '__MOCK_APPLY_RENDER_FAIL__'
+
 // `&amp;` goes last so "&amp;lt;" decodes once, to "&lt;".
 function decodeEntities(s: string): string {
   return s
@@ -34,7 +39,7 @@ function countWhole(haystack: string, needle: string): number {
 }
 
 export function mockHeadlineCheck(html: string, headline: string): HeadlineCheck {
-  if (html.includes(MOCK_HEADLINE_HIDDEN)) return 'not-visible'
+  if (html.includes(MOCK_HEADLINE_HIDDEN) || html.includes(MOCK_APPLY_NOT_PAINTED)) return 'not-visible'
   const text = html
     .replace(/<!--[\s\S]*?-->/g, ' ')
     .replace(/<head\b[\s\S]*?<\/head\s*>/gi, ' ')
@@ -43,4 +48,16 @@ export function mockHeadlineCheck(html: string, headline: string): HeadlineCheck
   const count = countWhole(normaliseHeadline(decodeEntities(text)), normaliseHeadline(headline))
   if (count === 0) return 'not-found'
   return count === 1 ? 'painted' : 'ambiguous'
+}
+
+// 031 FR-40: the painted candidates across the `absent` texts. The sentinel
+// forces one; otherwise the text stand-in counts whole occurrences.
+export function mockAbsentPainted(html: string, absent: string[]): number {
+  if (html.includes(MOCK_APPLY_OLD_PAINTED)) return 1
+  let n = 0
+  for (const text of absent) {
+    const c = mockHeadlineCheck(html, text)
+    n += c === 'painted' ? 1 : c === 'ambiguous' ? 2 : 0
+  }
+  return n
 }

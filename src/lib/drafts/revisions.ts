@@ -15,6 +15,7 @@ import { parseRenderedText, renderedTextColumn, stampFromCheck, type RenderedTex
 import { designHeadline } from '@/lib/captions/headline'
 import type { HeadlineCheck } from '@/lib/renderedText/vocab'
 import { parseRenderNotes, renderNotesFrom, renderNotesSchema, type RenderNotes } from '@/lib/fonts/renderNotes'
+import type { ApplyFailure } from '@/lib/applyText/vocab'
 import { canonicalCompositeHtml } from '@/lib/composite/insert'
 import { CompositePlacementError, CompositeRenderError, type CompositeRender } from '@/lib/composite/render'
 
@@ -373,6 +374,14 @@ export async function withNextRevisionNumber<T>(
 }
 
 export interface CommitRevisionArgs {
+  // 031 FR-40: runs after the render, before the upload; a non-null code throws
+  // RenderRejectedError and nothing is uploaded or written.
+  acceptRender?: (r: RenderResult) => ApplyFailure | null
+  // 031 FR-40: the expected headline; when set the check and the stamp are for
+  // this text instead of the draft's stored headline.
+  checkText?: string
+  // 031 FR-40: passed to the render as `absent`.
+  absentText?: string
   draftId: string
   instruction: string
   html: string
@@ -523,11 +532,22 @@ export async function compositeRenderForDraft(
 }
 
 // What one render returns: the PNG and, when a headline was given, its check.
-interface RenderResult {
+export interface RenderResult {
   png: Buffer
   headlineCheck: HeadlineCheck | null
   // 031 FR-24: the post-font families the render could not load.
   fontsMissing: string[]
+  // 031 FR-40: painted candidates across the `absent` texts; null when the check failed.
+  absentPainted: number | null
+}
+
+// 031 FR-40: Apply's refusal at the render. Thrown before the upload, so
+// nothing is uploaded or written.
+export class RenderRejectedError extends Error {
+  constructor(public readonly code: ApplyFailure) {
+    super(`render rejected: ${code}`)
+    this.name = 'RenderRejectedError'
+  }
 }
 
 // The on-image headline a render of this draft is checked against: the stored
@@ -551,11 +571,13 @@ export async function renderDraftHtml(
   // 030: the headline to check against the render, or null for a render that
   // stamps nothing (restore's re-render, the export).
   headline: string | null,
+  // 031 FR-40: texts that must not be painted (Apply's old headline).
+  absent?: string[],
 ): Promise<RenderResult> {
   const composites = await compositeRenderForDraft(draftId, composition, { width, height })
   const { renderPost } = await import('@/lib/renderer/puppeteer')
   try {
-    return await renderPost(html, width, height, composites, headline === null ? null : { headline })
+    return await renderPost(html, width, height, composites, headline === null ? null : { headline, ...(absent?.length ? { absent } : {}) })
   } catch (err) {
     if (err instanceof CompositeRenderError) throw new CompositePlacementError(err)
     throw err
@@ -611,8 +633,20 @@ export async function commitDraftRevision(
     const { uploadObject, exportKey, BUCKET_EXPORTS } = await import('@/lib/storage/minio')
     // 030: the headline is read before the render, so the check and the stamp
     // describe the same value (one indexed read, next to a 1 to 2 s render).
-    const headline = await draftHeadlineText(draftId)
-    const rendered = await renderDraftHtml(draftId, html, composition, width, height, headline)
+    const headline = args.checkText ?? (await draftHeadlineText(draftId))
+    const rendered = await renderDraftHtml(
+      draftId,
+      html,
+      composition,
+      width,
+      height,
+      headline,
+      args.absentText ? [args.absentText] : undefined,
+    )
+    if (args.acceptRender) {
+      const refusal = args.acceptRender(rendered)
+      if (refusal) throw new RenderRejectedError(refusal)
+    }
     stamp = currentRenderStamp(
       args.model ?? null,
       args.composition,

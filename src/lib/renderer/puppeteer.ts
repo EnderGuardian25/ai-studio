@@ -23,8 +23,8 @@ import {
 import { HEADLINE_CHECK_TIMEOUT_MS, type HeadlineCheck } from "@/lib/renderedText/vocab"
 import { FONT_CHECK_TIMEOUT_MS, mockFontsMissing } from "@/lib/fonts/renderNotes"
 import { NORMALISE_HEADLINE_SOURCE } from "@/lib/renderedText/normalise"
-import { evaluateHeadlineFacts, type HeadlineFacts } from "@/lib/renderedText/facts"
-import { mockHeadlineCheck } from "@/lib/renderedText/mockCheck"
+import { countPaintedCandidates, evaluateHeadlineFacts, type HeadlineFacts } from "@/lib/renderedText/facts"
+import { MOCK_APPLY_RENDER_FAIL, mockAbsentPainted, mockHeadlineCheck } from "@/lib/renderedText/mockCheck"
 
 const COMMON_LINUX_PATHS = [
   "/usr/bin/chromium-browser",
@@ -330,6 +330,37 @@ export async function runHeadlineCheck(
   }
 }
 
+// 031 FR-40: the painted candidates across the texts that must be gone from the
+// image (Apply's old headline). The same collector and rule as the headline
+// check; bounded and never throwing. A throw or timeout is null (logged), never 0:
+// Apply must not read an unchecked image as "old text gone" (031 T14 review).
+export async function runAbsentCheck(
+  page: Pick<Page, "evaluate">,
+  absent: string[],
+  canvas: { width: number; height: number },
+  timeoutMs: number = HEADLINE_CHECK_TIMEOUT_MS
+): Promise<number | null> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    const run = async () => {
+      let n = 0
+      for (const text of absent) n += countPaintedCandidates(await collectHeadlineFacts(page, text), canvas)
+      return n
+    }
+    return await Promise.race([
+      run(),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`timed out after ${timeoutMs} ms`)), timeoutMs)
+      }),
+    ])
+  } catch (err) {
+    console.warn(`[renderer] absent check: ${err instanceof Error ? err.message : String(err)}`)
+    return null
+  } finally {
+    if (timer) clearTimeout(timer)
+  }
+}
+
 // 031 FR-24 (design 5.6): the in-page font collector. The families are the `family` params of
 // the marked link (`link[data-post-fonts]`), axis stripped, so the render needs no kit argument.
 // After `document.fonts.ready`, a family is missing when the page holds no face for it (its
@@ -388,6 +419,9 @@ export interface RenderPostResult {
   headlineCheck: HeadlineCheck | null
   // 031 FR-24: the marked link's families that did not load ([] = none, or no check).
   fontsMissing: string[]
+  // 031 FR-40: painted candidates across `check.absent` (0 when none was asked;
+  // null when the check threw or timed out).
+  absentPainted: number | null
 }
 
 // 030: one render, and with `check` the verdict on the headline as painted in
@@ -398,7 +432,7 @@ export async function renderPost(
   width: number,
   height: number,
   composites: CompositeRender | null,
-  check: { headline: string } | null
+  check: { headline: string; absent?: string[] } | null
 ): Promise<RenderPostResult> {
   if (composites) assertCompositeHtml(html, composites)
   // Test seam: skip Chromium entirely and return a fixed PNG. The in-page
@@ -407,23 +441,27 @@ export async function renderPost(
     if (composites && shouldMockCompositeFail(html)) {
       throw new CompositeRenderError("composite-not-rendered", "mock composite failure")
     }
+    if (html.includes(MOCK_APPLY_RENDER_FAIL)) throw new Error("mock render failure")
     return {
       png: MOCK_PNG_BUFFER,
       headlineCheck: check ? mockHeadlineCheck(html, check.headline) : null,
       fontsMissing: mockFontsMissing(html),
+      absentPainted: check?.absent?.length ? mockAbsentPainted(html, check.absent) : 0,
     }
   }
   return limit(() => {
     let headlineCheck: HeadlineCheck | null = null
     let fontsMissing: string[] = []
+    let absentPainted: number | null = 0
     return withRenderedPage(
       html,
       width,
       height,
-      async (page) => ({ png: Buffer.from(await page.screenshot({ type: "png" })), headlineCheck, fontsMissing }),
+      async (page) => ({ png: Buffer.from(await page.screenshot({ type: "png" })), headlineCheck, fontsMissing, absentPainted }),
       composites,
       async (page) => {
         if (check) headlineCheck = await runHeadlineCheck(page, check.headline, { width, height })
+        if (check?.absent?.length) absentPainted = await runAbsentCheck(page, check.absent, { width, height })
         fontsMissing = await runFontCheck(page)
       }
     )

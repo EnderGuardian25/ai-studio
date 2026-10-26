@@ -241,7 +241,7 @@
       - Set `APPLY_TEXT_BETA` from the rate against 80%.
     - **Gate:** tsc, lint, unit.
 
-- [ ] `T14` — The in-render Apply check, `acceptRender` on `commitDraftRevision`, render fixtures
+- [x] `T14` — The in-render Apply check, `acceptRender` on `commitDraftRevision`, render fixtures
   - Files: `src/lib/renderer/puppeteer.ts`, `src/lib/drafts/revisions.ts`, `src/lib/renderedText/mockCheck.ts`, `src/lib/testHooks.ts`, `tests/unit/{renderPost,commitAcceptRender}.test.ts`, `tests/render/applyCheck.test.ts` (new) and fixtures
   - Estimate: medium
   - Kind: impl

@@ -46,6 +46,17 @@ function isPainted(c: CandidateFacts, canvas: Rect, tol: number): boolean {
   return c.topmost.every((t) => t === true)
 }
 
+// 031 FR-40: how many candidates are painted (the same rule, so Apply's
+// "the old text is still on the image" count and the headline verdict agree).
+export function countPaintedCandidates(
+  facts: HeadlineFacts,
+  canvasSize: { width: number; height: number },
+  tolerance: number = HEADLINE_TOLERANCE_PX,
+): number {
+  const canvas: Rect = { left: 0, top: 0, width: canvasSize.width, height: canvasSize.height }
+  return facts.candidates.filter((c) => isPainted(c, canvas, tolerance)).length
+}
+
 export function evaluateHeadlineFacts(
   facts: HeadlineFacts,
   canvasSize: { width: number; height: number },

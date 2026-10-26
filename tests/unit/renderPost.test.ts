@@ -126,3 +126,44 @@ describe('buildMockHtml and the refine reply (030)', () => {
     expect(none).toBe(buildMockHtml('', 1080, 1080))
   })
 })
+
+describe('the absent option (031 FR-40, AC-37)', () => {
+  const canvas = { width: 1080, height: 1080 }
+
+  it('mock: absentPainted counts the old text still in the HTML, 0 when gone or not asked', async () => {
+    const { renderPost, buildMockHtml } = await load()
+    const html = buildMockHtml('', 1080, 1080, 'New Words')
+    expect((await renderPost(html, 1080, 1080, null, { headline: 'New Words', absent: ['Old Words'] })).absentPainted).toBe(0)
+    expect((await renderPost(html, 1080, 1080, null, { headline: 'New Words' })).absentPainted).toBe(0)
+    expect((await renderPost(html, 1080, 1080, null, null)).absentPainted).toBe(0)
+    expect((await renderPost(html, 1080, 1080, null, { headline: 'x', absent: ['New Words'] })).absentPainted).toBe(1)
+  })
+
+  it('mock sentinels: not-painted, old-painted and a render failure', async () => {
+    const { renderPost, buildMockHtml } = await load()
+    const np = buildMockHtml('', 1080, 1080, 'New Words __MOCK_APPLY_NOT_PAINTED__')
+    expect((await renderPost(np, 1080, 1080, null, { headline: 'New Words __MOCK_APPLY_NOT_PAINTED__' })).headlineCheck).toBe('not-visible')
+    const op = buildMockHtml('', 1080, 1080, 'New Words __MOCK_APPLY_OLD_PAINTED__')
+    expect((await renderPost(op, 1080, 1080, null, { headline: 'New Words', absent: ['Old'] })).absentPainted).toBe(1)
+    const rf = buildMockHtml('', 1080, 1080, 'New Words __MOCK_APPLY_RENDER_FAIL__')
+    await expect(renderPost(rf, 1080, 1080, null, { headline: 'New Words' })).rejects.toThrow('mock render failure')
+  })
+
+  it('runAbsentCheck sums the painted candidates over every text, through the pure rule', async () => {
+    const { runAbsentCheck } = await load()
+    const painted = { visible: true, rects: [{ left: 10, top: 10, width: 100, height: 40 }], clipBoxes: [], topmost: [true] }
+    const hidden = { ...painted, visible: false }
+    const page = { evaluate: async () => ({ candidates: [painted, hidden] }) }
+    expect(await runAbsentCheck(page as never, ['a', 'b'], canvas)).toBe(2)
+  })
+
+  it('runAbsentCheck never throws: a throw or a hang is null (not 0, so Apply cannot pass unchecked)', async () => {
+    const { runAbsentCheck } = await load()
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const boom = { evaluate: async () => { throw new Error('crashed') } }
+    expect(await runAbsentCheck(boom as never, ['a'], canvas)).toBeNull()
+    const hang = { evaluate: () => new Promise(() => {}) }
+    expect(await runAbsentCheck(hang as never, ['a'], canvas, 30)).toBeNull()
+    expect(warn).toHaveBeenCalledTimes(2)
+  })
+})
