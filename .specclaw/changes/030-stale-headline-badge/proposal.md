@@ -103,3 +103,35 @@ What this shows:
 3. **The parser.** Option (a) is `parse5` with source locations: spec-compliant, and splicing at its offsets keeps the rest of the document byte-identical. Option (b) does the match in Chromium during the render, which needs no new dependency, but Chromium re-serialises the whole document on the way out. **Recommend (a).**
 4. **The publish dialog.** Should it show one non-blocking line ("The image shows an older headline") when the draft is stale? **Recommend yes** if it fits the dialog without a new component.
 5. **Path A.** All 35 measured drafts are Path B. Template fills may differ. The plan measures the seeded Path A templates before fixing the rule.
+
+**Party panel (2026-10-26, deep, CHANGES_REQUESTED; upheld findings, one line each; see [party-report.md](party-report.md)):**
+
+- (party-architect, BLOCK) The stamp rule misclassifies writers that change text inside kept HTML, so the badge's own remedy cannot clear it.
+- (party-architect, BLOCK) Apply commits before it checks, yet promises to write nothing on a failed check, and never names the commitDraftRevision change this needs.
+- (party-architect, WARN) "Visible text" is defined by two engines, and the mock seam cannot produce the not-visible refusal it promises to test.
+- (party-architect, WARN) Two staleness rules feed one `headlineStale` field, its shape is unspecified, and the null-stamp rule puts an HTML parse into the draft GET.
+- (party-architect, WARN) The failure vocabulary differs between the route, the badge and the event.
+- (party-architect, WARN) The affected-files list leaves out writers that item 1 says must change, and the co-changes a new claimed action needs.
+- (party-architect, NOTE) Rebuttal to party-po's "replace the stamp with the parse check": the stamp is the only input that tells an edit apart from a model rewording.
+- (party-ba, WARN) The apply path's match rate is measured on a different match rule than the one it will use, and the 28/35 criterion is satisfied by the drafts it was tuned on.
+- (party-ba, WARN) Frequency of the pain is unknown, yet the build is sized "architectural" on the assumption it hurts.
+- (party-ba, WARN) No acceptance criterion tests the stated main claim that the badge clears only when the image really shows the new headline.
+- (party-ba, WARN) "Stale" and "the old headline" carry two meanings, and the null-stamp case contradicts the badge text.
+- (party-ba, NOTE) Assumes the user notices the badge and accepts flattened styling, without evidence of either behaviour.
+- (party-po, BLOCK) A cheaper variant (inform-only badge, or a no-stamp read-time check) is dismissed in one line, and the proposal's own numbers show the Apply path is the expensive, low-value part.
+- (party-po, WARN) The per-revision stamp and migration are paid for by every writer to serve a read-time check that could be cheaper.
+- (party-po, WARN) Unbounded scope with no stated value, plus one acceptance bar with no stated source.
+- (party-po, NOTE) Name the shipping cut line and the default for pre-030 drafts.
+- (party-security, BLOCK) The "visible text" check passes on hidden, clipped or covered text, then clears the badge.
+- (party-security, WARN) `renderedHeadline` is written from intent at most writers and never checked against the HTML.
+- (party-security, WARN) The splice can delete content the check never looks at.
+- (party-security, WARN) For pre-030 drafts, the recommended read-time rule fails open on CSS-hidden matches.
+- (party-security, WARN) A stale image is published with no warning, record or recovery path on the publish side.
+- (party-security, NOTE) HTML escaping does not neutralise the document's reserved token strings.
+- (party-security, WARN) Rebuttal of party-architect's writer-class BLOCK: its "or set it to null" fallback fails open under the recommended null-stamp rule.
+- (party-security, WARN) Rebuttal of party-visionary's backfill: it turns a CSS-blind guess into stored stamps that look verified.
+- (party-visionary, WARN) The "one stamp per field" rule makes every future editable on-image text a migration, a badge and a route.
+- (party-visionary, WARN) "Visible text" gets two definitions that must agree forever, and the mock suite exercises only one.
+- (party-visionary, WARN) The null-stamp branch can never retire, because restore keeps bringing it back, so the null rule chosen now is permanent.
+- (party-visionary, NOTE) The apply event has no method field, so the match-rate data mixes once the named alternative ships.
+- (party-visionary, NOTE) Rebuttal to party-po's stamp-free alternative: a read-time parse rule changes the verdict on old drafts every time the matcher is tuned.

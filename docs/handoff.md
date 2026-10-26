@@ -1,13 +1,95 @@
 # bistec-studio — Session Handoff
 
-**Date:** 2026-10-26 (latest: **025 hero product screenshots VERIFIED PASS 18/18**; earlier: **025 BUILT (T1 to T14)**; **025 OP-025 PASSED at all three sizes after Amendment A1 (screen detection)**; earlier 2026-10-25: **025 Group A built (T1 to T5)**; **028 image looks (027b) VERIFIED PASS 21/21: OP-028 ran (full-bleed-scene passed, spotlight failed) and T7 moved Event and Hiring; 029 CLI usage-limit message VERIFIED PASS 5/5; CI green at `5db8953`; next is 025**; earlier 2026-10-24: **027a post styles VERIFIED PASS 22/22**; **006 product observability VERIFIED PASS 17/17**; earlier: **007 VERIFIED PASS 22/22; 009 OP-1 PASSED 6 of 6 (local run); 006 planned; 026 VERIFIED PASS 11/11; draft PR #43 closed; 010 dropped**). Earlier 2026-10-23: **024 caption credential route VERIFIED PASS, 17/17 ACs**; gates: unit 3024/3024, render 47/47, E2E 431/3/0/0, CI green at `cd9d411` (runs 39837152549, 39837162772; the PR run passed on one rerun after a CI-runner Chromium launch timeout in the render harness)). 2026-10-21: **009 hero imagery Phase 1 VERIFIED PASS (25/25), commit `d3534e0`; OP-1 is the user's pending step**; before it: **023 scheduler heartbeat VERIFIED PASS**; gates: unit 2947/2947, render 47/47, E2E 422/3/0/0, CI green at `f8f063c` (runs 39604699552, 39604706638)). 2026-10-20: **020 Create post button, 019 claim token, 021 Graphite re-theme, 018 and 022 VERIFIED PASS; the build order is complete**. 2026-10-19: this repo adopted the fork's `v2` on 2026-10-18. The fork-era sections, 2026-10-07 to 2026-10-14, moved to [`fork-history.md`](fork-history.md). Previous: 2026-10-07 (005 verified PASS; 011 planned, wave 1 built). Previous: 2026-10-03 (004 finished and verified PARTIAL, Phase 0 only; 005 built 9/10, waiting on one operator check). Before that: 2026-09-28 (build session — 004 Waves 1–3 built, MinIO → silo, PR #42 + draft PR #43). Before that: 2026-09-23 (later, later the same day: proposal **012** per-channel captions + copy→caption rename, a floating **Create post** button folded into 011, and a launch-video legibility pass. Before that: planning session — proposals 008–011 + roadmap, 004 re-planned to 24 tasks incl. Phase 0, and the deploy pipeline found broken: Coolify 401 since 2026-09-15). Previous: 2026-07-28 (copy-edit status clobber fix).
+**Date:** 2026-10-26 (latest: **030 stale-headline badge PROPOSED; deep panel CHANGES_REQUESTED; the user answers D1 to D5 next**; **025 hero product screenshots VERIFIED PASS 18/18**; earlier: **025 BUILT (T1 to T14)**; **025 OP-025 PASSED at all three sizes after Amendment A1 (screen detection)**; earlier 2026-10-25: **025 Group A built (T1 to T5)**; **028 image looks (027b) VERIFIED PASS 21/21: OP-028 ran (full-bleed-scene passed, spotlight failed) and T7 moved Event and Hiring; 029 CLI usage-limit message VERIFIED PASS 5/5; CI green at `5db8953`; next is 025**; earlier 2026-10-24: **027a post styles VERIFIED PASS 22/22**; **006 product observability VERIFIED PASS 17/17**; earlier: **007 VERIFIED PASS 22/22; 009 OP-1 PASSED 6 of 6 (local run); 006 planned; 026 VERIFIED PASS 11/11; draft PR #43 closed; 010 dropped**). Earlier 2026-10-23: **024 caption credential route VERIFIED PASS, 17/17 ACs**; gates: unit 3024/3024, render 47/47, E2E 431/3/0/0, CI green at `cd9d411` (runs 39837152549, 39837162772; the PR run passed on one rerun after a CI-runner Chromium launch timeout in the render harness)). 2026-10-21: **009 hero imagery Phase 1 VERIFIED PASS (25/25), commit `d3534e0`; OP-1 is the user's pending step**; before it: **023 scheduler heartbeat VERIFIED PASS**; gates: unit 2947/2947, render 47/47, E2E 422/3/0/0, CI green at `f8f063c` (runs 39604699552, 39604706638)). 2026-10-20: **020 Create post button, 019 claim token, 021 Graphite re-theme, 018 and 022 VERIFIED PASS; the build order is complete**. 2026-10-19: this repo adopted the fork's `v2` on 2026-10-18. The fork-era sections, 2026-10-07 to 2026-10-14, moved to [`fork-history.md`](fork-history.md). Previous: 2026-10-07 (005 verified PASS; 011 planned, wave 1 built). Previous: 2026-10-03 (004 finished and verified PARTIAL, Phase 0 only; 005 built 9/10, waiting on one operator check). Before that: 2026-09-28 (build session — 004 Waves 1–3 built, MinIO → silo, PR #42 + draft PR #43). Before that: 2026-09-23 (later, later the same day: proposal **012** per-channel captions + copy→caption rename, a floating **Create post** button folded into 011, and a launch-video legibility pass. Before that: planning session — proposals 008–011 + roadmap, 004 re-planned to 24 tasks incl. Phase 0, and the deploy pipeline found broken: Coolify 401 since 2026-09-15). Previous: 2026-07-28 (copy-edit status clobber fix).
 **Repo:** https://github.com/bistec-oss/studio, which `origin` points to. **The repo rules (branches, remotes, the `fork` remote; draft PR #43 was closed on 2026-10-23) are in [`CLAUDE.md`](../CLAUDE.md)'s top entry, which is authoritative.** This file does not repeat them.
 **Branch:** work continues on **`v2`**, pushed to `origin v2`. `main` is `671ad6e9` (PR #42) and deploys to company prod. `v2` → `main` is one PR, merged only on the user's go-ahead and after the pre-merge prod checklist below.
 **Production:** `https://studio.bistecglobal.com` serves company `main`. Its migration head is `20260728120000_heal_copy_edit_clobbered_drafts`. Merges to `main` build but do not deploy until the Coolify token is rotated (see CLAUDE.md).
 
 ---
 
-## ⏸️ 2026-10-26 — PICK UP HERE: 025 hero product screenshots is VERIFIED PASS (18/18); next is the stale-headline badge
+## ⏸️ 2026-10-26 — PICK UP HERE: 030 stale-headline badge is PROPOSED; the deep panel returned CHANGES_REQUESTED, and the user's answers to D1 to D5 below come next
+
+**State.** 025 is VERIFIED PASS (18/18; section below). 030 is the stale-headline badge the user split out of 006. Its files are in `.specclaw/changes/030-stale-headline-badge/`:
+
+- the [proposal](../.specclaw/changes/030-stale-headline-badge/proposal.md), committed `67038a3`;
+- the [party report](../.specclaw/changes/030-stale-headline-badge/party-report.md): tier deep, 5 seats, 2 rounds, 10 spawns, verdict **CHANGES_REQUESTED** (29 upheld: 4 BLOCK, 19 WARN, 6 NOTE; 1 withdrawn);
+- `headline-measure.cjs`, the read-only measurement script.
+
+Nothing is planned or built yet. The proposal is not approved.
+
+**The problem.** A headline edit (`saveHeadlineEdit`, `src/lib/captions/store.ts:385`) and Regenerate headline (`store.ts:347`) change `Draft.headline` but never the design. The preview and the published PNG keep the old headline, and nothing tells the user.
+
+**Measured, 2026-10-26.** The sample is 35 real model-made Path B drafts in the scratch DB `bistec_studio_op1`, rendered in Chromium with no network and no model calls:
+
+- the headline is a single text node in only 5 of 35 (models split it with accent spans and `<br>`);
+- the raw substring occurs exactly once in 9 of 35, and in 4 of those 9 the match is not visible text (for example the `<title>`);
+- exactly one innermost element holds the headline in 32 of 35;
+- the headline is visible in the page text in 34 of 35.
+
+So 006's exact-once raw replace would rarely work, and sometimes it would "fix" the `<title>`.
+
+**The four BLOCKs:**
+
+- **party-po:** Apply to image is the costly part, and its value is unknown. Ship the badge, the stamp and the events first, and gate Apply on what the events show.
+- **party-architect:** inline edit, Override and refine change text inside kept HTML. Stamping them from intent or carrying the stamp forward is wrong both ways: the badge cannot clear after a manual fix, and refine can mark a stale draft fresh.
+- **party-architect:** Apply as written commits, then checks, then stamps. "Writes nothing on a failed check" needs the check inside the render, before the write. That is a `commitDraftRevision` co-change.
+- **party-security:** a text read (`innerText`) passes on hidden, clipped or covered text. The check must be a Chromium geometry test: a box inside the canvas, computed visibility, no overflow, and `elementFromPoint` sampling as 025 does.
+
+**Decisions for the user (asked 2026-10-26; answers pending).** Each has a recommendation.
+
+- **D1, scope cut.**
+  - (a) Badge, stamp and events now, with Edit inline and Regenerate design as the remedies. Apply to image becomes a later change, gated on the events' edit rate and match rate.
+  - (b) The full build, Apply included, with every panel fix.
+  - (c) Like (b), but Apply is one scoped Haiku call that keeps the styling.
+
+  **Recommend (a).** Three of the four BLOCKs sit in Apply, and Apply flattens the accent styling.
+
+- **D2, what the stamp records.**
+  - (a) The headline that is visibly painted, checked in the real render at every design write. This is a geometry check in the page, as 025 does for the composite: one element, a box in the canvas, visible, not clipped, topmost. The stamp is the headline when it passes and `unverified` when it does not. Every write that renders a PNG already runs Chromium, so the check costs no extra render. Under `MOCK_PUPPETEER`, a parse-based stand-in plus a sentinel.
+  - (b) The intended headline (`designHeadline`).
+
+  **Recommend (a).** It answers the architect writer-class BLOCK and the security WARN together: an inline edit that fixes the headline then clears the badge.
+
+- **D3, drafts from before 030** (null stamp; restore keeps bringing null back, so this rule is permanent).
+  - (a) Show nothing.
+  - (b) A quiet "can't confirm the image matches the headline" note, with Edit inline and Regenerate design.
+
+  The panel agreed that "fresh" must never be derived from a parse. **Recommend (a)** (party-po, party-visionary).
+
+- **D4, the stamp's shape.**
+  - (a) One JSONB `renderedText` keyed by field (`{ headline: { text, verified } }`), with staleness that loops over the keys, so a later CTA or kicker field needs no migration.
+  - (b) A field-named `renderedHeadline` TEXT column.
+
+  **Recommend (a)** (party-visionary). It costs the same today.
+
+- **D5, the publish side** (never a gate).
+  - (a) Record `headlineStale` on the publish event (interactive and scheduled), always show one line in the publish dialog when the draft is stale, and when a headline edit lands on a draft with a pending SCHEDULED post, say so in the badge.
+  - (b) The dialog line only.
+  - (c) Nothing on the publish side.
+
+  **Recommend (a)** (party-security). Publishing is the one step that cannot be undone.
+
+**Adopted by default in the spec unless the user objects** (the remaining WARNs and NOTEs):
+
+- one closed reason enum shared by the route, the badge and the event;
+- a `method` field on the apply event, if Apply ships;
+- reserved tokens (`__COMPOSITE_0__`, `__INLINE_ASSET_n__`) refused in a new headline;
+- a splice refusal for elements holding `img`, `svg`, `[data-composite]`, tokens, or with no explicit end tag, and a re-parse to check nothing outside the element changed;
+- one shared normaliser (whitespace, case, `<br>`, `text-transform`) used by every side;
+- a stated rule for case-only edits;
+- the match rate re-measured under the final rule, and the sample called non-representative;
+- a `test:render` fixture where the parse matcher and the Chromium check must agree;
+- the full writer and file list, plus the claim co-changes;
+- a `MOCK_*` sentinel for the `not-visible` path.
+
+**Resume.**
+
+1. Record the user's D1 to D5 answers under a "User decisions" heading in `proposal.md`, as 025 did. Do not rewrite the panel lines.
+2. Run `specclaw-set-phase .specclaw 030-stale-headline-badge proposal approved --size <size>`. Under D1 (a) the size is still architectural (a stamp every writer carries, plus a migration).
+3. Run `/specclaw:plan 030-stale-headline-badge`.
+4. Ask before any further panel spend. No real model or image call is needed for 030.
+
+## 2026-10-26 — 025 hero product screenshots is VERIFIED PASS (18/18) (superseded as the pickup point by the 030 section above)
 
 **Latest:** all of 025 is built. Group A (T1 to T5), Amendment A1 (screen detection, T13) and Group B (T6 to T11, plus these docs as T12) are on `v2`. **OP-025 PASSED at all three sizes** (7 of 9 image calls, 2026-10-25/26; the user accepted all six kept renders). The OP-025 result is in its own subsection below. **VERIFIED PASS 18/18 (2026-10-26, [verify-report](../.specclaw/changes/025-hero-reference-images/verify-report.md))** at `703d263`. Next: the stale-headline badge (`/specclaw:propose`). The `v2` → `main` merge stays on the user's go-ahead. Gates: unit 4131/4131, render 119/119, lint 0 errors / 7 warnings, tsc clean, build passes, `test:upgrade` passes, full clean mock E2E 548/3/0/0, CI green at `5531d29` (run 40235850520).
 
