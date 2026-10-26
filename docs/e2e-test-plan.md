@@ -1215,6 +1215,7 @@ CI gate: **`.github/workflows/e2e.yml`** runs the whole suite (§A–§AA, inclu
 | Change 008 model selection, wave 2 (AC-27 → AC-31, AC-33)       | §Y TC-MODEL-13…20, `a11y` /drafts/[id] axe (see §Y wave-2 map)                         |
 | Change 020 Create post button off the draft page (AC-01, AC-02) | `create-post-button.test.ts` AC-01, AC-01b, AC-02b (see the 020 update note after §X)  |
 | Change 009 hero imagery (AC-04, AC-05, AC-12 to AC-19, AC-21)   | §AA TC-HERO-01…16, `a11y` draft page and `/brief` axe (see §AA map)                    |
+| Change 030 stale-headline badge (AC-11 → AC-19)                 | §AH TC-HL-01…10, `a11y` "AC-19: a draft page with the stale-headline badge" (see §AH)  |
 
 > Items with no behavioral surface (M2 init race, M3 stdin, M7 polling, M8 crypto guards, M13 dead code) are best covered by unit tests; M7 polling can optionally be a UI test (draft auto-refresh while `IN_PROGRESS`).
 

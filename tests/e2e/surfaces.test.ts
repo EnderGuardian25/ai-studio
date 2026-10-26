@@ -712,7 +712,7 @@ test.describe('Draft review (T9)', () => {
 
     // FR-12: every control the page had, by role and name.
     await expect(page.getByRole('link', { name: 'Library' }).first()).toBeVisible()
-    const regenDesign = page.getByRole('button', { name: 'Regenerate design' })
+    const regenDesign = page.getByRole('button', { name: 'Regenerate design', exact: true })
     for (const name of ['Regenerate design', 'Edit inline', 'Re-export', 'Regenerate all']) {
       await expect(page.getByRole('button', { name, exact: true })).toBeVisible()
     }
@@ -745,7 +745,7 @@ test.describe('Draft review (T9)', () => {
     await expect(page.locator('[aria-current="true"]')).toContainText('v1', { timeout: 20_000 })
 
     // The inline editor, in both modes.
-    await page.getByRole('button', { name: 'Edit inline' }).click()
+    await page.getByRole('button', { name: 'Edit inline', exact: true }).click()
     const dialog = page.getByRole('dialog', { name: 'Edit inline' })
     await expect(dialog.locator('[data-editor-ready="true"]')).toBeAttached({ timeout: 20_000 })
     await expectNoHorizontalScroll(page, 'inline editor at 375px')

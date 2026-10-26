@@ -7,89 +7,48 @@
 
 ---
 
-## ⏸️ 2026-10-26 — PICK UP HERE: 030 stale-headline badge is PROPOSED, the deep panel returned CHANGES_REQUESTED, and the user ANSWERED D1 to D5 (all recommendations); next: the user approves the amended proposal, then `/specclaw:plan 030-stale-headline-badge`
+## ⏸️ 2026-10-26 — PICK UP HERE: 030 stale-headline badge is BUILT (T1 to T6); next is `/specclaw:verify 030-stale-headline-badge`
 
-**State.** 025 is VERIFIED PASS (18/18; section below). 030 is the stale-headline badge the user split out of 006. Its files are in `.specclaw/changes/030-stale-headline-badge/`:
+**State.** 030 is built on `v2`, T1 to T6, and nothing is mid-build. Its files are in `.specclaw/changes/030-stale-headline-badge/` (the spec has 18 FR, 8 NFR and 20 AC; `reports/` and `reviews/` hold each task's record). The decisions D1 to D5 are under "User Decisions" in [`proposal.md`](../.specclaw/changes/030-stale-headline-badge/proposal.md) and govern the spec. No real model or image call was made.
 
-- the [proposal](../.specclaw/changes/030-stale-headline-badge/proposal.md), committed `67038a3`;
-- the [party report](../.specclaw/changes/030-stale-headline-badge/party-report.md): tier deep, 5 seats, 2 rounds, 10 spawns, verdict **CHANGES_REQUESTED** (29 upheld: 4 BLOCK, 19 WARN, 6 NOTE; 1 withdrawn);
-- `headline-measure.cjs`, the read-only measurement script.
+**What it does.**
 
-Nothing is planned or built yet. The proposal is not approved.
+- **The stamp.** Every design write that renders a PNG records the headline its render visibly painted: `Draft.renderedText` and `DraftRevision.renderedText`, shaped `{ headline: { text, verified, reason? } }`. The check runs in the same Chromium page that makes the PNG (FR-08 geometry: visible, inside the canvas, not clipped, topmost at each line centre). It is bounded at 5 s and never fails a render. A null stamp means "rendered before 030" and shows nothing, permanently (D3).
+- **The four states,** computed at read time and never stored: `fresh`, `stale`, `unconfirmed`, `unknown`. A case-only or whitespace-only edit is `fresh`.
+- **The badge.** `HeadlineImageNotice` on the draft page, for `stale` and `unconfirmed`, with Edit inline and Regenerate design. When a SCHEDULED post exists, it says so (D5).
+- **The publish dialog.** One non-blocking line for `stale` and `unconfirmed`, on the draft page and the library page. Publishing is never blocked (D5).
+- **The events.** `draft.headline_edited` (new; one emitter, `trackHeadlineEdited`), `publish.settled.headlineState` and `generation.finished.headlineCheck`. No payload holds headline text.
 
-**The problem.** A headline edit (`saveHeadlineEdit`, `src/lib/captions/store.ts:385`) and Regenerate headline (`store.ts:347`) change `Draft.headline` but never the design. The preview and the published PNG keep the old headline, and nothing tells the user.
+**The commits (on `v2`).** T1 `a643316` (the pure module), T2 `315175e` (`renderPost`, the in-page check, the mock stand-in), T3 `f714be0` (the columns, the stamp on every design writer, the writer guard), T4 `7a4dca1` (the read side and the events), T5 `6562240` (the badge, the publish line, E2E section AH). Lint fix `0069333` makes eslint ignore `.specclaw/`, so the 030 measurement script no longer crashes it. T6 is these docs and the gate; the orchestrator commits it.
 
-**Measured, 2026-10-26.** The sample is 35 real model-made Path B drafts in the scratch DB `bistec_studio_op1`, rendered in Chromium with no network and no model calls:
+**Known limits.**
 
-- the headline is a single text node in only 5 of 35 (models split it with accent spans and `<br>`);
-- the raw substring occurs exactly once in 9 of 35, and in 4 of those 9 the match is not visible text (for example the `<title>`);
-- exactly one innermost element holds the headline in 32 of 35;
-- the headline is visible in the page text in 34 of 35.
+- **L1.** Contrast and colour are not checked. Text the same colour as its background reads as painted.
+- **L2.** The check confirms that the headline text is painted, not that it is the design's headline. It could sit in a footer.
+- **L3.** A partly covered line passes when its centre is uncovered.
+- **L4.** The mock stand-in sees text, not CSS. Only the sentinel `__MOCK_HEADLINE_HIDDEN__` produces `not-visible` in mock runs.
+- **L5.** An overlay with `pointer-events: none` is not seen by `elementFromPoint`, so text it covers still reads as painted.
+- **L6.** A page whose CSP forbids `unsafe-eval` gives `not-checked`. The in-page collector is built with `new Function`, so the badge then says the check could not run.
 
-So 006's exact-once raw replace would rarely work, and sometimes it would "fix" the `<title>`.
+**The migration.** `20261027120000_rendered_text`: two nullable JSONB columns, `Draft.renderedText` and `DraftRevision.renderedText`, with no backfill. The manual down script is `prisma/rollback/030-stale-headline-badge.down.sql`.
 
-**The four BLOCKs:**
+**Check before the merge.**
 
-- **party-po:** Apply to image is the costly part, and its value is unknown. Ship the badge, the stamp and the events first, and gate Apply on what the events show.
-- **party-architect:** inline edit, Override and refine change text inside kept HTML. Stamping them from intent or carrying the stamp forward is wrong both ways: the badge cannot clear after a manual fix, and refine can mark a stale draft fresh.
-- **party-architect:** Apply as written commits, then checks, then stamps. "Writes nothing on a failed check" needs the check inside the render, before the write. That is a `commitDraftRevision` co-change.
-- **party-security:** a text read (`innerText`) passes on hidden, clipped or covered text. The check must be a Chromium geometry test: a box inside the canvas, computed visibility, no overflow, and `elementFromPoint` sampling as 025 does.
+- **030 stale-headline badge (FR-01, NFR-06).** This is a check, not a blocking step. The migration is additive: two nullable JSONB columns, no backfill. A redeploy applies it. Drafts and revisions from before 030 show no badge, permanently (D3). **No env var.** No model or image call is added (NFR-01), and publishing is never blocked by the badge (D5).
 
-**Decisions (asked and answered 2026-10-26).** The user chose the recommendation on D1, D2, D3 and D5. D4 was not asked; its recommendation (the field-keyed JSONB stamp) is adopted unless the user objects. The answers are recorded under "User Decisions" in `proposal.md`, which governs the spec. In short: **D1 (a)** badge, stamp and events now, Apply to image is a later change gated on the events; **D2 (a)** the stamp is the headline verified as painted in the real render at every design write (`verified: false` otherwise, never read as fresh); **D3 (a)** pre-030 drafts show nothing, permanently; **D4 (a)** `renderedText: { headline: { text, verified } }` JSONB on `Draft` and `DraftRevision`; **D5 (a)** the publish event records staleness, the publish dialog shows one line when stale, and the badge flags a pending scheduled post. The options as they were asked:
+**Gates (T6, 2026-10-26).** unit 4253/4253 · render 134/134 · lint 0 errors / 7 warnings · tsc clean · build passes · full clean mock E2E 559 passed / 3 skipped / 0 failed / 0 flaky (548 + 10 §AH + 1 a11y) · `test:upgrade` passes (T3) · CI: see the T6 commit's run. **The first full run failed 5 §T inline-edit cases:** the badge's Edit inline button shared its accessible name with the toolbar's, so a strict-mode locator matched both. The badge buttons now carry contextual names ("Edit inline to fix the headline", "Regenerate design to fix the headline"; the visible label is kept, so label-in-name holds) and the old locators use `exact: true`.
 
-- **D1, scope cut.**
-  - (a) Badge, stamp and events now, with Edit inline and Regenerate design as the remedies. Apply to image becomes a later change, gated on the events' edit rate and match rate.
-  - (b) The full build, Apply included, with every panel fix.
-  - (c) Like (b), but Apply is one scoped Haiku call that keeps the styling.
+**Resume.** `/specclaw:verify 030-stale-headline-badge`. Then push `v2` and check `gh run list --branch v2` until CI is green.
 
-  **Recommend (a).** Three of the four BLOCKs sit in Apply, and Apply flattens the accent styling.
+**Deferred.** Apply to image is a later change, gated on `draft.headline_edited`, `publish.settled.headlineState` and `generation.finished.headlineCheck` (D1). Its Insights-page queries are part of that change's evidence step; 030 records the events only.
 
-- **D2, what the stamp records.**
-  - (a) The headline that is visibly painted, checked in the real render at every design write. This is a geometry check in the page, as 025 does for the composite: one element, a box in the canvas, visible, not clipped, topmost. The stamp is the headline when it passes and `unverified` when it does not. Every write that renders a PNG already runs Chromium, so the check costs no extra render. Under `MOCK_PUPPETEER`, a parse-based stand-in plus a sentinel.
-  - (b) The intended headline (`designHeadline`).
+## ⏸️ 2026-10-26 — 030 stale-headline badge was PROPOSED, the deep panel returned CHANGES_REQUESTED, and the user answered D1 to D5 (superseded as the pickup point by the section above)
 
-  **Recommend (a).** It answers the architect writer-class BLOCK and the security WARN together: an inline edit that fixes the headline then clears the badge.
+**The problem.** A headline edit (`saveHeadlineEdit`, `src/lib/captions/store.ts`) and Regenerate headline change `Draft.headline` but never the design. The preview and the published PNG keep the old headline, and nothing says so.
 
-- **D3, drafts from before 030** (null stamp; restore keeps bringing null back, so this rule is permanent).
-  - (a) Show nothing.
-  - (b) A quiet "can't confirm the image matches the headline" note, with Edit inline and Regenerate design.
+**Measured 2026-10-26** on 35 real Path B drafts in `bistec_studio_op1` (read-only, no model calls): the headline is one text node in 5 of 35, a raw substring match is sometimes not visible text (`<title>`), and one innermost element holds it in 32 of 35. That is why the check is a Chromium geometry test, not a text match.
 
-  The panel agreed that "fresh" must never be derived from a parse. **Recommend (a)** (party-po, party-visionary).
-
-- **D4, the stamp's shape.**
-  - (a) One JSONB `renderedText` keyed by field (`{ headline: { text, verified } }`), with staleness that loops over the keys, so a later CTA or kicker field needs no migration.
-  - (b) A field-named `renderedHeadline` TEXT column.
-
-  **Recommend (a)** (party-visionary). It costs the same today.
-
-- **D5, the publish side** (never a gate).
-  - (a) Record `headlineStale` on the publish event (interactive and scheduled), always show one line in the publish dialog when the draft is stale, and when a headline edit lands on a draft with a pending SCHEDULED post, say so in the badge.
-  - (b) The dialog line only.
-  - (c) Nothing on the publish side.
-
-  **Recommend (a)** (party-security). Publishing is the one step that cannot be undone.
-
-**Adopted by default in the spec unless the user objects** (the remaining WARNs and NOTEs):
-
-- one closed reason enum shared by the route, the badge and the event;
-- a `method` field on the apply event, if Apply ships;
-- reserved tokens (`__COMPOSITE_0__`, `__INLINE_ASSET_n__`) refused in a new headline;
-- a splice refusal for elements holding `img`, `svg`, `[data-composite]`, tokens, or with no explicit end tag, and a re-parse to check nothing outside the element changed;
-- one shared normaliser (whitespace, case, `<br>`, `text-transform`) used by every side;
-- a stated rule for case-only edits;
-- the match rate re-measured under the final rule, and the sample called non-representative;
-- a `test:render` fixture where the parse matcher and the Chromium check must agree;
-- the full writer and file list, plus the claim co-changes;
-- a `MOCK_*` sentinel for the `not-visible` path.
-
-**Resume (in a new session).**
-
-1. **Ask the user to approve the proposal as amended by the User Decisions** (size architectural: a JSONB stamp on two tables that every design writer carries, a migration, a check in the renderer, the badge, the events and the publish-side record). The answers to D1 to D5 are not yet a recorded approval.
-2. On approval: `specclaw-set-phase .specclaw 030-stale-headline-badge proposal approved --size architectural`.
-3. Run `/specclaw:plan 030-stale-headline-badge`. The spec reads the Proposed Solution through the User Decisions. Apply to image, the splice module, `parse5` and Open Questions 1, 3 and 5 are out of scope (a later change). Every upheld panel finding that still applies must map to a requirement, or to an explicit "out of scope by D1" line in a "Panel findings → where addressed" table, as 025 did.
-4. Then build subagent-driven, one task at a time, as for 025: an implementer on the cheapest workable model, a `specclaw:code-reviewer`, the orchestrator re-runs the gates and commits. A full clean mock E2E and CI close the change.
-5. No real model or image call is needed for 030. Ask before any further panel spend.
-6. The baseline before 030: unit 4131, render 119, lint 0 errors / 7 warnings, E2E 548/3/0/0; CI green at `5531d29` (run 40235850520). The next free migration timestamp follows `20261026120000_composite_source`.
+**Decisions (answered 2026-10-26; recorded in `proposal.md`).** D1 the badge, the stamp and the events now, Apply to image later and gated on the events. D2 the stamp is the headline verified as painted at each design write. D3 pre-030 drafts show nothing, permanently. D4 one field-keyed JSONB stamp. D5 the publish event records staleness and the dialog shows one line, never a gate. The panel is [`party-report.md`](../.specclaw/changes/030-stale-headline-badge/party-report.md). The build that followed is in the section above.
 
 ## 2026-10-26 — 025 hero product screenshots is VERIFIED PASS (18/18) (superseded as the pickup point by the 030 section above)
 

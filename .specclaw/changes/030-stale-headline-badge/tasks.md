@@ -120,7 +120,7 @@
 
 ### Wave 6: Docs, the full gate and CI
 
-- [ ] `T6` — Docs, the full clean gate and CI
+- [x] `T6` — Docs, the full clean gate and CI
   - Files: `docs/handoff.md` (the 030 section: the stamp, the states, the known limits L1 to L4, the "Check before the merge" line for the migration), `CLAUDE.md` (an Architecture-decisions bullet and the Outstanding-work entry), `.specclaw/ROADMAP.md`, `docs/e2e-test-plan.md` (coverage map row), `reports/T6.md`
   - Estimate: small
   - Kind: docs

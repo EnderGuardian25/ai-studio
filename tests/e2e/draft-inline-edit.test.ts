@@ -528,7 +528,7 @@ test.describe('§T — draft inline edit', () => {
 
     await pageLogin(page)
     await page.goto(`/drafts/${id}`)
-    await page.getByRole('button', { name: 'Edit inline' }).click()
+    await page.getByRole('button', { name: 'Edit inline', exact: true }).click()
     const dialog = page.getByRole('dialog')
     await dialog.getByRole('tab', { name: 'Single element' }).click()
     const frame = page.frameLocator('iframe[title="Inline editor"]')
@@ -609,7 +609,7 @@ test.describe('§T — draft inline edit', () => {
 
     await pageLogin(page)
     await page.goto(`/drafts/${id}`)
-    const edit = page.getByRole('button', { name: 'Edit inline' })
+    const edit = page.getByRole('button', { name: 'Edit inline', exact: true })
     await expect(edit).toBeEnabled()
     const newer = await pin(api, id, TWO.replace('Old headline', 'Newer headline'))
 
@@ -655,7 +655,7 @@ test.describe('§T — draft inline edit', () => {
 
     await pageLogin(page)
     await page.goto(`/drafts/${id}`)
-    const edit = page.getByRole('button', { name: 'Edit inline' })
+    const edit = page.getByRole('button', { name: 'Edit inline', exact: true })
     await expect(edit).toBeEnabled()
     await press(edit)
     const dialog = page.getByRole('dialog')
@@ -772,7 +772,7 @@ test.describe('§T — draft inline edit', () => {
 
     await pageLogin(page)
     await page.goto(`/drafts/${id}`)
-    await page.getByRole('button', { name: 'Edit inline' }).click()
+    await page.getByRole('button', { name: 'Edit inline', exact: true }).click()
     const dialog = page.getByRole('dialog')
     const frame = page.frameLocator('iframe[title="Inline editor"]')
     const save = dialog.getByRole('button', { name: 'Save & re-export' })
@@ -802,7 +802,7 @@ test.describe('§T — draft inline edit', () => {
     // has refetched), then fail the read that the switch back to Whole
     // document makes.
     await expect(dialog).toBeHidden()
-    await page.getByRole('button', { name: 'Edit inline' }).click()
+    await page.getByRole('button', { name: 'Edit inline', exact: true }).click()
     await dialog.getByRole('tab', { name: 'Single element' }).click()
     await expect(dialog.locator('[data-editor-ready="true"]')).toBeAttached()
     const switchRead = (await failDraftGet(1)).failed
@@ -841,7 +841,7 @@ test.describe('§T — draft inline edit', () => {
 
     await pageLogin(page)
     await page.goto(`/drafts/${id}`)
-    await page.getByRole('button', { name: 'Edit inline' }).click()
+    await page.getByRole('button', { name: 'Edit inline', exact: true }).click()
     const dialog = page.getByRole('dialog')
     const frame = page.frameLocator('iframe[title="Inline editor"]')
     await expect(dialog.getByRole('button', { name: 'Save & re-export' })).toBeEnabled()

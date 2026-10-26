@@ -973,7 +973,7 @@ test.describe('ARIA states (T17)', () => {
     await expect(page.getByRole('region', { name: 'Refine requests', exact: true }).getByRole('listitem')).toHaveCount(0)
 
     // AC-12: the inline-edit modal.
-    await page.getByRole('button', { name: 'Edit inline' }).click()
+    await page.getByRole('button', { name: 'Edit inline', exact: true }).click()
     const dialog = page.getByRole('dialog', { name: 'Edit inline' })
     await expect(dialog.locator('[data-editor-ready="true"]')).toBeAttached({ timeout: 20_000 })
     await expectTablistsNamed(dialog, ['Edit mode'])

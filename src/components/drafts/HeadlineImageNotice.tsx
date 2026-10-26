@@ -48,11 +48,11 @@ export function HeadlineImageNotice({
         </p>
       )}
       <div className="mt-3 flex flex-wrap gap-2">
-        <Button variant="secondary" size="sm" onClick={onEditInline} disabled={disabled || !canEditInline}>
+        <Button variant="secondary" size="sm" onClick={onEditInline} disabled={disabled || !canEditInline} aria-label="Edit inline to fix the headline">
           Edit inline
         </Button>
         {canRegenerate && (
-          <Button variant="secondary" size="sm" onClick={onRegenerateDesign} disabled={disabled}>
+          <Button variant="secondary" size="sm" onClick={onRegenerateDesign} disabled={disabled} aria-label="Regenerate design to fix the headline">
             Regenerate design
           </Button>
         )}

@@ -481,3 +481,20 @@ T2 ran only the three caption specs; the full clean run then failed two specs el
 When a change alters a registry size or a page layout, grep all of tests/e2e for the old count and the moved control before the targeted run, not just the suites named in the task.
 
 ---
+
+## [L29] pattern — A notice that offers an action already on the page (Edit ...
+
+**When:** 2026-10-26 08:12 UTC
+**Category:** pattern
+**Priority:** medium
+**Status:** pending
+
+### Detail
+
+A notice that offers an action already on the page (Edit inline, Regenerate design) gives two buttons the same accessible name; strict-mode getByRole locators in older suites matched both and 5 §T cases failed only in the full run
+
+### Action
+
+Give action buttons inside notices contextual accessible names (keep the visible label as the start of the name) and run the full suite, not only the new one, before closing a UI task
+
+---
