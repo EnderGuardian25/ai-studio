@@ -15,3 +15,7 @@
 {"ev":"start","span":"T4","kind":"task","label":"Image key backend","parent":"W3","model":"sonnet","attempt":"1","at":"2026-10-26T13:11:35Z","ts":1793020295}
 {"ev":"stop","span":"T4","at":"2026-10-26T13:25:45Z","ts":1793021145,"status":"ok"}
 {"ev":"start","span":"T5","kind":"task","label":"Image key card, team page, notice, AI","parent":"W3","model":"sonnet","attempt":"1","at":"2026-10-26T13:25:48Z","ts":1793021148}
+{"ev":"stop","span":"T5","at":"2026-10-26T13:38:37Z","ts":1793021917,"status":"ok"}
+{"ev":"stop","span":"W3","at":"2026-10-26T13:38:37Z","ts":1793021917,"status":"ok"}
+{"ev":"start","span":"W4","kind":"wave","label":"wave 4","at":"2026-10-26T13:38:41Z","ts":1793021921}
+{"ev":"start","span":"T6","kind":"task","label":"Font catalogue, URL, validation","parent":"W4","model":"sonnet","attempt":"1","at":"2026-10-26T13:38:41Z","ts":1793021921}

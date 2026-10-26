@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { withTeamAdmin, parseBody } from '@/lib/api/handler'
+import { findFamily } from '@/lib/fonts/catalogue'
+import { validateKitFonts } from '@/lib/fonts/validateKitFonts'
 
 type Params = { id: string }
 
@@ -39,6 +41,16 @@ export const PATCH = withTeamAdmin<Params>(async (req, { params }, user) => {
   if (body.response) return body.response
   const { name, colors, fonts, logoUrl, isDefault } = body.data
 
+  // 031 FR-20: an entry identical to a stored one is kept as is; any other must be a catalogue
+  // family (its url is computed); at most 6. Nothing is written on a refusal.
+  let nextFonts = fonts
+  if (fonts !== undefined) {
+    const stored = Array.isArray(kit.fonts) ? (kit.fonts as Array<{ name: string; url: string }>) : []
+    const checked = validateKitFonts(fonts, stored, findFamily)
+    if (!checked.ok) return NextResponse.json({ error: checked.error }, { status: 400 })
+    nextFonts = checked.fonts
+  }
+
   // Setting the primary logo must reference an existing LOGO artifact of this
   // kit (clearing with null is always allowed). The gallery's "Set as primary"
   // PATCHes an artifact URL that necessarily exists; this rejects a stray URL.
@@ -69,7 +81,7 @@ export const PATCH = withTeamAdmin<Params>(async (req, { params }, user) => {
       data: {
         ...(name !== undefined && { name }),
         ...(colors !== undefined && { colors }),
-        ...(fonts !== undefined && { fonts }),
+        ...(nextFonts !== undefined && { fonts: nextFonts }),
         ...(logoUrl !== undefined && { logoUrl }),
         ...(isDefault !== undefined && { isDefault }),
       },

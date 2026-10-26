@@ -130,7 +130,7 @@
 
 ### Wave 4: B, fonts
 
-- [ ] `T6` — The catalogue snapshot, refresh script, lookup, URL builder, `/api/fonts`, save validation
+- [x] `T6` — The catalogue snapshot, refresh script, lookup, URL builder, `/api/fonts`, save validation
   - Files: `src/lib/fonts/{types,catalogue.json,catalogue,url,merge,validateKitFonts,index}.ts` (new), `scripts/refresh-google-fonts.mjs` (new), `src/app/api/fonts/route.ts` (new), `src/app/api/admin/brandkits/route.ts`, `src/app/api/admin/brandkits/[id]/route.ts`, `src/mcp/server.ts`, `src/mcp/tools/brandkit.ts`, `tests/unit/{fontsMerge,fontsUrl,fontsValidate,fontsRoute}.test.ts`
   - Estimate: large
   - Kind: impl
