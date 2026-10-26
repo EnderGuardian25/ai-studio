@@ -2,7 +2,29 @@
 
 This repo contains planning documents for **bistec-studio**, an internal marketing post generation tool for the Bistec marketing team.
 
-## ✅ Outstanding work — START HERE (updated 2026-10-26)
+## ✅ Outstanding work — START HERE (updated 2026-10-27)
+
+- **🍴 2026-10-27 — THIS REPO IS THE FORK `EnderGuardian25/ai-studio` AGAIN. PICK UP HERE: change 032 (fork restore) is APPROVED (architectural). Next: `/specclaw:plan 032-fork-folio-restore`.** This entry is authoritative. **Every entry below it, and the top sections of `docs/handoff.md`, describe the company repo `bistec-oss/studio` between 2026-10-18 and 2026-10-27, not this repo.** W1 of 032 rewrites them.
+  - **First, verify the repo:** `git remote get-url origin` must print `https://github.com/EnderGuardian25/ai-studio.git`. If it prints `bistec-oss/studio`, you are in the company clone: stop, and do not apply anything from this entry.
+  - **What happened.** Fork `v2` stopped at `1c38dbb9` (2026-10-14). On 2026-10-18 the company repo fast-forwarded its `v2` to that tip and continued with changes 018–031 (202 commits). On 2026-10-27 the user brought them into the fork **once**: local `v2` was fast-forwarded `1c38dbb9 → 59f3b222`, and the `upstream` and `company` remotes were removed. `origin` is the only remote. **There are no future company merges.**
+  - **What 018–031 brought that the fork must undo (change 032):**
+    - 021 re-themed Folio → **Graphite** and brought back the PNG logo. The fork stays on **Folio** with the typeset "Studio" wordmark (user decision, 2026-10-07, re-confirmed 2026-10-27).
+    - 022 restored `docker-publish.yml` (company GHCR + Coolify). Fork CI stays **checks only**.
+    - 022 rewrote the docs to company identity.
+  - **032's plan, as approved:** one change in three waves. The proposal's "Panel rulings" section is the brief: [`proposal.md`](.specclaw/changes/032-fork-folio-restore/proposal.md), [`party-report.md`](.specclaw/changes/032-fork-folio-restore/party-report.md).
+    - **W1:** its first commit deletes `docker-publish.yml`. Fork docs, deleting the company-only docs, `.claude/launch.json` → `D:\ai-studio`. Its own Docker stack: project `ai-studio`; ports 5442 (Postgres), 9100/9101 (MinIO), test 5443/9110; DB names `ai_studio`/`ai_studio_test`; local `.env`/`.env.test` rewritten; a preflight that refuses the `designer` stack. Then the full gate and a push to `origin v2`. **The user pre-approved that push** once the gate is green and `reports/pre-push-scan.md` is re-run for any new range.
+    - **W2:** Folio values (tokens, fonts, wordmark, `atoms.ts`) from `9f829456`, plus the guards.
+    - **W3:** restyle the 023–031 screens through `atoms.ts`/`classes.ts`, add the `DESIGN_SYSTEM.md` sections, re-capture the screenshots, then a full E2E.
+    - **No new UI work (020, 009, …) until W3 lands.**
+  - **⚠️ Until W1 lands, do not run `docker compose`, `npm run test:e2e:db` or any migrate/seed command in the fork.** The local `.env` still points at port 5432 and `bistec_studio`, which is now the company clone's DB.
+  - **Local layout (after the user's move script, 2026-10-27):**
+    - fork → `D:\ai-studio`;
+    - company clone → `D:\Bistec\studio`, pinned to the old `designer` Docker volumes via `COMPOSE_PROJECT_NAME=designer` in its `.env`.
+
+    If the fork is still at `D:\Bistec\designer`, the move has not run yet.
+
+  - **Deploy:** none yet. The user will deploy the fork **fresh, on their own server**, with a workflow written later. Object storage is already **`pgsty/silo`** (a drop-in MinIO fork, pinned by digest) in `docker-compose.yml`, `docker-compose.test.yml` and `e2e.yml`, so a fresh deploy needs no MinIO migration. MinIO keys must not be `minioadmin`.
+  - **Process (unchanged):** one task at a time. An implementer subagent does the work, `specclaw:code-reviewer` reviews it, and the orchestrator runs tsc, lint and unit and commits. No real model calls. Commit straight to `v2`; never touch fork `main` without the user's go-ahead.
 
 - **⏸️ 2026-10-27 — PICK UP HERE: 031 (v2 final polish, the last change before the `v2` → `main` merge) is VERIFIED PASS (46/46 ACs, [verify-report](.specclaw/changes/031-v2-final-polish/verify-report.md)). Nothing is mid-build. The next step is the user's: the `v2` → `main` merge go-ahead, after the pre-merge prod checklist in `docs/handoff.md`. It was BUILT (T1 to T19). Gates (T19): unit 4553, render 154, lint 0 / 7, full clean mock E2E 598/3/0/0, `test:upgrade` passes; screenshots recaptured; CI green at `a511013` (run 40374348999). OP-031 PASSED 2 of 2 (2 of 4 calls); Apply re-measure 97.2%, not beta. **
   - **The groups, as built:** H (T1: temp dirs, `discardOnLostClaim`, the AC-17 recheck), G (T2 to T3: the MEDIUM wording items, the glossary in `DESIGN_SYSTEM.md` §12, the wording guard, the W table), C (T4 to T5: the personal image generation key, OpenAI or Gemini), B (T6 to T8: the Google Fonts catalogue snapshot, script fonts, the searchable picker), E (T9 to T10: typography entries, the briefing design-rule upgrade), F (T11 to T12: the briefing assistant's schedule uses post styles; the brand-kit assistant applies fonts), A (T13 to T15: Apply to image, behind a re-measure gate), D (T16 to T18: OP-031 passed 2 of 2 using 2 of 4 calls, so spotlight v2 is current and Promotion and Milestone default to it at post-style revision 12).

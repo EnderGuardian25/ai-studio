@@ -1,0 +1,9 @@
+{
+  "change": "032-fork-folio-restore",
+  "phase": "proposal",
+  "branch": "",
+  "size": "architectural",
+  "phases": {
+    "proposal": { "status": "approved", "at": "2026-10-26T20:07:11Z" }
+  }
+}

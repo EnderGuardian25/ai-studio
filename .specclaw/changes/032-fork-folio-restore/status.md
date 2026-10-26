@@ -1,0 +1,29 @@
+# Status: Restore the fork after the one-time company sync
+
+**Change:** 032-fork-folio-restore
+**Started:** 2026-10-27
+**Last Updated:** 2026-10-27
+
+## Progress
+
+| Phase    | Status      | Notes |
+| -------- | ----------- | ----- |
+| Proposal | ✅ Approved |       |
+| Spec     | ⏳ Pending  |       |
+| Design   | ⏳ Pending  |       |
+| Tasks    | ⏳ Pending  |       |
+| Build    | ⏳ Pending  |       |
+| Verify   | ⏳ Pending  |       |
+
+## Task Progress
+
+**Completed:** 0 / 0
+**Failed:** 0
+**Deferred:** 0
+
+## Agent Runs
+
+| Task | Agent | Model | Status | Duration | Review |
+| ---- | ----- | ----- | ------ | -------- | ------ |
+
+## Issues
