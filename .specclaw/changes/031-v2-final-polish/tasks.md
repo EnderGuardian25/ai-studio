@@ -101,7 +101,7 @@
 
 ### Wave 3: C, the image generation key
 
-- [ ] `T4` — Prefix detector, migration, personal route, resolver, fallback, `imageSource`, upgrade scenario
+- [x] `T4` — Prefix detector, migration, personal route, resolver, fallback, `imageSource`, upgrade scenario
   - Files: `src/providers/keyPrefix.ts` (new), `src/providers/registry.ts`, `src/lib/agent/background.ts`, `src/lib/agent/openAiKey.ts`, `src/app/api/me/openai-key/route.ts`, `src/app/api/admin/providers/route.ts`, `prisma/schema.prisma`, `prisma/migrations/20261028120000_personal_image_key_provider/` (new), `prisma/rollback/031-v2-final-polish.down.sql` (new, section C), `src/lib/api-types.ts`, `src/lib/drafts/imageSourceNotice.ts` (new), `src/lib/drafts/backgroundNotice.ts`, `src/lib/agent/generateDraft.ts`, `src/app/api/drafts/[id]/refine/route.ts`, `src/app/api/drafts/[id]/route.ts`, `src/lib/testHooks.ts`, `scripts/test-upgrade-path.mjs`, `tests/unit/{keyPrefix,personalImageKey,imageProviderResolution,imageSourceNotice}.test.ts`
   - Estimate: large
   - Kind: impl

@@ -330,6 +330,9 @@ model UserOpenAiKey {
   encryptedKey String
   keyPrefix    String
   status       String   @default("ACTIVE") // ACTIVE | INVALID
+  // 031 FR-10: which provider the key belongs to (`openai` | `gemini`), from its
+  // prefix at save time. The table keeps its name (user decision).
+  provider     String   @default("openai")
   createdAt    DateTime @default(now())
 }
 
@@ -587,6 +590,10 @@ model Draft {
   // detail is the clipped (≤300 chars) error text. Null = no notice.
   backgroundSkipReason String?
   backgroundSkipDetail String?
+  // 031 FR-13: where the image that ran came from, `{ tier: 'personal' | 'team',
+  // provider: 'openai' | 'gemini', personalFailed?: true }`. Null = before 031 or
+  // no image provider ran.
+  imageSource          Json?
   // The short line printed on the post image (012 FR-03/FR-09), written by the
   // caption call. Null until it writes a valid one — design then falls back
   // to the brief topic (captions/headline.ts designHeadline).

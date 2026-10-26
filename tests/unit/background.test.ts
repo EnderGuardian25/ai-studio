@@ -69,7 +69,15 @@ vi.mock('@/lib/prisma', () => {
   return { prisma: { $transaction: async (fn: (t: typeof tx) => unknown) => fn(tx) } }
 })
 
-vi.mock('@/providers/registry', () => ({ resolveImageProvider: h.resolveImageProvider }))
+// 031: the step resolves through resolveImageProviderWithSource. The tests here
+// keep stubbing the provider alone (h.resolveImageProvider); the wrapper adds
+// the team tier. The personal tier and the fallback are personalImageKey.test.ts.
+vi.mock('@/providers/registry', () => ({
+  resolveImageProviderWithSource: async (...args: unknown[]) => {
+    const provider = (await h.resolveImageProvider(...args)) as { providerName?: string } | null
+    return provider ? { provider, tier: 'team', providerName: provider.providerName ?? 'openai' } : null
+  },
+}))
 vi.mock('@/lib/agent/claudeCli', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/agent/claudeCli')>()
   return { ...actual, runClaudeCli: h.runClaudeCli }
@@ -322,7 +330,7 @@ describe('generateBackgroundForBrief — skip reasons (FR-06)', () => {
     h.resolveImageProvider.mockResolvedValue(providerReturning('data:image/png;base64,AAAA'))
     h.persistDataUrlImage.mockResolvedValueOnce('http://minio.example.com/generated-images/background-1.png')
     h.anthropicCreate.mockResolvedValueOnce(decisionReply('{"needed": true, "prompt": "waves"}'))
-    await expect(generateBackgroundForBrief(brief, kit, 'Big news!', null, actor)).resolves.toEqual({
+    await expect(generateBackgroundForBrief(brief, kit, 'Big news!', null, actor)).resolves.toMatchObject({
       url: 'http://minio.example.com/generated-images/background-1.png',
     })
     expect(h.persistDataUrlImage).toHaveBeenCalledWith('data:image/png;base64,AAAA', 'background')
@@ -463,7 +471,7 @@ describe('generateBackgroundForRefine — refine semantics (FR-07)', () => {
     h.anthropicCreate.mockResolvedValueOnce(decisionReply('{"needed": true, "prompt": "a beach"}'))
     await expect(
       generateBackgroundForRefine(brief, kit, 'Swap it for a beach __MOCK_BG_FAIL__', actor),
-    ).resolves.toEqual({ url: 'https://cdn.example.com/real.png' })
+    ).resolves.toMatchObject({ url: 'https://cdn.example.com/real.png' })
     expect(h.anthropicCreate).toHaveBeenCalledTimes(1)
     expect(provider.generateImage).toHaveBeenCalledTimes(1)
   })
@@ -529,7 +537,7 @@ describe('generateBackgroundForBrief / generateBackgroundForRefine — actor vs.
       teamId: TEAM_ID,
     })
 
-    expect(result).toEqual({ url: `https://cdn.example.com/personal-${ACTOR_ID}.png` })
+    expect(result).toMatchObject({ url: `https://cdn.example.com/personal-${ACTOR_ID}.png` })
     expect(h.resolveImageProvider).toHaveBeenCalledWith({ teamId: TEAM_ID, userId: ACTOR_ID }, undefined)
     for (const call of h.resolveImageProvider.mock.calls) {
       expect(call[0].userId).not.toBe(OWNER_ID)
@@ -551,7 +559,7 @@ describe('generateBackgroundForBrief / generateBackgroundForRefine — actor vs.
       teamId: TEAM_ID,
     })
 
-    expect(result).toEqual({ url: 'https://cdn.example.com/team-default.png' })
+    expect(result).toMatchObject({ url: 'https://cdn.example.com/team-default.png' })
     expect(h.resolveImageProvider).toHaveBeenCalledWith({ teamId: TEAM_ID, userId: null }, undefined)
   })
 })
@@ -617,7 +625,7 @@ describe('background mock seam (MOCK_AI + __MOCK_BG__ sentinels)', () => {
     const real = providerReturning('https://real-provider.example.com/should-not-be-used.png')
     h.resolveImageProvider.mockResolvedValue(real)
     const result = await seam.generateBackgroundForBrief(seamBrief('Launch __MOCK_BG__'), kit, 'c', null, actor)
-    expect(result).toEqual({ url: 'http://minio.example.com/generated-images/background-mock.png' })
+    expect(result).toMatchObject({ url: 'http://minio.example.com/generated-images/background-mock.png' })
     expect(h.resolveImageProvider).toHaveBeenCalledWith({ teamId: 'team-actor', userId: 'user-actor' }, undefined)
     expect(real.generateImage).not.toHaveBeenCalled()
     expect(h.persistDataUrlImage).toHaveBeenCalledWith(hooks.MOCK_BACKGROUND_DATA_URL, 'background')
@@ -678,7 +686,7 @@ describe('background mock seam (MOCK_AI + __MOCK_BG__ sentinels)', () => {
       seam.generateBackgroundForRefine(seamBrief('Launch __MOCK_BG__'), kit, 'Bigger headline __MOCK_BG_NOT_NEEDED__', actor),
     ).resolves.toEqual({ url: null, skip: 'NOT_NEEDED' })
     // An instruction sentinel turns the seam on for a plain topic too.
-    await expect(seam.generateBackgroundForRefine(seamBrief('Plain'), kit, 'Add one __MOCK_BG__', actor)).resolves.toEqual({
+    await expect(seam.generateBackgroundForRefine(seamBrief('Plain'), kit, 'Add one __MOCK_BG__', actor)).resolves.toMatchObject({
       url: 'http://minio.example.com/generated-images/background-mock.png',
     })
     expect(real.generateImage).not.toHaveBeenCalled()
@@ -772,7 +780,7 @@ describe('backgroundSkippedFor — the poll payload', () => {
     expect(backgroundSkippedFor('NO_PROVIDER', null)).toEqual({
       reason: 'NO_PROVIDER',
       message:
-        'No image provider is set up. Add an OpenAI key in Settings, or ask a team admin to add an image provider in Team settings.',
+        'No image provider is set up. Add an image generation key in Settings, or ask a team admin to add an image provider in Team settings.',
     })
   })
   it('PROVIDER_ERROR carries the detail', () => {

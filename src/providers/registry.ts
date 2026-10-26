@@ -11,7 +11,7 @@ import { MOCK_AI, buildMockCaptionReply } from "@/lib/testHooks"
 import { env } from "@/lib/env"
 import { pipelineMode } from "@/lib/agent/config"
 import { modelCallFor, recordModelCall } from "@/lib/models/modelCalls"
-import { IMAGE_PROVIDERS } from "./imageCapabilities"
+import { IMAGE_PROVIDERS, type ImageProviderName } from "./imageCapabilities"
 import { loadCaptionRoute } from "./captionRoute"
 import { RouteNotReadyError } from "@/lib/models/route"
 
@@ -191,10 +191,33 @@ export async function resolveImageProvider(
   ctx: { teamId: string; userId?: string | null },
   providerKey?: string
 ): Promise<ImageProvider | null> {
+  return (await resolveImageProviderWithSource(ctx, providerKey))?.provider ?? null
+}
+
+// 031 FR-12: the same resolution, with the tier and provider that served it.
+// An ACTIVE personal key always comes first, whatever its provider (OpenAI or
+// Gemini, from the row's `provider`). Scheduled runs (userId null) never reach
+// the personal tier.
+export interface ResolvedImageProvider {
+  provider: ImageProvider
+  tier: "personal" | "team"
+  providerName: ImageProviderName
+}
+
+function resolved(provider: ImageProvider, tier: "personal" | "team", providerName: string): ResolvedImageProvider {
+  return { provider, tier, providerName: providerName.toLowerCase() as ImageProviderName }
+}
+
+export async function resolveImageProviderWithSource(
+  ctx: { teamId: string; userId?: string | null },
+  providerKey?: string
+): Promise<ResolvedImageProvider | null> {
   if (ctx.userId) {
     const personal = await prisma.userOpenAiKey.findUnique({ where: { userId: ctx.userId } })
     if (personal && personal.status === "ACTIVE") {
-      return instantiateImageProvider("openai", decrypt(personal.encryptedKey))
+      // A row written before 031 reads 'openai' through the column default.
+      const name = personal.provider === "gemini" ? "gemini" : "openai"
+      return resolved(instantiateImageProvider(name, decrypt(personal.encryptedKey)), "personal", name)
     }
   }
 
@@ -206,7 +229,11 @@ export async function resolveImageProvider(
       where: { slot: "IMAGE", providerKey, teamId: ctx.teamId, isEnabled: true, providerName: imageCapable },
     })
     if (record) {
-      return instantiateImageProvider(record.providerName, decrypt(record.encryptedApiKey))
+      return resolved(
+        instantiateImageProvider(record.providerName, decrypt(record.encryptedApiKey)),
+        "team",
+        record.providerName,
+      )
     }
   }
 
@@ -220,9 +247,10 @@ export async function resolveImageProvider(
       orderBy: oldestFirst,
     }))
   if (servingRecord) {
-    return instantiateImageProvider(
+    return resolved(
+      instantiateImageProvider(servingRecord.providerName, decrypt(servingRecord.encryptedApiKey)),
+      "team",
       servingRecord.providerName,
-      decrypt(servingRecord.encryptedApiKey)
     )
   }
 

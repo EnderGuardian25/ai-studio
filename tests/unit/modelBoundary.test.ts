@@ -104,7 +104,11 @@ vi.mock('@/lib/testHooks', async (importOriginal) => ({
 vi.mock('@/providers/registry', () => ({
   resolveAnthropicApiKey: async () => 'sk-ant-api03-FAKE-unit-test',
   // A provider exists, so the background step reaches its decision call.
-  resolveImageProvider: async () => ({ providerName: 'openai', generateImage: vi.fn() }),
+  resolveImageProviderWithSource: async () => ({
+    provider: { providerName: 'openai', generateImage: vi.fn() },
+    tier: 'team',
+    providerName: 'openai',
+  }),
 }))
 vi.mock('@/lib/brandkit/resolve', () => ({ resolveBrandKit: async () => null }))
 vi.mock('@/lib/renderer/domFacts', () => ({ extractDomFacts: h.extract }))

@@ -44,6 +44,7 @@ const CARRYOVER = '20261012130000_legacy_caption_carryover'
 const DROP_LEGACY = '20261013120000_drop_legacy_captions'
 const DROP_TEAM = '20261013130000_drop_empty_default_team'
 const GUARD_PREFIX = '022 legacy_caption_carryover'
+const PERSONAL_KEY_MIGRATION = '20261028120000_personal_image_key_provider' // 031 C
 
 // Scenario 3's sabotage: one exact replacement in the carry-over's INSERT, so
 // it writes the wrong text and the content guard must bite.
@@ -110,7 +111,7 @@ const ALL_MIGRATIONS = readdirSync(MIGRATIONS_DIR, { withFileTypes: true })
   .map((d) => d.name)
   .sort()
 
-for (const name of [MAIN_HEAD, PRE_CARRYOVER, CARRYOVER, DROP_LEGACY, DROP_TEAM]) {
+for (const name of [MAIN_HEAD, PRE_CARRYOVER, CARRYOVER, DROP_LEGACY, DROP_TEAM, PERSONAL_KEY_MIGRATION]) {
   if (!ALL_MIGRATIONS.includes(name)) {
     console.error(`FAIL setup: migration ${name} not found in prisma/migrations`)
     process.exit(1)
@@ -439,6 +440,68 @@ async function scenario3() {
   }
 }
 
+// 031 AC-10: a personal image key written before the provider column existed
+// reads as openai after the migrations, and the resolver serves it as the
+// personal tier. The one place this script runs app code: a tsx child process
+// (env and database pinned to the scratch database) does the encrypting and the
+// resolving, so the row holds a real ciphertext.
+const TSX_CLI = join(ROOT, 'node_modules', 'tsx', 'dist', 'cli.mjs')
+const KEY_PLAINTEXT = 'sk-upgrade-scenario-key-000000'
+const CRYPTO_ENV = { TOKEN_ENCRYPTION_KEY: 'd'.repeat(64) }
+
+function runTsx(code) {
+  const res = spawnSync(process.execPath, [TSX_CLI, '-e', code], {
+    cwd: ROOT,
+    encoding: 'utf8',
+    env: { ...process.env, ...CRYPTO_ENV, DATABASE_URL: SCRATCH_URL },
+  })
+  return { status: res.status, stdout: (res.stdout ?? '').trim(), output: `${res.stdout ?? ''}${res.stderr ?? ''}` }
+}
+
+async function scenario4() {
+  const failures = []
+  await freshScratch()
+  mustDeploy('before 031 C', deployFromTemp(ALL_MIGRATIONS.filter((m) => m < PERSONAL_KEY_MIGRATION)))
+  await seedMainBase()
+  const enc = runTsx(`import('@/lib/crypto').then((m) => console.log(m.encrypt(${JSON.stringify(KEY_PLAINTEXT)})))`)
+  if (enc.status !== 0 || !enc.stdout) {
+    failures.push(`could not encrypt the seed key:\n${enc.output}`)
+    return { failures, detail: '' }
+  }
+  await db.$executeRaw`
+    INSERT INTO "UserOpenAiKey" ("id", "userId", "encryptedKey", "keyPrefix", "status", "createdAt")
+    VALUES ('upg_key_1', ${USER}, ${enc.stdout}, '…0000', 'ACTIVE', now())`
+  if (await columnExists('UserOpenAiKey', 'provider')) failures.push('provider column exists before the migration')
+
+  mustDeploy('full deploy to head', deployFull())
+  const [row] = await db.$queryRaw`SELECT "provider", "status" FROM "UserOpenAiKey" WHERE "id" = 'upg_key_1'`
+  if (row?.provider !== 'openai') failures.push(`provider is ${json(row?.provider)} after the migration, expected "openai"`)
+  if (row?.status !== 'ACTIVE') failures.push(`status is ${json(row?.status)}, expected ACTIVE`)
+  if (!(await columnExists('Draft', 'imageSource'))) failures.push('Draft.imageSource missing after the migration')
+
+  const res = runTsx(
+    `import('@/providers/registry').then(async (m) => {
+       const r = await m.resolveImageProviderWithSource({ teamId: ${JSON.stringify(TEAM)}, userId: ${JSON.stringify(USER)} })
+       console.log(JSON.stringify({ tier: r && r.tier, providerName: r && r.providerName, apiKeyMatches: !!r && r.provider.client.apiKey === ${JSON.stringify(KEY_PLAINTEXT)} }))
+       process.exit(0)
+     })`,
+  )
+  let seen = null
+  try {
+    seen = JSON.parse(res.stdout.split(/\r?\n/).pop())
+  } catch {
+    failures.push(`the resolver run printed no result:\n${res.output}`)
+  }
+  if (seen) {
+    if (seen.tier !== 'personal' || seen.providerName !== 'openai') failures.push(`resolver gave ${json(seen)}, expected tier personal, provider openai`)
+    if (!seen.apiKeyMatches) failures.push('the resolver did not decrypt the pre-migration key')
+  }
+  return {
+    failures,
+    detail: `a pre-031 personal key reads provider "openai" and the resolver serves it as the personal tier (${json(seen)})`,
+  }
+}
+
 // ── Main ─────────────────────────────────────────────────────────────────────
 
 async function main() {
@@ -451,6 +514,7 @@ async function main() {
       ['scenario 1 (prod path: main head → head)', scenario1],
       ['scenario 2 (already dropped: carry-over is a no-op)', scenario2],
       ['scenario 3 (content guard bites, atomically)', scenario3],
+      ['scenario 4 (031: a pre-existing personal image key resolves as openai)', scenario4],
     ]) {
       const t0 = Date.now()
       let result

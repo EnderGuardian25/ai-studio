@@ -8,6 +8,7 @@
 import type { AspectRatio, Channel, DesignMode, TeamRole } from '@prisma/client'
 import type { Role } from '@/lib/auth'
 import type { BackgroundSkipped } from '@/lib/drafts/backgroundNotice'
+import type { ImageSourceNotice } from '@/lib/drafts/imageSourceNotice'
 import type { CompositionNotice } from '@/lib/drafts/compositionNotice'
 import type { FactsCheck } from '@/lib/factsCheck/types'
 import type { CompositionStamp } from '@/lib/designData'
@@ -58,7 +59,7 @@ export type TeamApiKeyCreated = { id: string; label: string; plaintext: string }
 // validation endpoint) — status flips to INVALID only after an observed
 // generation failure.
 export type OpenAiKeyInfo =
-  | { connected: true; status: 'ACTIVE' | 'INVALID'; keyPrefix: string }
+  | { connected: true; status: 'ACTIVE' | 'INVALID'; keyPrefix: string; provider?: 'openai' | 'gemini' }
   | { connected: false }
 
 // GET /api/me
@@ -394,6 +395,9 @@ export interface DraftDetail {
   // 005 FR-07: set when the current design has no AI background for a reason
   // other than the model deciding it didn't need one.
   backgroundSkipped: BackgroundSkipped | null
+  // 031 FR-14: set when the user's own image key failed and the team's
+  // provider made the image (null = nothing to say).
+  imageSourceNotice: ImageSourceNotice | null
   // 009 FR-15: the stamped composition (null = before 009 or Path A history)
   // and the plain-language notice derived from it (null = nothing to say).
   composition: CompositionStamp | null

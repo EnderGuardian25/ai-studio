@@ -44,7 +44,9 @@ import {
 import { imageGeometryPin, type HeroCheckResult, type HeroPlan } from '@/lib/designData'
 import { runHeroCheck } from '@/lib/renderer/heroCheck'
 import type { ResolvedBrandKit } from '@/lib/brandkit/resolve'
-import { resolveImageProvider } from '@/providers/registry'
+import { resolveImageProviderWithSource, type ResolvedImageProvider } from '@/providers/registry'
+import { isAuthRejection, markUserOpenAiKeyInvalid } from '@/lib/agent/openAiKey'
+import type { ImageSource } from '@/lib/drafts/imageSourceNotice'
 import { imageSizeFor, type ImageTier } from '@/providers/imageCapabilities'
 import type { ImageProvider } from '@/providers/interfaces/ImageProvider'
 import { persistDataUrlImage } from '@/lib/storage/minio'
@@ -69,7 +71,7 @@ export type { BackgroundResult, BackgroundSkipReason } from '@/lib/drafts/backgr
 // and, for a hero plan only, the pixel check's result. A skip is unchanged.
 // Assignable to BackgroundResult, so every existing consumer is untouched.
 export type BackgroundOutcome =
-  | { url: string; quality?: ImageTier; check?: HeroCheckResult }
+  | { url: string; quality?: ImageTier; check?: HeroCheckResult; imageSource?: ImageSource }
   | Extract<BackgroundResult, { url: null }>
 
 // CLOSED (009 FR-05): zod's default object parsing strips unknown keys, so an
@@ -92,9 +94,59 @@ function errorText(err: unknown): string {
 // One skip, logged once (the raw detail, server-side only). The returned
 // detail is redacted and clipped to SKIP_DETAIL_MAX here, at the source, so no
 // caller can store or show a key, an internal URL, or more than that.
-function skip(reason: BackgroundSkipReason, detail?: string): BackgroundResult {
+function skip(reason: BackgroundSkipReason, detail?: string, imageSource?: ImageSource): BackgroundResult {
   log(`skipped (${reason})${detail ? ` — ${detail}` : ''}`)
-  return detail ? { url: null, skip: reason, detail: cleanSkipDetail(detail) } : { url: null, skip: reason }
+  const src = imageSource ? { imageSource } : {}
+  return detail ? { url: null, skip: reason, detail: cleanSkipDetail(detail), ...src } : { url: null, skip: reason, ...src }
+}
+
+// 031 FR-13: the user's own key failed and the team has no provider to fall to.
+class PersonalKeyFailed extends Error {
+  constructor(
+    readonly providerName: ImageSource['provider'],
+    cause: unknown,
+  ) {
+    super(errorText(cause), { cause })
+  }
+}
+
+type GenerateImageResult = { url: string; quality?: ImageTier }
+
+// One image call with the 031 fallback. A personal-tier failure retries ONCE on
+// the team tiers (userId null), a 401 or 403 also marks the personal row
+// INVALID, and `source` says which provider ran. A team-tier failure is the
+// ordinary PROVIDER_ERROR path. `wrap` swaps in the MOCK_AI image stand-in
+// after the real resolver chose the provider.
+async function generateWithFallback(
+  resolved: ResolvedImageProvider,
+  opts: { actor: GenerationActor; imageProviderKey?: string | null },
+  wrap: (r: ResolvedImageProvider) => ImageProvider,
+  call: (provider: ImageProvider) => Promise<GenerateImageResult>,
+): Promise<{ result: GenerateImageResult; source: ImageSource }> {
+  try {
+    const result = await call(wrap(resolved))
+    return { result, source: { tier: resolved.tier, provider: resolved.providerName } }
+  } catch (err) {
+    if (resolved.tier !== 'personal') throw err
+    if (isAuthRejection(err) && opts.actor.userId) {
+      try {
+        await markUserOpenAiKeyInvalid(opts.actor.userId)
+      } catch (markErr) {
+        log(`could not mark the personal image key invalid: ${errorText(markErr)}`)
+      }
+    }
+    log(`personal ${resolved.providerName} image key failed — falling back to the team provider`)
+    const team = await resolveImageProviderWithSource(
+      { teamId: opts.actor.teamId, userId: null },
+      opts.imageProviderKey ?? undefined,
+    )
+    if (!team) throw new PersonalKeyFailed(resolved.providerName, err)
+    const result = await call(wrap(team))
+    return {
+      result,
+      source: { tier: 'team', provider: team.providerName, personalFailed: true, personalProvider: resolved.providerName },
+    }
+  }
 }
 
 // Tolerant strict-JSON extraction, mirroring the refine route's parseConflict:
@@ -186,7 +238,7 @@ async function runBackgroundStep(
   if (MOCK_AI && !mockSeam) return { url: null, skip: 'NOT_NEEDED' }
 
   const resolved = await resolveProvider(opts)
-  if (!resolved.provider) {
+  if (!resolved.resolved) {
     if (!resolved.failed) return skip('NO_PROVIDER')
     if (opts.kind === 'generation') return skip('PROVIDER_ERROR', resolved.detail)
   }
@@ -205,10 +257,14 @@ async function runBackgroundStep(
     // required, and only an empty prompt means there is none (no-image).
     if (opts.hero ? !decision.prompt.trim() : !decision.needed || !decision.prompt.trim()) return skip('NOT_NEEDED')
     // refine only: the held resolver failure, now that a background was wanted.
-    if (!resolved.provider) return skip('PROVIDER_ERROR', resolved.detail)
+    if (!resolved.resolved) return skip('PROVIDER_ERROR', resolved.detail)
+    const chosen = resolved.resolved
 
-    // The fixture swap happens AFTER the real resolver chose the provider.
-    const provider = mockSeam ? mockImageProvider(resolved.provider, opts.seamText) : resolved.provider
+    // The fixture swap happens AFTER the real resolver chose the provider. The
+    // tier rides along so __MOCK_BG_PERSONAL_FAIL__ can fail only the personal one.
+    const wrap = (r: ResolvedImageProvider): ImageProvider =>
+      mockSeam ? mockImageProvider(r.provider, opts.seamText, r.tier) : r.provider
+    const provider = wrap(chosen)
 
     // A composite look (025) gets its measurements appended word for word.
     const pin = opts.hero ? imageGeometryPin(opts.hero.contract, opts.hero.sizeContract) : null
@@ -216,31 +272,33 @@ async function runBackgroundStep(
     log(`generating background · size=${imageSizeFor(provider.providerName, opts.aspectRatio)} · prompt="${imagePrompt.slice(0, 120)}..."`)
     opts.onPrompt?.(imagePrompt)
     const startedAt = Date.now()
-    // TODO(team-tenancy): if a personal UserOpenAiKey was resolved above and this
-    // call fails with an auth error, flip it INVALID here (markUserOpenAiKeyInvalid,
-    // src/lib/agent/openAiKey.ts) — mirroring markUserTokenInvalid for Claude. Not
-    // wired yet: there is no existing OpenAI-error auth-classification helper to
-    // hang this off (unlike isClaudeAuthFailure for the CLI), and inventing one is
-    // out of scope here.
-    // ONE image call on every exit. The fourth argument exists only for a hero
-    // plan with IMAGE_QUALITY set: a classic call is exactly what it always was.
-    const size = imageSizeFor(provider.providerName, opts.aspectRatio)
+    // ONE image call on every exit (031: a failed personal key may be followed by
+    // one team call). The fourth argument exists only for a hero plan with
+    // IMAGE_QUALITY set: a classic call is exactly what it always was.
     const heroQuality = opts.hero ? env.IMAGE_QUALITY : undefined
-    const result = heroQuality
-      ? await provider.generateImage(imagePrompt, opts.brandKitId, size, { quality: heroQuality })
-      : await provider.generateImage(imagePrompt, opts.brandKitId, size)
+    const { result, source } = await generateWithFallback(chosen, opts, wrap, (p) => {
+      const size = imageSizeFor(p.providerName, opts.aspectRatio)
+      return heroQuality
+        ? p.generateImage(imagePrompt, opts.brandKitId, size, { quality: heroQuality })
+        : p.generateImage(imagePrompt, opts.brandKitId, size)
+    })
+
     // persistDataUrlImage enforces the raster allow-list and returns a stable
     // public URL; a provider that already returns an http(s) URL passes through.
     const url = result.url.startsWith('data:')
       ? await persistDataUrlImage(result.url, 'background')
       : result.url
     log(`background ready in ${((Date.now() - startedAt) / 1000).toFixed(1)}s · ${url}`)
-    if (!opts.hero) return { url }
+    if (!opts.hero) return { url, imageSource: source }
     // The pixel check runs on the bytes the provider returned (a data: URL: the
     // sampler refuses anything else, which settles to check-error).
     const check = await checkHero(result.url, opts.hero, mockSeam, opts.seamText)
-    return { url, ...(result.quality ? { quality: result.quality } : {}), check }
+    return { url, ...(result.quality ? { quality: result.quality } : {}), check, imageSource: source }
   } catch (err) {
+    // 031 FR-13: a personal key that failed with no team provider to fall to.
+    if (err instanceof PersonalKeyFailed) {
+      return skip('PROVIDER_ERROR', err.message, { tier: 'personal', provider: err.providerName, personalFailed: true })
+    }
     return skip(stage === 'decision' ? 'DECISION_ERROR' : 'PROVIDER_ERROR', errorText(err))
   }
 }
@@ -266,24 +324,25 @@ async function checkHero(
   })
 }
 
-// resolveImageProvider never throws (returns null), but keep the guard: a DB
-// hiccup here must still degrade gracefully, not fail the whole generation.
-// It returns the outcome, not a skip: the caller decides when a failure is
-// reported (refine holds it until its decision has run).
+// resolveImageProviderWithSource never throws (returns null), but keep the
+// guard: a DB hiccup here must still degrade gracefully, not fail the whole
+// generation. It returns the outcome, not a skip: the caller decides when a
+// failure is reported (refine holds it until its decision has run).
 async function resolveProvider(opts: {
   actor: GenerationActor
   imageProviderKey?: string | null
 }): Promise<
-  { provider: ImageProvider; failed?: never; detail?: never } | { provider: null; failed: boolean; detail?: string }
+  | { resolved: ResolvedImageProvider; failed?: never; detail?: never }
+  | { resolved: null; failed: boolean; detail?: string }
 > {
   try {
-    const provider = await resolveImageProvider(
+    const resolved = await resolveImageProviderWithSource(
       { teamId: opts.actor.teamId, userId: opts.actor.userId },
       opts.imageProviderKey ?? undefined
     )
-    return provider ? { provider } : { provider: null, failed: false }
+    return resolved ? { resolved } : { resolved: null, failed: false }
   } catch (err) {
-    return { provider: null, failed: true, detail: errorText(err) }
+    return { resolved: null, failed: true, detail: errorText(err) }
   }
 }
 

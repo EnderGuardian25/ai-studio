@@ -11,6 +11,7 @@ import { currentRenderStamp, draftStampFields, revisionStampFields, type RenderS
 import { classicStamp } from '@/lib/designData'
 import { humanizeGenerationError } from '@/lib/agent/generationErrors'
 import { generationSkipFields, type BackgroundSkipFields } from '@/lib/drafts/backgroundNotice'
+import { generationImageSource, type ImageSourceWrite } from '@/lib/drafts/imageSourceFields'
 import type { GenerationActor, GenerationRunActor } from '@/lib/agent/types'
 import { track } from '@/lib/analytics/track'
 import { newUsage, usageFields, withUsage, type UsageStore } from '@/lib/analytics/trace'
@@ -130,6 +131,8 @@ interface ProducedDesign {
   // 005 FR-07: why this render has no AI background, when that was not the
   // model's choice — cleared for a produced/not-needed background and Path A.
   backgroundSkip: BackgroundSkipFields
+  // 031 FR-13: where the image came from (DbNull when none ran).
+  imageSource: ImageSourceWrite
   // F3 (AC-04): the prompt version + font set of THIS render, resolved once
   // and written to both the draft and its v1 revision.
   stamp: RenderStamp
@@ -159,6 +162,7 @@ async function produceDesign(
       backgroundImageUrl: null,
       // Path A has no background step: nothing was skipped.
       backgroundSkip: generationSkipFields(null),
+      imageSource: generationImageSource(null),
       // 009: a Path A draft is classic (and gives the evidence its denominator).
       stamp: currentRenderStamp(
         model,
@@ -175,6 +179,7 @@ async function produceDesign(
     exportUrl: result.exportUrl,
     backgroundImageUrl: result.backgroundImageUrl,
     backgroundSkip: generationSkipFields(result.background),
+    imageSource: generationImageSource(result.background),
     // 009 FR-12: the run's composition stamp (the image style asked for, the
     // one applied, why not), resolved by runPathBDesign.
     stamp: currentRenderStamp(
@@ -205,6 +210,7 @@ async function finalizeDraftV1(
         // skipped, and always null for Path A).
         imageUrl: design.backgroundImageUrl,
         ...design.backgroundSkip,
+        imageSource: design.imageSource,
         status: 'EXPORTED',
         ...draftStampFields(design.stamp),
         currentRevisionNumber: 1,
@@ -394,6 +400,7 @@ async function generateDraftForBriefInner(
         exportUrl: design.exportUrl,
         imageUrl: design.backgroundImageUrl,
         ...design.backgroundSkip,
+        imageSource: design.imageSource,
         status: 'EXPORTED',
         ...draftStampFields(design.stamp),
         currentRevisionNumber: 1,

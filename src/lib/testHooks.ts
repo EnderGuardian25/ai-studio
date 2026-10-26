@@ -362,11 +362,12 @@ export function mockProviderKeyValidation(apiKey: string): { ok: boolean; error?
  * Whether the background step (agent/background.ts) runs its MOCK_AI seam for
  * this brief topic (or refine instruction, see backgroundSeamText). True only
  * with MOCK_AI on and one of the sentinels "__MOCK_BG__", "__MOCK_BG_FAIL__"
+ * "__MOCK_BG_PERSONAL_FAIL__" (031: only the personal-key provider throws)
  * or "__MOCK_BG_NOT_NEEDED__" in that text.
  * Without one, MOCK_AI keeps the step's early return (no background, nothing
  * recorded), so every suite written before the seam is unchanged.
  */
-const MOCK_BG_SENTINEL = /__MOCK_BG(?:_FAIL|_NOT_NEEDED)?__/
+const MOCK_BG_SENTINEL = /__MOCK_BG(?:_FAIL|_PERSONAL_FAIL|_NOT_NEEDED)?__/
 
 export function shouldMockBackground(topic: string): boolean {
   return MOCK_AI && MOCK_BG_SENTINEL.test(topic)
@@ -403,11 +404,20 @@ export const MOCK_BACKGROUND_DATA_URL =
  * else (the resolved row, its providerName) is the real provider's, via the
  * prototype, so the resolver is what's under test, not a stand-in.
  */
-export function mockImageProvider(provider: ImageProvider, topic: string): ImageProvider {
+export function mockImageProvider(
+  provider: ImageProvider,
+  topic: string,
+  tier: 'personal' | 'team' = 'team',
+): ImageProvider {
   const mocked = Object.create(provider) as ImageProvider
   mocked.generateImage = async () => {
     if (topic.includes('__MOCK_BG_FAIL__')) {
       throw new Error('Mock image provider failure (__MOCK_BG_FAIL__ sentinel)')
+    }
+    // 031 FR-13: only the personal tier fails, so the fallback to the team's
+    // provider can be exercised. The team provider succeeds.
+    if (tier === 'personal' && topic.includes('__MOCK_BG_PERSONAL_FAIL__')) {
+      throw new Error('Mock personal image key failure (__MOCK_BG_PERSONAL_FAIL__ sentinel)')
     }
     return { url: MOCK_BACKGROUND_DATA_URL }
   }

@@ -19,6 +19,7 @@ import { modelError, parseModelField } from '@/lib/models/requests'
 import { buildRefineSystemPrompt, buildRefineUserMessage } from '@/lib/agent/prompts/refine'
 import { generateBackgroundForRefine } from '@/lib/agent/background'
 import { refineSkipFields } from '@/lib/drafts/backgroundNotice'
+import { refineImageSource } from '@/lib/drafts/imageSourceFields'
 import { commitDraftRevision, draftCompositionStamp, draftPostStyleStamp, recordRejectedRender, type ModelStamp } from '@/lib/drafts/revisions'
 import { imageRulesAtStamp } from '@/lib/agent/briefInput'
 import type { PostStyleStamp } from '@/lib/postStyles'
@@ -355,6 +356,7 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
           height,
           backgroundImageUrl,
           backgroundSkip: refineSkipFields(background),
+          imageSource: refineImageSource(background),
           // 008 FR-08: the revision and the draft record the refine's model.
           model,
           // 019: the final draft write is guarded on this run's claim.

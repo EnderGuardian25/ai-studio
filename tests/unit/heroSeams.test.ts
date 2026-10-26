@@ -60,7 +60,14 @@ vi.mock('@/lib/env', async (importOriginal) => {
     env: new Proxy(actual.env, { get: (t, k) => (k === 'IMAGE_QUALITY' ? h.imageQuality : (t as never)[k]) }),
   }
 })
-vi.mock('@/providers/registry', () => ({ resolveImageProvider: h.resolveImageProvider }))
+// 031: the step resolves through resolveImageProviderWithSource; this file keeps
+// stubbing the provider alone and the wrapper adds the team tier.
+vi.mock('@/providers/registry', () => ({
+  resolveImageProviderWithSource: async (...args: unknown[]) => {
+    const provider = (await h.resolveImageProvider(...args)) as { providerName?: string } | null
+    return provider ? { provider, tier: 'team', providerName: provider.providerName ?? 'openai' } : null
+  },
+}))
 vi.mock('@/lib/agent/claudeCli', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/agent/claudeCli')>()
   return { ...actual, runClaudeCli: h.runClaudeCli }
@@ -181,7 +188,7 @@ describe('the hero background step: one image call, the check, the fallback (FR-
     h.sample.mockResolvedValue([calm()])
     const brief = mkBrief()
     const result = await run(brief)
-    expect(result).toEqual({ url: 'https://minio.example.com/bg.png', check: { ok: true } })
+    expect(result).toEqual({ url: 'https://minio.example.com/bg.png', check: { ok: true }, imageSource: { tier: 'team', provider: 'openai' } })
     expect(p.generateImage).toHaveBeenCalledTimes(1)
     // The sampler gets the data: URL the provider returned (not the stored URL), the plan's regions and the canvas.
     expect(h.sample).toHaveBeenCalledWith(
@@ -243,7 +250,7 @@ describe('the hero background step: one image call, the check, the fallback (FR-
     h.sample.mockResolvedValue(samples())
     const brief = mkBrief()
     const result = await run(brief)
-    expect(result).toEqual({ url: 'https://minio.example.com/bg.png', check: { ok: false, reason } })
+    expect(result).toEqual({ url: 'https://minio.example.com/bg.png', check: { ok: false, reason }, imageSource: { tier: 'team', provider: 'openai' } })
     expect(p.generateImage).toHaveBeenCalledTimes(1)
     expect(settleComposition(heroPlanFor(brief), result)).toEqual({
       requestedArchetype: 'product-showcase',
@@ -325,7 +332,7 @@ describe('the hero background step: one image call, the check, the fallback (FR-
       h.sample.mockResolvedValue(samples())
       const brief = mkBrief({ imageStyle: 'spotlight', aspectRatio: 'STORY' })
       const result = await run(brief)
-      expect(result).toEqual({ url: 'https://minio.example.com/bg.png', check })
+      expect(result).toEqual({ url: 'https://minio.example.com/bg.png', check, imageSource: { tier: 'team', provider: 'openai' } })
       expect(p.generateImage).toHaveBeenCalledTimes(1)
       expect(h.sample.mock.calls.at(-1)![1]).toHaveLength(2)
     }
@@ -343,7 +350,7 @@ describe('the hero background step: one image call, the check, the fallback (FR-
       h.anthropicCreate.mockResolvedValue(decisionReply({ needed: true, prompt: 'a laptop' }))
       h.sample.mockImplementation(fail)
       const result = await run(mkBrief())
-      expect(result).toEqual({ url: 'https://minio.example.com/bg.png', check: { ok: false, reason: 'check-error' } })
+      expect(result).toEqual({ url: 'https://minio.example.com/bg.png', check: { ok: false, reason: 'check-error' }, imageSource: { tier: 'team', provider: 'openai' } })
       expect(p.generateImage).toHaveBeenCalledTimes(1)
     }
   })

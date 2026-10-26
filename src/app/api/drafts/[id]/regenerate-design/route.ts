@@ -14,6 +14,7 @@ import { modelError, parseRegenerateDesignBody } from '@/lib/models/requests'
 import { claimWhere, DraftClaimLostError } from '@/lib/drafts/claim'
 import { claimDraftAction, startDraftAction, touchDraftAction } from '@/lib/drafts/draftActions'
 import { generationSkipFields } from '@/lib/drafts/backgroundNotice'
+import { generationImageSource } from '@/lib/drafts/imageSourceFields'
 import { newActionTrace } from '@/lib/analytics/trace'
 import { designHeadline, headlineFallbackMessage } from '@/lib/captions/headline'
 
@@ -166,6 +167,7 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
             // 005 FR-07: this design was made from scratch, so its skip (or
             // none) replaces whatever the previous render recorded.
             ...generationSkipFields(result.background),
+            imageSource: generationImageSource(result.background),
             status: 'EXPORTED',
             currentRevisionNumber: revisionNumber,
             pendingConflict: Prisma.JsonNull,

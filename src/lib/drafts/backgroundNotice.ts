@@ -8,15 +8,17 @@
 // CSS/SVG design is a design decision, not a failure (design Key decision 4).
 
 import { redactText } from '@/lib/text/redact'
+import { noPersonalFallbackMessage, type ImageSource } from '@/lib/drafts/imageSourceNotice'
 
 export const BACKGROUND_SKIP_REASONS = ['NO_PROVIDER', 'PROVIDER_ERROR', 'DECISION_ERROR', 'NOT_NEEDED'] as const
 export type BackgroundSkipReason = (typeof BACKGROUND_SKIP_REASONS)[number]
 
 // What background.ts returns. The step never throws: every way it can end
 // is one of these.
+// 031 FR-13: `imageSource` says where the image that ran (or failed) came from.
 export type BackgroundResult =
-  | { url: string }
-  | { url: null; skip: BackgroundSkipReason; detail?: string }
+  | { url: string; imageSource?: ImageSource }
+  | { url: null; skip: BackgroundSkipReason; detail?: string; imageSource?: ImageSource }
 
 // The reasons that show a notice.
 export type BackgroundNoticeReason = Exclude<BackgroundSkipReason, 'NOT_NEEDED'>
@@ -104,14 +106,22 @@ function providerErrorMessage(detail: string | null): string {
 
 const FIXED_MESSAGES: Record<Exclude<BackgroundNoticeReason, 'PROVIDER_ERROR'>, string> = {
   NO_PROVIDER:
-    'No image provider is set up. Add an OpenAI key in Settings, or ask a team admin to add an image provider in Team settings.',
+    'No image provider is set up. Add an image generation key in Settings, or ask a team admin to add an image provider in Team settings.',
   DECISION_ERROR: 'The step that plans the background failed, so the post was designed without one.',
 }
 
 // The stored columns → the poll payload. Provider text appears at most as the
 // redacted, clipped detail inside the PROVIDER_ERROR sentence; every other message is
 // fixed. An unknown stored value (or NOT_NEEDED) shows nothing.
-export function backgroundSkippedFor(reason: string | null, detail: string | null): BackgroundSkipped | null {
+export function backgroundSkippedFor(
+  reason: string | null,
+  detail: string | null,
+  source?: ImageSource | null,
+): BackgroundSkipped | null {
+  // 031 FR-14: the personal key failed and there was no team provider to fall to.
+  if (reason === 'PROVIDER_ERROR' && source?.tier === 'personal' && source.personalFailed) {
+    return { reason, message: noPersonalFallbackMessage(source.provider) }
+  }
   switch (reason) {
     case 'NO_PROVIDER':
     case 'DECISION_ERROR':

@@ -5,13 +5,13 @@ import { withTeamAdmin, parseBody } from '@/lib/api/handler'
 import { encrypt } from '@/lib/crypto'
 import { MOCK_AI, mockProviderKeyValidation } from '@/lib/testHooks'
 import { IMAGE_PROVIDERS, canServeSlot } from '@/providers/imageCapabilities'
+import { detectKeyProvider, KEY_PROVIDER_LABEL } from '@/providers/keyPrefix'
 
 function detectProvider(apiKey: string): { providerName: string; autoLabel: string } | null {
-  if (apiKey.startsWith('sk-ant-')) return { providerName: 'anthropic', autoLabel: 'Claude (Anthropic)' }
-  if (apiKey.startsWith('sk-')) return { providerName: 'openai', autoLabel: 'OpenAI' }
-  // Google API keys (Gemini): IMAGE only, which canServeSlot enforces (005 FR-13).
-  if (apiKey.startsWith('AIza')) return { providerName: 'gemini', autoLabel: 'Gemini (Google)' }
-  return null
+  // 031 FR-09: the prefix rule lives in one place. Gemini keys are IMAGE only,
+  // which canServeSlot enforces (005 FR-13).
+  const detected = detectKeyProvider(apiKey)
+  return detected ? { providerName: detected, autoLabel: KEY_PROVIDER_LABEL[detected] } : null
 }
 
 async function validateApiKey(providerName: string, apiKey: string): Promise<string | null> {

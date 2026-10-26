@@ -7,6 +7,7 @@ import { getFontSetId } from '@/lib/renderer/fontSet'
 import { claimWhere, DraftClaimLostError, type DraftClaim } from '@/lib/drafts/claim'
 import type { DraftNotApplied } from '@/lib/api-types'
 import type { BackgroundSkipFields } from '@/lib/drafts/backgroundNotice'
+import type { ImageSourceWrite } from '@/lib/drafts/imageSourceFields'
 import type { ResolvedModel } from '@/lib/models/resolve'
 import { compositionStampSchema, parseCompositionStamp, type CompositionStamp } from '@/lib/designData'
 import { parsePostStyleStamp, postStyleStampSchema, type PostStyleStamp } from '@/lib/postStyles'
@@ -360,6 +361,9 @@ export interface CommitRevisionArgs {
   // NOT_NEEDED, or DECISION_ERROR) leaves the draft's
   // backgroundSkipReason/backgroundSkipDetail unchanged.
   backgroundSkip?: BackgroundSkipFields
+  // 031 FR-13: the refine's image-source write (refineImageSource), in the same
+  // final draft write. Undefined leaves the draft's imageSource unchanged.
+  imageSource?: ImageSourceWrite
   // "Use anyway" (T19, FR-14a): the id of the rejected DraftRevision row being
   // adopted. When set, it is stamped adoptedAt + adoptedRevisionNumber
   // atomically INSIDE this same transaction, after the chain insert and
@@ -542,7 +546,7 @@ export async function renderDraftHtml(
 export async function commitDraftRevision(
   args: CommitRevisionArgs,
 ): Promise<{ revisionId: string; exportKey: string; revisionNumber: number }> {
-  const { draftId, instruction, width, height, backgroundImageUrl, backgroundSkip, adoptRejectedRevisionId } = args
+  const { draftId, instruction, width, height, backgroundImageUrl, backgroundSkip, imageSource, adoptRejectedRevisionId } = args
   const casExpected = args.expectedRevisionNumber
   const cas = casExpected !== undefined
   const claim = args.claim
@@ -676,6 +680,7 @@ export async function commitDraftRevision(
       ...draftStampFields(finalStamp),
       ...(backgroundImageUrl ? { imageUrl: backgroundImageUrl } : {}),
       ...backgroundSkip,
+      ...(imageSource !== undefined ? { imageSource } : {}),
     }
 
     if (!cas && !adoptRejectedRevisionId && !claim) {

@@ -9,3 +9,7 @@
 {"ev":"start","span":"T2","kind":"task","label":"MEDIUM wording items and stale docs","parent":"W2","model":"sonnet","attempt":"1","at":"2026-10-26T12:26:40Z","ts":1793017600}
 {"ev":"stop","span":"T2","at":"2026-10-26T12:44:03Z","ts":1793018643,"status":"ok"}
 {"ev":"start","span":"T3","kind":"task","label":"Glossary, LOW sweep, wording guard, full E2E","parent":"W2","model":"sonnet","attempt":"1","at":"2026-10-26T12:44:16Z","ts":1793018656}
+{"ev":"stop","span":"T3","at":"2026-10-26T13:11:15Z","ts":1793020275,"status":"ok"}
+{"ev":"stop","span":"W2","at":"2026-10-26T13:11:15Z","ts":1793020275,"status":"ok"}
+{"ev":"start","span":"W3","kind":"wave","label":"wave 3","at":"2026-10-26T13:11:35Z","ts":1793020295}
+{"ev":"start","span":"T4","kind":"task","label":"Image key backend","parent":"W3","model":"sonnet","attempt":"1","at":"2026-10-26T13:11:35Z","ts":1793020295}

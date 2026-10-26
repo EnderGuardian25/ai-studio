@@ -33,6 +33,15 @@ vi.mock('@/providers/implementations/image/openai', () => ({
     }
   },
 }))
+vi.mock('@/providers/implementations/image/gemini', () => ({
+  GeminiImageProvider: class {
+    readonly providerName = 'gemini'
+    apiKey: string
+    constructor(apiKey: string) {
+      this.apiKey = apiKey
+    }
+  },
+}))
 vi.mock('@/providers/implementations/copy/openai', () => ({
   OpenAICopyProvider: class {
     apiKey: string
@@ -67,7 +76,9 @@ vi.mock('@/lib/env', async (importOriginal) => {
 process.env.TOKEN_ENCRYPTION_KEY = 'b'.repeat(64)
 
 const { encrypt } = await import('@/lib/crypto')
-const { resolveImageProvider, resolveCopyProvider, resolveAnthropicApiKey } = await import('@/providers/registry')
+const { resolveImageProvider, resolveImageProviderWithSource, resolveCopyProvider, resolveAnthropicApiKey } = await import(
+  '@/providers/registry'
+)
 const { IMAGE_PROVIDERS, pickServingImageProvider } = await import('@/providers/imageCapabilities')
 
 const TEAM_ID = 'team-1'
@@ -538,4 +549,43 @@ describe('resolveImageProvider tiers 3+4 agree with pickServingImageProvider', (
       expect(hits[0] ?? null).toBe(pickServingImageProvider(c.rows)?.id ?? null)
     })
   }
+})
+
+// 031 FR-12: the same resolution, with the tier and provider that served it.
+describe('resolveImageProviderWithSource (031)', () => {
+  it('a personal key written before 031 (provider openai through the column default) is tier personal, openai', async () => {
+    h.userOpenAiKeyFindUnique.mockResolvedValue(personalKeyRow({ provider: 'openai' }))
+    const r = await resolveImageProviderWithSource({ teamId: TEAM_ID, userId: USER_ID })
+    expect(r).toMatchObject({ tier: 'personal', providerName: 'openai' })
+    expect((r!.provider as unknown as { apiKey: string }).apiKey).toBe(PERSONAL_KEY)
+  })
+
+  it('a personal Gemini key builds the Gemini provider and wins over a team OpenAI default', async () => {
+    h.userOpenAiKeyFindUnique.mockResolvedValue(personalKeyRow({ provider: 'gemini' }))
+    h.availableProviderFindFirst.mockResolvedValue(providerRow())
+    const r = await resolveImageProviderWithSource({ teamId: TEAM_ID, userId: USER_ID })
+    expect(r).toMatchObject({ tier: 'personal', providerName: 'gemini' })
+    expect(r!.provider.providerName).toBe('gemini')
+    expect(h.availableProviderFindFirst).not.toHaveBeenCalled()
+  })
+
+  it('an INVALID personal key falls to the team tier', async () => {
+    h.userOpenAiKeyFindUnique.mockResolvedValue(personalKeyRow({ provider: 'gemini', status: 'INVALID' }))
+    h.availableProviderFindFirst.mockResolvedValue(providerRow())
+    const r = await resolveImageProviderWithSource({ teamId: TEAM_ID, userId: USER_ID })
+    expect(r).toMatchObject({ tier: 'team', providerName: 'openai' })
+  })
+
+  it('userId null never reads the personal row', async () => {
+    h.availableProviderFindFirst.mockResolvedValue(providerRow({ providerName: 'gemini' }))
+    const r = await resolveImageProviderWithSource({ teamId: TEAM_ID, userId: null })
+    expect(h.userOpenAiKeyFindUnique).not.toHaveBeenCalled()
+    expect(r).toMatchObject({ tier: 'team', providerName: 'gemini' })
+  })
+
+  it('no personal key and no team row is null', async () => {
+    h.userOpenAiKeyFindUnique.mockResolvedValue(null)
+    h.availableProviderFindFirst.mockResolvedValue(null)
+    expect(await resolveImageProviderWithSource({ teamId: TEAM_ID, userId: USER_ID })).toBeNull()
+  })
 })

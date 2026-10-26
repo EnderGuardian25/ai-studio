@@ -10,6 +10,7 @@ import { parseCompositeSource } from '@/lib/brief/compositeSource'
 import { planDraftRecovery, STUCK_ACTION_REASON, STUCK_REASON } from '@/lib/drafts/recovery'
 import { COMMITTED_REVISION, draftCompositionStamp, resolveNotAppliedOutcome } from '@/lib/drafts/revisions'
 import { backgroundSkippedFor } from '@/lib/drafts/backgroundNotice'
+import { imageSourceNoticeFor, parseImageSource } from '@/lib/drafts/imageSourceNotice'
 import { compositionNoticeFor } from '@/lib/drafts/compositionNotice'
 import { styleSummary } from '@/lib/postStyles'
 import { parseFactsCheck } from '@/lib/factsCheck/types'
@@ -160,6 +161,7 @@ async function loadDraft(id: string) {
   // The scheduled-posts read runs only for a state that shows it, so the 4 s
   // poll stays flat for `fresh` and `unknown`, which is nearly every poll.
   const renderedText = parseRenderedText(draft.renderedText)
+  const imageSource = parseImageSource(draft.imageSource)
   const state = headlineState(renderedText, draft.headline)
   const wantsScheduled = state === 'stale' || state === 'unconfirmed'
 
@@ -219,7 +221,9 @@ async function loadDraft(id: string) {
     notApplied,
     // 005 FR-07: why there is no AI background, when that was not the
     // model's choice. The message is a fixed per-reason sentence.
-    backgroundSkipped: backgroundSkippedFor(draft.backgroundSkipReason, draft.backgroundSkipDetail),
+    backgroundSkipped: backgroundSkippedFor(draft.backgroundSkipReason, draft.backgroundSkipDetail, imageSource),
+    // 031 FR-14: the user's own key failed and the team's provider made the image.
+    imageSourceNotice: imageSourceNoticeFor(imageSource),
     // 009 FR-15: the tolerant parse (null on anything unreadable) and its notice.
     composition,
     compositionNotice: compositionNoticeFor(composition),
