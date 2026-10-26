@@ -1,7 +1,9 @@
 # bistec-studio roadmap — changes 004–025
 
 **Updated:** 2026-10-25 · **Branch:** all of this lands on `v2` (see Branching at the bottom); handoff in `docs/handoff.md` top section.
-**Status (2026-10-26, latest):** **030** stale-headline badge is **BUILT** (T1 to T6: the stamp, the four states, the badge, the publish line and the events); `/specclaw:verify 030-stale-headline-badge` is next. Apply to image is a later change, gated on the 030 events (D1).
+**Status (2026-10-26, verified):** **030** stale-headline badge is **VERIFIED PASS (20/20 ACs)** ([verify-report](changes/030-stale-headline-badge/verify-report.md)); the agreed order (027a → 028 → 029 → 025 → 030) is complete. Apply to image is a later change, gated on the 030 events (D1).
+
+**(Superseded) Status (2026-10-26, built):** **030** stale-headline badge is **BUILT** (T1 to T6: the stamp, the four states, the badge, the publish line and the events); `/specclaw:verify 030-stale-headline-badge` is next. Apply to image is a later change, gated on the 030 events (D1).
 
 **(Superseded) Status (2026-10-26, proposal):** **030** stale-headline badge is **proposed**; the deep panel returned CHANGES_REQUESTED (29 upheld) and the user answered D1 to D5 (badge, verified stamp and events now; Apply to image later). Next: approval, then `/specclaw:plan` (the 030 section of `docs/handoff.md`). **025** is VERIFIED PASS (18/18).
 
