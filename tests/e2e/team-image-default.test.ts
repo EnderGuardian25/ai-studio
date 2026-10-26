@@ -72,7 +72,7 @@ test.describe('§TID — IMAGE default in /team', () => {
     await expect(state).toHaveAttribute('data-state', 'none')
     await expect(state).toContainText('No image provider')
     await expect(state).toContainText(
-      'Teammates without a personal OpenAI key get no AI backgrounds',
+      'Teammates without a personal image key get no AI backgrounds',
     )
 
     // register one IMAGE row through the API (the first row becomes the default)
@@ -88,7 +88,7 @@ test.describe('§TID — IMAGE default in /team', () => {
     // (a) a default exists
     await page.reload()
     await expect(state).toHaveAttribute('data-state', 'default')
-    await expect(state).toContainText('Teammates without a personal OpenAI key use this provider.')
+    await expect(state).toContainText('Teammates without a personal image key use this provider.')
     await expect(page.getByText('Default', { exact: true })).toBeVisible()
 
     // (b) no enabled default, but a serving fallback

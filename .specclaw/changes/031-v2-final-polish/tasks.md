@@ -116,7 +116,7 @@
     - Mock sentinel `__MOCK_BG_PERSONAL_FAIL__` (design §4.3).
     - **Gate:** tsc, lint, unit, `npm run test:upgrade`.
 
-- [ ] `T5` — The image generation key card, the team page, the notice on the draft page, §AI
+- [x] `T5` — The image generation key card, the team page, the notice on the draft page, §AI
   - Files: `src/components/settings/OpenAiKeyCard.tsx`, `src/app/(app)/team/page.tsx`, `tests/unit/uiWordingGuard.test.ts`, `src/app/(app)/drafts/[id]/page.tsx`, `tests/e2e/image-key.test.ts` (new), `docs/e2e-test-plan.md` (§AI), E2E files with adapted locators
   - Estimate: medium
   - Kind: impl

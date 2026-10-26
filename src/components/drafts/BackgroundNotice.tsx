@@ -18,7 +18,7 @@ export interface BackgroundNoticeProps {
 //
 // The fix-it link follows who can fix it: a team admin (or super admin) can
 // add or repair the team's image provider at /team; anyone else can add a
-// personal OpenAI key at /settings. A DECISION_ERROR is a failed model call,
+// personal image generation key at /settings. A DECISION_ERROR is a failed model call,
 // not a setup problem, so it gets no link.
 export function BackgroundNotice({ skipped }: BackgroundNoticeProps) {
   const { isTeamAdmin } = useCurrentUser()

@@ -1235,7 +1235,7 @@ test.describe('Team, settings and admin (T12)', () => {
     await page.goto('/settings')
 
     await expect(page.getByRole('heading', { name: 'Settings', level: 1 })).toBeVisible()
-    for (const name of ['Claude account', 'OpenAI key', 'Password']) {
+    for (const name of ['Claude account', 'Image generation key', 'Password']) {
       await expect(page.getByRole('heading', { name, exact: true, level: 2 })).toBeVisible()
     }
     const tablist = page.getByRole('tablist', { name: 'Operating system' })
@@ -1249,7 +1249,7 @@ test.describe('Team, settings and admin (T12)', () => {
 
     const claudeForm = page.locator('form', { has: page.getByLabel('Claude OAuth token') })
     await expect(claudeForm.getByRole('button', { name: /^(Connect|Replace)$/ })).toBeDisabled()
-    const openAiForm = page.locator('form', { has: page.getByLabel('OpenAI API key') })
+    const openAiForm = page.locator('form', { has: page.getByLabel('Image generation API key') })
     await expect(openAiForm.getByRole('button', { name: /^(Connect|Replace)$/ })).toBeDisabled()
     for (const name of ['Current password', 'New password', 'Confirm new password']) {
       await expect(page.getByRole('textbox', { name, exact: true })).toBeVisible()

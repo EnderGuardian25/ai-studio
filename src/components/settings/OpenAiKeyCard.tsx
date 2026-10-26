@@ -14,13 +14,14 @@ import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { apiFetch } from '@/lib/apiFetch'
 import type { OpenAiKeyInfo } from '@/lib/api-types'
 
-// Self-service "OpenAI key" card — clone of ClaudeTokenCard against
-// /api/me/openai-key. Used ahead of the team's configured IMAGE provider for
-// image generation (see resolveImageProvider). Unlike the Claude token there
-// is no live validation ping at save time (no free OpenAI endpoint to check
-// against) — the key is accepted by shape only and only flips to INVALID
-// after an observed generation failure, so a fresh INVALID row here just
-// means "reconnect", not "this key was rejected on save."
+// Self-service "Image generation key" card (031 FR-15), a clone of
+// ClaudeTokenCard against /api/me/openai-key (the route keeps its name). The
+// key is an OpenAI or a Gemini key; the server detects which from its prefix
+// and refuses anything else. It is used ahead of the team's configured IMAGE
+// provider for image generation (see resolveImageProvider). There is no live
+// validation ping at save time: the key is accepted by shape only and only
+// flips to INVALID after an observed generation failure, so a fresh INVALID
+// row here just means "reconnect", not "this key was rejected on save."
 
 const QUERY_KEY = ['me', 'openai-key'] as const
 
@@ -52,7 +53,7 @@ export function OpenAiKeyCard() {
     onSuccess: () => {
       setKey('')
       invalidate()
-      toast.success('OpenAI key connected')
+      toast.success('Image generation key connected')
     },
     onError: (err: Error) => toast.error(err.message),
   })
@@ -61,14 +62,14 @@ export function OpenAiKeyCard() {
     mutationFn: () => apiFetch<OpenAiKeyInfo>('/api/me/openai-key', { method: 'DELETE' }),
     onSuccess: () => {
       invalidate()
-      toast.success('OpenAI key disconnected')
+      toast.success('Image generation key disconnected')
     },
     onError: (err: Error) => toast.error(err.message),
   })
 
   const handleDisconnect = async () => {
     const ok = await confirm({
-      title: 'Disconnect your OpenAI key?',
+      title: 'Disconnect your image generation key?',
       description: 'Image generation will fall back to the team\'s configured provider until you reconnect.',
       confirmLabel: 'Disconnect',
     })
@@ -80,19 +81,20 @@ export function OpenAiKeyCard() {
   return (
     // A bezel card (021 design.md §8), its head the study's .card-hd.
     <section className="surface-bezel min-w-0 p-5">
-      <SectionHead title="OpenAI key" className="mb-3">
+      <SectionHead title="Image generation key" className="mb-3">
         {!isLoading && statusPill(info)}
       </SectionHead>
 
       <div className="flex flex-col gap-5">
         <p className="text-ui-sm text-fg-muted">
-          Connect your personal OpenAI key for image generation.
+          Your own OpenAI or Gemini key. When connected, it makes every image you generate, before the
+          team&apos;s provider.
         </p>
 
         {info.connected && info.status === 'INVALID' && (
           <Notice tone="warning">
             <span className="text-fg">
-              Your OpenAI key was rejected on a recent generation — reconnect below. Until then image
+              Your image generation key was rejected on a recent generation — reconnect below. Until then image
               generation uses the team&apos;s configured provider.
             </span>
           </Notice>
@@ -100,7 +102,9 @@ export function OpenAiKeyCard() {
 
         {info.connected && (
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-ui-sm text-fg-muted">
-            <span className="font-mono">key {info.keyPrefix}</span>
+            <span className="font-mono" data-testid="image-key-summary">
+              {info.provider === 'gemini' ? 'Gemini' : 'OpenAI'} {info.keyPrefix}
+            </span>
           </div>
         )}
 
@@ -115,8 +119,8 @@ export function OpenAiKeyCard() {
             <Input
               type="password"
               autoComplete="off"
-              placeholder="sk-…"
-              aria-label="OpenAI API key"
+              placeholder="sk-… or AIza…"
+              aria-label="Image generation API key"
               value={key}
               onChange={(e) => setKey(e.target.value)}
             />

@@ -32,6 +32,7 @@ import { apiFetch } from '@/lib/apiFetch'
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser'
 import { useCaptionRoute } from '@/lib/hooks/useCaptionRoute'
 import { pickServingImageProvider } from '@/providers/imageCapabilities'
+import { detectKeyProvider, KEY_PROVIDER_LABEL } from '@/providers/keyPrefix'
 import type { AdminProvider as Provider, ProviderSlot, ChannelStatus, ChannelMap } from '@/lib/api-types'
 
 // Team settings: AI providers + social channels (moved here from the old
@@ -64,11 +65,10 @@ function LinkedinIcon({ size = 16 }: { size?: number }) {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+// 031 FR-09: the prefix rule lives in one pure, client-safe module.
 function detectProvider(key: string): { name: string; label: string } | null {
-  if (key.startsWith('sk-ant-')) return { name: 'anthropic', label: 'Claude (Anthropic)' }
-  if (key.startsWith('sk-')) return { name: 'openai', label: 'OpenAI' }
-  if (key.startsWith('AIza')) return { name: 'gemini', label: 'Gemini (Google)' }
-  return null
+  const name = detectKeyProvider(key)
+  return name ? { name, label: KEY_PROVIDER_LABEL[name] } : null
 }
 
 const DETECTED_NAMES: Record<string, string> = { anthropic: 'Anthropic', openai: 'OpenAI', gemini: 'Gemini' }
@@ -418,7 +418,7 @@ function ChannelRow({
 }
 
 // FR-05: say plainly which IMAGE row serves teammates who have no personal
-// OpenAI key. The rule is pickServingImageProvider's, the same one the resolver
+// image key. The rule is pickServingImageProvider's, the same one the resolver
 // uses, so this text can't disagree with what generation actually does.
 function ImageDefaultState({ rows, onRefresh }: { rows: Provider[]; onRefresh: () => void }) {
   const serving = pickServingImageProvider(rows)
@@ -442,7 +442,7 @@ function ImageDefaultState({ rows, onRefresh }: { rows: Provider[]; onRefresh: (
       <Notice tone="warning" data-testid="image-default-state" data-state="none" role="status">
         <p className="font-semibold">No image provider</p>
         <p className="mt-1 text-ui-xs text-fg">
-          Teammates without a personal OpenAI key get no AI backgrounds.
+          Teammates without a personal image key get no AI backgrounds.
         </p>
       </Notice>
     )
@@ -450,7 +450,7 @@ function ImageDefaultState({ rows, onRefresh }: { rows: Provider[]; onRefresh: (
   if (serving.isDefault) {
     return (
       <p data-testid="image-default-state" data-state="default" className="text-ui-xs text-fg-muted">
-        Teammates without a personal OpenAI key use this provider.
+        Teammates without a personal image key use this provider.
       </p>
     )
   }

@@ -1216,6 +1216,7 @@ CI gate: **`.github/workflows/e2e.yml`** runs the whole suite (§A–§AA, inclu
 | Change 020 Create post button off the draft page (AC-01, AC-02) | `create-post-button.test.ts` AC-01, AC-01b, AC-02b (see the 020 update note after §X)  |
 | Change 009 hero imagery (AC-04, AC-05, AC-12 to AC-19, AC-21)   | §AA TC-HERO-01…16, `a11y` draft page and `/brief` axe (see §AA map)                    |
 | Change 030 stale-headline badge (AC-11 → AC-19)                 | §AH TC-HL-01…10, `a11y` "AC-19: a draft page with the stale-headline badge" (see §AH)  |
+| Change 031 personal image generation key (AC-12)                | §AI TC-IK-01…06 (see §AI)                                                              |
 
 > Items with no behavioral surface (M2 init race, M3 stdin, M7 polling, M8 crypto guards, M13 dead code) are best covered by unit tests; M7 polling can optionally be a UI test (draft auto-refresh while `IN_PROGRESS`).
 
@@ -1239,3 +1240,20 @@ Mock mode (`MOCK_AI` + `MOCK_PUPPETEER`), the seeded team, serial. The mock desi
 | TC-HL-10 | AC-19     | `draft.headline_edited` once per change with `via` and `state` and no text, none for an unchanged save; `publish.settled` carries `headlineState` |
 
 Adopting a rejected render (AC-16, second half) is covered by the unit tests of the stamp writers, not here.
+
+### AI. Personal image generation key (`image-key.test.ts`, change 031 T5 — AC-12)
+
+Mock mode (`MOCK_AI` + `MOCK_PUPPETEER`), a fresh team per case, serial. The acting user is the seeded super admin; the personal key is removed after each case. The route is still `/api/me/openai-key`. The card is driven at `/settings` (heading "Image generation key", input "Image generation API key"); the connected line is `data-testid="image-key-summary"` ("Gemini …a1b2"). Every `page.waitForResponse` is created before its trigger.
+
+**The seams** (dormant in prod). `__MOCK_BG__` in the brief topic (the decision is "needed"; the real resolver picks the provider, only its `generateImage` is swapped for a fixture PNG); `__MOCK_BG_PERSONAL_FAIL__` (the personal tier's image call throws and the team tier succeeds).
+
+| Case     | AC    | What it checks                                                                                                                      |
+| -------- | ----- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| TC-IK-01 | AC-12 | An OpenAI key connects through the card; the card shows "OpenAI" next to the suffix; the key is never returned                      |
+| TC-IK-02 | AC-12 | A Gemini key connects through the card; the card shows "Gemini" next to the suffix; the route reports `provider: gemini`            |
+| TC-IK-03 | AC-12 | An `sk-ant-` key, a random string and a short `AIza` key are 400 with the message naming both kinds, and nothing is stored          |
+| TC-IK-04 | AC-12 | A personal Gemini key with `__MOCK_BG__` serves the image; the draft records `{ tier: personal, provider: gemini }`; no notice      |
+| TC-IK-05 | AC-12 | `__MOCK_BG_PERSONAL_FAIL__` falls back to the team provider; the draft page shows the fallback notice naming Gemini; no skip notice |
+| TC-IK-06 | AC-12 | Disconnect (through the confirm dialog) removes the key; the card returns to "Not connected"                                        |
+
+Locators adapted for the card and `/team` wording: `surfaces.test.ts` ("Image generation key" heading and "Image generation API key" label), `team-image-default.test.ts` ("Teammates without a personal image key ...").

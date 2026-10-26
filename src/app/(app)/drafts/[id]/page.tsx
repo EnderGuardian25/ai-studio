@@ -26,6 +26,7 @@ import { CaptionPanels } from '@/components/drafts/CaptionPanels'
 import { RefinementPanel } from '@/components/drafts/RefinementPanel'
 import { InlineEditModal } from '@/components/drafts/InlineEditModal'
 import { BackgroundNotice } from '@/components/drafts/BackgroundNotice'
+import { Notice } from '@/components/ui/Notice'
 import { CompositionNotice } from '@/components/drafts/CompositionNotice'
 import { GeneratedWith, PostStyleLine } from '@/components/drafts/GeneratedWith'
 import { FactsCheckNotice } from '@/components/drafts/FactsCheckNotice'
@@ -520,6 +521,14 @@ export default function DraftDetailPage() {
             {/* 005 FR-07: why this design has no AI background, when that
               was not the model's choice. Non-blocking. */}
             {draft.backgroundSkipped && <BackgroundNotice skipped={draft.backgroundSkipped} />}
+
+            {/* 031 FR-14: the user's own image key failed and the team's provider
+              made the image. Non-blocking. */}
+            {draft.imageSourceNotice && (
+              <Notice tone="warning" role="status" data-testid="image-source-notice" className="mt-4">
+                <p className="text-ui-xs text-fg">{draft.imageSourceNotice.message}</p>
+              </Notice>
+            )}
 
             {/* 009 FR-15: the image style asked for was not (fully) applied. */}
             {draft.compositionNotice && <CompositionNotice notice={draft.compositionNotice} />}
