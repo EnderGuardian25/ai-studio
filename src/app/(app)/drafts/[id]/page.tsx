@@ -29,6 +29,7 @@ import { BackgroundNotice } from '@/components/drafts/BackgroundNotice'
 import { CompositionNotice } from '@/components/drafts/CompositionNotice'
 import { GeneratedWith, PostStyleLine } from '@/components/drafts/GeneratedWith'
 import { FactsCheckNotice } from '@/components/drafts/FactsCheckNotice'
+import { HeadlineImageNotice } from '@/components/drafts/HeadlineImageNotice'
 import { ModelPicker } from '@/components/ui/ModelPicker'
 import { PageTitle } from '@/components/ui/PageHead'
 import { EYEBROW, FOCUS, ICON, ICON_SM, PILL_BADGE } from '@/components/ui/atoms'
@@ -526,6 +527,18 @@ export default function DraftDetailPage() {
             {/* 027 FR-13: values the post states that the brief does not. Never blocks. */}
             <FactsCheckNotice check={draft.factsCheck} />
 
+            {/* 030 FR-13: the image does not show the current headline. Never blocks. */}
+            {draft.headlineImage && (
+              <HeadlineImageNotice
+                image={draft.headlineImage}
+                canEditInline={ready && !!draft.htmlContent}
+                canRegenerate={isPathB && !!draft.htmlContent}
+                disabled={actionPending || regenDesign || designUndo.undoing}
+                onEditInline={() => setShowInlineEdit(true)}
+                onRegenerateDesign={handleRegenerateDesign}
+              />
+            )}
+
             {/* The versions (§8.13, the study's .v): a thumbnail at the post's
               ratio, the number, the instruction. The current one is ringed in
               ink with a "Current" pill. No previous/next arrows (021 A5). */}
@@ -706,6 +719,7 @@ export default function DraftDetailPage() {
       {showPublish && (
         <PublishDialog
           draftId={draftId}
+          headlineState={draft.headlineImage?.state}
           onClose={() => {
             // A partial failure closes here, not via onSuccess, and the
             // channels that did publish can change the draft's status.

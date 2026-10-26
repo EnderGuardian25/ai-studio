@@ -262,6 +262,7 @@ export default function LibraryPage() {
       {showPublishDialog && (
         <PublishDialog
           draftId={showPublishDialog.draftId}
+          headlineState={drafts.find((d) => d.id === showPublishDialog.draftId)?.headlineState}
           onClose={() => {
             // A failed channel leaves a FAILED row; show it once the dialog closes.
             setShowPublishDialog(null)

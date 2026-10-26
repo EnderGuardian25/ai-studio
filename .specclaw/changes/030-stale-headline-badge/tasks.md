@@ -105,7 +105,7 @@
 
 ### Wave 5: The UI and E2E
 
-- [ ] `T5` — The badge, the publish dialog line, and E2E §AH
+- [x] `T5` — The badge, the publish dialog line, and E2E §AH
   - Files: `src/components/drafts/HeadlineImageNotice.tsx` (new), `src/components/library/PublishDialog.tsx`, `src/app/(app)/drafts/[id]/page.tsx`, `src/app/(app)/library/page.tsx`, `tests/e2e/headline-badge.test.ts` (new, TC-HL-01 to TC-HL-10), `docs/e2e-test-plan.md` (§AH)
   - Estimate: medium
   - Kind: impl

@@ -1217,3 +1217,24 @@ CI gate: **`.github/workflows/e2e.yml`** runs the whole suite (§A–§AA, inclu
 | Change 009 hero imagery (AC-04, AC-05, AC-12 to AC-19, AC-21)   | §AA TC-HERO-01…16, `a11y` draft page and `/brief` axe (see §AA map)                    |
 
 > Items with no behavioral surface (M2 init race, M3 stdin, M7 polling, M8 crypto guards, M13 dead code) are best covered by unit tests; M7 polling can optionally be a UI test (draft auto-refresh while `IN_PROGRESS`).
+
+### AH. Stale-headline badge (`headline-badge.test.ts`, change 030 T5 — AC-11 to AC-19)
+
+Mock mode (`MOCK_AI` + `MOCK_PUPPETEER`), the seeded team, serial. The mock design paints the headline it was given in one element, and the check under `MOCK_PUPPETEER` is the text stand-in (`src/lib/renderedText/mockCheck.ts`), so a mock generation stamps `painted`. The headline is changed through `PATCH /api/drafts/[id]`. Every `page.waitForResponse` is created before its trigger. The a11y suite gains one case (`AC-19: a draft page with the stale-headline badge`, axe on a draft page with the badge shown).
+
+**The seams** (dormant in prod). `__MOCK_HEADLINE_HIDDEN__` in the brief topic (the design carries it as a comment and the check says `not-visible`); `POST /api/test/draft-rendered-text` (`{ draftId }`: nulls `renderedText` on the draft and its revisions, for a draft from before 030; 404 in production and without `MOCK_AI`); the analytics seam `GET/DELETE /api/test/analytics-events`. The mock `regenerate-copy` returns the same headline the design painted, so TC-HL-02 first writes an older painted headline into the stamp through the test DB.
+
+| Case     | AC        | What it checks                                                                                                                                    |
+| -------- | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| TC-HL-01 | AC-11     | A headline edit shows the stale badge, with the old headline, Edit inline and Regenerate design                                                   |
+| TC-HL-02 | AC-12     | Regenerate headline (`regenerate-copy` with `{ headline: true }`) shows the badge                                                                 |
+| TC-HL-03 | AC-13     | An inline edit that paints the new headline clears the badge; so does Regenerate design (clicked from the badge)                                  |
+| TC-HL-04 | AC-14     | `__MOCK_HEADLINE_HIDDEN__` shows the `unconfirmed` badge with `not-visible`; it stays unconfirmed after a headline edit                           |
+| TC-HL-05 | AC-15     | A draft from before 030 (the seam) shows no badge after an edit                                                                                   |
+| TC-HL-06 | AC-15, 16 | Restoring the pre-edit revision keeps the stale badge; restoring a revision with a null stamp brings none                                         |
+| TC-HL-07 | AC-17     | With a SCHEDULED post, the badge shows the scheduled line                                                                                         |
+| TC-HL-08 | AC-18     | The publish dialog on the draft page shows the line when stale and none when fresh; Confirm stays enabled                                         |
+| TC-HL-09 | AC-18     | The library list item carries `headlineState`; the dialog on the library page shows the line; the library shows no badge                          |
+| TC-HL-10 | AC-19     | `draft.headline_edited` once per change with `via` and `state` and no text, none for an unchanged save; `publish.settled` carries `headlineState` |
+
+Adopting a rejected render (AC-16, second half) is covered by the unit tests of the stamp writers, not here.

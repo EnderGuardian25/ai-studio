@@ -8,6 +8,8 @@ import { Button } from '@/components/ui/Button'
 import { apiFetch } from '@/lib/apiFetch'
 import { CHANNEL_VALUES, channelLabel } from '@/lib/channels'
 import type { Channel } from '@prisma/client'
+import { publishLineFor } from '@/lib/renderedText/noticeText'
+import type { HeadlineState } from '@/lib/renderedText/vocab'
 
 // Shared publish dialog: pick one or more channels and an optional schedule, then
 // fire a POST /api/posts per channel. Used from both the Library grid and the
@@ -18,6 +20,8 @@ const CHANNELS = CHANNEL_VALUES
 
 export interface PublishDialogProps {
   draftId: string
+  // 030 FR-14: a non-blocking line when the image may show an older headline.
+  headlineState?: HeadlineState
   onClose: () => void
   onSuccess: () => void
 }
@@ -30,7 +34,8 @@ export interface PublishDialogProps {
 // only when every checked channel worked.
 type ChannelOutcome = { ok: true } | { ok: false; message: string }
 
-export function PublishDialog({ draftId, onClose, onSuccess }: PublishDialogProps) {
+export function PublishDialog({ draftId, headlineState, onClose, onSuccess }: PublishDialogProps) {
+  const headlineLine = headlineState ? publishLineFor(headlineState) : null
   const [checkedChannels, setCheckedChannels] = useState<Channel[]>([])
   const [scheduledAt, setScheduledAt] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -110,6 +115,12 @@ export function PublishDialog({ draftId, onClose, onSuccess }: PublishDialogProp
         </>
       }
     >
+        {headlineLine && (
+          <p data-testid="publish-headline-line" className="mb-4 text-ui-xs text-fg-muted">
+            {headlineLine}
+          </p>
+        )}
+
         {/* Channel checkboxes */}
         <FieldLabel as="span" id={channelsId} className="mb-2">Channels</FieldLabel>
         <div role="group" aria-labelledby={channelsId} className="flex flex-wrap gap-x-6 gap-y-2 pb-5 mb-5 border-b border-line-subtle">

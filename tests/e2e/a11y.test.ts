@@ -1191,6 +1191,17 @@ test.describe('axe scan (T18)', () => {
     await expectNoAxeViolations(page, '/projects/[id]', { settle: true })
   })
 
+  // 030 FR-13: the draft page with the stale-headline badge shown.
+  test('AC-19: a draft page with the stale-headline badge', async ({ page }) => {
+    if (!MOCKED()) test.skip()
+    const draft = await mintExportedDraft(api, `a11y-headline-${Date.now()}`)
+    expect((await api.patch(`/api/drafts/${draft.id}`, { headline: 'A brand new headline' })).status()).toBe(200)
+    await pageLogin(page)
+    await page.goto(`/drafts/${draft.id}`)
+    await expect(page.getByTestId('headline-image-notice')).toBeVisible({ timeout: 20_000 })
+    await expectNoAxeViolations(page, '/drafts/[id] (stale headline badge)', { settle: true })
+  })
+
   test('AC-19: /admin/brandkits with a kit open in edit mode', async ({ page }) => {
     const { kit } = await mintBrandKitFixture(api)
     mintedKits.push(kit.id)
