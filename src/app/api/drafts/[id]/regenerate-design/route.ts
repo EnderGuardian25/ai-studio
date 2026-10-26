@@ -7,6 +7,7 @@ import { resolveBrandKit } from '@/lib/brandkit/resolve'
 import { getActiveCampaignBriefing } from '@/lib/campaign/briefing'
 import { runPathBDesign } from '@/lib/agent/pathB'
 import { stampFromCheck } from '@/lib/renderedText/stamp'
+import { renderNotesFrom } from '@/lib/fonts/renderNotes'
 import { currentRenderStamp, draftStampFields, revisionStampFields, withNextRevisionNumber, discardOnLostClaim } from '@/lib/drafts/revisions'
 import { briefPostStyleStamp } from '@/lib/agent/briefInput'
 import { resolveModel } from '@/lib/models/policy'
@@ -129,6 +130,8 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
       result.composition,
       briefPostStyleStamp(draft.brief),
       stampFromCheck(headline.text, result.headlineCheck ?? 'not-checked'),
+      // 031 FR-24: and what the same render found about its fonts.
+      renderNotesFrom(result.fontsMissing),
     )
 
     // The Undo target is whatever revision is currently live. The design history

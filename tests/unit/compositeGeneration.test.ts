@@ -178,7 +178,10 @@ describe('runPathBDesign places the screenshot (025 FR-15)', () => {
 
     // The second call is classic: no hero contract, no image, no insertion.
     expect(h.designCalls[1].composites ?? null).toBeNull()
-    expect(h.designCalls[1].postProcess).toBeUndefined()
+    // 031 FR-22: the only post-process left is the font injection, which inserts no screenshot.
+    const classicHtml = h.designCalls[1].postProcess?.('<html><body>design</body></html>') ?? ''
+    expect(classicHtml).not.toContain('data-composite')
+    expect(classicHtml).not.toContain('__COMPOSITE_0__')
     expect(h.designCalls[1].systemPrompt).not.toContain('Headline, body text and the logo go only inside these regions:')
     expect(h.designCalls[1].systemPrompt).not.toContain('https://minio.example.com/bg.png')
 

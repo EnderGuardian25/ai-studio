@@ -32,6 +32,8 @@ interface Row {
   postStyle?: unknown
   // 030: the rendered-text stamp (a JSON value, or Prisma.DbNull for none).
   renderedText?: unknown
+  // 031: the render note (a JSON value, or Prisma.DbNull for none).
+  renderNotes?: unknown
   fontSet?: string | null
   promptVersion?: string | null
   // 008 FR-08: the model whose output the row's HTML is.
@@ -48,6 +50,8 @@ const fake = vi.hoisted(() => {
     failWith: null as Error | null,
     check: 'painted' as string,
     headlines: [] as Array<string | null>,
+    // 031: what the render mock returns as its font check.
+    fontsMissing: [] as string[],
   })
   const db = {
     rows: [] as Row[],
@@ -306,7 +310,11 @@ vi.mock('@/lib/renderer/puppeteer', () => ({
     fake.db.render.headlines.push(check ? check.headline : null)
     if (fake.db.render.failWith) throw fake.db.render.failWith
     if (fake.db.render.fail) throw new Error('Chromium crashed')
-    return { png: Buffer.from('png'), headlineCheck: check ? fake.db.render.check : null }
+    return {
+      png: Buffer.from('png'),
+      headlineCheck: check ? fake.db.render.check : null,
+      fontsMissing: fake.db.render.fontsMissing,
+    }
   },
 }))
 vi.mock('@/lib/composite/assets', () => ({
@@ -1229,7 +1237,7 @@ const STAMP_V2 = {
   fontSet: 'fonts-v2',
   model: 'claude-sonnet-4-6',
   modelSubstitutedFrom: null,
-  composition: null, postStyle: null, renderedText: null,
+  composition: null, postStyle: null, renderedText: null, renderNotes: null,
 }
 
 describe('restoreDraftToRevision (F2 — restore guard)', () => {
@@ -1271,12 +1279,12 @@ describe('restoreDraftToRevision (F2 — restore guard)', () => {
 
 describe('F3 render stamps: every revision write records the render it holds', () => {
   it('currentRenderStamp is the prompt version + the installed font set (+ the 008 model, null when unknown)', () => {
-    expect(currentRenderStamp(null, null, null, null)).toEqual({
+    expect(currentRenderStamp(null, null, null, null, null)).toEqual({
       promptVersion: PROMPT_VERSION,
       fontSet: 'fonts-test',
       model: null,
       modelSubstitutedFrom: null,
-      composition: null, postStyle: null, renderedText: null,
+      composition: null, postStyle: null, renderedText: null, renderNotes: null,
     })
   })
 
@@ -1362,7 +1370,7 @@ describe("F3 restore: the draft takes the restored revision's stamp", () => {
       fontSet: 'fonts-old',
       model: null,
       modelSubstitutedFrom: null,
-      composition: null, postStyle: null, renderedText: null,
+      composition: null, postStyle: null, renderedText: null, renderNotes: null,
     })
   })
 
@@ -1372,7 +1380,7 @@ describe("F3 restore: the draft takes the restored revision's stamp", () => {
       fontSet: null,
       model: null,
       modelSubstitutedFrom: null,
-      composition: null, postStyle: null, renderedText: null,
+      composition: null, postStyle: null, renderedText: null, renderNotes: null,
     })
   })
 
@@ -1384,7 +1392,7 @@ describe("F3 restore: the draft takes the restored revision's stamp", () => {
       fontSet: 'fonts-test',
       model: null,
       modelSubstitutedFrom: null,
-      composition: null, postStyle: null, renderedText: null,
+      composition: null, postStyle: null, renderedText: null, renderNotes: null,
     })
   })
 })
@@ -1544,7 +1552,7 @@ describe('008 FR-08: commitDraftRevision / recordRejectedRender record the model
 
   it('currentRenderStamp takes the internal / resolved model as its arg, never the key', () => {
     const m = internalModel('INTERNAL_VERIFIER', 'api')
-    expect(currentRenderStamp(m, null, null, null)).toMatchObject({ model: m.arg, modelSubstitutedFrom: null })
+    expect(currentRenderStamp(m, null, null, null, null)).toMatchObject({ model: m.arg, modelSubstitutedFrom: null })
   })
 })
 
@@ -1774,7 +1782,7 @@ describe('009 composition stamp: every revision writer carries it', () => {
   })
 
   it('revisionStampFields is the revision row’s four old fields plus composition', () => {
-    expect(revisionStampFields(currentRenderStamp(null, KEPT_STAMP, null, null))).toEqual({
+    expect(revisionStampFields(currentRenderStamp(null, KEPT_STAMP, null, null, null))).toEqual({
       promptVersion: PROMPT_VERSION,
       fontSet: 'fonts-test',
       model: null,
@@ -1782,6 +1790,7 @@ describe('009 composition stamp: every revision writer carries it', () => {
       composition: KEPT_STAMP,
       postStyle: Prisma.DbNull,
       renderedText: Prisma.DbNull,
+      renderNotes: Prisma.DbNull,
     })
   })
 })
@@ -1874,7 +1883,7 @@ describe('027 post-style stamp: every revision writer carries it', () => {
   })
 
   it('currentRenderStamp requires it and the field helpers write it as a column value', () => {
-    const stamp = currentRenderStamp(null, null, STYLE_STAMP, null)
+    const stamp = currentRenderStamp(null, null, STYLE_STAMP, null, null)
     expect(stamp.postStyle).toEqual(STYLE_STAMP)
     expect(revisionStampFields(stamp).postStyle).toEqual(STYLE_STAMP)
     expect(draftStampFields(stamp).postStyle).toEqual(STYLE_STAMP)
@@ -2128,5 +2137,76 @@ describe('030 rendered-text stamp: commit, rejected render, adopt, restore', () 
     expect(db.draftUpdates.at(-1)!.data.renderedText).toEqual(own)
     await restoreDraftToRevision('d1', 2, '<html>v2</html>', 'exports/d1-2.png', restoredRenderStamp({}, false, null))
     expect(db.draftUpdates.at(-1)!.data.renderedText).toBe(Prisma.DbNull)
+  })
+})
+
+// ── 031 FR-24: the render note in every revision writer ─────────────────────
+// Written exactly where renderedText is: a render made here stamps its own font
+// check; a carried render (adopt, restore) keeps its row's note; a caller-supplied
+// export with no adopt stamps none.
+describe('031 render notes: commit, rejected render, adopt, restore', () => {
+  const missing = { fontsMissing: ['Noto Sans Sinhala'] }
+  const commit = (over: Record<string, unknown> = {}) =>
+    commitDraftRevision({
+      draftId: 'd1', instruction: 'edit', html: '<html><body>x</body></html>', width: 1080, height: 1080,
+      composition: null, postStyle: null, ...over,
+    })
+  const rowOf = (id: string) => db.rows.find((r) => r.id === id)!
+
+  it("a commit stamps the render's font check on the row and the draft", async () => {
+    db.rows = [committed('d1', 1)]
+    db.render.fontsMissing = ['Noto Sans Sinhala']
+    const { revisionId } = await commit()
+    expect(rowOf(revisionId).renderNotes).toEqual(missing)
+    expect(db.draftUpdates.at(-1)!.data.renderNotes).toEqual(missing)
+  })
+
+  it('nothing missing is SQL NULL on both rows', async () => {
+    db.rows = [committed('d1', 1)]
+    const { revisionId } = await commit()
+    expect(rowOf(revisionId).renderNotes).toBe(Prisma.DbNull)
+    expect(db.draftUpdates.at(-1)!.data.renderNotes).toBe(Prisma.DbNull)
+  })
+
+  it('a caller-supplied export (no render here) stamps no note', async () => {
+    db.rows = [committed('d1', 1)]
+    db.render.fontsMissing = ['X']
+    const { revisionId } = await commit({ exportKey: 'exports/given.png' })
+    expect(db.render.calls).toBe(0)
+    expect(rowOf(revisionId).renderNotes).toBe(Prisma.DbNull)
+  })
+
+  it('a rejected render stamps its own row and leaves the draft alone; a failed render stamps none', async () => {
+    db.rows = [committed('d1', 1)]
+    db.render.fontsMissing = ['Abhaya Libre']
+    const ok = await recordHeld(rejectArgs())
+    expect(rowOf(ok.revisionId).renderNotes).toEqual({ fontsMissing: ['Abhaya Libre'] })
+    expect(db.draftUpdates.at(-1)!.data).not.toHaveProperty('renderNotes')
+    db.render.fail = true
+    const failed = await recordHeld(rejectArgs())
+    expect(rowOf(failed.revisionId).renderNotes).toBe(Prisma.DbNull)
+  })
+
+  it("adopt carries the rejected row's own note and renders nothing", async () => {
+    db.rows = [committed('d1', 1)]
+    const r = rejected('d1')
+    r.renderNotes = { fontsMissing: ['Old Font'] }
+    db.rows.push(r)
+    db.notAppliedRevisionId = r.id
+    db.render.fontsMissing = ['Now Font']
+    const { revisionId } = await commit({ exportKey: r.exportUrl!, adoptRejectedRevisionId: r.id })
+    expect(rowOf(revisionId).renderNotes).toEqual({ fontsMissing: ['Old Font'] })
+    expect(db.draftUpdates.at(-1)!.data.renderNotes).toEqual({ fontsMissing: ['Old Font'] })
+    expect(db.render.calls).toBe(0)
+  })
+
+  it("restore carries the revision's note (also when re-rendered); a pre-031 or unreadable one is null", async () => {
+    expect(restoredRenderStamp({ renderNotes: missing }, false, null).renderNotes).toEqual(missing)
+    expect(restoredRenderStamp({ renderNotes: missing }, true, null).renderNotes).toEqual(missing)
+    expect(restoredRenderStamp({}, false, null).renderNotes).toBeNull()
+    expect(restoredRenderStamp({ renderNotes: { fontsMissing: [] } }, false, null).renderNotes).toBeNull()
+    db.currentRevisionNumber = 3
+    await restoreDraftToRevision('d1', 2, '<html>v2</html>', 'exports/d1-2.png', restoredRenderStamp({ renderNotes: missing }, false, null))
+    expect(db.draftUpdates.at(-1)!.data.renderNotes).toEqual(missing)
   })
 })

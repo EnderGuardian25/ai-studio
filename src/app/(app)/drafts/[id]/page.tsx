@@ -530,6 +530,14 @@ export default function DraftDetailPage() {
               </Notice>
             )}
 
+            {/* 031 FR-24: the render could not load a post font and used a
+              fallback. Non-blocking. */}
+            {draft.fontNotice && (
+              <Notice tone="warning" role="status" data-testid="font-notice" className="mt-4">
+                <p className="text-ui-xs text-fg">{draft.fontNotice.message}</p>
+              </Notice>
+            )}
+
             {/* 009 FR-15: the image style asked for was not (fully) applied. */}
             {draft.compositionNotice && <CompositionNotice notice={draft.compositionNotice} />}
 

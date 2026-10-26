@@ -30,6 +30,8 @@ import { insertComposite, withDetectedScreen } from '@/lib/composite/insert'
 import { CompositeRenderError, type CompositeRender } from '@/lib/composite/render'
 import { parseCompositeSource } from '@/lib/brief/compositeSource'
 import { deleteObject, BUCKET_EXPORTS } from '@/lib/storage/minio'
+import { applyPostFonts } from '@/lib/fonts/inject'
+import { postFontPlan, postFontsUrl } from '@/lib/fonts/plan'
 
 // Re-export for existing importers; canonical home is agent/briefInput.ts.
 export { buildBriefInput } from '@/lib/agent/briefInput'
@@ -135,6 +137,8 @@ export async function runPathBDesign(
 
   const mode = pipelineMode()
   const briefImages = parseBriefImages(brief.briefImages)
+  // 031 FR-22: the kit's post fonts, planned once for the run.
+  const fontPlan = postFontPlan(kit)
 
   // Background pre-step: Claude (INTERNAL_BACKGROUND, Haiku) decides + gpt-image generates a
   // full-bleed background before the design call. A skip (with its reason)
@@ -229,10 +233,16 @@ export async function runPathBDesign(
     })
     // 025 FR-15: code inserts the screenshot at the detected screen after the
     // model's HTML is extracted and restored, before every render.
+    // 031 FR-22: then code adds the kit's fonts (the marked link, the script font in every stack),
+    // on every render, so the stored document is the one that was checked.
+    const withFonts = (h: string) => applyPostFonts(h, fontPlan, postFontsUrl)
     const insert =
       render && screen
-        ? { postProcess: (h: string) => insertComposite(h, screen, { width, height }), composites: render }
-        : {}
+        ? {
+            postProcess: (h: string) => withFonts(insertComposite(h, screen, { width, height })),
+            composites: render,
+          }
+        : { postProcess: withFonts }
     return isCliMode()
       ? runDesignAgentCli({ systemPrompt, userMessage, briefId: brief.id, width, height, model, headline, ...insert })
       : runDesignAgent({

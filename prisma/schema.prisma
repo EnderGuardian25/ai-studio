@@ -621,6 +621,10 @@ model Draft {
   // 030: the text the live render visibly painted, { headline: { text, verified, reason? } },
   // validated in src/lib/renderedText/stamp.ts. Null = rendered before 030.
   renderedText    Json?
+  // 031 FR-24: what the live render noted, { fontsMissing: string[] } (the
+  // post-font families that did not load), validated in src/lib/fonts/renderNotes.ts.
+  // Null = before 031, no check, or nothing missing.
+  renderNotes     Json?
   // 027: the facts-check result (numbers and places only, no text). Null = never checked.
   factsCheck      Json?
   createdAt       DateTime        @default(now())
@@ -672,6 +676,9 @@ model BrandKit {
   colors    Json?
   fonts     Json?
   logoUrl   String?
+  // 031 FR-21: the font per script, { [script]: family }, keyed by the catalogue's
+  // script id (only `sinhala` is offered). Null = none (the default).
+  scriptFonts Json?
   isDefault Boolean             @default(false)
   isDeleted Boolean             @default(false)
   deletedAt DateTime?
@@ -732,6 +739,9 @@ model BrandKitPrompt {
   isActive   Boolean  @default(false)
   createdBy  String
   createdAt  DateTime @default(now())
+  // 031 (T12): the kit fonts before an assistant apply that changed them, so the
+  // History line can name them. Null = the version changed no fonts.
+  previousFonts Json?
 
   @@unique([brandKitId, version])
 }
@@ -846,6 +856,9 @@ model DraftRevision {
   postStyle            Json?
   // 030: the text this row's render visibly painted. Null = rendered before 030.
   renderedText         Json?
+  // 031 FR-24: what this row's render noted ({ fontsMissing }). Null = before 031,
+  // no check, or nothing missing.
+  renderNotes          Json?
   // Drafts whose current not-applied outcome references this rejected row.
   notAppliedOn   Draft[]  @relation("DraftNotAppliedRevision")
 

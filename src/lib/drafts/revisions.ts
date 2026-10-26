@@ -14,6 +14,7 @@ import { parsePostStyleStamp, postStyleStampSchema, type PostStyleStamp } from '
 import { parseRenderedText, renderedTextColumn, stampFromCheck, type RenderedText } from '@/lib/renderedText/stamp'
 import { designHeadline } from '@/lib/captions/headline'
 import type { HeadlineCheck } from '@/lib/renderedText/vocab'
+import { parseRenderNotes, renderNotesFrom, renderNotesSchema, type RenderNotes } from '@/lib/fonts/renderNotes'
 import { canonicalCompositeHtml } from '@/lib/composite/insert'
 import { CompositePlacementError, CompositeRenderError, type CompositeRender } from '@/lib/composite/render'
 
@@ -65,6 +66,12 @@ import { CompositePlacementError, CompositeRenderError, type CompositeRender } f
 // on both tables. null is "unknown" (a pre-030 row), as for the composition.
 // A render writer builds it from its render's check (stampFromCheck); a restore
 // or an adopt carries the row's own.
+//
+// 031 FR-24: it also carries the render note ({ fontsMissing }: the post-font
+// families the render could not load), one JSON value on both tables, written
+// exactly where renderedText is. null is "no check, or nothing missing" (and a
+// pre-031 row). A render writer builds it from its render (renderNotesFrom); a
+// restore or an adopt carries the row's own.
 export interface RenderStamp {
   promptVersion: string | null
   fontSet: string | null
@@ -73,6 +80,7 @@ export interface RenderStamp {
   composition: CompositionStamp | null
   postStyle: PostStyleStamp | null
   renderedText: RenderedText | null
+  renderNotes: RenderNotes | null
 }
 
 // The model half of a RenderStamp, as stored. A render made now takes it from
@@ -115,11 +123,14 @@ export function draftModelStamp(draft: {
 // own check (stampFromCheck), a carried one, or null.
 // 027: `postStyle` is the same, required for the same reason: the run's stamp
 // (briefPostStyleStamp), a carried one (draftPostStyleStamp), or null.
+// 031: `renderNotes` is the same, required: the note built from the render's
+// own font check (renderNotesFrom), a carried one, or null.
 export function currentRenderStamp(
   model: ResolvedModel | ModelStamp | null,
   composition: CompositionStamp | null,
   postStyle: PostStyleStamp | null,
   renderedText: RenderedText | null,
+  renderNotes: RenderNotes | null,
 ): RenderStamp {
   return {
     promptVersion: PROMPT_VERSION,
@@ -128,7 +139,14 @@ export function currentRenderStamp(
     composition,
     postStyle,
     renderedText,
+    renderNotes,
   }
+}
+
+// The render note as a Json column value: SQL NULL when there is none,
+// otherwise the value, validated by its schema at every write.
+export function renderNotesColumn(notes: RenderNotes | null): Prisma.InputJsonValue | typeof Prisma.DbNull {
+  return notes ? (renderNotesSchema.parse(notes) as Prisma.InputJsonValue) : Prisma.DbNull
 }
 
 // The draft's CURRENT post-style stamp (027), carried forward by a write that
@@ -169,6 +187,7 @@ export function revisionStampFields(stamp: RenderStamp): {
   composition: Prisma.InputJsonValue | typeof Prisma.DbNull
   postStyle: Prisma.InputJsonValue | typeof Prisma.DbNull
   renderedText: Prisma.InputJsonValue | typeof Prisma.DbNull
+  renderNotes: Prisma.InputJsonValue | typeof Prisma.DbNull
 } {
   return {
     promptVersion: stamp.promptVersion,
@@ -178,6 +197,7 @@ export function revisionStampFields(stamp: RenderStamp): {
     composition: toJsonColumn(stamp.composition),
     postStyle: postStyleColumn(stamp.postStyle),
     renderedText: renderedTextColumn(stamp.renderedText),
+    renderNotes: renderNotesColumn(stamp.renderNotes),
   }
 }
 
@@ -191,6 +211,7 @@ export function draftStampFields(stamp: RenderStamp): {
   composition: Prisma.InputJsonValue | typeof Prisma.DbNull
   postStyle: Prisma.InputJsonValue | typeof Prisma.DbNull
   renderedText: Prisma.InputJsonValue | typeof Prisma.DbNull
+  renderNotes: Prisma.InputJsonValue | typeof Prisma.DbNull
 } {
   return {
     promptVersion: stamp.promptVersion,
@@ -200,6 +221,7 @@ export function draftStampFields(stamp: RenderStamp): {
     composition: toJsonColumn(stamp.composition),
     postStyle: postStyleColumn(stamp.postStyle),
     renderedText: renderedTextColumn(stamp.renderedText),
+    renderNotes: renderNotesColumn(stamp.renderNotes),
   }
 }
 
@@ -217,6 +239,7 @@ export function restoredRenderStamp(
     modelSubstitutedFrom?: string | null
     composition?: unknown
     renderedText?: unknown
+    renderNotes?: unknown
   },
   rerendered: boolean,
   // 027: the draft's CURRENT post-style stamp, carried (a restore moves the
@@ -235,6 +258,9 @@ export function restoredRenderStamp(
     // 030: the row's own stamp, also when re-rendered (FR-04): a row old enough
     // to need a re-render predates 030, so this is null there.
     renderedText: parseRenderedText(revision.renderedText),
+    // 031: the row's own note. A legacy row re-rendered here predates 031, so
+    // this is null there, as for renderedText.
+    renderNotes: parseRenderNotes(revision.renderNotes),
   }
 }
 
@@ -500,6 +526,8 @@ export async function compositeRenderForDraft(
 interface RenderResult {
   png: Buffer
   headlineCheck: HeadlineCheck | null
+  // 031 FR-24: the post-font families the render could not load.
+  fontsMissing: string[]
 }
 
 // The on-image headline a render of this draft is checked against: the stored
@@ -590,6 +618,7 @@ export async function commitDraftRevision(
       args.composition,
       args.postStyle,
       stampFromCheck(headline, rendered.headlineCheck ?? 'not-checked'),
+      renderNotesFrom(rendered.fontsMissing),
     )
     finalExportKey = exportKey('refine', draftId)
     await uploadObject(rendered.png, BUCKET_EXPORTS, finalExportKey, 'image/png')
@@ -597,9 +626,9 @@ export async function commitDraftRevision(
   }
   const committedExportKey: string = finalExportKey
   // A caller-supplied export with no adopt id: nothing here saw its pixels, so
-  // the stamp carries no rendered text.
+  // the stamp carries no rendered text and no render note.
   const finalStamp: RenderStamp =
-    stamp ?? currentRenderStamp(args.model ?? null, args.composition, args.postStyle, null)
+    stamp ?? currentRenderStamp(args.model ?? null, args.composition, args.postStyle, null, null)
 
   let revision: { id: string; revisionNumber: number }
   try {
@@ -747,6 +776,7 @@ async function rejectedRenderStamp(
       modelSubstitutedFrom: true,
       composition: true,
       renderedText: true,
+      renderNotes: true,
     },
   })
   return {
@@ -757,6 +787,7 @@ async function rejectedRenderStamp(
     composition: parseCompositionStamp(row?.composition),
     postStyle,
     renderedText: parseRenderedText(row?.renderedText),
+    renderNotes: parseRenderNotes(row?.renderNotes),
   }
 }
 
@@ -960,6 +991,7 @@ export async function recordRejectedRender(
     args.composition,
     args.postStyle,
     stampFromCheck(headline, 'not-checked'),
+    null,
   )
   // 025 FR-16: canonical for the stamp, like a commit's. An unusable document
   // (no html) is kept as the model wrote it.
@@ -973,7 +1005,11 @@ export async function recordRejectedRender(
       const rendered = await renderDraftHtml(draftId, html, stamp.composition, width, height, headline)
       const key = mintExportKey('refine', draftId)
       await uploadObject(rendered.png, BUCKET_EXPORTS, key, 'image/png')
-      stamp = { ...stamp, renderedText: stampFromCheck(headline, rendered.headlineCheck ?? 'not-checked') }
+      stamp = {
+        ...stamp,
+        renderedText: stampFromCheck(headline, rendered.headlineCheck ?? 'not-checked'),
+        renderNotes: renderNotesFrom(rendered.fontsMissing),
+      }
       exportKey = key
       exported = 'stored'
     } catch (err) {

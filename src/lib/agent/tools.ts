@@ -56,13 +56,13 @@ export async function toolRenderHtml(
   composites: CompositeRender | null,
   // 030: the headline the render is checked against.
   headline: string
-): Promise<{ url: string; key: string; headlineCheck: HeadlineCheck | null }> {
-  const { png: buffer, headlineCheck } = await renderPost(html, width, height, composites, { headline })
+): Promise<{ url: string; key: string; headlineCheck: HeadlineCheck | null; fontsMissing: string[] }> {
+  const { png: buffer, headlineCheck, fontsMissing } = await renderPost(html, width, height, composites, { headline })
   const key = exportKey("design", "agent")
   await uploadObject(buffer, BUCKET_EXPORTS, key, "image/png")
   // The export PNG stays private. Return a signed URL for the agent's reference
   // plus the object key, which the caller persists as Draft.exportUrl.
-  return { url: (await resolveExportUrl(key))!, key, headlineCheck }
+  return { url: (await resolveExportUrl(key))!, key, headlineCheck, fontsMissing }
 }
 
 export async function toolGetBrandKitContext(briefId: string): Promise<BrandKitContext> {

@@ -9,6 +9,8 @@ import { isCliMode, pipelineMode } from '@/lib/agent/config'
 import type { ResolvedModel } from '@/lib/models/resolve'
 import { buildPathASystemPrompt, buildPathAUserMessage } from '@/lib/agent/prompts/pathA'
 import { imageRulesFor } from '@/lib/agent/briefInput'
+import { applyPostFonts } from '@/lib/fonts/inject'
+import { postFontPlan, postFontsUrl } from '@/lib/fonts/plan'
 
 // Template/brief mismatch — thrown by the guards below so both HTTP routes
 // (mapped to 400) and the headless scheduler (recorded as errorReason) get the
@@ -95,6 +97,11 @@ export async function runPathADesign(
     imageRules: imageRulesFor(brief),
   })
 
+  // 031 FR-22: code adds the kit's fonts to the filled HTML before every render and upload, so
+  // the stored document carries the marked link and the script font in its stacks.
+  const fontPlan = postFontPlan(kit)
+  const postProcess = (html: string) => applyPostFonts(html, fontPlan, postFontsUrl)
+
   return isCliMode()
     ? runDesignAgentCli({
         systemPrompt,
@@ -105,6 +112,7 @@ export async function runPathADesign(
         height,
         model,
         headline,
+        postProcess,
       })
     : runDesignAgent({
         systemPrompt,
@@ -117,5 +125,6 @@ export async function runPathADesign(
         height,
         actor,
         headline,
+        postProcess,
       })
 }

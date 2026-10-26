@@ -231,6 +231,12 @@ describe('SCRIPT_SUPPORT_NOTE — no-emoji guidance', () => {
     expect(SCRIPT_SUPPORT_NOTE).toContain('captions are unaffected')
   })
 
+  it("says the app adds the brand's Sinhala font to every font stack (031 FR-23)", () => {
+    expect(SCRIPT_SUPPORT_NOTE).toContain(
+      'When the brand has a Sinhala font, the app adds it to every font stack in the design, so you do not need to name it.',
+    )
+  })
+
   it('carves emoji out of the exact-reproduction rule so the two rules cannot conflict', () => {
     // The exact-reproduction rule (protects Sinhala and other scripts) must not
     // fight the no-emoji-in-design rule: emoji get an explicit, narrow exception.
@@ -246,7 +252,9 @@ describe('SCRIPT_SUPPORT_NOTE — no-emoji guidance', () => {
     // 2026-10-11.1: the design prompts take the fenced headline, not the caption (012 FR-09).
     // 2026-10-21.1: hero image styles (009): the image-style contract in the art-director, Path B and refine prompts.
     // 2026-10-25.1: post styles (027): the value derives from the post-style dataset.
-    expect(PROMPT_VERSION).toBe(`2026-10-25.1+ps${POST_STYLES_REVISION}`)
+    // 2026-10-29.1: post fonts (031): the recomputed font request, the script font line and the
+    // note's sentence about the brand's Sinhala font.
+    expect(PROMPT_VERSION).toBe(`2026-10-29.1+ps${POST_STYLES_REVISION}`)
   })
 })
 

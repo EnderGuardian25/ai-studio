@@ -11,6 +11,8 @@ import { planDraftRecovery, STUCK_ACTION_REASON, STUCK_REASON } from '@/lib/draf
 import { COMMITTED_REVISION, draftCompositionStamp, resolveNotAppliedOutcome } from '@/lib/drafts/revisions'
 import { backgroundSkippedFor } from '@/lib/drafts/backgroundNotice'
 import { imageSourceNoticeFor, parseImageSource } from '@/lib/drafts/imageSourceNotice'
+import { fontNoticeFor } from '@/lib/drafts/fontNotice'
+import { parseRenderNotes } from '@/lib/fonts/renderNotes'
 import { compositionNoticeFor } from '@/lib/drafts/compositionNotice'
 import { styleSummary } from '@/lib/postStyles'
 import { parseFactsCheck } from '@/lib/factsCheck/types'
@@ -224,6 +226,8 @@ async function loadDraft(id: string) {
     backgroundSkipped: backgroundSkippedFor(draft.backgroundSkipReason, draft.backgroundSkipDetail, imageSource),
     // 031 FR-14: the user's own key failed and the team's provider made the image.
     imageSourceNotice: imageSourceNoticeFor(imageSource),
+    // 031 FR-24: the live render used a fallback for a post font (tolerant parse; null = nothing to say).
+    fontNotice: fontNoticeFor(parseRenderNotes(draft.renderNotes)),
     // 009 FR-15: the tolerant parse (null on anything unreadable) and its notice.
     composition,
     compositionNotice: compositionNoticeFor(composition),

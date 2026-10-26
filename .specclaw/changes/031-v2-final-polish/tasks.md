@@ -144,7 +144,7 @@
     - `catalogue.ts` starts with `import 'server-only'`.
     - **Gate:** tsc, lint, unit.
 
-- [ ] `T7` — Script fonts, code injection, prompt version, the render font check, `renderNotes`, the font notice
+- [x] `T7` — Script fonts, code injection, prompt version, the render font check, `renderNotes`, the font notice
   - Files: `prisma/schema.prisma`, `prisma/migrations/20261029120000_post_fonts/` (new), the down-script section B, `src/lib/fonts/{plan,inject}.ts` (new), `src/lib/brandkit/systemContext.ts`, `src/lib/agent/prompts/shared.ts`, `src/lib/agent/pathA.ts`, `src/lib/agent/pathB.ts`, `src/app/api/drafts/[id]/refine/route.ts`, `src/lib/renderer/puppeteer.ts`, `src/lib/drafts/revisions.ts`, `src/lib/agent/generateDraft.ts`, `src/app/api/drafts/[id]/regenerate-design/route.ts`, every `currentRenderStamp` caller, `src/lib/drafts/fontNotice.ts` (new), `src/app/api/drafts/[id]/route.ts`, `src/app/(app)/drafts/[id]/page.tsx`, `src/app/api/admin/brandkits/[id]/route.ts` (`scriptFonts`), `tests/unit/{applyPostFonts,fontInjectionSites,renderStampWriters,fontNotice}.test.ts`, `tests/render/postFonts.test.ts` (new) and fixtures
   - Estimate: large
   - Kind: impl

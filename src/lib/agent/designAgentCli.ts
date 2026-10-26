@@ -74,12 +74,12 @@ export async function runDesignAgentCli(options: CliAgentOptions): Promise<Desig
 
   // Render HTML → PNG → MinIO (same pipeline as the export route). A failed
   // composite check throws before anything is uploaded.
-  const { png, headlineCheck } = await renderPost(html, width, height, composites, { headline })
+  const { png, headlineCheck, fontsMissing } = await renderPost(html, width, height, composites, { headline })
   const key = exportKey("cli", briefId)
   await uploadObject(png, BUCKET_EXPORTS, key, "image/png")
 
   // Persist the object key; it is signed per read.
-  return { htmlContent: html, exportUrl: key, toolCallCount: 0, headlineCheck }
+  return { htmlContent: html, exportUrl: key, toolCallCount: 0, headlineCheck, fontsMissing }
 }
 
 // ── Refine mode (change 004 Phase 2, T17) ────────────────────────────────────

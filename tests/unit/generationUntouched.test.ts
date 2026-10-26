@@ -30,7 +30,8 @@ describe('generation is untouched by 007', () => {
       [
         'Brand guidelines:',
         '- Colors: #0A1F44, #00A99D',
-        '- Fonts: Poppins (https://fonts.example/poppins), Inter (https://fonts.example/inter)',
+        // 031 FR-23: catalogue fonts carry their recomputed request (the one adaptation).
+        '- Fonts: Poppins (https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600;1,700&display=swap), Inter (https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600;1,700&display=swap)',
         '- Logos (pick the variant that fits the design; use the primary if unsure):',
         '    • [primary] Primary mark: https://cdn.example/logo.png',
         '    • Reversed: https://cdn.example/logo-w.png',
@@ -38,7 +39,7 @@ describe('generation is untouched by 007', () => {
       ].join('\n'),
     )
   })
-  it('PROMPT_VERSION moved only by 027 (the derived post-styles suffix)', () => {
-    expect(PROMPT_VERSION).toBe(`2026-10-25.1+ps${POST_STYLES_REVISION}`)
+  it('PROMPT_VERSION moved only by 027 (the derived post-styles suffix) and 031 (the base bump)', () => {
+    expect(PROMPT_VERSION).toBe(`2026-10-29.1+ps${POST_STYLES_REVISION}`)
   })
 })

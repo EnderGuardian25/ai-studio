@@ -9,6 +9,8 @@ import { resolveExportUrl } from '@/lib/storage/minio'
 import { runDesignAgentRefine } from '@/lib/agent/designAgent'
 import { runDesignAgentCliRefine } from '@/lib/agent/designAgentCli'
 import { extractInlineAssets, restoreInlineAssets } from '@/lib/agent/inlineAssets'
+import { applyPostFonts } from '@/lib/fonts/inject'
+import { postFontPlan, postFontsUrl } from '@/lib/fonts/plan'
 import { dimensionsFor } from '@/lib/aspectRatio'
 import { pathForDesignMode, pipelineMode } from '@/lib/agent/config'
 import { resolveModel } from '@/lib/models/policy'
@@ -238,6 +240,11 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
     // keeps its stamp (refineReplacedStamp returns it unchanged).
     const commitStamp = prevStamp && background.url ? refineReplacedStamp(prevStamp) : prevStamp
 
+    // 031 FR-22: code adds the kit's fonts to the refined document before it is written (the
+    // commit, the rejected render "Use anyway" may adopt, and a conflict's withheld HTML that an
+    // Override commits). Idempotent, so a document that already carries them is unchanged.
+    const fontPlan = postFontPlan(kit)
+
     // 027 FR-09: the image rules of the draft's STAMPED post style, at the
     // stamped version. No stamp, or one that no longer resolves, passes none
     // (the unresolvable case warns once); it never fails a refine.
@@ -351,7 +358,7 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
         await commitDraftRevision({
           draftId: draft.id,
           instruction,
-          html,
+          html: applyPostFonts(html, fontPlan, postFontsUrl),
           width,
           height,
           backgroundImageUrl,
@@ -379,7 +386,11 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
               conflictId: randomUUID(),
               // Restore externalized assets so the withheld HTML renders correctly
               // if the user clicks Override later.
-              pendingHtml: restoreInlineAssets(conflict.pendingHtml, inlineAssets),
+              pendingHtml: applyPostFonts(
+                restoreInlineAssets(conflict.pendingHtml, inlineAssets),
+                fontPlan,
+                postFontsUrl,
+              ),
               explanation: conflict.explanation,
               // 008 A6: what wrote pendingHtml, for the Override's stamp.
               model: model.arg,
@@ -401,7 +412,7 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
         await recordRejectedRender({
           draftId: draft.id,
           instruction,
-          html: notApplied.html,
+          html: notApplied.html ? applyPostFonts(notApplied.html, fontPlan, postFontsUrl) : notApplied.html,
           unusableHtml: notApplied.unusableHtml,
           width,
           height,

@@ -134,12 +134,12 @@ export async function runDesignAgent(options: RunDesignAgentOptions): Promise<De
       throw new Error("Mock generation failure (__FAIL_GEN_ALWAYS__ sentinel)")
     }
     if (userMessage.includes("conflict_test")) {
-      return { htmlContent: buildMockConflict(), exportUrl: "", toolCallCount: 0, headlineCheck: null }
+      return { htmlContent: buildMockConflict(), exportUrl: "", toolCallCount: 0, headlineCheck: null, fontsMissing: [] }
     }
     const mockHtml = buildMockHtml(`${systemPrompt}\n${userMessage}`, width, height, headline)
     const html = postProcess ? postProcess(mockHtml) : mockHtml
-    const { key, headlineCheck } = await toolRenderHtml(html, width, height, composites, headline)
-    return { htmlContent: html, exportUrl: key, toolCallCount: 1, headlineCheck }
+    const { key, headlineCheck, fontsMissing } = await toolRenderHtml(html, width, height, composites, headline)
+    return { htmlContent: html, exportUrl: key, toolCallCount: 1, headlineCheck, fontsMissing }
   }
 
   const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY })
@@ -158,6 +158,8 @@ export async function runDesignAgent(options: RunDesignAgentOptions): Promise<De
   let lastExportUrl = ""
   // 030: the check of the last render (null until one happens).
   let lastHeadlineCheck: HeadlineCheck | null = null
+  // 031 FR-24: the font check of the last render.
+  let lastFontsMissing: string[] = []
   // Every export this run uploaded (025: the composite fallback deletes them all).
   const uploadedKeys: string[] = []
 
@@ -261,6 +263,7 @@ export async function runDesignAgent(options: RunDesignAgentOptions): Promise<De
           // Persist the object KEY (signed per read), not the transient URL.
           lastExportUrl = (result as { key: string }).key
           lastHeadlineCheck = (result as { headlineCheck: HeadlineCheck | null }).headlineCheck
+          lastFontsMissing = (result as { fontsMissing?: string[] }).fontsMissing ?? []
           uploadedKeys.push(lastExportUrl)
         }
 
@@ -294,7 +297,13 @@ export async function runDesignAgent(options: RunDesignAgentOptions): Promise<De
     }
   }
 
-  return { htmlContent: lastHtml, exportUrl: lastExportUrl, toolCallCount, headlineCheck: lastHeadlineCheck }
+  return {
+    htmlContent: lastHtml,
+    exportUrl: lastExportUrl,
+    toolCallCount,
+    headlineCheck: lastHeadlineCheck,
+    fontsMissing: lastFontsMissing,
+  }
 }
 
 // ── Refine mode (change 004 Phase 2, T17) ────────────────────────────────────

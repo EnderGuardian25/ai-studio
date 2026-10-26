@@ -3,6 +3,9 @@
 // preStyleGolden.json, captured from these same functions at the base commit
 // (8816d89, before any 027 edit to a builder) in a git worktree. The test
 // asserts byte equality, so a brief with no style cannot change any prompt.
+// 031 (T7) adapted the golden JSON by exactly two substitutions, the change's own prompt edits:
+// Poppins's request is the recomputed catalogue URL (FR-23), and SCRIPT_SUPPORT_NOTE gains its
+// one sentence.
 //
 // This file calls only the builders' pre-027 option sets. It must never pass
 // `imageRules` or `captionRules`.

@@ -15,8 +15,18 @@
 
 -- ============================================================================
 -- Section B: 20261029120000_post_fonts
--- PLACEHOLDER: written by the group B task (T9). Nothing here yet.
+-- It drops each kit's script fonts, each draft's and revision's render note, and
+-- the fonts a prompt version recorded before an assistant apply. The previous
+-- image reads none of them. The stored HTML keeps the injected font link and
+-- stack entries, which render as before.
 -- ============================================================================
+ALTER TABLE "BrandKitPrompt" DROP COLUMN IF EXISTS "previousFonts";
+ALTER TABLE "DraftRevision" DROP COLUMN IF EXISTS "renderNotes";
+ALTER TABLE "Draft" DROP COLUMN IF EXISTS "renderNotes";
+ALTER TABLE "BrandKit" DROP COLUMN IF EXISTS "scriptFonts";
+
+DELETE FROM "_prisma_migrations"
+WHERE "migration_name" = '20261029120000_post_fonts';
 
 -- ============================================================================
 -- Section C: 20261028120000_personal_image_key_provider

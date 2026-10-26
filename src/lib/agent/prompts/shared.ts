@@ -21,7 +21,11 @@ import { derivedPromptVersion } from '@/lib/postStyles'
 // 2026-10-25.1: post styles (027): the version now derives from the post-style
 // dataset, so a checklist edit (which raises POST_STYLES_REVISION) changes it
 // with no manual bump. A brief with no style gets the same prompt text as before.
-export const PROMPT_VERSION_BASE = '2026-10-25.1'
+// 2026-10-29.1: post fonts (031): the brand context lists each catalogue font with
+// its recomputed request and the kit's script fonts ("Sinhala text: ... (loaded for
+// you)"), and SCRIPT_SUPPORT_NOTE says the app adds the brand's Sinhala font to
+// every font stack.
+export const PROMPT_VERSION_BASE = '2026-10-29.1'
 export const PROMPT_VERSION = derivedPromptVersion(PROMPT_VERSION_BASE)
 
 // The on-image headline block every design prompt carries (012 FR-09): the
@@ -47,7 +51,7 @@ ${fenceUntrusted(text)}`
 export const SCRIPT_SUPPORT_NOTE = `
 Text & language fidelity:
 - The copy may contain non-Latin scripts, including Sinhala (සිංහල). Reproduce every character of the copy EXACTLY as given — never transliterate, romanize, drop, or substitute glyphs. The only exception is emoji, covered below; every non-emoji character (Sinhala included) still follows this rule with no exception.
-- Sinhala (and other Unicode) text renders correctly in the output. You may name "Noto Sans Sinhala" explicitly in a font-family for Sinhala text, but the renderer also falls back to it automatically, so unstyled Sinhala still renders.
+- Sinhala (and other Unicode) text renders correctly in the output. You may name "Noto Sans Sinhala" explicitly in a font-family for Sinhala text, but the renderer also falls back to it automatically, so unstyled Sinhala still renders. When the brand has a Sinhala font, the app adds it to every font stack in the design, so you do not need to name it.
 - In the rendered design, use monochrome symbols from the covered set (e.g. ★ ✓ → • ✦) — never emoji; colour emoji glyphs are not installed and render as boxes. If the copy itself contains emoji, this does NOT contradict the exact-reproduction rule above: leave those emoji out of the rendered design, or replace each with a covered monochrome symbol from the listed set — never render the emoji glyph itself. This applies to the design only; captions are unaffected — the caption text keeps the copy's original emoji unchanged.`
 
 // Instruction to preserve externalized inline-asset tokens (see inlineAssets.ts).

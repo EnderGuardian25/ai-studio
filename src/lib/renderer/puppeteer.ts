@@ -21,6 +21,7 @@ import {
 } from "@/lib/designData"
 // Narrow imports, not the index: the stamp and notice modules are not needed here.
 import { HEADLINE_CHECK_TIMEOUT_MS, type HeadlineCheck } from "@/lib/renderedText/vocab"
+import { FONT_CHECK_TIMEOUT_MS, mockFontsMissing } from "@/lib/fonts/renderNotes"
 import { NORMALISE_HEADLINE_SOURCE } from "@/lib/renderedText/normalise"
 import { evaluateHeadlineFacts, type HeadlineFacts } from "@/lib/renderedText/facts"
 import { mockHeadlineCheck } from "@/lib/renderedText/mockCheck"
@@ -329,15 +330,76 @@ export async function runHeadlineCheck(
   }
 }
 
+// 031 FR-24 (design 5.6): the in-page font collector. The families are the `family` params of
+// the marked link (`link[data-post-fonts]`), axis stripped, so the render needs no kit argument.
+// After `document.fonts.ready`, a family is missing when the page holds no face for it (its
+// stylesheet was refused, blocked or never loaded) or every face it holds failed to load.
+// Deviation from the design's `document.fonts.check`: check() is false for a face that is
+// declared but never needed by the post's text (faces load lazily, per unicode-range subset), so
+// it would report a Sinhala font missing on every English post. A face that is merely unused
+// ("unloaded") is not missing.
+async function collectFontFacts(page: Pick<Page, "evaluate">): Promise<string[]> {
+  return page.evaluate(async () => {
+    const link = document.querySelector("link[data-post-fonts]") as HTMLLinkElement | null
+    if (!link) return []
+    let families: string[] = []
+    try {
+      families = new URL(link.href).searchParams.getAll("family").map((f) => f.split(":")[0].trim())
+    } catch {
+      return []
+    }
+    families = Array.from(new Set(families.filter(Boolean)))
+    if (families.length === 0) return []
+    await document.fonts.ready
+    const norm = (s: string) => s.replace(/^["']|["']$/g, "").replace(/\s+/g, " ").trim().toLowerCase()
+    const faces: FontFace[] = []
+    document.fonts.forEach((f) => faces.push(f))
+    return families.filter((family) => {
+      const mine = faces.filter((f) => norm(f.family) === norm(family))
+      return mine.length === 0 || mine.every((f) => f.status === "error")
+    })
+  })
+}
+
+// 031 FR-24, NFR-06: bounded and never throwing. A throw or a timeout gives [] and a log line,
+// and the render goes on. `page` is only what the collector needs, so a test can hand in a stub.
+export async function runFontCheck(
+  page: Pick<Page, "evaluate">,
+  timeoutMs: number = FONT_CHECK_TIMEOUT_MS
+): Promise<string[]> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    return await Promise.race([
+      collectFontFacts(page),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`timed out after ${timeoutMs} ms`)), timeoutMs)
+      }),
+    ])
+  } catch (err) {
+    console.warn(`[renderer] font check: ${err instanceof Error ? err.message : String(err)}`)
+    return []
+  } finally {
+    if (timer) clearTimeout(timer)
+  }
+}
+
+export interface RenderPostResult {
+  png: Buffer
+  headlineCheck: HeadlineCheck | null
+  // 031 FR-24: the marked link's families that did not load ([] = none, or no check).
+  fontsMissing: string[]
+}
+
 // 030: one render, and with `check` the verdict on the headline as painted in
-// that same render. `renderHtmlToPng` is this with no check.
+// that same render. `renderHtmlToPng` is this with no check. 031: every render
+// also runs the font check, after the composite and headline checks.
 export async function renderPost(
   html: string,
   width: number,
   height: number,
   composites: CompositeRender | null,
   check: { headline: string } | null
-): Promise<{ png: Buffer; headlineCheck: HeadlineCheck | null }> {
+): Promise<RenderPostResult> {
   if (composites) assertCompositeHtml(html, composites)
   // Test seam: skip Chromium entirely and return a fixed PNG. The in-page
   // check is skipped; the sentinel makes the composite check fail on demand.
@@ -345,21 +407,25 @@ export async function renderPost(
     if (composites && shouldMockCompositeFail(html)) {
       throw new CompositeRenderError("composite-not-rendered", "mock composite failure")
     }
-    return { png: MOCK_PNG_BUFFER, headlineCheck: check ? mockHeadlineCheck(html, check.headline) : null }
+    return {
+      png: MOCK_PNG_BUFFER,
+      headlineCheck: check ? mockHeadlineCheck(html, check.headline) : null,
+      fontsMissing: mockFontsMissing(html),
+    }
   }
   return limit(() => {
     let headlineCheck: HeadlineCheck | null = null
+    let fontsMissing: string[] = []
     return withRenderedPage(
       html,
       width,
       height,
-      async (page) => ({ png: Buffer.from(await page.screenshot({ type: "png" })), headlineCheck }),
+      async (page) => ({ png: Buffer.from(await page.screenshot({ type: "png" })), headlineCheck, fontsMissing }),
       composites,
-      check
-        ? async (page) => {
-            headlineCheck = await runHeadlineCheck(page, check.headline, { width, height })
-          }
-        : undefined
+      async (page) => {
+        if (check) headlineCheck = await runHeadlineCheck(page, check.headline, { width, height })
+        fontsMissing = await runFontCheck(page)
+      }
     )
   })
 }

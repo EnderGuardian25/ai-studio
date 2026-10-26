@@ -9,6 +9,7 @@ import type { AspectRatio, Channel, DesignMode, TeamRole } from '@prisma/client'
 import type { Role } from '@/lib/auth'
 import type { BackgroundSkipped } from '@/lib/drafts/backgroundNotice'
 import type { ImageSourceNotice } from '@/lib/drafts/imageSourceNotice'
+import type { FontNotice } from '@/lib/drafts/fontNotice'
 import type { CompositionNotice } from '@/lib/drafts/compositionNotice'
 import type { FactsCheck } from '@/lib/factsCheck/types'
 import type { CompositionStamp } from '@/lib/designData'
@@ -398,6 +399,8 @@ export interface DraftDetail {
   // 031 FR-14: set when the user's own image key failed and the team's
   // provider made the image (null = nothing to say).
   imageSourceNotice: ImageSourceNotice | null
+  // 031 FR-24: set when the live render could not load a post font (null = nothing to say).
+  fontNotice: FontNotice | null
   // 009 FR-15: the stamped composition (null = before 009 or Path A history)
   // and the plain-language notice derived from it (null = nothing to say).
   composition: CompositionStamp | null

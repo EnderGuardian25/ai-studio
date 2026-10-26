@@ -71,6 +71,8 @@ export interface DesignAgentResult {
   toolCallCount: number
   // 030: the check of the final render (null when the run rendered nothing).
   headlineCheck: HeadlineCheck | null
+  // 031 FR-24: the post-font families the final render could not load ([] = none, or no render).
+  fontsMissing: string[]
 }
 
 export class AgentToolLimitError extends Error {

@@ -7,6 +7,7 @@ import { briefPostStyleStamp, buildBriefInput } from '@/lib/agent/briefInput'
 import { runPathADesign, assertTemplateMatchesBrief } from '@/lib/agent/pathA'
 import { runPathBDesign } from '@/lib/agent/pathB'
 import { stampFromCheck } from '@/lib/renderedText/stamp'
+import { renderNotesFrom } from '@/lib/fonts/renderNotes'
 import { currentRenderStamp, draftStampFields, revisionStampFields, type RenderStamp } from '@/lib/drafts/revisions'
 import { classicStamp } from '@/lib/designData'
 import { humanizeGenerationError } from '@/lib/agent/generationErrors'
@@ -170,6 +171,8 @@ async function produceDesign(
         briefPostStyleStamp(brief),
         // 030 FR-04: the render's own check (null = no render ran: not-checked).
         stampFromCheck(headline, result.headlineCheck ?? 'not-checked'),
+        // 031 FR-24: what the same render found about its fonts.
+        renderNotesFrom(result.fontsMissing),
       ),
     }
   }
@@ -187,6 +190,7 @@ async function produceDesign(
       result.composition,
       briefPostStyleStamp(brief),
       stampFromCheck(headline, result.headlineCheck ?? 'not-checked'),
+      renderNotesFrom(result.fontsMissing),
     ),
   }
 }

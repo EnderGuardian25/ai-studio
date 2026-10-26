@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server'
+import { Prisma } from '@prisma/client'
 import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { withTeamAdmin, parseBody } from '@/lib/api/handler'
 import { findFamily } from '@/lib/fonts/catalogue'
-import { validateKitFonts } from '@/lib/fonts/validateKitFonts'
+import { validateKitFonts, validateScriptFonts } from '@/lib/fonts/validateKitFonts'
 
 type Params = { id: string }
 
@@ -27,6 +28,8 @@ const patchSchema = z.object({
   name: z.string().trim().optional(),
   colors: z.array(z.string()).optional(),
   fonts: z.array(z.object({ name: z.string(), url: z.string() })).optional(),
+  // 031 FR-21: { [script]: family }; null or {} clears it.
+  scriptFonts: z.record(z.string()).nullable().optional(),
   logoUrl: z.string().regex(/^https?:\/\//, 'logoUrl must be an http(s) URL').nullable().optional(),
   isDefault: z.boolean().optional(),
 })
@@ -39,7 +42,7 @@ export const PATCH = withTeamAdmin<Params>(async (req, { params }, user) => {
 
   const body = await parseBody(req, patchSchema)
   if (body.response) return body.response
-  const { name, colors, fonts, logoUrl, isDefault } = body.data
+  const { name, colors, fonts, scriptFonts, logoUrl, isDefault } = body.data
 
   // 031 FR-20: an entry identical to a stored one is kept as is; any other must be a catalogue
   // family (its url is computed); at most 6. Nothing is written on a refusal.
@@ -49,6 +52,15 @@ export const PATCH = withTeamAdmin<Params>(async (req, { params }, user) => {
     const checked = validateKitFonts(fonts, stored, findFamily)
     if (!checked.ok) return NextResponse.json({ error: checked.error }, { status: 400 })
     nextFonts = checked.fonts
+  }
+
+  // 031 FR-21: an offered script key, a catalogue family that has that script. null or {} clears
+  // it (stored as SQL NULL). Nothing is written on a refusal.
+  let nextScriptFonts: Prisma.InputJsonValue | typeof Prisma.DbNull | undefined
+  if (scriptFonts !== undefined) {
+    const checked = validateScriptFonts(scriptFonts, findFamily)
+    if (!checked.ok) return NextResponse.json({ error: checked.error }, { status: 400 })
+    nextScriptFonts = checked.scriptFonts ?? Prisma.DbNull
   }
 
   // Setting the primary logo must reference an existing LOGO artifact of this
@@ -82,6 +94,7 @@ export const PATCH = withTeamAdmin<Params>(async (req, { params }, user) => {
         ...(name !== undefined && { name }),
         ...(colors !== undefined && { colors }),
         ...(nextFonts !== undefined && { fonts: nextFonts }),
+        ...(nextScriptFonts !== undefined && { scriptFonts: nextScriptFonts }),
         ...(logoUrl !== undefined && { logoUrl }),
         ...(isDefault !== undefined && { isDefault }),
       },
