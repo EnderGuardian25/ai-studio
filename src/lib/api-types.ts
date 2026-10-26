@@ -314,7 +314,7 @@ export interface ModelsView {
 // ── Drafts ───────────────────────────────────────────────────────────────
 
 // In-flight async draft action — mirrors the Prisma DraftAction enum.
-export type DraftAction = 'REGENERATE_COPY' | 'REGENERATE_DESIGN' | 'REFINE'
+export type DraftAction = 'REGENERATE_COPY' | 'REGENERATE_DESIGN' | 'REFINE' | 'APPLY_TEXT'
 
 // GET /api/drafts/[id] — the not-applied refine outcome (change 004 FR-14,
 // AC-18; T18). A refine that failed its fidelity check twice commits

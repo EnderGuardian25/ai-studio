@@ -1217,6 +1217,7 @@ CI gate: **`.github/workflows/e2e.yml`** runs the whole suite (§A–§AA, inclu
 | Change 009 hero imagery (AC-04, AC-05, AC-12 to AC-19, AC-21)   | §AA TC-HERO-01…16, `a11y` draft page and `/brief` axe (see §AA map)                    |
 | Change 030 stale-headline badge (AC-11 → AC-19)                 | §AH TC-HL-01…10, `a11y` "AC-19: a draft page with the stale-headline badge" (see §AH)  |
 | Change 031 personal image generation key (AC-12)                | §AI TC-IK-01…06 (see §AI)                                                              |
+| Change 031 Apply to image (AC-38 → AC-40)                       | §AM TC-AP-01…10 (see §AM)                                                              |
 
 > Items with no behavioral surface (M2 init race, M3 stdin, M7 polling, M8 crypto guards, M13 dead code) are best covered by unit tests; M7 polling can optionally be a UI test (draft auto-refresh while `IN_PROGRESS`).
 
@@ -1305,3 +1306,24 @@ Mock mode (`MOCK_AI` + `MOCK_PUPPETEER`), a fresh campaign per case, serial. The
 TC-AS-04 to TC-AS-06 (T12) create a kit with two fonts through the API and drive the "Extract from references" drawer; the `MOCK_AI` brand-kit reply proposes heading Playfair Display, body Inter and a Sinhala font. Unit: `brandKitBlock.test.ts` and `brandKitApply.test.ts` (AC-31).
 
 Adapted: `campaign-scheduling.test.ts` (F4 chat case) sends `postStyle` instead of `goal`; `briefingAssistant.test.ts` no longer expects a defaulted `goal`.
+
+### AM. Apply to image (`apply-text.test.ts`, change 031 T15 — AC-38, AC-39, AC-40)
+
+Mock mode (`MOCK_AI` + `MOCK_PUPPETEER`), the seeded team, serial. The mock design paints its headline in one element, and the in-render check is the text stand-in (`src/lib/renderedText/mockCheck.ts`). A stale draft is made by changing the headline through `PATCH /api/drafts/[id]`. The button is "Apply the new headline to the image" (the badge); the confirm dialog is titled "Apply to image". Every `page.waitForResponse` is created before its trigger.
+
+**The seams** (dormant in prod). A new headline carrying `__MOCK_APPLY_NOT_PAINTED__` (the new text is not painted), `__MOCK_APPLY_OLD_PAINTED__` (the old text still is) or `__MOCK_APPLY_RENDER_FAIL__` (the render throws) forces that verdict; the 030 seams (`__MOCK_HEADLINE_HIDDEN__`, `POST /api/test/draft-rendered-text`, `GET/DELETE /api/test/analytics-events`) make an `unconfirmed` and an `unknown` draft and read the events. A held claim is made through the test DB.
+
+| Case     | AC           | What it checks                                                                                                                                                                        |
+| -------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| TC-AP-01 | AC-38        | Apply on a stale draft shows the exact confirm text; then the badge is gone, the stamp is `{ text: new, verified: true }`, the HTML holds the new headline, and one revision is added |
+| TC-AP-02 | AC-38        | Undo after Apply restores the previous `htmlContent` byte for byte, and the badge comes back                                                                                          |
+| TC-AP-03 | AC-39        | `__MOCK_APPLY_NOT_PAINTED__` ends with the `not-painted` sentence on the page, no new revision, the HTML unchanged                                                                    |
+| TC-AP-04 | AC-39        | `__MOCK_APPLY_OLD_PAINTED__` ends with the `old-still-painted` sentence, no new revision                                                                                              |
+| TC-AP-05 | AC-39        | `__MOCK_APPLY_RENDER_FAIL__` ends with the `render-failed` sentence, no new revision                                                                                                  |
+| TC-AP-06 | AC-39        | No Apply button on a fresh, an unconfirmed or an unknown draft; the server refuses the last two with 422 `not-stale`                                                                  |
+| TC-AP-07 | AC-39        | While an Apply holds the claim, Apply and Regenerate design get 409, the preview shows "Applying headline", and the badge button is disabled                                          |
+| TC-AP-08 | AC-39        | A headline shown twice (seeded) is 422 `ambiguous`: the sentence in a toast, no claim, no revision, the badge still shown                                                             |
+| TC-AP-09 | AC-40        | One `draft.text_applied` per verdict (`ok`, then `failed` with `failure: ambiguous`), `draft.headline_edited` with `via: apply`, and no headline text in any payload                  |
+| TC-AP-10 | AC-40, FR-35 | No "Beta" chip while the measured rate is at or above 80% (`APPLY_TEXT_BETA` is false); the chip itself is covered by the unit test `applyTextRoute.test.ts`                          |
+
+Unit: `applyTextRoute.test.ts` (each refusal is 422 with nothing claimed; 409; the 202 path; the event once per verdict; the verdict fails closed on a null absent check) and `applyTextCoverage.test.ts` (every `APPLY_FAILURES` value is carried by the event). Render: `tests/render/applyCheck.test.ts` (T14).

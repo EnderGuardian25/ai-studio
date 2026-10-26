@@ -1142,7 +1142,7 @@ test.describe('Brand kits (T11)', () => {
     await expect(proposal.getByRole('button', { name: /^Remove color / }).first()).toBeVisible()
     await expect(proposal.getByRole('button', { name: 'Dismiss' })).toBeVisible()
     await expectNoHorizontalScroll(page, 'assistant with a proposal at 375px')
-    await proposal.getByRole('button', { name: 'Apply voice + colors' }).click()
+    await proposal.getByRole('button', { name: 'Apply to brand kit' }).click()
     await expect(drawer).toBeHidden()
 
     // The Add kit modal.

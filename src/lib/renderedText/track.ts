@@ -11,7 +11,7 @@ export interface HeadlineEditedInput {
   draftId: string
   teamId: string
   userId: string | null
-  via: 'edit' | 'regenerate'
+  via: 'edit' | 'regenerate' | 'apply'
   /** The headline before the write. */
   before: string | null
 }

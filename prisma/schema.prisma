@@ -41,6 +41,7 @@ enum DraftAction {
   REGENERATE_COPY
   REGENERATE_DESIGN
   REFINE
+  APPLY_TEXT
 }
 
 enum Channel {

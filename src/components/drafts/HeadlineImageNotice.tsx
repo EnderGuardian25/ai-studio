@@ -3,6 +3,7 @@
 import { Type } from 'lucide-react'
 import type { HeadlineImage } from '@/lib/api-types'
 import { headlineNoticeText } from '@/lib/renderedText/noticeText'
+import { APPLY_TEXT_BETA } from '@/lib/applyText'
 import { Notice } from '@/components/ui/Notice'
 import { Button } from '@/components/ui/Button'
 import { ICON } from '@/components/ui/atoms'
@@ -11,9 +12,14 @@ export interface HeadlineImageNoticeProps {
   image: HeadlineImage
   canEditInline: boolean
   canRegenerate: boolean
+  // 031 FR-44: Apply to image, offered only while the image is stale.
+  canApply?: boolean
   disabled: boolean
   onEditInline: () => void
   onRegenerateDesign: () => void
+  onApply?: () => void
+  // The "Beta" chip; defaults to the measured constant (031 FR-35).
+  beta?: boolean
 }
 
 // 030 FR-13: the image does not show the current headline. Amber and
@@ -23,9 +29,12 @@ export function HeadlineImageNotice({
   image,
   canEditInline,
   canRegenerate,
+  canApply = false,
   disabled,
   onEditInline,
   onRegenerateDesign,
+  onApply,
+  beta = APPLY_TEXT_BETA,
 }: HeadlineImageNoticeProps) {
   const text = headlineNoticeText(image)
   if (!text) return null
@@ -54,6 +63,16 @@ export function HeadlineImageNotice({
         {canRegenerate && (
           <Button variant="secondary" size="sm" onClick={onRegenerateDesign} disabled={disabled} aria-label="Regenerate design to fix the headline">
             Regenerate design
+          </Button>
+        )}
+        {canApply && image.state === 'stale' && onApply && (
+          <Button variant="secondary" size="sm" onClick={onApply} disabled={disabled} aria-label="Apply the new headline to the image">
+            Apply to image
+            {beta && (
+              <span data-testid="apply-beta-chip" className="ml-1.5 rounded-ui-pill border border-line px-1.5 text-ui-2xs font-semibold text-fg-muted">
+                Beta
+              </span>
+            )}
           </Button>
         )}
       </div>

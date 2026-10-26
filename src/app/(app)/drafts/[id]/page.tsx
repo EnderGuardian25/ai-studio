@@ -37,12 +37,21 @@ import { EYEBROW, FOCUS, ICON, ICON_SM, PILL_BADGE } from '@/components/ui/atoms
 import { ApiError, apiFetch } from '@/lib/apiFetch'
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser'
 import { useUndoableAction } from '@/lib/hooks/useUndoableAction'
+import { useConfirm } from '@/components/ui/ConfirmDialog'
+import { applyFailureNotice, APPLY_FAILURES, type ApplyFailure } from '@/lib/applyText'
 import type { DraftDetail } from '@/lib/api-types'
 import { ASPECT_LABELS, aspectClassFor, dimensionsFor } from '@/lib/aspectRatio'
 import { channelLabel } from '@/lib/channels'
 import { formatDateTime } from '@/lib/format'
 import type { ModelKey } from '@/lib/models/catalogue'
 import { generatedWith } from '@/lib/models/stampLabel'
+
+// The words on the preview overlay while a design action runs (no ellipsis).
+function designOverlayLabel(action: DraftDetail['pendingAction']): string {
+  if (action === 'REFINE') return 'Refining design'
+  if (action === 'APPLY_TEXT') return 'Applying headline'
+  return 'Regenerating design'
+}
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -98,6 +107,8 @@ export default function DraftDetailPage() {
   const [showPreview, setShowPreview] = useState(false)
   const [showInlineEdit, setShowInlineEdit] = useState(false)
   const [regenDesign, setRegenDesign] = useState(false)
+  const [applyingText, setApplyingText] = useState(false)
+  const confirm = useConfirm()
   // 008 FR-20: the design regenerate's model pick (undefined = the current
   // design's stamp, A5) and a refused pick's 400 message.
   const [designModel, setDesignModel] = useState<ModelKey | undefined>(undefined)
@@ -273,12 +284,53 @@ export default function DraftDetailPage() {
     }
   }
 
+  // 031 FR-44: put the new headline on the image (no model call). A refusal is a
+  // 422 before anything is claimed; a render-time failure arrives later as
+  // pendingActionError. Undo is captured first, as for regenerate.
+  async function handleApplyText() {
+    if (!draft) return
+    const oldText = draft.headlineImage?.renderedHeadline ?? ''
+    const confirmed = await confirm({
+      title: 'Apply to image',
+      description: `Replace “${oldText}” with “${draft.headline ?? ''}” in the image. Styling inside the headline (for example a colored word or a line break) becomes plain text. Undo brings the old version back.`,
+      confirmLabel: 'Apply to image',
+      danger: false,
+    })
+    if (!confirmed) return
+    setApplyingText(true)
+    const previousUndo = designUndo.snapshot
+    if (draft.currentRevisionNumber != null) {
+      designUndo.capture(draft.currentRevisionNumber)
+    } else {
+      designUndo.clear()
+    }
+    try {
+      await apiFetch(`/api/drafts/${draftId}/apply-text`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ field: 'headline' }),
+      })
+      await fetchDraft()
+    } catch (e: unknown) {
+      // Nothing was claimed or written: put back the Undo target it replaced.
+      if (previousUndo === null) designUndo.clear()
+      else designUndo.capture(previousUndo)
+      const code = e instanceof ApiError ? e.code : undefined
+      const known = (APPLY_FAILURES as readonly string[]).includes(code ?? '')
+      toast.error(known ? applyFailureNotice(code as ApplyFailure) : e instanceof Error ? e.message : 'Could not apply the headline')
+    } finally {
+      setApplyingText(false)
+    }
+  }
+
   const isPathB = draft?.brief.designMode === 'GENERATE'
   const isGenerating = draft?.status === 'IN_PROGRESS'
   // An async action (regenerate/refine) is running in the background.
   const actionPending = draft?.pendingAction != null
   const designActionPending =
-    draft?.pendingAction === 'REGENERATE_DESIGN' || draft?.pendingAction === 'REFINE'
+    draft?.pendingAction === 'REGENERATE_DESIGN' ||
+    draft?.pendingAction === 'REFINE' ||
+    draft?.pendingAction === 'APPLY_TEXT'
   const isFailed = draft?.status === 'FAILED'
   const ready = draft?.status === 'EXPORTED' || draft?.status === 'PUBLISHED'
 
@@ -310,7 +362,7 @@ export default function DraftDetailPage() {
   // the API lists newest first.
   const versions = [...revisions].sort((a, b) => a.revisionNumber - b.revisionNumber)
   // Regenerate design's Undo — Path B only, like the button itself.
-  const showUndo = isPathB && designUndo.snapshot !== null
+  const showUndo = designUndo.snapshot !== null
   // The meta row (the study's .meta): channels, kit and size, split by 3 px dots.
   const meta = [
     draft.brief.channels.map(channelLabel).join(' · '),
@@ -494,13 +546,13 @@ export default function DraftDetailPage() {
                 <div
                   className="absolute inset-0 flex flex-col items-center justify-center bg-scrim/40"
                   aria-label={
-                    draft.pendingAction === 'REFINE' ? 'Refining design' : 'Regenerating design'
+                    designOverlayLabel(draft.pendingAction)
                   }
                   role="status"
                 >
                   <span className="surface-raised flex items-center gap-2 px-3 py-2 text-ui-xs font-semibold text-fg">
                     <Loader2 {...ICON} className="animate-spin" />
-                    {draft.pendingAction === 'REFINE' ? 'Refining design…' : 'Regenerating design…'}
+                    {designOverlayLabel(draft.pendingAction)}…
                   </span>
                 </div>
               )}
@@ -550,9 +602,11 @@ export default function DraftDetailPage() {
                 image={draft.headlineImage}
                 canEditInline={ready && !!draft.htmlContent}
                 canRegenerate={isPathB && !!draft.htmlContent}
-                disabled={actionPending || regenDesign || designUndo.undoing}
+                canApply={ready && !!draft.htmlContent}
+                disabled={actionPending || regenDesign || applyingText || designUndo.undoing}
                 onEditInline={() => setShowInlineEdit(true)}
                 onRegenerateDesign={handleRegenerateDesign}
+                onApply={handleApplyText}
               />
             )}
 

@@ -10,8 +10,19 @@
 
 -- ============================================================================
 -- Section A: 20261030120000_apply_text_action
--- PLACEHOLDER: written by the group A task (T14). Nothing here yet.
 -- ============================================================================
+-- Postgres cannot drop an enum value, so this section leaves 'APPLY_TEXT' in
+-- the "DraftAction" type. That is harmless: the previous image never reads it.
+-- Before running the other sections, clear any claim that holds it, so no row
+-- carries a value the previous image does not know:
+UPDATE "Draft" SET "pendingAction" = NULL, "pendingActionClaimId" = NULL
+WHERE "pendingAction" = 'APPLY_TEXT';
+
+-- Un-record the migration, so a later redeploy's boot `migrate deploy` runs it
+-- again. Its statement is not idempotent, so a re-run on a database that still
+-- holds the value would fail: drop this DELETE if you will not re-apply.
+DELETE FROM "_prisma_migrations"
+WHERE "migration_name" = '20261030120000_apply_text_action';
 
 -- ============================================================================
 -- Section B: 20261029120000_post_fonts

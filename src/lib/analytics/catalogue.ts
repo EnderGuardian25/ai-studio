@@ -25,6 +25,7 @@ import { archetypes, FALLBACK_REASONS, type ArchetypeKey } from '@/lib/designDat
 import { POST_STYLE_KEYS } from '@/lib/postStyles'
 import { redactText } from '@/lib/text/redact'
 import { HEADLINE_CHECKS, HEADLINE_STATES } from '@/lib/renderedText/vocab'
+import { APPLY_FAILURES, APPLY_FIELDS, APPLY_METHODS } from '@/lib/applyText/vocab'
 
 export const INSTRUCTION_MAX = 2000
 export const FAILURE_REASON_MAX = 500
@@ -160,9 +161,21 @@ export const CATALOGUE = {
     source: ['web'],
     outcomes: [],
     schema: z.object({
-      via: z.enum(['edit', 'regenerate']),
+      // 031 FR-43: 'apply' is additive; the schemaVersion stays.
+      via: z.enum(['edit', 'regenerate', 'apply']),
       state: z.enum(HEADLINE_STATES),
       scheduledPending: z.boolean(),
+    }),
+  },
+  // 031 FR-43: an Apply to image that reached a verdict. No text.
+  'draft.text_applied': {
+    schemaVersion: 1,
+    source: ['web'],
+    outcomes: ['ok', 'failed'],
+    schema: z.object({
+      field: z.enum(APPLY_FIELDS),
+      method: z.enum(APPLY_METHODS),
+      failure: z.enum(APPLY_FAILURES).optional(),
     }),
   },
   'publish.settled': {

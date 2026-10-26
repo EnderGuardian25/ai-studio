@@ -229,7 +229,7 @@ export function HeadlinePanel({
           )}
           <div className="mt-2 flex items-baseline justify-between gap-4">
             <p id={helpId} className="text-ui-xs text-fg-muted">
-              The text on the image. Edit inline or regenerate the design to put a changed headline on the image.
+              The text on the image. To put a changed headline on the image, use Edit inline, or Apply to image when the image is out of date. On Freeform posts, Regenerate design also works.
             </p>
             <span
               id={counterId}

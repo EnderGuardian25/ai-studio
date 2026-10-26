@@ -252,7 +252,7 @@
     - Design §8.2. The `absent` texts reuse `collectHeadlineFacts` and `evaluateHeadlineFacts`; do not write a second collector.
     - **Gate:** tsc, lint, unit, `npm run test:render`.
 
-- [ ] `T15` — The `apply-text` action, migration, claim co-changes, event, UI; §AM; full E2E
+- [x] `T15` — The `apply-text` action, migration, claim co-changes, event, UI; §AM; full E2E
   - Files: `prisma/schema.prisma`, `prisma/migrations/20261030120000_apply_text_action/` (new), the down-script section A, `src/app/api/drafts/[id]/apply-text/route.ts` (new), `src/lib/applyText/track.ts` (new), `src/lib/analytics/catalogue.ts`, `src/lib/api-types.ts`, `src/components/drafts/HeadlineImageNotice.tsx`, `src/components/drafts/HeadlinePanel.tsx` (W-19 Apply clause), `src/app/(app)/drafts/[id]/page.tsx`, `tests/unit/{applyTextRoute,applyTextCoverage}.test.ts`, `tests/e2e/apply-text.test.ts` (new), `docs/e2e-test-plan.md` (§AM)
   - Estimate: large
   - Kind: impl
