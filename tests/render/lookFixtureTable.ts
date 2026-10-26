@@ -103,6 +103,15 @@ export const LOOK_FIXTURES: readonly FixtureSpec[] = [
   row('device-screen', 1, 'STORY', 'small'),
 ]
 
+// 031 T16: candidate contracts (a version above its look's `current`, not yet served). The render
+// suite runs these with the shipped rows. They join LOOK_FIXTURES when OP-031 passes and T18 moves
+// `current`; fixtureCompletenessProblems is unchanged and ignores them while `current` stays 1.
+export const CANDIDATE_FIXTURES: readonly FixtureSpec[] = [
+  row('spotlight', 2, 'SQUARE', 'pass'),
+  row('spotlight', 2, 'SQUARE', 'busy'),
+  row('spotlight', 2, 'SQUARE', 'contrast'),
+]
+
 const KINDS: readonly FixtureKind[] = ['pass', 'busy', 'contrast']
 // The screen kinds exist exactly for a contract with a composite region (025, A1).
 const KINDS_WITH_SCREEN: readonly FixtureKind[] = [...KINDS, 'screen', 'pass-offset', 'text-overlap', 'small']

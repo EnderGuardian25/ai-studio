@@ -282,3 +282,18 @@ describe('look-check probe mode (025 AC-07)', () => {
     expect(text).toContain('"mode":"probe"')
   })
 })
+
+describe('031 OP-031 additions (the full rule is in op031Verdict.test.ts)', () => {
+  it('the OP-031 slot set is its own: one versioned slot, not in the 028 or 025 sets, with its own cap', () => {
+    expect(lc.OP031_SLOTS).toEqual(['spotlight@2:SQUARE'])
+    for (const s of lc.OP031_SLOTS) {
+      expect(SLOTS.map((x) => x.slot)).not.toContain(s)
+      expect(lc.PROBE_SLOTS).not.toContain(s)
+    }
+    expect(lc.OP031_CAP).toBe(4)
+    expect(lc.ledgerFitsOp031([{ slot: 'spotlight@2:SQUARE' }])).toBe(true)
+    expect(lc.ledgerFitsOp031([{ slot: 'spotlight:SQUARE' }])).toBe(false)
+    expect(lc.ledgerFitsOp031([{ malformed: true, slot: null }])).toBe(false)
+    expect(lc.ledgerFitsOp031([])).toBe(true)
+  })
+})

@@ -43,3 +43,7 @@
 {"ev":"start","span":"T14","kind":"task","label":"In-render Apply check, acceptRender","parent":"W7","model":"sonnet","attempt":"1","at":"2026-10-26T15:36:29Z","ts":1793028989}
 {"ev":"stop","span":"T14","at":"2026-10-26T15:48:04Z","ts":1793029684,"status":"ok"}
 {"ev":"start","span":"T15","kind":"task","label":"apply-text action, migration, UI, AM, full E2E","parent":"W7","model":"sonnet","attempt":"1","at":"2026-10-26T15:48:13Z","ts":1793029693}
+{"ev":"stop","span":"T15","at":"2026-10-26T16:25:41Z","ts":1793031941,"status":"ok"}
+{"ev":"stop","span":"W7","at":"2026-10-26T16:25:41Z","ts":1793031941,"status":"ok"}
+{"ev":"start","span":"W8","kind":"wave","label":"wave 8","at":"2026-10-26T16:25:53Z","ts":1793031953}
+{"ev":"start","span":"T16","kind":"task","label":"Spotlight evidence, v2 contract, runner","parent":"W8","model":"sonnet","attempt":"1","at":"2026-10-26T16:25:53Z","ts":1793031953}

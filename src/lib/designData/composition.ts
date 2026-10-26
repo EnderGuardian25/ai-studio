@@ -268,6 +268,40 @@ export const archetypes: ArchetypeMap = deepFreeze({
           },
         },
       },
+      // 031 (T16), a CANDIDATE: not served until OP-031 passes (`current` stays 1). SQUARE only
+      // differs from v1: both bands are pulled back from the subject, and the prompt says the
+      // top and bottom 22% are a flat, plain backdrop. PORTRAIT and STORY are v1 unchanged.
+      // Evidence: .specclaw/changes/031-v2-final-polish/look-check/evidence.md.
+      2: {
+        role: 'hero',
+        textTone: 'light',
+        sizes: {
+          SQUARE: {
+            subject:
+              'a single subject (an object, a product or an emblem) centred in the middle 50% of the frame, lit by one spotlight against a plain, dark background; the top 22% and bottom 22% are a flat, plain, dark backdrop with no texture or detail',
+            regions: [
+              band(0, 0, 100, 20, 'the headline'),
+              band(0, 80, 100, 20, 'the call to action and the logo'),
+            ],
+          },
+          PORTRAIT: {
+            subject:
+              'a single subject (an object, a product or an emblem) centred in the middle 42% of the frame, lit by one spotlight against a plain, dark background that stays dark at the top and bottom',
+            regions: [
+              band(0, 0, 100, 24, 'the headline'),
+              band(0, 76, 100, 24, 'the call to action and the logo'),
+            ],
+          },
+          STORY: {
+            subject:
+              'a single subject (an object, a product or an emblem) centred in the middle 56% of the frame, lit by one spotlight against a plain, dark background that stays dark at the top and bottom',
+            regions: [
+              band(0, 0, 100, 22, 'the headline'),
+              band(0, 78, 100, 22, 'the call to action and the logo'),
+            ],
+          },
+        },
+      },
     },
   },
   'device-screen': {

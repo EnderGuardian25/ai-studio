@@ -6,7 +6,7 @@ import { withTeamAuth, parseBody } from '@/lib/api/handler'
 import { resolveBrandKit } from '@/lib/brandkit/resolve'
 import { generateBackgroundForBrief } from '@/lib/agent/background'
 import { withClaudeAuth } from '@/lib/agent/userToken'
-import { planComposition, BLANK_STDDEV_MAX } from '@/lib/designData'
+import { planComposition, BLANK_STDDEV_MAX, archetypes } from '@/lib/designData'
 import { BUCKET_IMAGES, deleteObject } from '@/lib/storage/minio'
 import { MOCK_AI } from '@/lib/testHooks'
 
@@ -20,8 +20,20 @@ const bodySchema = z
   .object({
     key: z.string().min(1).max(64),
     size: z.enum(['SQUARE', 'PORTRAIT', 'STORY']),
+    // 031 FR-48: plan this contract version instead of the look's `current` (OP-031 checks a
+    // candidate version). At most the look's latest version. This route is the only caller that
+    // may pass one (planOverrideBoundary.test.ts).
+    version: z.number().int().positive().optional(),
   })
   .strict()
+  .refine(
+    (b) => {
+      if (b.version === undefined) return true
+      const versions = archetypes[b.key]?.versions
+      return !!versions && b.version <= Math.max(...Object.keys(versions).map(Number))
+    },
+    { message: 'version is above the latest version of this look', path: ['version'] },
+  )
 
 const PROBE_TOPIC = 'Product screen probe'
 
@@ -31,9 +43,9 @@ export const POST = withTeamAuth(async (req, _ctx, user) => {
 
   const body = await parseBody(req, bodySchema)
   if (body.response) return body.response
-  const { key, size } = body.data
+  const { key, size, version } = body.data
 
-  const plan = planComposition({ imageStyle: key, aspectRatio: size, hasCompositeSource: true })
+  const plan = planComposition({ imageStyle: key, aspectRatio: size, hasCompositeSource: true }, undefined, { version })
   if (plan.kind !== 'hero') {
     return NextResponse.json({ error: `Not a hero look at this size (${plan.fallbackReason ?? 'classic'})` }, { status: 400 })
   }

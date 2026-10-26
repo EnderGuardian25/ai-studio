@@ -8,6 +8,10 @@
 // 025 A1 recheck (no network, no image call): re-judge every saved render with the shipped check,
 // write `recheck` into results.json and a page with the detected rects drawn (recheck.html):
 //   node scripts/look-check/run-look-check.mjs --probe --recheck [--out <dir>]
+// 031 OP-031 (Spotlight SQUARE v2; --out defaults to .specclaw/changes/031-v2-final-polish/look-check, a
+// cap of 4 ledger lines, pass = the first 2 counted attempts both kept and accepted):
+//   node scripts/look-check/run-look-check.mjs --probe --slot-set op031 --base http://localhost:3002 [--out <dir>] [--dry-run]
+//   node scripts/look-check/run-look-check.mjs --probe --slot-set op031 [--out <dir>] --verdict spotlight@2:SQUARE#<attempt>=accept|reject
 // env (a run only): LOOK_CHECK_USERNAME, LOOK_CHECK_PASSWORD, LOOK_CHECK_TEAM, LOOK_CHECK_KIT
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -16,6 +20,7 @@ import { randomUUID } from 'node:crypto'
 import {
   SLOTS, capFor, checkBase, lastResult, parseLedger, parseVerdictArg, planNext, totalLine,
   PROBE_SLOTS, PROBE_MAX_ATTEMPTS_PER_SLOT, planNextProbe, parseProbeVerdictArg, probeLedgerLine, probeVerdicts,
+  OP031_SLOTS, OP031_CAP, ledgerFitsOp031, op031Verdict, parseVersionedSlot, planNextOp031,
 } from './lookCheck.mjs'
 
 const POLL_MS = 10_000
@@ -64,6 +69,7 @@ function parseArgs(argv) {
     if (v === '--dry-run') a.dryRun = true
     else if (v === '--probe') a.probe = true
     else if (v === '--recheck') a.recheck = true
+    else if (v === '--slot-set') a.slotSet = argv[++i]
     else if (v === '--base') a.base = argv[++i]
     else if (v === '--out') a.out = argv[++i]
     else if (v === '--verdict') a.verdict = argv[++i]
@@ -74,7 +80,14 @@ function parseArgs(argv) {
 }
 
 const args = parseArgs(process.argv.slice(2))
-if (args.probe && !args.out) args.out = '.specclaw/changes/025-hero-reference-images/look-check'
+if (args.slotSet !== undefined && !(args.probe && args.slotSet === 'op031')) {
+  console.error('--slot-set takes only "op031" and only with --probe')
+  process.exit(1)
+}
+const op031 = args.slotSet === 'op031'
+if (args.probe && !args.out) {
+  args.out = op031 ? '.specclaw/changes/031-v2-final-polish/look-check' : '.specclaw/changes/025-hero-reference-images/look-check'
+}
 if (!args.out) { console.error('--out <dir> is required'); process.exit(1) }
 
 const ledgerPath = join(args.out, 'ledger.jsonl')
@@ -92,12 +105,21 @@ function wanted() {
 
 // ---- 025 probe mode: the device-screen look, through POST /api/admin/look-probe ----
 async function runProbe() {
-  const pcap = capFor(PROBE_SLOTS, PROBE_MAX_ATTEMPTS_PER_SLOT)
+  const slotSet = op031 ? OP031_SLOTS : PROBE_SLOTS
+  const pcap = op031 ? OP031_CAP : capFor(PROBE_SLOTS, PROBE_MAX_ATTEMPTS_PER_SLOT)
   const pwanted = () => {
-    const unknown = args.only.filter((s) => !PROBE_SLOTS.includes(s))
+    const unknown = args.only.filter((s) => !slotSet.includes(s))
     if (unknown.length) { console.error(`unknown slot: ${unknown.join(', ')}`); process.exit(1) }
-    return PROBE_SLOTS.filter((s) => args.only.length === 0 || args.only.includes(s))
+    return slotSet.filter((s) => args.only.length === 0 || args.only.includes(s))
   }
+  const verdictOf = (results) => (op031 ? op031Verdict(results) : probeVerdicts(results))
+  const planFor = (entries, results, slot) => (op031 ? planNextOp031(entries, results) : planNextProbe(entries, results, slot, pcap))
+  // An OP-031 --out holds only OP-031 slots (an earlier look check's ledger is another slot set).
+  if (op031 && !ledgerFitsOp031(readLedger())) {
+    console.error(`refusing --out ${args.out}: its ledger holds slots of another slot set`)
+    process.exit(1)
+  }
+  if (op031 && args.recheck) { console.error('--recheck is not supported for --slot-set op031'); process.exit(1) }
 
   if (args.recheck) {
     // The shipped check, run in a tsx entry (it imports the same module the app does) on the saved
@@ -115,7 +137,7 @@ async function runProbe() {
     r.accepted = v.accepted
     writeFileSync(resultsPath, JSON.stringify(results, null, 2))
     console.log(`${v.slot}#${v.attempt}: ${v.accepted ? 'accepted' : 'rejected'}`)
-    console.log(JSON.stringify(probeVerdicts(results)))
+    console.log(JSON.stringify(verdictOf(results)))
     process.exit(0)
   }
 
@@ -126,10 +148,11 @@ async function runProbe() {
       const b = checkBase(args.base)
       if (!b.ok) { console.error(b.error); process.exit(1) }
     }
-    console.log(`[look-check] probe dry run: ledger ${entries.length} of cap ${pcap}`)
+    console.log(`[look-check] probe dry run${op031 ? ' (slot set op031)' : ''}: ledger ${entries.length} of cap ${pcap}`)
+    if (op031) console.log(`slots: ${OP031_SLOTS.join(', ')}; the probe is asked for contract version ${parseVersionedSlot(OP031_SLOTS[0]).version}; pass = the first 2 counted attempts kept and accepted`)
     console.log(`ledger line shape: ${JSON.stringify(probeLedgerLine({ at: '<iso>', runId: '<uuid>', slot: '<slot>', attempt: 1 }))}`)
     for (const slot of pwanted()) {
-      const p = planNextProbe(entries, results, slot, pcap)
+      const p = planFor(entries, results, slot)
       console.log(`${slot}: ${p.ok ? `would run attempt ${p.attempt}` : `refused: ${p.reason}`}`)
     }
     process.exit(0)
@@ -175,7 +198,7 @@ async function runProbe() {
   for (const slot of pwanted()) {
     const entries = readLedger()
     const results = readResults()
-    const p = planNextProbe(entries, results, slot, pcap)
+    const p = planFor(entries, results, slot)
     if (!p.ok) {
       console.log(`${slot}: skipped (${p.reason})`)
       if (p.reason === 'cap') break
@@ -186,10 +209,11 @@ async function runProbe() {
     appendFileSync(ledgerPath, JSON.stringify(probeLedgerLine({ at: new Date().toISOString(), runId, slot, attempt: p.attempt })) + '\n')
     console.log(totalLine(entries.length + 1, pcap))
     log('started', slot, `attempt ${p.attempt}`)
-    const [key, size] = slot.split(':')
+    const versioned = parseVersionedSlot(slot)
+    const [key, size] = versioned ? [versioned.key, versioned.size] : slot.split(':')
     const result = { slot, attempt: p.attempt, runId, styleKept: false, fallbackReason: null, threshold: null, promptHash: null, rect: null, render: null, error: null, accepted: null }
     try {
-      const r = await call('/api/admin/look-probe', { method: 'POST', body: JSON.stringify({ key, size }) })
+      const r = await call('/api/admin/look-probe', { method: 'POST', body: JSON.stringify(versioned ? { key, size, version: versioned.version } : { key, size }) })
       if (r.status !== 200) throw new Error(`probe ${r.status}: ${JSON.stringify(r.body).slice(0, 300)}`)
       result.styleKept = r.body.verdict?.ok === true
       result.fallbackReason = r.body.fallbackReason ?? null
@@ -198,7 +222,7 @@ async function runProbe() {
       result.rect = r.body.rect ?? null
       const m = /^data:[^;]+;base64,(.+)$/s.exec(String(r.body.image ?? ''))
       if (m) {
-        const name = `${key}_${size}_${p.attempt}.png`
+        const name = `${key}${versioned ? `_v${versioned.version}` : ''}_${size}_${p.attempt}.png`
         writeFileSync(join(args.out, 'renders', name), Buffer.from(m[1], 'base64'))
         result.render = name
       }
@@ -206,6 +230,10 @@ async function runProbe() {
       result.error = String(e?.message ?? e)
       result.styleKept = false
     }
+    // OP-031: a call that returned no image is infrastructure, not an attempt at the look: it is
+    // not counted, but its ledger line stays (the cap holds). A response that names a fallback
+    // reason is a real attempt even without an image, so it counts (and fails) (031 T16 review).
+    if (op031 && !result.render && (result.error || !result.fallbackReason)) result.infra = true
     results.push(result)
     writeFileSync(resultsPath, JSON.stringify(results, null, 2))
     log('done', slot, result.error ? `error: ${result.error}` : `styleKept ${result.styleKept}${result.fallbackReason ? ` (${result.fallbackReason})` : ''}`)

@@ -23,7 +23,7 @@ import {
   planComposition,
   type HeroPlan,
 } from '@/lib/designData'
-import { LOOK_FIXTURES } from './lookFixtureTable'
+import { CANDIDATE_FIXTURES, LOOK_FIXTURES } from './lookFixtureTable'
 import { lookFixture } from './lookFixtures'
 
 describe('the look fixtures run in real Chromium', () => {
@@ -32,7 +32,7 @@ describe('the look fixtures run in real Chromium', () => {
   })
 })
 
-describe.each(LOOK_FIXTURES)('look fixture $id $kind', (spec) => {
+describe.each([...LOOK_FIXTURES, ...CANDIDATE_FIXTURES])('look fixture $id $kind', (spec) => {
   it('gets the verdict the check should give', async () => {
     const sizeContract = contractAt(spec.key, spec.version, spec.size)!
     const tone = contractVersionOf(spec.key, spec.version)!.textTone
@@ -46,12 +46,24 @@ describe.each(LOOK_FIXTURES)('look fixture $id $kind', (spec) => {
     const samples = await sampleRegionLuminance(url, judged, canvas)
     const verdict = evaluateRegions(samples, judged, tone)
     const detection = composite
-      ? detectScreenRect((await sampleLuminanceGrid(url, detectionWindow(composite, canvas), canvas))!, composite, texts, canvas)
+      ? detectScreenRect(
+          (await sampleLuminanceGrid(url, detectionWindow(composite, canvas), canvas))!,
+          composite,
+          texts,
+          canvas,
+        )
       : null
 
     // The shipped check as a whole, on the same image.
-    const plan = planComposition({ imageStyle: spec.key, aspectRatio: spec.size, hasCompositeSource: true })
+    const plan = planComposition(
+      { imageStyle: spec.key, aspectRatio: spec.size, hasCompositeSource: true },
+      undefined,
+      {
+        version: spec.version, // 031: a candidate row is planned at its own version, as the probe does
+      },
+    )
     expect(plan.kind).toBe('hero')
+    expect((plan as HeroPlan).contractVersion).toBe(spec.version)
     const shipped = await runHeroCheck(url, plan as HeroPlan)
 
     if (spec.kind === 'pass') {
@@ -89,7 +101,11 @@ describe.each(LOOK_FIXTURES)('look fixture $id $kind', (spec) => {
         expect(rect.x - composite!.rect.x).toBeGreaterThan(1.5)
         expect(rect.y - composite!.rect.y).toBeGreaterThan(0.5)
       } else {
-        const detail = { screen: 'seed-not-blank', 'text-overlap': 'text-overlap', small: 'too-small' }[spec.kind]
+        const detail = {
+          screen: 'seed-not-blank',
+          'text-overlap': 'text-overlap',
+          small: 'too-small',
+        }[spec.kind]
         expect(detection).toEqual({ ok: false, detail })
       }
     }

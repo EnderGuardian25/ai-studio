@@ -275,7 +275,7 @@
 
 ### Wave 8: D, Spotlight SQUARE v2
 
-- [ ] `T16` — The busy evidence, the v2 contract, candidate fixtures, the probe version, the OP-031 runner
+- [x] `T16` — The busy evidence, the v2 contract, candidate fixtures, the probe version, the OP-031 runner
   - Files: `scripts/look-check/recheck.ts`, `.specclaw/changes/031-v2-final-polish/look-check/evidence.md` (new), `src/lib/designData/composition.ts`, `src/lib/designData/plan.ts`, `src/app/api/admin/look-probe/route.ts`, `scripts/look-check/{lookCheck,run-look-check}.mjs`, `tests/render/lookFixtureTable.ts`, `tests/render/lookFixtures.ts`, `tests/unit/{lookDataset,planOverrideBoundary,op031Verdict,lookCheck}.test.ts`
   - Estimate: medium
   - Kind: impl

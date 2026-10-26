@@ -110,6 +110,28 @@ describe('POST /api/admin/look-probe', () => {
     expect(h.generate).not.toHaveBeenCalled()
   })
 
+  it('031 FR-48: a super admin plans an explicit contract version (spotlight v2), and the default is `current`', async () => {
+    const res = await call({ key: 'spotlight', size: 'SQUARE', version: 2 })
+    expect(res.status).toBe(200)
+    expect(h.generate.mock.calls[0][5]).toMatchObject({ kind: 'hero', requestedArchetype: 'spotlight', contractVersion: 2 })
+    expect(h.generate.mock.calls[0][5].sizeContract.regions[0].rect).toEqual({ x: 0, y: 0, w: 100, h: 20 })
+    h.generate.mockClear()
+    await call({ key: 'spotlight', size: 'SQUARE' })
+    expect(h.generate.mock.calls[0][5]).toMatchObject({ contractVersion: 1 })
+  })
+
+  it('031 FR-48: refuses a version over the latest, a non-integer, zero and a non-super-admin', async () => {
+    expect((await call({ key: 'spotlight', size: 'SQUARE', version: 3 })).status).toBe(400)
+    expect((await call({ key: 'spotlight', size: 'SQUARE', version: 1.5 })).status).toBe(400)
+    expect((await call({ key: 'spotlight', size: 'SQUARE', version: 0 })).status).toBe(400)
+    expect((await call({ key: 'spotlight', size: 'SQUARE', version: '2' })).status).toBe(400)
+    expect((await call({ key: 'no-such-look', size: 'SQUARE', version: 1 })).status).toBe(400)
+    expect(h.generate).not.toHaveBeenCalled()
+    h.isSuperAdmin = false
+    expect((await call({ key: 'spotlight', size: 'SQUARE', version: 2 })).status).toBe(403)
+    expect(h.generate).not.toHaveBeenCalled()
+  })
+
   it('under MOCK_AI returns a verdict with threshold and promptHash, and writes no row', async () => {
     const res = await call({ key: 'device-screen', size: 'PORTRAIT' })
     expect(res.status).toBe(200)

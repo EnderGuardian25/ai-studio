@@ -13,8 +13,21 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { dimensionsFor } from '@/lib/aspectRatio'
-import { compositeRegionOf, coverFit, planComposition, type Rect } from '@/lib/designData'
+import {
+  BUSY_STDDEV_MAX,
+  CONTRAST_MIN,
+  TEXT_TONE_LUMINANCE,
+  archetypes,
+  compositeRegionOf,
+  contrastRatio,
+  coverFit,
+  lightness,
+  planComposition,
+  type Rect,
+  type Region,
+} from '@/lib/designData'
 import { runHeroCheck } from '@/lib/renderer/heroCheck'
+import { sampleRegionLuminance } from '@/lib/renderer/puppeteer'
 
 interface ProbeResult {
   slot: string
@@ -33,14 +46,83 @@ if (process.env.MOCK_PUPPETEER === 'true' || process.env.MOCK_AI === 'true') {
 }
 
 const argv = process.argv.slice(2)
+
+// 031 FR-46 evidence mode (no results.json, no network, no image call):
+//   npx tsx scripts/look-check/recheck.ts --regions <png> <key>@<version>:<size>
+// Samples the render with the production sampler against that version's regions and prints, per
+// region, the luminance std dev (CIE L*/100) against BUSY_STDDEV_MAX and the contrast fraction.
+// For each text band it also samples a strip of 4% of the canvas height on each side of the
+// band's inner edge, which shows where the busy pixels sit.
+const regionsIdx = argv.indexOf('--regions')
+if (regionsIdx >= 0) {
+  const [png, spec] = [argv[regionsIdx + 1], argv[regionsIdx + 2]]
+  const m = /^([a-z-]+)@(\d+):(SQUARE|PORTRAIT|STORY)$/.exec(spec ?? '')
+  if (!png || !m) {
+    console.error('usage: --regions <png> <key>@<version>:<SQUARE|PORTRAIT|STORY>')
+    process.exit(1)
+  }
+  const sizeContract = archetypes[m[1]]?.versions[Number(m[2])]?.sizes[m[3] as 'SQUARE']
+  const tone = archetypes[m[1]]?.versions[Number(m[2])]?.textTone
+  if (!sizeContract || !tone || !existsSync(png)) {
+    console.error(`unknown contract ${spec} or missing file ${png}`)
+    process.exit(1)
+  }
+  const sd = (lum: readonly number[]) => {
+    const ls = lum.map(lightness)
+    const mean = ls.reduce((a, v) => a + v, 0) / ls.length
+    return Math.sqrt(ls.reduce((a, v) => a + (v - mean) ** 2, 0) / ls.length)
+  }
+  const rows: Array<{ label: string; region: Region }> = []
+  for (const r of sizeContract.regions) {
+    rows.push({ label: r.purpose, region: r })
+    if (r.purpose !== 'text') continue
+    const { x, w, y, h } = r.rect
+    const top = y === 0
+    const edge = top ? y + h : y // the inner edge, toward the subject
+    const strip = (label: string, sy: number): void => {
+      rows.push({ label, region: { rect: { x, y: Math.max(0, Math.min(96, sy)), w, h: 4 }, purpose: 'text', minAreaPct: 0 } })
+    }
+    strip(`  strip inside the band at its inner edge (${top ? edge - 4 : edge}% to ${top ? edge : edge + 4}%)`, top ? edge - 4 : edge)
+    strip(`  strip outside the band (${top ? edge : edge - 4}% to ${top ? edge + 4 : edge}%)`, top ? edge : edge - 4)
+  }
+  // Extra full-width strips: --strip <y>,<h> (canvas percent), repeatable.
+  argv.forEach((a, i) => {
+    const sm = a === '--strip' ? /^(\d+(?:\.\d+)?),(\d+(?:\.\d+)?)$/.exec(argv[i + 1] ?? '') : null
+    if (sm) rows.push({ label: `strip y ${sm[1]}% h ${sm[2]}%`, region: { rect: { x: 0, y: Number(sm[1]), w: 100, h: Number(sm[2]) }, purpose: 'text', minAreaPct: 0 } })
+  })
+  async function evidence() {
+    const canvas = dimensionsFor(m![3] as 'SQUARE')
+    const dataUrl = `data:image/png;base64,${readFileSync(png).toString('base64')}`
+    const samples = await sampleRegionLuminance(dataUrl, rows.map((r) => r.region), canvas)
+    console.log(`file ${png}  contract ${spec}  BUSY_STDDEV_MAX ${BUSY_STDDEV_MAX}  CONTRAST_MIN ${CONTRAST_MIN}`)
+    console.log('region | rect (x,y,w,h %) | stddev | busy? | contrastFraction')
+    rows.forEach((row, i) => {
+      const s = samples[i]
+      const r = row.region.rect
+      const rect = `${r.x},${r.y},${r.w},${r.h}`
+      if (!s) return console.log(`${row.label} | ${rect} | no samples`)
+      const lum = s.luminance.filter(Number.isFinite)
+      const std = sd(lum)
+      const cf = lum.filter((l) => contrastRatio(l, TEXT_TONE_LUMINANCE[tone!]) >= CONTRAST_MIN).length / lum.length
+      console.log(`${row.label}${row.region.use ? ` (${row.region.use})` : ''} | ${rect} | ${std.toFixed(4)} | ${std > BUSY_STDDEV_MAX ? 'BUSY' : 'ok'} | ${cf.toFixed(3)}`)
+    })
+  }
+  evidence().then(
+    () => process.exit(0),
+    (e) => {
+      console.error(e)
+      process.exit(1)
+    },
+  )
+}
 const outIdx = argv.indexOf('--out')
 const out = outIdx >= 0 ? argv[outIdx + 1] : '.specclaw/changes/025-hero-reference-images/look-check'
-if (!out) {
+if (regionsIdx < 0 && !out) {
   console.error('--out <dir> is required')
   process.exit(1)
 }
-const resultsPath = join(out, 'results.json')
-if (!existsSync(resultsPath)) {
+const resultsPath = join(out ?? '.', 'results.json')
+if (regionsIdx < 0 && !existsSync(resultsPath)) {
   console.error(`no results.json in ${out}`)
   process.exit(1)
 }
@@ -132,7 +214,7 @@ ${cards.join('\n')}
   console.log(`wrote ${resultsPath} and ${join(out, 'recheck.html')}`)
 }
 
-main().then(
+if (regionsIdx < 0) main().then(
   () => process.exit(0),
   (e) => {
     console.error(e)

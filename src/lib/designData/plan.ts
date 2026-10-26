@@ -48,9 +48,13 @@ export interface SettleBackground {
 // 'classic' is classic; an unknown or retired key is `unknown-archetype`; a
 // size the active archetype's current contract does not declare is
 // `unsupported-size`. `source` is injectable for tests only.
+// `opts.version` (031 FR-48) plans an explicit contract version instead of the look's `current`.
+// Only the super-admin look probe passes it (planOverrideBoundary.test.ts); every served path
+// uses `current`.
 export function planComposition(
   input: { imageStyle: string | null | undefined; aspectRatio: AspectRatio; hasCompositeSource?: boolean },
-  source: ArchetypeMap = archetypes
+  source: ArchetypeMap = archetypes,
+  opts?: { version?: number }
 ): CompositionPlan {
   const requested = typeof input.imageStyle === 'string' && input.imageStyle !== '' ? input.imageStyle : 'classic'
   if (requested === 'classic') return { kind: 'classic', requestedArchetype: 'classic' }
@@ -58,7 +62,8 @@ export function planComposition(
   if (!archetype || archetype.status !== 'active') {
     return { kind: 'classic', requestedArchetype: requested, fallbackReason: 'unknown-archetype' }
   }
-  const contract = archetype.versions[archetype.current]
+  const version = opts?.version ?? archetype.current
+  const contract = archetype.versions[version]
   const sizeContract = contract?.sizes[input.aspectRatio]
   if (!contract || !sizeContract) {
     return { kind: 'classic', requestedArchetype: requested, fallbackReason: 'unsupported-size' }
@@ -71,7 +76,7 @@ export function planComposition(
     kind: 'hero',
     requestedArchetype: requested,
     label: archetype.label,
-    contractVersion: archetype.current,
+    contractVersion: version,
     contract,
     size: input.aspectRatio,
     sizeContract,

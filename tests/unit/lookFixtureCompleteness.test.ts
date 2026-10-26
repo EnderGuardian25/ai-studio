@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest'
 import { archetypes, type ArchetypeMap } from '@/lib/designData'
 import {
+  CANDIDATE_FIXTURES,
   INTENDED_BACKDROP,
   LOOK_FIXTURES,
   fixtureCompletenessProblems,
@@ -47,6 +48,19 @@ describe('look fixture completeness', () => {
     expect(fixtureCompletenessProblems(archetypes, noScreen)).toEqual(['missing fixture device-screen@1:SQUARE#screen'])
     const extra = [...LOOK_FIXTURES, { ...LOOK_FIXTURES.find((f) => f.key === 'spotlight')!, kind: 'screen' as const }]
     expect(fixtureCompletenessProblems(archetypes, extra)).toEqual(['extra fixture spotlight@1:SQUARE#screen'])
+  })
+
+  it('candidate fixtures (031 T16) are pass, busy and contrast for contracts above `current`, and are not in the main table', () => {
+    expect(CANDIDATE_FIXTURES.map((f) => `${f.id}#${f.kind}`)).toEqual([
+      'spotlight@2:SQUARE#pass',
+      'spotlight@2:SQUARE#busy',
+      'spotlight@2:SQUARE#contrast',
+    ])
+    for (const f of CANDIDATE_FIXTURES) {
+      expect(archetypes[f.key].versions[f.version]?.sizes[f.size], f.id).toBeDefined()
+      expect(f.version, f.id).toBeGreaterThan(archetypes[f.key].current)
+      expect(LOOK_FIXTURES.some((m) => m.id === f.id && m.kind === f.kind), f.id).toBe(false)
+    }
   })
 
   it('the intended backdrop is dark exactly when the current textTone is light', () => {

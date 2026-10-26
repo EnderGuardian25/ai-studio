@@ -33,6 +33,8 @@ const HASHES: Record<string, string> = {
   'editorial-split@2': '1e403779e9a3f44d1002c67bfa75a94455a3a9e40b224060924157c62adb6733',
   'full-bleed-scene@1': '37f092ceaf25161f099c37736e3101669f404fd9e7006d1abca5dab4609a0b8e',
   'spotlight@1': '856a579c1ac7fb5fdc9a2918671b774691b6db803b6d56d39c8a53a8c0c2634f',
+  // 031 T16: the Spotlight SQUARE candidate. Not served (`current` stays 1) until OP-031 passes.
+  'spotlight@2': 'f6b6750686f65375e9280cebfc871f97492ba4e137c7bb51864365068ef67172',
   // 025 T1: computed from the finished rows. OP-025 passed at every size, so T6
   // removed none and this is the released hash.
   'device-screen@1': 'b53138ccfa78c6ca4ef0e07f555f0f19b079707e021c49583e55c2d3522f2529',
@@ -78,6 +80,20 @@ describe('the shipped dataset (AC-01, AC-02)', () => {
       expect(v2.sizes.STORY).toBeDefined()
       expect(v2.textTone).toBe('light')
     }
+  })
+
+  it('spotlight v2 is a candidate: current stays 1, PORTRAIT and STORY deep-equal v1, SQUARE differs (031 FR-47)', () => {
+    const a = archetypes.spotlight
+    expect(a.current).toBe(1)
+    expect(a.versions[2].sizes.PORTRAIT).toEqual(a.versions[1].sizes.PORTRAIT)
+    expect(a.versions[2].sizes.STORY).toEqual(a.versions[1].sizes.STORY)
+    expect(a.versions[2].sizes.SQUARE).not.toEqual(a.versions[1].sizes.SQUARE)
+    expect(a.versions[2].sizes.SQUARE?.regions.map((r) => r.rect)).toEqual([
+      { x: 0, y: 0, w: 100, h: 20 },
+      { x: 0, y: 80, w: 100, h: 20 },
+    ])
+    expect(a.versions[2].sizes.SQUARE?.subject).toContain('the top 22% and bottom 22% are a flat, plain, dark backdrop')
+    expect(lookDatasetProblems(archetypes)).toEqual([])
   })
 
   it('no shipped contract has variantOf', () => {

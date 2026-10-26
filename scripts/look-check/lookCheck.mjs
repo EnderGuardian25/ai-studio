@@ -170,3 +170,65 @@ export function parseProbeVerdictArg(s) {
 export function probeLedgerLine({ at, runId, slot, attempt, threshold = /** @type {number | null} */ (null), promptHash = /** @type {string | null} */ (null) }) {
   return { at, runId, slot, attempt, mode: 'probe', threshold, promptHash }
 }
+
+// ---- 031 OP-031: Spotlight SQUARE v2 through the look probe (design section 9.3) ----
+// One slot, `<key>@<version>:<size>`, so the probe plans a non-current version. A hard cap of 4
+// ledger lines (an attempt that returned no image still uses one), and the 028 rule: the first
+// two counted attempts must both keep the look and both be accepted.
+export const OP031_SLOTS = ['spotlight@2:SQUARE']
+export const OP031_CAP = 4
+export const OP031_COUNTED = 2
+
+// "spotlight@2:SQUARE" -> { key, version, size }; null for an ordinary `key:size` slot.
+export function parseVersionedSlot(slot) {
+  const m = /^([a-z-]+)@(\d+):(SQUARE|PORTRAIT|STORY)$/.exec(String(slot ?? ''))
+  return m ? { key: m[1], version: Number(m[2]), size: m[3] } : null
+}
+
+// True when every ledger line belongs to the OP-031 slot set (an empty ledger is fine). A line of
+// another slot set, or a malformed line with no slot, is another set's ledger: refuse to use it.
+export function ledgerFitsOp031(entries) {
+  return (entries ?? []).every((e) => e && typeof e.slot === 'string' && OP031_SLOTS.includes(e.slot))
+}
+
+// The latest result per attempt number (a re-recorded attempt replaces the earlier one), in order.
+function op031Attempts(results) {
+  const byAttempt = new Map()
+  for (const r of results ?? []) if (r && OP031_SLOTS.includes(r.slot)) byAttempt.set(r.attempt, r)
+  return [...byAttempt.values()].sort((a, b) => a.attempt - b.attempt)
+}
+
+// An attempt re-judged offline counts by its recheck, as in probe mode (025 A1).
+const op031Kept = (r) => (r.recheck && typeof r.recheck.styleKept === 'boolean' ? r.recheck.styleKept : r.styleKept === true)
+
+// An attempt is counted unless the call returned no image (`infra: true`).
+export function op031Counted(results) {
+  return op031Attempts(results).filter((r) => r.infra !== true)
+}
+
+// 'pass' only when the first two counted attempts are both kept and accepted. Any fallback or
+// reject among them is 'fail' (a fallback is decided at once, and so is a reject; a kept render
+// waits for the user's verdict). Anything else is 'pending'.
+export function op031Verdict(results) {
+  const first = op031Counted(results).slice(0, OP031_COUNTED)
+  const failed = first.some((r) => !op031Kept(r) || r.accepted === false)
+  if (failed) return { passed: false, status: 'fail', counted: first.length }
+  if (first.length === OP031_COUNTED && first.every((r) => r.accepted === true)) {
+    return { passed: true, status: 'pass', counted: first.length }
+  }
+  return { passed: false, status: 'pending', counted: first.length }
+}
+
+// The next attempt. The ledger is the cap: 4 lines, counted or not. Refused once decided and
+// while a kept render awaits the user's verdict.
+export function planNextOp031(entries, results, cap = OP031_CAP) {
+  if ((entries ?? []).length >= cap) return { ok: false, reason: 'cap' }
+  const v = op031Verdict(results)
+  if (v.status === 'pass') return { ok: false, reason: 'already-passed' }
+  if (v.status === 'fail') return { ok: false, reason: 'decided-fail' }
+  const attempts = op031Attempts(results)
+  if (attempts.some((r) => op031Kept(r) && r.infra !== true && (r.accepted === null || r.accepted === undefined))) {
+    return { ok: false, reason: 'awaiting-verdict' }
+  }
+  return { ok: true, attempt: entries.length + 1 }
+}
