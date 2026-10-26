@@ -47,3 +47,4 @@
 {"ev":"stop","span":"W7","at":"2026-10-26T16:25:41Z","ts":1793031941,"status":"ok"}
 {"ev":"start","span":"W8","kind":"wave","label":"wave 8","at":"2026-10-26T16:25:53Z","ts":1793031953}
 {"ev":"start","span":"T16","kind":"task","label":"Spotlight evidence, v2 contract, runner","parent":"W8","model":"sonnet","attempt":"1","at":"2026-10-26T16:25:53Z","ts":1793031953}
+{"ev":"stop","span":"T16","at":"2026-10-26T16:41:31Z","ts":1793032891,"status":"ok"}

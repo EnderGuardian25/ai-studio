@@ -288,7 +288,7 @@
     - Dry-run the runner (`--dry-run`) against a fake out-dir in the scratchpad to show the cap and the slot set.
     - **Gate:** tsc, lint, unit, `npm run test:render`.
 
-- [ ] `T17` — OP-031, the operator real-image check (on the user's go)
+- [x] `T17` — OP-031, the operator real-image check (on the user's go)
   - Files: `.specclaw/changes/031-v2-final-polish/look-check/{ledger.jsonl,results.json,renders/}`
   - Estimate: small
   - Kind: config
