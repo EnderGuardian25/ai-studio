@@ -540,6 +540,8 @@ export interface BrandKitPrompt {
   version: number
   isActive: boolean
   createdAt: string
+  // 031 FR-34: the kit fonts before an assistant apply that changed them; null otherwise.
+  previousFonts?: { fonts: Array<{ name: string; url: string }>; scriptFonts: Record<string, string> | null } | null
 }
 
 export interface BrandKitTemplateFull {

@@ -212,6 +212,15 @@ export function PromptSection({ kitId, prompts, onRefresh }: PromptSectionProps)
                     <p className="mt-0.5 line-clamp-2 break-words text-ui-xs text-fg-muted" title={p.content}>
                       {p.content}
                     </p>
+                    {p.previousFonts && (
+                      <p className="mt-0.5 break-words text-ui-xs text-fg-muted" data-testid="previous-fonts">
+                        Fonts before this version:{' '}
+                        {[
+                          ...p.previousFonts.fonts.slice(0, 2).map(f => f.name),
+                          ...(p.previousFonts.scriptFonts?.sinhala ? [`Sinhala: ${p.previousFonts.scriptFonts.sinhala}`] : []),
+                        ].join(', ') || 'none'}
+                      </p>
+                    )}
                   </div>
                   {!p.isActive && (
                     <Button variant="ghost" size="sm" onClick={() => activate(p.id)}>Restore</Button>

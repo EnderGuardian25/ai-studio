@@ -14,6 +14,7 @@ const CATALOGUE = 'src/lib/fonts/catalogue'
 
 // The only server files that import the catalogue.
 const ALLOWED = [
+  'src/app/api/admin/brandkits/[id]/assistant/apply/route.ts', // the assistant Apply validation (T12)
   'src/app/api/admin/brandkits/[id]/route.ts', // save validation, the snapshot date
   'src/app/api/admin/brandkits/route.ts', // create validation
   'src/app/api/fonts/route.ts', // the picker's search

@@ -60,7 +60,7 @@ describe('extractBrandKitBlock parity (pinned before the rewrite)', () => {
       voice: 'v',
       tone: '',
       style: '',
-      fonts: [],
+      fonts: {},
       colors: ['#1A2B3C'],
     })
   })

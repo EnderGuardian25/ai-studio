@@ -1289,14 +1289,19 @@ Mock mode (`MOCK_AI` + `MOCK_PUPPETEER`), a fresh campaign per case, serial. The
 | TC-BU-04 | AC-28 | A stale `baseVersion` is 409 `STALE_BASE` with the active version and no recorder entry; the right base is 200                             |
 | TC-BU-05 | AC-28 | One `briefing-upgrade` record on `ASSISTANT_BRIEFING`, and no `kit-upgrade` record                                                         |
 
-### AL. Briefing assistant schedule with post styles (`assistants-031.test.ts`, change 031 T11 — AC-30)
+### AL. The assistants: schedule post styles and brand-kit fonts (`assistants-031.test.ts`, change 031 T11, T12 — AC-30, AC-32)
 
 Mock mode (`MOCK_AI` + `MOCK_PUPPETEER`), a fresh campaign per case, serial. The panel is driven at `/campaigns/[id]` ("Draft with AI", then "Please schedule a short series of posts."). The `MOCK_AI` schedule reply has two rows: "Mock scheduled post 1" with the active style `launch`, and "Mock scheduled post 2" with the bad key `flash-sale`, which the parser replaces with the campaign's default style (or General). No model is called. Every `page.waitForResponse` is created before its trigger. TC-AS-04 to TC-AS-06 (the brand-kit assistant) follow in T12.
 
-| Case     | AC    | What it checks                                                                                                                           |
-| -------- | ----- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| TC-AS-01 | AC-30 | Each plan row has a "Post style" select (row 1 reads `launch`), and the plan shows no goal text                                          |
-| TC-AS-02 | AC-30 | With a campaign default of Event, the bad key row shows Event and the line "Suggested style flash-sale is not available; using Event"    |
-| TC-AS-03 | AC-30 | After the user changes the replaced row to Tip, Schedule posts `postStyle` and no `goal`, and the queue entries carry `launch` and `tip` |
+| Case     | AC    | What it checks                                                                                                                                                                                                                                          |
+| -------- | ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| TC-AS-01 | AC-30 | Each plan row has a "Post style" select (row 1 reads `launch`), and the plan shows no goal text                                                                                                                                                         |
+| TC-AS-02 | AC-30 | With a campaign default of Event, the bad key row shows Event and the line "Suggested style flash-sale is not available; using Event"                                                                                                                   |
+| TC-AS-03 | AC-30 | After the user changes the replaced row to Tip, Schedule posts `postStyle` and no `goal`, and the queue entries carry `launch` and `tip`                                                                                                                |
+| TC-AS-04 | AC-32 | The brand-kit assistant accept view shows "Current: Roboto → Proposed: Playfair Display" and the Sinhala row; with `__MOCK_FONT_UNKNOWN__` the body reads "Zzyzx Mock Sans is not in the font list and won't be applied", its checkbox off and disabled |
+| TC-AS-05 | AC-32 | "Apply to brand kit" posts once to `/assistant/apply`; the kit's fonts become Playfair Display and Inter (computed Google URLs) and `scriptFonts` is `{ sinhala: "Noto Sans Sinhala" }`                                                                 |
+| TC-AS-06 | AC-32 | The new voice version carries `previousFonts` (Roboto, Lora), and History shows "Fonts before this version: Roboto, Lora"                                                                                                                               |
+
+TC-AS-04 to TC-AS-06 (T12) create a kit with two fonts through the API and drive the "Extract from references" drawer; the `MOCK_AI` brand-kit reply proposes heading Playfair Display, body Inter and a Sinhala font. Unit: `brandKitBlock.test.ts` and `brandKitApply.test.ts` (AC-31).
 
 Adapted: `campaign-scheduling.test.ts` (F4 chat case) sends `postStyle` instead of `goal`; `briefingAssistant.test.ts` no longer expects a defaulted `goal`.

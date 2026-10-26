@@ -187,12 +187,12 @@ describe('extractBrandKitBlock', () => {
     ].join('\n')
     const block = extractBrandKitBlock(text)
     expect(block).toMatchObject({ voice: 'Warm and expert.', tone: 'friendly', style: 'airy' })
-    expect(block!.fonts).toEqual(['Inter'])
+    expect(block!.fonts).toEqual({ heading: 'Inter' })
   })
 
   it('applies defaults for omitted optional fields', () => {
     const block = extractBrandKitBlock('```brandkit\n{"voice":"Just a voice."}\n```')
-    expect(block).toMatchObject({ voice: 'Just a voice.', tone: '', style: '', fonts: [], colors: [] })
+    expect(block).toMatchObject({ voice: 'Just a voice.', tone: '', style: '', fonts: {}, colors: [] })
   })
 
   it('parses document-declared hex colors and rejects non-hex values', () => {
@@ -223,7 +223,7 @@ describe('MOCK_AI brand-kit seam', () => {
     const block = extractBrandKitBlock(reply)
     expect(block).not.toBeNull()
     expect(block!.voice).toContain('extract style')
-    expect(block!.fonts.length).toBeGreaterThan(0)
+    expect(Object.keys(block!.fonts).length).toBeGreaterThan(0)
   })
 })
 

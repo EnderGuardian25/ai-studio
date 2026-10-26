@@ -234,12 +234,21 @@ export function buildMockBriefingEnhance(content: string): string {
  * asserted end-to-end without a live vision call. Colors are injected separately
  * from the (also-mocked) color sampler.
  */
+export const MOCK_BRANDKIT_UNKNOWN_FONT = '__MOCK_FONT_UNKNOWN__'
+
 export function buildMockBrandKitReply(lastUserMessage: string): string {
   const suggestion = {
     voice: `Mock brand voice extracted from references. [${lastUserMessage}]`,
     tone: 'confident, modern',
     style: 'Clean, high-contrast, generous whitespace.',
-    fonts: ['Inter', 'Playfair Display'],
+    // 031 FR-33: catalogue families plus a Sinhala script font. The sentinel in the user's
+    // message swaps the body for a name that is not in the font list (the panel keeps exact
+    // catalogue matches only).
+    fonts: {
+      heading: 'Playfair Display',
+      body: lastUserMessage.includes(MOCK_BRANDKIT_UNKNOWN_FONT) ? 'Zzyzx Mock Sans' : 'Inter',
+    },
+    scriptFonts: { sinhala: 'Noto Sans Sinhala' },
   }
   return [
     'Mock brand-kit assistant reply for E2E tests.',

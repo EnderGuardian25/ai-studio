@@ -30,11 +30,35 @@ export interface ChatMessage {
 
 const HEX_COLOR = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/
 
+export interface BrandKitFonts {
+  heading?: string
+  body?: string
+}
+
 const brandKitBlockSchema = z.object({
   voice: z.string().trim().min(1),
   tone: z.string().trim().default(''),
   style: z.string().trim().default(''),
-  fonts: z.array(z.string().trim().min(1)).max(6).default([]),
+  // 031 FR-33: { heading?, body? }. The old string[] still parses: entry 0 is the heading, entry 1 the body.
+  fonts: z
+    .union([
+      z
+        .array(z.string().trim().min(1))
+        .max(6)
+        .transform((a): BrandKitFonts => {
+          const out: BrandKitFonts = {}
+          if (a[0]) out.heading = a[0]
+          if (a[1]) out.body = a[1]
+          return out
+        }),
+      z.object({
+        heading: z.string().trim().min(1).optional(),
+        body: z.string().trim().min(1).optional(),
+      }),
+    ])
+    .default({}),
+  // 031 FR-33: { [script]: family }; checked on apply against the catalogue.
+  scriptFonts: z.record(z.string().trim().min(1)).optional(),
   // Colors explicitly stated in reference DOCUMENTS only (validated hex).
   colors: z.array(z.string().trim().regex(HEX_COLOR)).max(6).default([]),
 })
@@ -43,7 +67,8 @@ export interface BrandKitSuggestion {
   voice: string
   tone: string
   style: string
-  fonts: string[]
+  fonts: BrandKitFonts
+  scriptFonts?: Record<string, string>
   // Document-declared colors first (authoritative), then colors sampled from
   // the reference images — never colors guessed by vision from pixels. Font
   // guesses ARE from vision, so the UI presents them (and everything else) as
@@ -195,7 +220,7 @@ export async function runBrandKitChat(
   const system = [
     'You are a brand designer helping an admin of bistec-studio derive a brand kit from reference material (past posts, mock-ups, logos, brand guideline documents).',
     'Study the references and the conversation, then describe the brand: its VOICE (how copy should sound), TONE, visual STYLE (layout, imagery, mood), and the FONTS in use.',
-    'In every reply once you have enough to work with, include your current best extraction inside a fenced code block that starts with ```brandkit and ends with ``` containing ONLY JSON of the shape {"voice":string,"tone":string,"style":string,"fonts":string[],"colors":string[]}. voice is a reusable brand-voice prompt (roughly 60-150 words) that will steer AI copy. colors: include ONLY hex color values the reference DOCUMENTS state explicitly (e.g. a brand guideline naming #1A2B3C) — NEVER estimate colors from images; leave the array empty otherwise (image colors are sampled separately). Font names from images are your best visual guess; the admin will confirm them.',
+    'In every reply once you have enough to work with, include your current best extraction inside a fenced code block that starts with ```brandkit and ends with ``` containing ONLY JSON of the shape {"voice":string,"tone":string,"style":string,"fonts":{"heading"?:string,"body"?:string},"scriptFonts"?:{"sinhala"?:string},"colors":string[]}. voice is a reusable brand-voice prompt (roughly 60-150 words) that will steer AI copy. colors: include ONLY hex color values the reference DOCUMENTS state explicitly (e.g. a brand guideline naming #1A2B3C) — NEVER estimate colors from images; leave the array empty otherwise (image colors are sampled separately). Font names are your best visual guess: use Google Fonts family names only; the admin will confirm them, and a name that is not a Google Fonts family is not applied. Propose scriptFonts only when the references show Sinhala text.',
     'Summarise briefly in prose above the block; the app turns the block into an editable, applyable suggestion.',
     UNTRUSTED_CONTENT_GUARD,
     docs.text

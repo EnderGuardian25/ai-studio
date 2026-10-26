@@ -9,22 +9,50 @@ import { ModelPicker } from '@/components/ui/ModelPicker'
 import { ApiError, apiFetch } from '@/lib/apiFetch'
 import type { ModelKey } from '@/lib/models/catalogue'
 import { ColorEditor } from './ColorEditor'
-import { COMPACT_TEXTAREA, EYEBROW, FOCUS, ICON, ICON_BUTTON, ICON_SM, SCROLL_FOCUS, TAG } from '@/components/ui/atoms'
+import { COMPACT_TEXTAREA, EYEBROW, FOCUS, ICON, ICON_BUTTON, ICON_SM, SCROLL_FOCUS } from '@/components/ui/atoms'
+import type { FontFamily } from '@/lib/fonts/types'
 import { FieldLabel } from '@/components/ui/FieldLabel'
 
 // F5 — conversational brand-kit extraction from reference images. Mirrors the
 // campaign BriefingAssistantPanel: chat grounded on the kit's feedToAI reference
 // images, the assistant proposes a brand suggestion, the admin reviews + edits it,
 // then applies. Apply writes the VOICE (new active prompt) and the COLOR palette
-// (sampled, editable). Font guesses + style are surfaced as read-only suggestions
-// — vision font guesses are never auto-committed (they lack real font files).
+// (sampled, editable) and, since 031, the fonts: each proposed name is looked up in
+// the font list (exact match only) and shown as current versus proposed. A name that
+// is not in the list is never applied. One Apply calls /assistant/apply (all or nothing).
 
 interface BrandKitSuggestion {
   voice: string
   tone: string
   style: string
-  fonts: string[]
+  fonts: { heading?: string; body?: string }
+  scriptFonts?: Record<string, string>
   colors: string[]
+}
+
+// One reviewable font change in the accept view.
+interface FontRow {
+  key: 'heading' | 'body' | 'sinhala'
+  label: string
+  current: string
+  proposed: string
+  // Why the row cannot be applied; null when the proposed name is a usable catalogue family.
+  problem: 'not-listed' | 'no-sinhala' | null
+  checked: boolean
+}
+
+interface KitFontsView {
+  fonts: Array<{ name: string }>
+  scriptFonts: Record<string, string> | null
+}
+
+async function lookupFamily(name: string): Promise<FontFamily | null> {
+  try {
+    const res = await apiFetch<{ families: FontFamily[] }>(`/api/fonts?q=${encodeURIComponent(name)}`)
+    return res.families.find(f => f.family === name) ?? null
+  } catch {
+    return null
+  }
 }
 
 interface ChatMessage {
@@ -73,7 +101,9 @@ export function BrandKitAssistantPanel({ kitId, open, onClose, onApplied }: Bran
   // The suggestion under review (editable), and which fields to apply.
   const [voice, setVoice] = useState('')
   const [colors, setColors] = useState<string[]>([])
-  const [fonts, setFonts] = useState<string[]>([])
+  const [fontRows, setFontRows] = useState<FontRow[]>([])
+  // The font lookups run after a suggestion arrives; Apply waits for them so a fast click cannot skip the fonts.
+  const [fontsLoading, setFontsLoading] = useState(false)
   const [style, setStyle] = useState('')
   const [hasSuggestion, setHasSuggestion] = useState(false)
   const [applying, setApplying] = useState(false)
@@ -136,10 +166,43 @@ export function BrandKitAssistantPanel({ kitId, open, onClose, onApplied }: Bran
     }
   }
 
+  // FR-33: look each proposed name up (exact match only) and set it beside the kit's current font.
+  async function buildFontRows(s: BrandKitSuggestion): Promise<FontRow[]> {
+    const proposals: Array<{ key: FontRow['key']; label: string; name: string }> = []
+    if (s.fonts?.heading) proposals.push({ key: 'heading', label: 'Heading font', name: s.fonts.heading })
+    if (s.fonts?.body) proposals.push({ key: 'body', label: 'Body font', name: s.fonts.body })
+    if (s.scriptFonts?.sinhala) proposals.push({ key: 'sinhala', label: 'Sinhala font', name: s.scriptFonts.sinhala })
+    if (proposals.length === 0) return []
+    let kit: KitFontsView | null = null
+    try {
+      kit = await apiFetch<KitFontsView>(`/api/admin/brandkits/${kitId}`)
+    } catch {
+      /* "Current" shows as none; Apply still validates on the server */
+    }
+    const storedFonts = Array.isArray(kit?.fonts) ? kit!.fonts : []
+    return Promise.all(
+      proposals.map(async p => {
+        const found = await lookupFamily(p.name)
+        const problem: FontRow['problem'] = !found
+          ? 'not-listed'
+          : p.key === 'sinhala' && !found.scripts.includes('sinhala')
+            ? 'no-sinhala'
+            : null
+        const current =
+          p.key === 'heading' ? storedFonts[0]?.name : p.key === 'body' ? storedFonts[1]?.name : kit?.scriptFonts?.sinhala
+        return { key: p.key, label: p.label, current: current ?? 'none', proposed: p.name, problem, checked: problem === null }
+      }),
+    )
+  }
+
   function loadSuggestion(s: BrandKitSuggestion) {
     setVoice(s.voice)
     setColors(s.colors)
-    setFonts(s.fonts)
+    setFontRows([])
+    setFontsLoading(true)
+    void buildFontRows(s)
+      .then(setFontRows)
+      .finally(() => setFontsLoading(false))
     setStyle([s.tone, s.style].filter(Boolean).join(' — '))
     setHasSuggestion(true)
   }
@@ -179,25 +242,28 @@ export function BrandKitAssistantPanel({ kitId, open, onClose, onApplied }: Bran
     }
   }
 
+  const chosenFonts = fontRows.filter(r => r.checked && r.problem === null)
+  const canApply = voice.trim() !== '' || colors.length > 0 || chosenFonts.length > 0
+
   async function apply() {
-    if (!voice.trim() && colors.length === 0) return
+    if (!canApply) return
     setApplying(true)
     try {
-      if (voice.trim()) {
-        await apiFetch(`/api/admin/brandkits/${kitId}/prompts`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ content: voice.trim() }),
-        })
-      }
-      if (colors.length > 0) {
-        await apiFetch(`/api/admin/brandkits/${kitId}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ colors }),
-        })
-      }
-      toast.success('Applied brand voice and colors to the kit.')
+      const fonts: { heading?: string; body?: string } = {}
+      for (const r of chosenFonts) if (r.key !== 'sinhala') fonts[r.key] = r.proposed
+      const sinhala = chosenFonts.find(r => r.key === 'sinhala')
+      // One call, all or nothing (FR-34): voice, colors, fonts and script fonts together.
+      await apiFetch(`/api/admin/brandkits/${kitId}/assistant/apply`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...(voice.trim() && { voice: voice.trim() }),
+          ...(colors.length > 0 && { colors }),
+          ...(Object.keys(fonts).length > 0 && { fonts }),
+          ...(sinhala && { scriptFonts: { sinhala: sinhala.proposed } }),
+        }),
+      })
+      toast.success('Applied the suggestion to the kit.')
       setHasSuggestion(false)
       onApplied()
     } catch (e: unknown) {
@@ -364,18 +430,44 @@ export function BrandKitAssistantPanel({ kitId, open, onClose, onApplied }: Bran
               </div>
             </div>
 
-            {fonts.length > 0 && (
+            {fontRows.length > 0 && (
               <div>
-                <p className={EYEBROW}>
-                  Font guesses (not applied — add manually with a font file if correct)
-                </p>
-                <div className="mt-1.5 flex flex-wrap gap-1.5">
-                  {fonts.map(f => (
-                    <span key={f} className={TAG}>
-                      {f}
-                    </span>
-                  ))}
-                </div>
+                <p className={EYEBROW}>Fonts (checked ones are applied)</p>
+                <ul className="mt-1.5 space-y-1.5">
+                  {fontRows.map(r => {
+                    const id = `${voiceId}-font-${r.key}`
+                    return (
+                      <li key={r.key} className="flex items-start gap-2">
+                        <input
+                          id={id}
+                          type="checkbox"
+                          checked={r.checked && r.problem === null}
+                          disabled={r.problem !== null}
+                          onChange={e =>
+                            setFontRows(rows => rows.map(x => (x.key === r.key ? { ...x, checked: e.target.checked } : x)))
+                          }
+                          className={`mt-0.5 h-4 w-4 accent-accent disabled:cursor-not-allowed ${FOCUS}`}
+                        />
+                        <label htmlFor={id} className="min-w-0 break-words text-ui-sm text-fg">
+                          <span className="font-medium">{r.label}: </span>
+                          {r.problem === 'not-listed' ? (
+                            <span className="text-fg-muted">
+                              {`${r.proposed} is not in the font list and won't be applied`}
+                            </span>
+                          ) : r.problem === 'no-sinhala' ? (
+                            <span className="text-fg-muted">
+                              {`${r.proposed} does not support Sinhala and won't be applied`}
+                            </span>
+                          ) : (
+                            <span>
+                              Current: {r.current} → Proposed: {r.proposed}
+                            </span>
+                          )}
+                        </label>
+                      </li>
+                    )
+                  })}
+                </ul>
               </div>
             )}
 
@@ -386,9 +478,9 @@ export function BrandKitAssistantPanel({ kitId, open, onClose, onApplied }: Bran
             )}
 
             <div className="flex flex-wrap gap-2">
-              <Button size="sm" onClick={apply} disabled={applying || (!voice.trim() && colors.length === 0)}>
+              <Button size="sm" onClick={apply} disabled={applying || fontsLoading || !canApply}>
                 {applying ? <Loader2 {...ICON} className="animate-spin" /> : <Check {...ICON} />}
-                Apply voice + colors
+                Apply to brand kit
               </Button>
               <Button variant="ghost" size="sm" onClick={() => setHasSuggestion(false)} disabled={applying}>
                 Dismiss

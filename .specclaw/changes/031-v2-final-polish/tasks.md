@@ -210,7 +210,7 @@
     - TC-AS-01 to TC-AS-03.
     - **Gate:** tsc, lint, unit, §AL and the briefing-assistant suite.
 
-- [ ] `T12` — The brand-kit assistant fonts, the apply route, `previousFonts` in History; the rest of §AL
+- [x] `T12` — The brand-kit assistant fonts, the apply route, `previousFonts` in History; the rest of §AL
   - Files: `src/lib/brandkit/assistant.ts`, `src/components/admin/brandkits/BrandKitAssistantPanel.tsx`, `src/app/api/admin/brandkits/[id]/assistant/apply/route.ts` (new), `src/app/api/admin/brandkits/[id]/prompts/route.ts` (extract `createPromptVersion`), `src/components/admin/brandkits/PromptSection.tsx`, `src/lib/testHooks.ts`, `tests/unit/{brandKitBlock,brandKitApply}.test.ts`, `tests/e2e/assistants-031.test.ts`
   - Estimate: medium
   - Kind: impl
