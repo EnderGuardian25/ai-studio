@@ -1,5 +1,5 @@
 // Upgrade-path test for change 022 (FR-03): proves that a database coming from
-// `main` (company prod) converts its legacy single captions and then passes
+// `main` (the pre-fork schema) converts its legacy single captions and then passes
 // 016's drop, that the carry-over is a no-op on a database that already
 // dropped them, and that the carry-over's content guard fails the deploy
 // atomically.
@@ -13,7 +13,7 @@
 // the .env.test line, else the setup-test-db.mjs fallback). The database name
 // is always replaced by the hard-coded SCRATCH_DB below and asserted before
 // anything connects; the script refuses to run otherwise. It never touches
-// any other database (not bistec_studio, not bistec_studio_test). The scratch
+// any other database (not ai_studio, not ai_studio_test). The scratch
 // database is dropped (WITH (FORCE)) before each scenario and in a `finally`,
 // and every temporary migrations folder is removed, pass or fail.
 //
@@ -34,9 +34,9 @@ import { PrismaClient } from '@prisma/client'
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
-const SCRATCH_DB = 'bistec_studio_upgrade'
+const SCRATCH_DB = 'ai_studio_upgrade'
 const MAINTENANCE_DB = 'postgres'
-const FALLBACK_DB_URL = 'postgresql://bistec:bistec@localhost:5432/bistec_studio_test'
+const FALLBACK_DB_URL = 'postgresql://bistec:bistec@localhost:5442/ai_studio_test'
 
 const MAIN_HEAD = '20260728120000_heal_copy_edit_clobbered_drafts' // origin/main's migration head
 const PRE_CARRYOVER = '20261012120000_model_selection'
@@ -87,16 +87,16 @@ const SOURCE_URL = process.env.DATABASE_URL || readEnvTestDatabaseUrl() || FALLB
 const SCRATCH_URL = withDatabase(SOURCE_URL, SCRATCH_DB)
 const MAINTENANCE_URL = withDatabase(SOURCE_URL, MAINTENANCE_DB)
 
-if (databaseOf(SCRATCH_URL) !== 'bistec_studio_upgrade' || databaseOf(MAINTENANCE_URL) !== 'postgres') {
+if (databaseOf(SCRATCH_URL) !== 'ai_studio_upgrade' || databaseOf(MAINTENANCE_URL) !== 'postgres') {
   console.error(
     `REFUSING TO RUN: derived database names are "${databaseOf(SCRATCH_URL)}" / "${databaseOf(MAINTENANCE_URL)}", ` +
-      'expected "bistec_studio_upgrade" / "postgres".',
+      'expected "ai_studio_upgrade" / "postgres".',
   )
   process.exit(2)
 }
 
 // The scratch database is created and dropped on whatever server SOURCE_URL
-// names, so only a local server is accepted: an exported prod DATABASE_URL
+// names, so only a local server is accepted: an exported production DATABASE_URL
 // must never get a scratch database made (and dropped) next to its data.
 const SOURCE_HOST = new URL(SOURCE_URL).hostname
 if (!['localhost', '127.0.0.1', '::1', '[::1]'].includes(SOURCE_HOST)) {
@@ -169,7 +169,7 @@ function mustDeploy(label, res) {
 }
 
 async function dropScratch() {
-  if (SCRATCH_DB !== 'bistec_studio_upgrade') throw new Error('scratch name changed')
+  if (SCRATCH_DB !== 'ai_studio_upgrade') throw new Error('scratch name changed')
   await admin.$executeRawUnsafe(`DROP DATABASE IF EXISTS "${SCRATCH_DB}" WITH (FORCE)`)
 }
 

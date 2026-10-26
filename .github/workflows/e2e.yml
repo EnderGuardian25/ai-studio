@@ -35,9 +35,9 @@ jobs:
         env:
           POSTGRES_USER: bistec
           POSTGRES_PASSWORD: bistec
-          POSTGRES_DB: bistec_studio_test
+          POSTGRES_DB: ai_studio_test
         ports:
-          - 5432:5432
+          - 5442:5432
         options: >-
           --health-cmd "pg_isready -U bistec"
           --health-interval 5s
@@ -49,11 +49,11 @@ jobs:
       NEXT_PUBLIC_APP_URL: http://localhost:3001
       BETTER_AUTH_SECRET: ci-test-secret-0000000000000000000000000000000000000000000000000000000000000000
       BETTER_AUTH_URL: http://localhost:3001
-      DATABASE_URL: postgresql://bistec:bistec@localhost:5432/bistec_studio_test
-      POSTGRES_DB: bistec_studio_test
+      DATABASE_URL: postgresql://bistec:bistec@localhost:5442/ai_studio_test
+      POSTGRES_DB: ai_studio_test
       POSTGRES_USER: bistec
       POSTGRES_PASSWORD: bistec
-      MINIO_ENDPOINT: http://localhost:9000
+      MINIO_ENDPOINT: http://localhost:9100
       MINIO_ACCESS_KEY: minioadmin
       MINIO_SECRET_KEY: minioadmin
       MINIO_ROOT_USER: minioadmin
@@ -96,12 +96,12 @@ jobs:
         # directions) and its entrypoint translates `server /data` argv to
         # the `silo` binary, so nothing else in this step changes.
         run: |
-          docker run -d --name minio -p 9000:9000 \
+          docker run -d --name minio -p 9100:9000 \
             -e MINIO_ROOT_USER=minioadmin -e MINIO_ROOT_PASSWORD=minioadmin \
             pgsty/silo:RELEASE.2026-09-16T00-00-00Z@sha256:635197cb9f36d01bee221d34d1c7d7960f6a95c48b0b6c01d99cd13bdae51a46 server /data
           # Wait for MinIO to accept connections.
           for _ in $(seq 1 30); do
-            if curl -sf http://localhost:9000/minio/health/live >/dev/null; then echo "minio ready"; break; fi
+            if curl -sf http://localhost:9100/minio/health/live >/dev/null; then echo "minio ready"; break; fi
             sleep 2
           done
 
@@ -110,12 +110,12 @@ jobs:
           npx prisma generate
           npx prisma migrate deploy
 
-      # Change 022 FR-03: the upgrade path from main's schema (company prod).
-      # Builds its own scratch database (bistec_studio_upgrade) on the same
+      # Change 022 FR-03: the upgrade path from main's schema (the pre-fork one).
+      # Builds its own scratch database (ai_studio_upgrade) on the same
       # service, migrates it from main's head with prod-shaped legacy drafts,
       # and proves the carry-over converts them before 016's drop, is a no-op
       # on an already-dropped database, and fails atomically on bad content.
-      # It never touches bistec_studio_test and drops its scratch DB at the end.
+      # It never touches ai_studio_test and drops its scratch DB at the end.
       - name: Upgrade path from main's schema (022)
         run: npm run test:upgrade
 

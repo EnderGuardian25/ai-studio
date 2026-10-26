@@ -73,7 +73,7 @@ const LOGO_FILES = [
 ]
 
 // ── MinIO (mirrors scripts/refine-bistec-brandkit.mjs / src/lib/storage/minio.ts) ──
-const endpoint = process.env.MINIO_ENDPOINT ?? "http://localhost:9000"
+const endpoint = process.env.MINIO_ENDPOINT ?? "http://localhost:9100"
 const publicEndpoint = (process.env.MINIO_PUBLIC_ENDPOINT ?? endpoint).replace(/\/+$/, "")
 const BUCKET = process.env.MINIO_BUCKET_BRANDKITS ?? "brand-kits"
 

@@ -102,7 +102,7 @@ Banned patterns:
 - Fabricated social proof or unsubstantiated superlatives.`
 
 // ── MinIO (mirrors src/lib/storage/minio.ts) ────────────────────────────────
-const endpoint = process.env.MINIO_ENDPOINT ?? "http://localhost:9000"
+const endpoint = process.env.MINIO_ENDPOINT ?? "http://localhost:9100"
 const publicEndpoint = (process.env.MINIO_PUBLIC_ENDPOINT ?? endpoint).replace(/\/+$/, "")
 const BUCKET = process.env.MINIO_BUCKET_BRANDKITS ?? "brand-kits"
 

@@ -8,7 +8,7 @@ import { readEnvTest } from './db'
 export const DOCS_BUCKET = readEnvTest('MINIO_BUCKET_DOCS') ?? 'campaign-docs'
 
 const s3 = new S3Client({
-  endpoint: readEnvTest('MINIO_ENDPOINT') ?? 'http://localhost:9000',
+  endpoint: readEnvTest('MINIO_ENDPOINT') ?? 'http://localhost:9100',
   region: 'us-east-1',
   credentials: {
     accessKeyId: readEnvTest('MINIO_ACCESS_KEY') ?? 'minioadmin',

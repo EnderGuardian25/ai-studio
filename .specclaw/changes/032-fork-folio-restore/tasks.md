@@ -35,7 +35,7 @@
 
 ### Wave 1: Foundations
 
-- [ ] `T1` — Delete the company deploy workflow (first commit)
+- [x] `T1` — Delete the company deploy workflow (first commit)
   - Files: `.github/workflows/docker-publish.yml` (delete)
   - Estimate: tiny
   - Kind: config
@@ -43,7 +43,7 @@
   - Depends: none
   - Notes: The commit holds this deletion only (FR-01, AC-01). No push.
 
-- [ ] `T2` — The fork's own stack and the preflight
+- [x] `T2` — The fork's own stack and the preflight
   - Files: `docker-compose.yml`, `docker-compose.override.yml`, `docker-compose.test.yml`, `.env.example`, `package.json`, `scripts/lib/stackPreflight.mjs` (new), `scripts/stack-preflight.mjs` (new), `scripts/setup-test-db.mjs`, `scripts/test-upgrade-path.mjs`, `scripts/seed-admin.mjs`, `scripts/seed-hearts-talk.mjs`, `scripts/refine-bistec-brandkit.mjs`, `.github/workflows/e2e.yml`, `tests/e2e/agui-refinement.test.ts`, `tests/e2e/brief-draft-recovery.test.ts`, `tests/unit/stackPreflight.test.ts` (new); local untracked `.env`, `.env.test`
   - Estimate: medium
   - Kind: config

@@ -1,14 +1,16 @@
 # Isolated test environment — uses separate DB and MinIO instances.
 # Start with: docker compose -f docker-compose.test.yml up -d
+name: ${COMPOSE_TEST_PROJECT_NAME:-ai-studio-test}
+
 services:
   postgres-test:
     image: postgres:16-alpine
     environment:
-      POSTGRES_DB: bistec_studio_test
+      POSTGRES_DB: ai_studio_test
       POSTGRES_USER: bistec
       POSTGRES_PASSWORD: bistec
     ports:
-      - "5433:5432"
+      - "${POSTGRES_TEST_HOST_PORT:-5443}:5432"
     tmpfs:
       - /var/lib/postgresql/data
 
@@ -23,8 +25,8 @@ services:
     image: pgsty/silo:RELEASE.2026-09-16T00-00-00Z@sha256:635197cb9f36d01bee221d34d1c7d7960f6a95c48b0b6c01d99cd13bdae51a46
     command: server /data --console-address ":9002"
     ports:
-      - "127.0.0.1:9002:9001"
-      - "9010:9000"
+      - "127.0.0.1:${MINIO_TEST_CONSOLE_HOST_PORT:-9111}:9001"
+      - "${MINIO_TEST_HOST_PORT:-9110}:9000"
     environment:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin

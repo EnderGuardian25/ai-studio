@@ -286,7 +286,7 @@ function doc(inner: string): string {
 }
 const textDoc = () => doc(`<p>${PARAGRAPH}</p>`)
 // An "uploaded" image on the public MinIO host (the IMAGES bucket is public-read).
-const imageUrlFor = (tag: string) => `http://localhost:9000/images/t21-${tag}-uploaded.png`
+const imageUrlFor = (tag: string) => `http://localhost:9100/images/t21-${tag}-uploaded.png`
 const imageDoc = (tag: string) => doc(`<img src="${imageUrlFor(tag)}" alt="Uploaded photo"><p>Autumn open day</p>`)
 // Final F1 / C-1: an old background plus an "uploaded" inset — the before-
 // document of the reported duplicate (background first, inset second: the
@@ -596,7 +596,7 @@ test.describe('§V — refine fidelity contract', () => {
   test('regression: the inset image applied as the background AND kept as the inset is not applied', async () => {
     if (!FIDELITY_READY()) { test.skip(); return }
     const tag = `img-move-dup-${Date.now()}`
-    const oldBg = `http://localhost:9000/images/t21-${tag}-old-bg.png`
+    const oldBg = `http://localhost:9100/images/t21-${tag}-old-bg.png`
     const upload = imageUrlFor(tag)
     const draft = await fidelityDraft(api, tag, moveDoc(oldBg, upload))
     const instruction = `Use the uploaded image as the background __REFINE_IMAGE_MOVE_DUP__ ${uniq('V05b')}`
@@ -624,7 +624,7 @@ test.describe('§V — refine fidelity contract', () => {
   test('the inset image moved to the background (inset gone) commits on the retry', async () => {
     if (!FIDELITY_READY()) { test.skip(); return }
     const tag = `img-move-${Date.now()}`
-    const oldBg = `http://localhost:9000/images/t21-${tag}-old-bg.png`
+    const oldBg = `http://localhost:9100/images/t21-${tag}-old-bg.png`
     const upload = imageUrlFor(tag)
     const draft = await fidelityDraft(api, tag, moveDoc(oldBg, upload))
     const settled = await refineCommitted(

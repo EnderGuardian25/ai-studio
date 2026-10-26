@@ -2,19 +2,22 @@
 // migrations, and seed the baseline (admin + Bistec kit + Hearts Talk kit + the
 // keyless 'cli' COPY provider the brief flow validates against).
 //
-// Usage: npm run test:e2e:db
-// Requires: the Postgres container running and .env.test present.
+// Usage: npm run test:e2e:db [-- --reset]
+//   --reset drops the test database first (WITH (FORCE)), for a clean gate.
+// Requires: this clone's Postgres service running (`docker compose up -d`) and
+// .env.test present. The npm script runs scripts/stack-preflight.mjs first.
 //
 // Configuration:
 //   - The test DB URL is derived from DATABASE_URL in .env.test (simple line
 //     parse — no dotenv dependency). When .env.test is missing or has no
 //     DATABASE_URL, the historical default below is used as a fallback.
-//   - Override the Postgres container name with POSTGRES_CONTAINER if it
-//     differs from the docker-compose default (designer-postgres-1).
+//   - Postgres is reached with `docker compose exec -T postgres psql`, so the
+//     compose project (name: / COMPOSE_PROJECT_NAME) decides which container;
+//     no container name is hard-coded.
 import { execSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 
-const FALLBACK_DB_URL = 'postgresql://bistec:bistec@localhost:5432/bistec_studio_test'
+const FALLBACK_DB_URL = 'postgresql://bistec:bistec@localhost:5442/ai_studio_test'
 
 // Minimal .env line parser: first `DATABASE_URL=...` line wins. Tolerates
 // optional surrounding single/double quotes on the value.
@@ -36,8 +39,8 @@ function readEnvTestDatabaseUrl() {
 
 const ENV_DB_URL = readEnvTestDatabaseUrl()
 const TEST_DB_URL = ENV_DB_URL ?? FALLBACK_DB_URL
-const TEST_DB_NAME = new URL(TEST_DB_URL).pathname.replace(/^\//, '') || 'bistec_studio_test'
-const CONTAINER = process.env.POSTGRES_CONTAINER ?? 'designer-postgres-1'
+const TEST_DB_NAME = new URL(TEST_DB_URL).pathname.replace(/^\//, '') || 'ai_studio_test'
+const RESET = process.argv.includes('--reset')
 
 console.log(`Test DB: ${TEST_DB_NAME} (from ${ENV_DB_URL ? '.env.test DATABASE_URL' : 'built-in fallback'})`)
 
@@ -46,9 +49,20 @@ function run(cmd, env) {
   execSync(cmd, { stdio: 'inherit', env: { ...process.env, ...env } })
 }
 
+const PSQL = 'docker compose exec -T postgres psql -U bistec -d postgres -c'
+
+// 0. --reset: drop the test database first. Only a *_test name is ever dropped.
+if (RESET) {
+  if (!TEST_DB_NAME.endsWith('_test') || !/^[a-z0-9_]+$/.test(TEST_DB_NAME)) {
+    console.error(`REFUSING --reset: "${TEST_DB_NAME}" is not a *_test database.`)
+    process.exit(2)
+  }
+  run(`${PSQL} "DROP DATABASE IF EXISTS ${TEST_DB_NAME} WITH (FORCE);"`)
+}
+
 // 1. Create the database (ignore "already exists").
 try {
-  run(`docker exec ${CONTAINER} psql -U bistec -d postgres -c "CREATE DATABASE ${TEST_DB_NAME};"`)
+  run(`${PSQL} "CREATE DATABASE ${TEST_DB_NAME};"`)
 } catch {
   console.log('(test database already exists — continuing)')
 }
