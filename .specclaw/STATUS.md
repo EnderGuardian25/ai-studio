@@ -1,7 +1,7 @@
 # 🦞 SpecClaw Dashboard
 
 **Project:** bistec-studio
-**Last Updated:** 2026-10-26 11:20 UTC
+**Last Updated:** 2026-10-26 18:02 UTC
 
 _1 unnumbered change · run `/specclaw:renumber` to order them_
 
@@ -17,18 +17,18 @@ _1 unnumbered change · run `/specclaw:renumber` to order them_
 - 🔍 **008-model-selection** ▣ — verify PASS | 19/19 tasks (100%) | 0 failed | PR #43 closed | 27h54m
 - 🔍 **009-hero-image-design** ▣ — verify PASS | 6/6 tasks (100%) | 0 failed | PR #43 closed | 11h49m
 - 🔍 **011-app-visual-redesign** — verify PASS | 13/13 tasks (100%) | 0 failed | PR #43 closed | 59h23m
-- 🔍 **012-per-channel-captions** ▣ — verify PASS | 16/16 tasks (100%) | 0 failed | PR #43 closed | 26h43m
+- 🔍 **012-per-channel-captions** ▣ — verify PASS | 16/16 tasks (100%) | 0 failed | 26h43m
 - 🔍 **013-fork-ci-checks-only** ▫ — verify PASS | 3/3 tasks (100%) | 0 failed | PR #43 closed | 13h13m
 - 🔍 **014-ui-a11y-consistency-pass** ▣ — verify PASS | 18/18 tasks (100%) | 0 failed | PR #43 closed | 42h45m
 - 🔍 **015-draft-action-settle-race** ▫ — verify PASS | 3/3 tasks (100%) | 0 failed | PR #43 closed | 25m
-- 🔍 **016-fresh-start-cleanup** ▫ — verify PASS | 5/5 tasks (100%) | 0 failed | PR #43 closed | 2m
+- 🔍 **016-fresh-start-cleanup** ▫ — verify PASS | 5/5 tasks (100%) | 0 failed | 2m
 - 🔍 **017-publish-api-fixes** ▫ — verify PASS | 3/3 tasks (100%) | 0 failed | PR #43 closed
 - 🔍 **018-post-008-small-fixes** ▫ — verify PASS | 4/4 tasks (100%) | 0 failed | PR #43 closed | 1h2m
 - 🔍 **019-draft-action-claim-token** ▫ — verify PASS | 4/4 tasks (100%) | 0 failed | PR #43 closed | 4h14m
-- 🔍 **020-create-post-button-draft-page** ▫ — verify PASS | 2/2 tasks (100%) | 0 failed | PR #43 closed | 1h16m
+- 🔍 **020-create-post-button-draft-page** ▫ — verify PASS | 2/2 tasks (100%) | 0 failed | 1h16m
 - 🔍 **021-graphite-retheme** ▣ — verify PASS | 8/8 tasks (100%) | 0 failed | 42h47m
 - 🔍 **022-prod-data-and-deploy-restore** ▫ — verify PASS | 4/4 tasks (100%) | 0 failed | 5h22m
-- 🔍 **023-scheduler-heartbeat** ▫ — verify PASS | 3/3 tasks (100%) | 0 failed | PR #43 closed | 5h24m
+- 🔍 **023-scheduler-heartbeat** ▫ — verify PASS | 3/3 tasks (100%) | 0 failed | 5h24m
 - 🔍 **024-caption-credential-route** ▣ — verify PASS | 4/4 tasks (100%) | 0 failed | PR #43 closed | 6h45m
 - 🔍 **025-hero-reference-images** ▣ — verify PASS | 14/14 tasks (100%) | 0 failed | PR #43 closed | 80h11m
 - 🔍 **026-drop-whatsapp-caption-refine-under-preview** ▫ — verify PASS | 3/3 tasks (100%) | 0 failed | PR #43 closed | 1h53m
@@ -36,7 +36,7 @@ _1 unnumbered change · run `/specclaw:renumber` to order them_
 - 🔍 **028-image-looks** ▣ — verify PASS | 7/7 tasks (100%) | 0 failed | PR #43 closed | 12h57m
 - 🔍 **029-cli-usage-limit-message** ▫ — verify PASS | 1/1 tasks (100%) | 0 failed | 45m
 - 🔍 **030-stale-headline-badge** ▣ — verify PASS | 6/6 tasks (100%) | 0 failed | PR #43 closed | 6h40m
-- 📝 **031-v2-final-polish** ▣ — tasks done | 0/19 tasks (0%) | 0 failed | 29m
+- 🔨 **031-v2-final-polish** ▣ — build done | 19/19 tasks (100%) | 0 failed | PR #43 closed | 7h24m
 
 ## Pending Proposals
 
