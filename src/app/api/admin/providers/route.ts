@@ -8,7 +8,7 @@ import { IMAGE_PROVIDERS, canServeSlot } from '@/providers/imageCapabilities'
 
 function detectProvider(apiKey: string): { providerName: string; autoLabel: string } | null {
   if (apiKey.startsWith('sk-ant-')) return { providerName: 'anthropic', autoLabel: 'Claude (Anthropic)' }
-  if (apiKey.startsWith('sk-')) return { providerName: 'openai', autoLabel: 'GPT (OpenAI)' }
+  if (apiKey.startsWith('sk-')) return { providerName: 'openai', autoLabel: 'OpenAI' }
   // Google API keys (Gemini): IMAGE only, which canServeSlot enforces (005 FR-13).
   if (apiKey.startsWith('AIza')) return { providerName: 'gemini', autoLabel: 'Gemini (Google)' }
   return null
@@ -70,7 +70,7 @@ const createSchema = z.object({
   // The key is encrypted verbatim — validate presence without altering the value.
   apiKey: z.string().refine((v) => v.trim().length > 0, 'apiKey is required'),
   slot: z.enum(['COPY', 'IMAGE'], {
-    errorMap: () => ({ message: 'slot must be COPY or IMAGE' }),
+    errorMap: () => ({ message: 'slot must be COPY (Captions) or IMAGE (Images)' }),
   }),
   providerName: z.string().optional(),
   label: z.string().optional(),
@@ -95,7 +95,7 @@ export const POST = withTeamAdmin(async (req: NextRequest, _ctx, user) => {
   // 005 FR-04: refuse a pair the slot can't instantiate (e.g. an sk-ant- key
   // as IMAGE) before any live validation call.
   if (!canServeSlot(slot, providerName)) {
-    return NextResponse.json({ error: `Provider ${providerName} cannot serve the ${slot} slot` }, { status: 400 })
+    return NextResponse.json({ error: `Provider ${providerName} cannot serve the ${slot === 'COPY' ? 'Captions' : 'Images'} slot` }, { status: 400 })
   }
 
   const validationError = await validateApiKey(providerName, apiKey)

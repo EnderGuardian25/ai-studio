@@ -24,7 +24,7 @@ export const POST = withTeamAuth<Params>(async (_req, { params }, user) => {
   // Re-arming an auto-publish entry re-arms a deferred publish — team-admin-only.
   if (requiresAdmin(existing.postAction) && !(user.teamRole === 'ADMIN' || user.isSuperAdmin)) {
     return NextResponse.json(
-      { error: 'Auto-publish actions require admin — use HOLD to generate for review.' },
+      { error: 'Auto-publish actions require a team admin — use HOLD to generate for review.' },
       { status: 403 }
     )
   }

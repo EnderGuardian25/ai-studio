@@ -68,7 +68,7 @@
 
 ### Wave 2: G, wording
 
-- [ ] `T2` — The MEDIUM wording items and the stale docs
+- [x] `T2` — The MEDIUM wording items and the stale docs
   - Files: as listed by W-03 to W-12, W-14, W-17, W-18, W-19 (the wording part), W-20 to W-26 and W-39 to W-41 in `wording-scan.md`; any E2E file whose locator matches a changed string
   - Estimate: medium
   - Kind: refactor

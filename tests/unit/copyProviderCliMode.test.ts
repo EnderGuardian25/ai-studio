@@ -111,7 +111,7 @@ describe('resolveCopyProvider — non-CLI mode unchanged', () => {
   it('NOT CLI mode + nothing configured + no ANTHROPIC_API_KEY ⇒ still throws', async () => {
     h.isCliMode.mockReturnValue(false)
     h.availableProviderFindMany.mockResolvedValue([])
-    await expect(resolveCopyProvider(TEAM_ID)).rejects.toThrow(/No COPY provider configured/)
+    await expect(resolveCopyProvider(TEAM_ID)).rejects.toThrow(/No caption provider is set up/)
   })
 })
 

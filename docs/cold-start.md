@@ -162,7 +162,7 @@ kit's `createdBy` resolves to a real admin id). Both are idempotent. Result:
   - **Without the demo content** (a fresh system: run only `node --env-file=.env scripts/seed-admin.mjs`): sign in as the super admin; the dashboard says there are no teams yet and links to **`/admin/teams`** to create the first one.
   - **With the seed:** the super admin works in the Bistec team straight away (super admins act in any live team). Editors need a membership, added at `/admin/teams`.
 
-Optional: seed a 3:4 portrait template on the default kit so Path A has a portrait option out of the box (the brief filters templates by the chosen size):
+Optional: seed a 4:5 portrait template on the default kit so Path A has a portrait option out of the box (the brief filters templates by the chosen size):
 
 ```bash
 node --env-file=.env scripts/seed-portrait-template.mjs   # idempotent

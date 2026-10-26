@@ -3,3 +3,7 @@
 {"ev":"stop","span":"plan","at":"2026-10-26T11:20:31Z","ts":1793013631,"status":"ok"}
 {"ev":"start","span":"W1","kind":"wave","label":"wave 1","at":"2026-10-26T12:18:31Z","ts":1793017111}
 {"ev":"start","span":"T1","kind":"task","label":"Temp-dir cleanup, lost-claim cleanup, AC-17","parent":"W1","model":"sonnet","attempt":"1","at":"2026-10-26T12:18:32Z","ts":1793017112}
+{"ev":"stop","span":"T1","at":"2026-10-26T12:26:30Z","ts":1793017590,"status":"ok"}
+{"ev":"stop","span":"W1","at":"2026-10-26T12:26:39Z","ts":1793017599,"status":"ok"}
+{"ev":"start","span":"W2","kind":"wave","label":"wave 2","at":"2026-10-26T12:26:40Z","ts":1793017600}
+{"ev":"start","span":"T2","kind":"task","label":"MEDIUM wording items and stale docs","parent":"W2","model":"sonnet","attempt":"1","at":"2026-10-26T12:26:40Z","ts":1793017600}

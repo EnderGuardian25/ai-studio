@@ -424,7 +424,7 @@ test.describe('§AB — the caption credential route', () => {
     await expect(card).toBeVisible({ timeout: 20_000 })
     const stateLine = page.getByTestId('caption-route-state')
     await expect(stateLine).toHaveAttribute('data-state', 'unset')
-    await expect(page.getByRole('heading', { name: /Copy \(text generation\)/ })).toBeVisible()
+    await expect(page.getByRole('heading', { name: /Captions \(text generation\)/ })).toBeVisible()
     await expect(page.getByText('Not used in CLI mode')).toHaveCount(0)
     await expect(page.getByText('safe to delete')).toHaveCount(0)
     await expect(page.getByRole('button', { name: 'Register Provider' })).toBeVisible()

@@ -8,7 +8,7 @@ import { MOCK_SOCIAL, mockPlatformId, shouldMockPublishFail } from "@/lib/testHo
 async function resolveCredentials(teamId: string): Promise<{ accessToken: string; businessAccountId: string }> {
   const row = await prisma.channelToken.findFirst({ where: { teamId, channel: "INSTAGRAM" } })
   if (!row) {
-    throw new Error("No Instagram credentials configured for this team")
+    throw new Error("No Instagram credentials configured for this team. Add them under Team settings > Social channels.")
   }
   return { accessToken: decrypt(row.encryptedToken), businessAccountId: decrypt(row.encryptedMetadata) }
 }

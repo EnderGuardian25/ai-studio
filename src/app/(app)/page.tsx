@@ -102,7 +102,7 @@ async function getDashboardData(user: TeamAuthedUser) {
     ...recentProviders.map(p => ({
       id: `prov-${p.id}`,
       at: p.createdAt,
-      text: `${p.slot === 'COPY' ? 'Copy' : 'Image'} provider added — ${p.label}`,
+      text: `${p.slot === 'COPY' ? 'Caption' : 'Image'} provider added — ${p.label}`,
       kind: 'provider' as const,
     })),
   ]

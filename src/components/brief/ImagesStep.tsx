@@ -31,7 +31,7 @@ export function ImagesStep({
       <StepHead
         title={<>Images <span className="font-normal text-ui-sm text-fg-muted">(optional)</span></>}
       >
-        Attach images for Claude to use. Choose how each one is used: embed it directly in the design, or use it as style inspiration only.
+        Attach images to use in the design. Choose how each one is used: embed it directly in the design, or use it as style inspiration only.
       </StepHead>
 
       <input
@@ -87,8 +87,8 @@ export function ImagesStep({
 
       {images.length > 0 && (
         <p className="mt-4 rounded-ui-md bg-canvas px-4 py-3 ring-1 ring-inset ring-line-subtle text-ui-xs text-fg-muted leading-relaxed">
-          <strong className="font-semibold text-fg">Embed</strong> — Claude places this image directly in the design.<br />
-          <strong className="font-semibold text-fg">Style reference</strong> — Claude uses it for visual inspiration only, won&apos;t embed it.
+          <strong className="font-semibold text-fg">Embed</strong> — the design places this image directly.<br />
+          <strong className="font-semibold text-fg">Style reference</strong> — used for visual inspiration only, never embedded.
         </p>
       )}
     </div>

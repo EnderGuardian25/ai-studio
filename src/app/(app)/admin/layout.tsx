@@ -21,8 +21,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   if (!isTeamAdmin) {
     return (
-      <GateNotice title="Requires admin" backLink>
-        This area is limited to administrators. Ask an admin if you need access.
+      <GateNotice title="Requires team admin" backLink>
+        This area is limited to team admins. Ask a team admin if you need access.
       </GateNotice>
     )
   }

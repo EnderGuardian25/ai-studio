@@ -40,7 +40,7 @@ export const POST = withTeamAuth<Params>(async (req, { params }, user) => {
   // any entry needs it.
   if (entries.some((e) => requiresAdmin(e.postAction)) && !(user.teamRole === 'ADMIN' || user.isSuperAdmin)) {
     return NextResponse.json(
-      { error: 'Auto-publish actions require admin — use HOLD to generate for review.' },
+      { error: 'Auto-publish actions require a team admin — use HOLD to generate for review.' },
       { status: 403 }
     )
   }

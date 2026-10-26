@@ -27,7 +27,7 @@ export const PATCH = withTeamAdmin<Params>(async (req, { params }, user) => {
   // incompatible state is putting a legacy incompatible row back into service.
   if ((isEnabled === true || isDefault === true) && !canServeSlot(existing.slot, existing.providerName)) {
     return NextResponse.json(
-      { error: `Provider ${existing.providerName} cannot serve the ${existing.slot} slot` },
+      { error: `Provider ${existing.providerName} cannot serve the ${existing.slot === 'COPY' ? 'Captions' : 'Images'} slot` },
       { status: 400 },
     )
   }

@@ -19,7 +19,7 @@ describe('factsNoticeFor', () => {
     const n = factsNoticeFor(check)
     expect(n?.status).toBe('flagged')
     expect(n?.message).toBe(
-      '$49 (Instagram caption), 30 March (headline), 35% (LinkedIn caption). These are not in your brief or campaign. Check them before publishing.',
+      '$49 (Instagram caption), 30 March (headline), 35% (LinkedIn caption). These are not in your brief, campaign or brand voice. Check them before publishing.',
     )
   })
   it('error says the check could not run', () => {

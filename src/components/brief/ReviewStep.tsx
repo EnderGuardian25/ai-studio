@@ -137,7 +137,7 @@ export function ReviewStep({
   return (
     <div>
       <StepHead title={<>Review &amp; Generate</>}>
-        Check your brief before sending it to Claude.
+        Check your post before generating it.
       </StepHead>
 
       {/* Ruled rows on --line-subtle (DESIGN_SYSTEM.md §8.15) */}
@@ -175,7 +175,7 @@ export function ReviewStep({
       {providersLoaded && !copyProviderReady && (
         <Notice tone="warning" className="mt-6" data-testid="caption-route-warning">
           {captionRouteMessage ??
-            'No copy provider is configured, and the server is not in CLI mode. An admin must add a COPY provider in AI Providers before generating.'}
+            'No caption provider is set up. Ask a team admin to add one under Team settings > AI providers.'}
         </Notice>
       )}
 

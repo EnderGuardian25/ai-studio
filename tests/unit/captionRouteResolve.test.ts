@@ -233,7 +233,7 @@ describe('resolveCopyProvider — never chosen resolves as before', () => {
     expect(await resolveCopyProvider(TEAM)).toMatchObject({ apiKey: 'sk-server', route: 'SERVER_KEY' })
 
     h.serverKey = undefined
-    await expect(resolveCopyProvider(TEAM)).rejects.toThrow(/No COPY provider configured/)
+    await expect(resolveCopyProvider(TEAM)).rejects.toThrow(/No caption provider is set up/)
   })
 })
 

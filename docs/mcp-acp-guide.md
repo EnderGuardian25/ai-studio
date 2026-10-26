@@ -109,7 +109,7 @@ curl -X POST https://studio.bistecglobal.com/api/acp/run \
   -d '{
     "capability": "generate_post",
     "input": {
-      "topic": "…", "goal": "…", "tone": "…",
+      "topic": "…", "postStyle": "general", "tone": "…",
       "designMode": "GENERATE", "channels": ["LINKEDIN"]
     }
   }'
@@ -120,6 +120,8 @@ curl -X POST https://studio.bistecglobal.com/api/acp/run \
   -H "content-type: application/json" \
   -d '{"capability":"publish_post","input":{"draftId":"…","channel":"LINKEDIN"}}'
 ```
+
+`goal` is a legacy field. It picks a post style (`hiring` or `announcement`) only when no `postStyle` is given, and is ignored otherwise.
 
 Response codes: `400` invalid input, `401` bad/missing key, `422` tool-level failure, `200` `{ output }` on success.
 

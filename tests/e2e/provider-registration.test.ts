@@ -235,7 +235,7 @@ test.describe('Provider registration', () => {
   test('AC-06: an sk-ant- key as IMAGE is refused with 400 and creates no row', async () => {
     const res = await api.post('/api/admin/providers', { apiKey: 'sk-ant-image-attempt-000008', slot: 'IMAGE' })
     expect(res.status()).toBe(400)
-    expect((await res.json()).error).toBe('Provider anthropic cannot serve the IMAGE slot')
+    expect((await res.json()).error).toBe('Provider anthropic cannot serve the Images slot')
     expect(await listImageRows()).toEqual([])
 
     // An unknown provider name is refused for IMAGE too.
@@ -243,7 +243,7 @@ test.describe('Provider registration', () => {
       apiKey: 'gsk_image_attempt_000009', slot: 'IMAGE', providerName: 'groq', label: 'Groq',
     })
     expect(unknown.status()).toBe(400)
-    expect((await unknown.json()).error).toBe('Provider groq cannot serve the IMAGE slot')
+    expect((await unknown.json()).error).toBe('Provider groq cannot serve the Images slot')
     expect(await listImageRows()).toEqual([])
 
     // An image-only provider is refused for COPY.
@@ -251,7 +251,7 @@ test.describe('Provider registration', () => {
       apiKey: 'gem_copy_attempt_000010', slot: 'COPY', providerName: 'gemini', label: 'Gemini',
     })
     expect(geminiCopy.status()).toBe(400)
-    expect((await geminiCopy.json()).error).toBe('Provider gemini cannot serve the COPY slot')
+    expect((await geminiCopy.json()).error).toBe('Provider gemini cannot serve the Captions slot')
   })
 
   test('AC-06: a PATCH cannot move a row into an incompatible slot/provider', async () => {
@@ -276,7 +276,7 @@ test.describe('Provider registration', () => {
     })
     const enable = await api.patch(`/api/admin/providers/${legacy.id}`, { isEnabled: true })
     expect(enable.status()).toBe(400)
-    expect((await enable.json()).error).toBe('Provider anthropic cannot serve the IMAGE slot')
+    expect((await enable.json()).error).toBe('Provider anthropic cannot serve the Images slot')
     expect((await api.patch(`/api/admin/providers/${legacy.id}`, { isDefault: true })).status()).toBe(400)
     // Clean-up stays possible: a label edit and a delete still work.
     expect((await api.patch(`/api/admin/providers/${legacy.id}`, { label: 'renamed' })).status()).toBe(200)
@@ -316,7 +316,7 @@ test.describe('Provider registration', () => {
   test('AC-20: an AIza… key as COPY is refused with 400 and creates no row', async () => {
     const res = await api.post('/api/admin/providers', { apiKey: GEMINI_KEY, slot: 'COPY' })
     expect(res.status()).toBe(400)
-    expect((await res.json()).error).toBe('Provider gemini cannot serve the COPY slot')
+    expect((await res.json()).error).toBe('Provider gemini cannot serve the Captions slot')
     const all: ProviderRow[] = await (await api.get('/api/admin/providers')).json()
     expect(all).toEqual([])
   })

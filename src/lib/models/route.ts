@@ -49,12 +49,11 @@ export type RouteDecision =
 export type NotReadyDecision = Extract<RouteDecision, { ok: false }>
 
 export const API_KEY_NOT_READY_MESSAGE =
-  'Captions are set to the API key route, but this team has no enabled Anthropic key for captions. Add one at /team → AI Providers, or choose another route.'
+  'Captions are set to the API key route, but this team has no enabled Anthropic key for captions. Add one under Team settings > AI providers, or choose another route.'
 export const CLI_NOT_READY_MESSAGE =
-  'Captions are set to the CLI route, but this server is not in CLI mode (DESIGN_PROVIDER=cli). Choose the API key route at /team, or run the server in CLI mode.'
-// Today's registry text, unchanged.
+  'Captions are set to the CLI route, but this server is not in CLI mode. Choose the API key route under Team settings, or ask the person who runs the server to switch it to CLI mode.'
 export const NO_PROVIDER_MESSAGE =
-  'No COPY provider configured — set ANTHROPIC_API_KEY, add a default COPY AvailableProvider, or run in CLI mode with a connected Claude token'
+  'No caption provider is set up for this team. Ask a team admin to add one under Team settings > AI providers, or connect a Claude token.'
 
 /** A chosen route that cannot run: thrown by resolveCopyProvider, never swallowed. */
 export class RouteNotReadyError extends Error {

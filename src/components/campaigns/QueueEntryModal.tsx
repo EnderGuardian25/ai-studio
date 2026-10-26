@@ -278,7 +278,7 @@ export function QueueEntryModal({ campaignId, resolvedKitId, isTeamAdmin, entry,
           </div>
           {!isTeamAdmin && (
             <p className="mt-1.5 text-ui-xs text-fg-muted">
-              Auto-publish requires admin.
+              Auto-publish requires a team admin.
             </p>
           )}
         </div>

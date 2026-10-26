@@ -55,8 +55,8 @@ export function CaptionRouteCard() {
     <section aria-labelledby={headingId} className="surface-bezel min-w-0 p-5">
       <SectionHead title="Caption route" id={headingId} className="mb-3" />
       <p className="text-ui-sm text-fg-muted">
-        Which credential this team&apos;s captions run on. Image design always needs a team Claude
-        token.
+        Which credential this team&apos;s captions run on. Post design, scheduled posts and MCP/ACP runs use the
+        Claude account, not this route; scheduled runs need a team Claude token.
       </p>
 
       <div className="mt-4 space-y-4">

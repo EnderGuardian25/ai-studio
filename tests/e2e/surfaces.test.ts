@@ -1288,8 +1288,8 @@ test.describe('Team, settings and admin (T12)', () => {
     await page.getByRole('button', { name: 'Register Provider' }).click()
     await expect(page.getByRole('heading', { name: 'Register new provider', level: 3 })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Show API key' })).toBeVisible()
-    await expect(page.getByRole('tab', { name: 'COPY' })).toBeVisible()
-    await expect(page.getByRole('tab', { name: 'IMAGE' })).toBeVisible()
+    await expect(page.getByRole('tab', { name: 'Captions' })).toBeVisible()
+    await expect(page.getByRole('tab', { name: 'Images' })).toBeVisible()
     await expect(page.getByRole('button', { name: 'Register', exact: true })).toBeDisabled()
     await expectNoHorizontalScroll(page, 'register form at 375px')
 

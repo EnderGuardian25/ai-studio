@@ -658,7 +658,7 @@ export function useBriefWizard(): UseBriefWizardResult {
     if (!copyProviderReady) {
       setError(
         captionRouteMessage ??
-          'No copy provider is configured, and the server is not in CLI mode. Ask an admin to add a COPY provider in AI Providers.'
+          'No caption provider is set up. Ask a team admin to add one under Team settings > AI providers.'
       )
       return
     }

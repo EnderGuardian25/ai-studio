@@ -82,7 +82,7 @@ describe("legacy (never chosen) — AC-02: today's outcomes", () => {
       code: 'NO_PROVIDER',
       message: NO_PROVIDER_MESSAGE,
     })
-    expect(NO_PROVIDER_MESSAGE).toMatch(/^No COPY provider configured/)
+    expect(NO_PROVIDER_MESSAGE).toMatch(/^No caption provider is set up/)
   })
 
   it('a brief key of "cli" with no cli row falls to the default row', () => {

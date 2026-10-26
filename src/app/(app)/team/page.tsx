@@ -66,7 +66,7 @@ function LinkedinIcon({ size = 16 }: { size?: number }) {
 
 function detectProvider(key: string): { name: string; label: string } | null {
   if (key.startsWith('sk-ant-')) return { name: 'anthropic', label: 'Claude (Anthropic)' }
-  if (key.startsWith('sk-')) return { name: 'openai', label: 'GPT (OpenAI)' }
+  if (key.startsWith('sk-')) return { name: 'openai', label: 'OpenAI' }
   if (key.startsWith('AIza')) return { name: 'gemini', label: 'Gemini (Google)' }
   return null
 }
@@ -174,8 +174,8 @@ function RegisterForm({ onSuccess, cliMode }: { onSuccess: () => void; cliMode: 
 
         <SegmentedToggle
           options={[
-            { value: 'COPY', label: 'COPY' },
-            { value: 'IMAGE', label: 'IMAGE' },
+            { value: 'COPY', label: 'Captions' },
+            { value: 'IMAGE', label: 'Images' },
           ]}
           value={slot}
           onChange={v => setSlot(v as ProviderSlot)}
@@ -183,7 +183,7 @@ function RegisterForm({ onSuccess, cliMode }: { onSuccess: () => void; cliMode: 
         />
         {copyNeedsAnthropic && (
           <p className="text-ui-xs text-fg-muted" data-testid="register-copy-anthropic-only">
-            In CLI mode only an Anthropic key (sk-ant-…) can be registered for COPY, for the API key
+            In CLI mode only an Anthropic key (sk-ant-…) can be registered for Captions, for the API key
             caption route.
           </p>
         )}
@@ -240,7 +240,7 @@ function ProviderCard({
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           <span className="min-w-0 truncate text-ui-base font-medium text-fg" title={provider.label}>{provider.label}</span>
-          <span className={TAG}>{provider.slot}</span>
+          <span className={TAG}>{provider.slot === 'COPY' ? 'Captions' : 'Images'}</span>
           {provider.isDefault && <span className={PILL_BADGE}>Default</span>}
           {serving !== undefined && (
             <span data-testid="copy-row-serving" data-serving={serving ? 'true' : 'false'}>
@@ -509,11 +509,17 @@ function ProvidersSection() {
       {visibleSlots.map(slot => (
         <div key={slot} className="space-y-3">
           <h3 className={EYEBROW}>
-            {slot === 'COPY' ? 'Copy (text generation)' : 'Image generation'}
+            {slot === 'COPY' ? 'Captions (text generation)' : 'Image generation'}
           </h3>
+          {slot === 'COPY' && (
+            <p className="text-ui-xs text-fg-muted" data-testid="captions-slot-helper">
+              Captions: writes captions and headlines. In API mode, a default Anthropic key here also powers
+              the brand voice and briefing assistants.
+            </p>
+          )}
           {slot === 'IMAGE' && <ImageDefaultState rows={providersBySlot('IMAGE')} onRefresh={invalidateProviders} />}
           {providersBySlot(slot).length === 0 && (
-            <p className="text-ui-sm text-fg-muted">No providers registered for {slot}</p>
+            <p className="text-ui-sm text-fg-muted">No providers registered for {slot === 'COPY' ? 'Captions' : 'Images'}</p>
           )}
           {providersBySlot(slot).length > 0 && (
             <ul className="border-t border-line-subtle">

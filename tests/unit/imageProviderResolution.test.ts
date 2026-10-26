@@ -245,12 +245,12 @@ function fakeCopyRows(rows: Array<ReturnType<typeof copyProviderRow>>) {
 describe('resolveCopyProvider — env.OPENAI_API_KEY fallback removed', () => {
   it('throws (does not silently fall back to env) when no default COPY provider is configured', async () => {
     fakeCopyRows([])
-    await expect(resolveCopyProvider(TEAM_ID)).rejects.toThrow(/No COPY provider configured/)
+    await expect(resolveCopyProvider(TEAM_ID)).rejects.toThrow(/No caption provider is set up/)
   })
 
   it('is team-scoped: the COPY-provider lookup is filtered by teamId (team-tenancy fix)', async () => {
     fakeCopyRows([])
-    await expect(resolveCopyProvider(TEAM_ID)).rejects.toThrow(/No COPY provider configured/)
+    await expect(resolveCopyProvider(TEAM_ID)).rejects.toThrow(/No caption provider is set up/)
     expect(h.availableProviderFindMany).toHaveBeenCalled()
     for (const call of h.availableProviderFindMany.mock.calls) {
       expect(call[0].where.teamId).toBe(TEAM_ID)
@@ -273,7 +273,7 @@ describe('resolveCopyProvider — explicit providerKey (team-scoped)', () => {
     // used to query with no teamId filter at all).
     fakeCopyRows([copyProviderRow({ teamId: OTHER_TEAM_ID })])
 
-    await expect(resolveCopyProvider(TEAM_ID, 'explicit-copy')).rejects.toThrow(/No COPY provider configured/)
+    await expect(resolveCopyProvider(TEAM_ID, 'explicit-copy')).rejects.toThrow(/No caption provider is set up/)
   })
 })
 

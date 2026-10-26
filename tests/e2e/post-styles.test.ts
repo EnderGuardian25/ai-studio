@@ -1057,7 +1057,7 @@ test.describe('The draft page: the facts notice and the style line', () => {
     await expect(notice).toContainText('$49')
     await expect(notice).toContainText('30 March 2027')
     await expect(notice).toContainText('(Instagram caption)')
-    await expect(notice).toContainText('These are not in your brief or campaign. Check them before publishing.')
+    await expect(notice).toContainText('These are not in your brief, campaign or brand voice. Check them before publishing.')
     await expect(page.getByRole('button', { name: /^publish$/i })).toBeEnabled()
     await expect(page.getByTestId('post-style-line')).toHaveText('Post style: Promotion / deal')
     await expectNoAxeViolations(page, '/drafts/[id] with the facts notice', { settle: true })

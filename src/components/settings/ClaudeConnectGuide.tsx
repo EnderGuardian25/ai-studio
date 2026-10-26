@@ -175,14 +175,14 @@ export function ClaudeConnectGuide({ variant }: { variant: 'personal' | 'team' }
           ))}
           <li>
             {variant === 'team'
-              ? 'Paste it below. It becomes the team’s fallback for members without their own token.'
+              ? 'Paste it below. It becomes the team’s fallback for members without their own token, and the only credential for scheduled posts, MCP and ACP.'
               : 'Paste it below.'}
           </li>
         </ol>
       </div>
 
       <p className="text-ui-xs text-fg-muted">
-        Full guide: <code className="font-mono">docs/claude-account-setup.md</code> in the repository.
+        A paid Claude plan (Pro, Max, Team or Enterprise) is needed. The free plan does not work.
       </p>
     </div>
   )

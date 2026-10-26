@@ -135,7 +135,7 @@ export default function CampaignsPage() {
         className="mb-6"
         eyebrow="Organize"
         title="Campaigns"
-        lead="Group posts by campaign and assign a brand kit override."
+        lead="Group posts by campaign, assign a brand kit override and set a default post style."
         actions={
           <>
             <Button variant="ghost" size="sm" onClick={() => setShowDeleted(v => !v)}>

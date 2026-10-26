@@ -65,7 +65,7 @@ export function ContentStep({ topic, setTopic, prompt, setPrompt, goal, tone, se
   return (
     <div>
       <StepHead title={<>Brief &amp; Caption Direction</>}>
-        Give the post a short topic, tell Claude what it&apos;s about, then check the tone.
+        Give the post a short topic, describe what it&apos;s about, then check the tone.
       </StepHead>
 
       <FieldLabel htmlFor={topicId} className="mb-2.5">Topic</FieldLabel>
@@ -147,7 +147,7 @@ export function ContentStep({ topic, setTopic, prompt, setPrompt, goal, tone, se
           </div>
           <div className="mt-2 mb-6 text-ui-xs text-fg-muted">
             {enhancing
-              ? 'Rewriting with the brand voice and campaign context — this can take up to a minute.'
+              ? 'Rewriting with the brand voice and campaign documents — this can take up to a minute.'
               : 'Rewrites the brief with AI, grounded in the brand voice and campaign briefing. Works from just the topic too.'}
           </div>
         </>

@@ -102,7 +102,7 @@ export default function AdminUsersPage() {
       <PageHead
         eyebrow="Admin"
         title="Users"
-        lead="Create accounts and manage roles. Share initial passwords out-of-band."
+        lead="Create and deactivate accounts. Team roles are set under Teams. Share initial passwords out-of-band."
         className="mb-6"
         actions={
           <Button onClick={() => setAddOpen(true)}>

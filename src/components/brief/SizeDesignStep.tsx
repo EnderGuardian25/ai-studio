@@ -166,7 +166,7 @@ export function SizeDesignStep({
               Path A — Template
             </div>
             <div className="text-ui-xs text-fg-muted">
-              Claude fills a pre-built HTML/CSS brand template. Consistent, on-brand output.
+              Fills a pre-built HTML/CSS brand template. Consistent, on-brand output.
             </div>
           </button>
           <button
@@ -182,7 +182,7 @@ export function SizeDesignStep({
               Path B — Freeform
             </div>
             <div className="text-ui-xs text-fg-muted">
-              Claude designs a new HTML/CSS layout from scratch. Maximum creative flexibility.
+              Designs a new HTML/CSS layout from scratch. Maximum creative flexibility.
             </div>
           </button>
         </div>
@@ -349,7 +349,7 @@ export function SizeDesignStep({
             Style Reference Template <span className="font-normal text-fg-muted">(optional)</span>
           </FieldLabel>
           <p className="text-ui-xs text-fg-muted mb-3">
-            Claude uses this for visual inspiration only — it won&apos;t copy the layout exactly.
+            Used for visual inspiration only — it won&apos;t copy the layout exactly.
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <button

@@ -14,7 +14,7 @@ const WHERE_LABEL: Record<FactWhere, string> = {
   LINKEDIN: 'LinkedIn caption',
 }
 
-export const FLAGGED_ADVICE = 'These are not in your brief or campaign. Check them before publishing.'
+export const FLAGGED_ADVICE = 'These are not in your brief, campaign or brand voice. Check them before publishing.'
 export const ERROR_MESSAGE =
   'The facts check could not run for this post. Check the numbers and dates yourself before publishing.'
 
