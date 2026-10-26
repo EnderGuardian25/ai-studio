@@ -250,6 +250,9 @@ async function emitGenerationFinished(
 ): Promise<void> {
   const composition = trace.design?.stamp.composition ?? null
   const route = trace.captionStamp?.route
+  // 030 FR-17: the final render's headline check; absent with no design or no stamp.
+  const headlineStamp = trace.design?.stamp.renderedText?.headline
+  const headlineCheck = headlineStamp ? (headlineStamp.verified ? 'painted' : headlineStamp.reason) : undefined
   await track('generation.finished', {
     source: actor.source,
     teamId: actor.teamId,
@@ -290,6 +293,7 @@ async function emitGenerationFinished(
           }
         : {}),
       ...(trace.design ? { backgroundSkipped: trace.design.backgroundSkip.backgroundSkipReason !== null } : {}),
+      ...(headlineCheck ? { headlineCheck } : {}),
       ...(failure !== undefined ? { failureReason: humanizeGenerationError(failure) } : {}),
     },
   })

@@ -12,3 +12,7 @@
 {"ev":"stop","span":"W2","at":"2026-10-26T06:01:42Z","ts":1792994502,"status":"ok"}
 {"ev":"start","span":"W3","kind":"wave","label":"wave 3","at":"2026-10-26T06:01:43Z","ts":1792994503}
 {"ev":"start","span":"T3","kind":"task","label":"stamp on every writer","parent":"W3","model":"sonnet","attempt":"1","at":"2026-10-26T06:01:44Z","ts":1792994504}
+{"ev":"stop","span":"T3","at":"2026-10-26T06:30:07Z","ts":1792996207,"status":"ok"}
+{"ev":"stop","span":"W3","at":"2026-10-26T06:30:08Z","ts":1792996208,"status":"ok"}
+{"ev":"start","span":"W4","kind":"wave","label":"wave 4","at":"2026-10-26T06:30:24Z","ts":1792996224}
+{"ev":"start","span":"T4","kind":"task","label":"read side and events","parent":"W4","model":"sonnet","attempt":"1","at":"2026-10-26T06:30:25Z","ts":1792996224}

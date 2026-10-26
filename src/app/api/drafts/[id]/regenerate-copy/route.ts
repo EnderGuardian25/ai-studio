@@ -9,6 +9,7 @@ import { briefPostStyleStamp, buildBriefInput } from '@/lib/agent/briefInput'
 import { writeCaptions } from '@/lib/captions/generate'
 import { parseRegenerateBody } from '@/lib/captions/requests'
 import { failedCaptionFields } from '@/lib/captions/actionTargets'
+import { trackHeadlineEdited } from '@/lib/renderedText/track'
 import { claimCaptionAction, loadDraftCaptions, settleCaptionAction } from '@/lib/captions/store'
 import { releaseDraftAction, startDraftAction } from '@/lib/drafts/draftActions'
 import { resolveModel } from '@/lib/models/policy'
@@ -135,7 +136,17 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
         // Draft.postStyle (claim-guarded) and recomputes the facts check. Only when
         // some target validated: a run that changed no text keeps the old stamp.
         const anyOk = Object.values(fields).some((f) => f?.ok)
-        await settleCaptionAction(draft.id, claim, targets, fields, stamp, undefined, anyOk ? briefPostStyleStamp(draft.brief) : undefined)
+        const settled = await settleCaptionAction(draft.id, claim, targets, fields, stamp, undefined, anyOk ? briefPostStyleStamp(draft.brief) : undefined)
+        // 030 FR-15: one event when the settle wrote a headline (after the transaction).
+        if (settled.headlineWritten) {
+          await trackHeadlineEdited({
+            draftId: draft.id,
+            teamId: user.teamId,
+            userId: user.userId,
+            via: 'regenerate',
+            before: settled.headlineBefore,
+          })
+        }
         // A headline has no row to carry a failure, so it is reported on
         // pendingActionError; the stored headline is unchanged.
         const headline = fields.HEADLINE
@@ -143,7 +154,9 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
           throw new Error(`Regenerate headline failed: ${headline?.reason ?? 'missing'}`)
         }
       },
-      (err) => settleCaptionAction(draft.id, claim, targets, failedCaptionFields(targets, errorMessage(err))),
+      async (err) => {
+        await settleCaptionAction(draft.id, claim, targets, failedCaptionFields(targets, errorMessage(err)))
+      },
       trace,
     )
   } catch (err) {

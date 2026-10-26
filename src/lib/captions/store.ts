@@ -293,6 +293,13 @@ async function settlePendingRows(
   }
 }
 
+// 030 FR-15: whether the settle wrote the headline, and the value it replaced,
+// so the caller can emit draft.headline_edited outside the transaction.
+export interface SettleResult {
+  headlineWritten: boolean
+  headlineBefore: string | null
+}
+
 // A caption action's write (FR-11, design §5): each target row per its field
 // result, and the headline when it was requested and validated, in one
 // transaction. It opens with a write to the draft row guarded on the claim (the
@@ -318,9 +325,10 @@ export async function settleCaptionAction(
   stamp: CaptionStamp | null = null,
   db: PrismaClient = prisma,
   postStyle?: PostStyleStamp | null,
-): Promise<void> {
+): Promise<SettleResult> {
   const headline = targets.includes('HEADLINE') ? fields.HEADLINE : undefined
   let settled = false
+  const result: SettleResult = { headlineWritten: false, headlineBefore: null }
   await db.$transaction(async (tx) => {
     const { count } = await tx.draft.updateMany({
       where: { id: draftId, ...claimWhere(claim) },
@@ -342,13 +350,18 @@ export async function settleCaptionAction(
       stamp,
     )
     if (headline?.ok) {
-      await tx.draft.updateMany({
+      // 030 FR-15: the value before, read in the same transaction.
+      const before = await tx.draft.findUnique({ where: { id: draftId }, select: { headline: true } })
+      const wrote = await tx.draft.updateMany({
         where: { id: draftId, ...claimWhere(claim) },
         data: { headline: headline.text, ...(stamp ? headlineStampFields(stamp) : {}) },
       })
+      result.headlineWritten = wrote.count === 1
+      result.headlineBefore = before?.headline ?? null
     }
   })
   if (settled) await refreshAfterWrite(draftId, db)
+  return result
 }
 
 // The stale sweep's caption half (FR-11): an interrupted generation or caption

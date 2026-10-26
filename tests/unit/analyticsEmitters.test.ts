@@ -367,3 +367,118 @@ describe('publish.settled from the retry route (FR-04)', () => {
     expect(only()).toMatchObject({ outcome: 'failed', payload: { terminal: false, errorReason: 'LinkedIn is down' } })
   })
 })
+
+// ── 030 FR-16: publish.settled carries headlineState from every caller ─────────
+
+describe('publish.settled headlineState (030 FR-16, AC-19)', () => {
+  const STALE = { headline: 'New line', renderedText: { headline: { text: 'Old line', verified: true } } }
+  const UNCONFIRMED = { headline: 'H', renderedText: { headline: { text: 'H', verified: false, reason: 'not-visible' } } }
+  const FRESH = { headline: 'H', renderedText: { headline: { text: 'h', verified: true } } }
+
+  describe('the immediate path and the MCP/ACP tool (createAndPublishPost)', () => {
+    beforeEach(publishSetup)
+    const run = (source: 'web' | 'mcp') =>
+      createAndPublishPost({ draftId: 'd1', channel: 'LINKEDIN' as Channel, userId: 'u1', source })
+
+    it.each([
+      ['stale', STALE],
+      ['unconfirmed', UNCONFIRMED],
+      ['fresh', FRESH],
+      ['unknown', { headline: 'H', renderedText: null }],
+    ])('a %s draft: the event carries it, on a published and a failed outcome', async (state, over) => {
+      h.draftFindUniqueOrThrow.mockImplementation(async () => ({ ...draftRow(), ...over }))
+      await createAndPublishPost({ draftId: 'd1', channel: 'LINKEDIN' as Channel, userId: 'u1', source: 'web' })
+      expect(only().payload).toMatchObject({ headlineState: state })
+
+      h.eventCreate.mockClear()
+      h.liPublish.mockRejectedValue(new PublishError('LINKEDIN', 'rejected', { terminal: true }))
+      await run('mcp')
+      expect(only()).toMatchObject({ source: 'mcp', outcome: 'failed', payload: { headlineState: state } })
+    })
+
+    it('reads the two fields in the draft load it already makes (no extra query)', async () => {
+      await run('web')
+      expect(h.draftFindUniqueOrThrow).toHaveBeenCalledTimes(1)
+      expect(h.draftFindUniqueOrThrow.mock.calls[0][0].select).toMatchObject({ headline: true, renderedText: true })
+    })
+  })
+
+  describe('the scheduler tick', () => {
+    beforeEach(() => {
+      publishSetup()
+      h.queryRaw.mockResolvedValue([{ id: 'p1' }])
+    })
+    const post = (draft: Record<string, unknown>) => ({
+      id: 'p1',
+      draftId: 'd1',
+      teamId: 'team1',
+      channel: 'LINKEDIN',
+      retryCount: 0,
+      draft: { exportUrl: 'exports/d1.png', ...draft },
+    })
+
+    it('selects the two fields on the claimed post draft', async () => {
+      h.postFindMany.mockResolvedValue([post(STALE)])
+      await runScheduledJobs()
+      expect(h.postFindMany.mock.calls[0][0].include.draft.select).toMatchObject({ headline: true, renderedText: true })
+    })
+
+    it.each([
+      ['stale', STALE],
+      ['unconfirmed', UNCONFIRMED],
+      ['fresh', FRESH],
+    ])('published and retry-scheduled outcomes carry %s', async (state, over) => {
+      h.postFindMany.mockResolvedValue([post(over)])
+      await runScheduledJobs()
+      expect(only()).toMatchObject({ source: 'scheduler', outcome: 'published', payload: { headlineState: state } })
+
+      h.eventCreate.mockClear()
+      h.liPublish.mockRejectedValue(new PublishError('LINKEDIN', 'LinkedIn is down'))
+      h.postFindMany.mockResolvedValue([post(over)])
+      await runScheduledJobs()
+      expect(only()).toMatchObject({ outcome: 'retry-scheduled', payload: { headlineState: state } })
+    })
+
+    it('a pre-030 draft (no stamp) reports unknown', async () => {
+      h.postFindMany.mockResolvedValue([post({ headline: 'H', renderedText: null })])
+      await runScheduledJobs()
+      expect(only().payload).toMatchObject({ headlineState: 'unknown' })
+    })
+  })
+
+  describe('the retry route', () => {
+    beforeEach(publishSetup)
+    const call = () =>
+      retryRoute.POST(new Request('http://x', { method: 'POST' }) as never, { params: { id: 'p1' } } as never)
+    const failedPost = (draft: Record<string, unknown>) => ({
+      id: 'p1',
+      draftId: 'd1',
+      teamId: 'team1',
+      channel: 'LINKEDIN',
+      status: 'FAILED',
+      retryCount: 2,
+      draft: { exportUrl: 'exports/d1.png', ...draft },
+    })
+
+    it('selects the two fields on the post draft it already includes', async () => {
+      h.postFindUnique.mockResolvedValue(failedPost(STALE))
+      await call()
+      expect(h.postFindUnique.mock.calls[0][0].include.draft.select).toMatchObject({ headline: true, renderedText: true })
+    })
+
+    it.each([
+      ['stale', STALE],
+      ['unconfirmed', UNCONFIRMED],
+      ['fresh', FRESH],
+    ])('published and failed outcomes carry %s', async (state, over) => {
+      h.postFindUnique.mockResolvedValue(failedPost(over))
+      expect((await call()).status).toBe(200)
+      expect(only().payload).toMatchObject({ headlineState: state })
+
+      h.eventCreate.mockClear()
+      h.liPublish.mockRejectedValue(new PublishError('LINKEDIN', 'LinkedIn is down'))
+      expect((await call()).status).toBe(502)
+      expect(only()).toMatchObject({ outcome: 'failed', payload: { headlineState: state } })
+    })
+  })
+})

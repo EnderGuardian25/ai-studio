@@ -7,6 +7,8 @@ import { PublishError } from '@/lib/social/types'
 import { resolveExportUrl } from '@/lib/storage/minio'
 import type { AnalyticsSource, Channel, Post } from '@prisma/client'
 import { trackPublish } from '@/lib/publish/trackPublish'
+import { headlineState } from '@/lib/renderedText/state'
+import { parseRenderedText } from '@/lib/renderedText/stamp'
 
 // The one channel → publisher map. Every publish surface (immediate API path,
 // FAILED-retry, scheduler tick, ACP tool) goes through this module so a new
@@ -76,7 +78,7 @@ export async function createAndPublishPost(opts: {
   // draft's team at creation (draft.teamId is the source of truth here).
   const draft = await prisma.draft.findUniqueOrThrow({
     where: { id: opts.draftId },
-    select: { exportUrl: true, teamId: true },
+    select: { exportUrl: true, teamId: true, headline: true, renderedText: true },
   })
 
   const post = await prisma.post.create({
@@ -98,6 +100,8 @@ export async function createAndPublishPost(opts: {
     channel: opts.channel,
     retryCount: 0,
     startedAt,
+    // 030 FR-16: what the image shows of the headline at this attempt.
+    headlineState: headlineState(parseRenderedText(draft.renderedText), draft.headline),
   }
   let published: Post
   try {

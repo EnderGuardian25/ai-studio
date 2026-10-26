@@ -18,6 +18,9 @@ import { validateHeadline } from '@/lib/captions/headline'
 import { loadDraftCaptions, saveCaptionEdit, saveHeadlineEdit, settlePendingCaptions } from '@/lib/captions/store'
 import { copyProviderIsClaude } from '@/providers/registry'
 import { track } from '@/lib/analytics/track'
+import { headlineImageFor, headlineState, type ScheduledPosts } from '@/lib/renderedText/state'
+import { parseRenderedText } from '@/lib/renderedText/stamp'
+import { trackHeadlineEdited } from '@/lib/renderedText/track'
 
 type Params = { id: string }
 
@@ -153,8 +156,15 @@ async function loadDraft(id: string) {
     explanation: string
   } | null
 
-  // Three independent reads, run together (018 FR-04: this GET is the 4 s poll).
-  const [kit, notApplied, captionProviderIsClaude] = await Promise.all([
+  // 030 FR-12: the state comes from columns already read (no parse, no render).
+  // The scheduled-posts read runs only for a state that shows it, so the 4 s
+  // poll stays flat for `fresh` and `unknown`, which is nearly every poll.
+  const renderedText = parseRenderedText(draft.renderedText)
+  const state = headlineState(renderedText, draft.headline)
+  const wantsScheduled = state === 'stale' || state === 'unconfirmed'
+
+  // Independent reads, run together (018 FR-04: this GET is the 4 s poll).
+  const [kit, notApplied, captionProviderIsClaude, scheduledAgg] = await Promise.all([
     resolveBrandKit(draft.teamId, draft.brief.campaignId ?? undefined, draft.brief.brandKitId ?? undefined),
     // FR-14/AC-18: a twice-failed refine is a distinct outcome, not the
     // existing error channel — re-derived from the retained rejected row on
@@ -165,7 +175,18 @@ async function loadDraft(id: string) {
     // (the brief's key, else the team default), not GET /api/models' team
     // default. It selects the provider name only.
     copyProviderIsClaude(draft.brief.teamId, draft.brief.copyProviderKey ?? undefined),
+    wantsScheduled
+      ? prisma.post.aggregate({
+          where: { draftId: draft.id, status: 'SCHEDULED' },
+          _count: true,
+          _min: { scheduledAt: true },
+        })
+      : null,
   ])
+  const scheduled: ScheduledPosts | null =
+    scheduledAgg && scheduledAgg._count > 0 && scheduledAgg._min.scheduledAt
+      ? { count: scheduledAgg._count, nextAt: scheduledAgg._min.scheduledAt.toISOString() }
+      : null
 
   const composition = draftCompositionStamp(draft)
 
@@ -206,6 +227,8 @@ async function loadDraft(id: string) {
     // unreadable) and the post-style stamp as { key, label, version } or null.
     factsCheck: parseFactsCheck(draft.factsCheck),
     postStyle: styleSummary(draft.postStyle),
+    // 030 FR-12: what the image shows of the headline, from the stamp.
+    headlineImage: headlineImageFor(renderedText, draft.headline, scheduled),
     createdAt: draft.createdAt,
     revisionCount: draft._count.revisions,
     currentRevisionNumber: draft.currentRevisionNumber,
@@ -255,7 +278,7 @@ export const PATCH = withTeamAuth<Params>(async (req, { params }, user) => {
 
   const existing = await prisma.draft.findUnique({
     where: { id: params.id },
-    select: { status: true, pendingAction: true, teamId: true, brief: { select: { userId: true, campaignId: true } } },
+    select: { status: true, pendingAction: true, teamId: true, headline: true, brief: { select: { userId: true, campaignId: true } } },
   })
   if (
     !existing ||
@@ -289,6 +312,14 @@ export const PATCH = withTeamAuth<Params>(async (req, { params }, user) => {
     ) {
       return beingGenerated()
     }
+    // 030 FR-15: after a successful save, with the headline read before it.
+    await trackHeadlineEdited({
+      draftId: params.id,
+      teamId: existing.teamId,
+      userId: user.userId,
+      via: 'edit',
+      before: existing.headline,
+    })
   } else {
     // Load first, so every registry channel has its row; a PENDING row is
     // being written and is refused.

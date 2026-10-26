@@ -60,7 +60,7 @@ beforeEach(() => {
   for (const fn of Object.values(h)) fn.mockReset()
   // Batch form: each op is the value its builder returned.
   h.transaction.mockImplementation(async (ops: unknown) =>
-    typeof ops === 'function' ? ops({ draft: { updateMany: h.draftUpdateMany }, draftCaption: { findMany: h.captionFindMany, updateMany: h.captionUpdateMany } }) : Promise.all(ops as unknown[]),
+    typeof ops === 'function' ? ops({ draft: { updateMany: h.draftUpdateMany, findUnique: h.draftFindUnique }, draftCaption: { findMany: h.captionFindMany, updateMany: h.captionUpdateMany } }) : Promise.all(ops as unknown[]),
   )
   h.captionCreateMany.mockResolvedValue({ count: 2 })
   h.draftUpdateMany.mockResolvedValue({ count: 1 })
@@ -327,6 +327,28 @@ describe('settleCaptionAction (FR-11, design §5)', () => {
     h.draftUpdateMany.mockClear()
     await settleCaptionAction('d1', CLAIM, ['HEADLINE'], { HEADLINE: { ok: false, reason: 'empty' } })
     expect(headlineWrites()).toHaveLength(0)
+  })
+
+  it('reports the headline write and the value before it (030 FR-15)', async () => {
+    h.captionFindMany.mockResolvedValue([])
+    h.draftFindUnique.mockResolvedValue({ headline: 'Before' })
+    expect(await settleCaptionAction('d1', CLAIM, ['HEADLINE'], { HEADLINE: { ok: true, text: 'New line' } })).toEqual({
+      headlineWritten: true,
+      headlineBefore: 'Before',
+    })
+    // The value is read in the transaction, before the write.
+    expect(h.draftFindUnique.mock.invocationCallOrder[0]).toBeLessThan(h.draftUpdateMany.mock.invocationCallOrder.at(-1)!)
+  })
+
+  it('reports no headline write for a failed or unrequested headline, and for a lost claim', async () => {
+    h.captionFindMany.mockResolvedValue([])
+    const none = { headlineWritten: false, headlineBefore: null }
+    expect(await settleCaptionAction('d1', CLAIM, ['HEADLINE'], { HEADLINE: { ok: false, reason: 'empty' } })).toEqual(none)
+    expect(await settleCaptionAction('d1', CLAIM, ['INSTAGRAM'], { HEADLINE: { ok: true, text: 'Sneaky' } })).toEqual(none)
+    h.draftUpdateMany.mockResolvedValue({ count: 0 })
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    expect(await settleCaptionAction('d1', CLAIM, ['HEADLINE'], { HEADLINE: { ok: true, text: 'New line' } })).toEqual(none)
+    warn.mockRestore()
   })
 
   it('never writes a headline that was not requested, even if the reply carried one', async () => {

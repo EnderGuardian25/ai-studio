@@ -24,6 +24,7 @@ import { INSTRUCTION_CLASS_KEYS } from '@/lib/agent/instructionClasses'
 import { archetypes, FALLBACK_REASONS, type ArchetypeKey } from '@/lib/designData'
 import { POST_STYLE_KEYS } from '@/lib/postStyles'
 import { redactText } from '@/lib/text/redact'
+import { HEADLINE_CHECKS, HEADLINE_STATES } from '@/lib/renderedText/vocab'
 
 export const INSTRUCTION_MAX = 2000
 export const FAILURE_REASON_MAX = 500
@@ -105,6 +106,8 @@ export const CATALOGUE = {
       postStyle: z.enum(POST_STYLE_KEYS).nullable().optional(),
       factsStatus: z.enum(FACTS_STATUSES).nullable().optional(),
       factsFlagCount: z.number().int().min(0).max(20).optional(),
+      // 030 FR-17: the outcome of the final render's headline check.
+      headlineCheck: z.enum(HEADLINE_CHECKS).optional(),
     }),
   },
   'generation.swept': {
@@ -151,6 +154,17 @@ export const CATALOGUE = {
     outcomes: ['ok'],
     schema: z.object({ from: z.number().int().min(0), to: z.number().int().min(0) }),
   },
+  // 030 FR-15: a headline change, with how the image stands afterwards. No text.
+  'draft.headline_edited': {
+    schemaVersion: 1,
+    source: ['web'],
+    outcomes: [],
+    schema: z.object({
+      via: z.enum(['edit', 'regenerate']),
+      state: z.enum(HEADLINE_STATES),
+      scheduledPending: z.boolean(),
+    }),
+  },
   'publish.settled': {
     schemaVersion: 1,
     source: ['web', 'mcp', 'scheduler'],
@@ -160,6 +174,8 @@ export const CATALOGUE = {
       terminal: z.boolean(),
       retryCount: z.number().int().min(0).optional(),
       errorReason: failureReason.optional(),
+      // 030 FR-16: what the image showed of the headline at the attempt.
+      headlineState: z.enum(HEADLINE_STATES).optional(),
     }),
   },
   'scheduled_generation.settled': {

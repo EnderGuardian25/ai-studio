@@ -5,6 +5,7 @@
 // own try blocks so it cannot change a publish's result.
 import type { AnalyticsSource, Channel } from '@prisma/client'
 import { track } from '@/lib/analytics/track'
+import type { HeadlineState } from '@/lib/renderedText/vocab'
 
 export interface PublishOutcome {
   source: AnalyticsSource
@@ -19,6 +20,8 @@ export interface PublishOutcome {
   errorReason?: string
   /** Epoch ms when this attempt began. */
   startedAt: number
+  /** 030 FR-16: what the image showed of the headline at the attempt. */
+  headlineState?: HeadlineState
 }
 
 export async function trackPublish(o: PublishOutcome): Promise<void> {
@@ -34,6 +37,7 @@ export async function trackPublish(o: PublishOutcome): Promise<void> {
       terminal: o.terminal,
       ...(o.retryCount !== undefined ? { retryCount: o.retryCount } : {}),
       ...(o.errorReason !== undefined ? { errorReason: o.errorReason } : {}),
+      ...(o.headlineState !== undefined ? { headlineState: o.headlineState } : {}),
     },
   })
 }

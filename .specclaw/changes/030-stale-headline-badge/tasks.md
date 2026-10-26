@@ -88,7 +88,7 @@
 
 ### Wave 4: The read side and the events
 
-- [ ] `T4` — `headlineImage` on the GET, `headlineState` on the library, the three event changes, the test seam
+- [x] `T4` — `headlineImage` on the GET, `headlineState` on the library, the three event changes, the test seam
   - Files: `src/lib/renderedText/track.ts` (new), `src/app/api/drafts/[id]/route.ts` (GET and PATCH), `src/app/api/library/route.ts`, `src/lib/api-types.ts`, `src/lib/captions/store.ts` (`settleCaptionAction` reports the headline write), `src/app/api/drafts/[id]/regenerate-copy/route.ts`, `src/lib/analytics/catalogue.ts`, `src/lib/agent/generateDraft.ts` (`emitGenerationFinished`), `src/lib/publish/{trackPublish,publishDraft}.ts`, `src/app/api/posts/[id]/publish/route.ts`, `src/lib/scheduler/jobRunner.ts`, `src/app/api/test/draft-rendered-text/route.ts` (new), `tests/unit/{draftDetailGet,analyticsCoverage,analyticsGeneration}.test.ts` and the publish / scheduler / library / captions-store tests (extend)
   - Estimate: medium
   - Kind: impl

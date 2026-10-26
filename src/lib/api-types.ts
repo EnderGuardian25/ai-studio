@@ -13,6 +13,7 @@ import type { FactsCheck } from '@/lib/factsCheck/types'
 import type { CompositionStamp } from '@/lib/designData'
 import type { ModelKey, ModelSpeed, ModelTier, UserSurface } from '@/lib/models/catalogue'
 import type { CredentialTier, PipelineMode } from '@/lib/models/resolve'
+import type { HeadlineState, UnverifiedReason } from '@/lib/renderedText/vocab'
 
 // ── Auth ─────────────────────────────────────────────────────────────────
 
@@ -350,6 +351,18 @@ export interface DraftCaptionDetail {
   route: string | null
 }
 
+// 030 FR-12: what the image shows of the headline, derived from the stamp at
+// read time. Each field is filled only for the states the spec names.
+export interface HeadlineImage {
+  state: HeadlineState
+  // The stamped text, when the state is 'stale'.
+  renderedHeadline: string | null
+  // Why the check could not confirm, when the state is 'unconfirmed'.
+  reason: UnverifiedReason | null
+  // SCHEDULED posts of this draft, when the state is 'stale' or 'unconfirmed'.
+  scheduledPosts: { count: number; nextAt: string } | null
+}
+
 export interface DraftDetail {
   id: string
   briefId: string
@@ -389,6 +402,7 @@ export interface DraftDetail {
   // style the draft was made with (null = before 027).
   factsCheck: FactsCheck | null
   postStyle: { key: string; label: string; version: number } | null
+  headlineImage: HeadlineImage
   createdAt: string
   revisionCount: number
   currentRevisionNumber: number | null
@@ -430,6 +444,8 @@ export interface DraftRecord {
   exportUrl: string | null
   status: string
   createdAt: string
+  // 030 FR-12: the state only (no text), from the stamp.
+  headlineState: HeadlineState
   brief: {
     topic: string
     channels: string[]

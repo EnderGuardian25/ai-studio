@@ -5,12 +5,14 @@ import { PublishError } from '@/lib/social/types'
 import { resolveExportUrl } from '@/lib/storage/minio'
 import { publishToChannel } from '@/lib/publish/publishDraft'
 import { trackPublish } from '@/lib/publish/trackPublish'
+import { headlineState } from '@/lib/renderedText/state'
+import { parseRenderedText } from '@/lib/renderedText/stamp'
 
 export const POST = withTeamAdmin<{ id: string }>(async (_req, { params }, user) => {
   const post = await prisma.post.findUnique({
     where: { id: params.id },
     include: {
-      draft: { select: { exportUrl: true } },
+      draft: { select: { exportUrl: true, headline: true, renderedText: true } },
     },
   })
 
@@ -38,6 +40,8 @@ export const POST = withTeamAdmin<{ id: string }>(async (_req, { params }, user)
     draftId: post.draftId,
     channel: post.channel,
     startedAt,
+    // 030 FR-16: what the image shows of the headline at this attempt.
+    headlineState: headlineState(parseRenderedText(draft.renderedText), draft.headline),
   }
   try {
     // A refused caption (012 FR-14) is a terminal PublishError: the post

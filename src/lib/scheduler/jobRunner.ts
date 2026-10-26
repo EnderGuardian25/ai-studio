@@ -2,6 +2,8 @@ import { prisma } from "../prisma"
 import { PublishError } from "../social/types"
 import { publishToChannel } from "../publish/publishDraft"
 import { trackPublish, type PublishOutcome } from "../publish/trackPublish"
+import { headlineState } from "../renderedText/state"
+import { parseRenderedText } from "../renderedText/stamp"
 
 // A transient failure is retried up to MAX_RETRIES times with exponential
 // backoff before the post is marked terminally FAILED. A terminal PublishError
@@ -62,6 +64,8 @@ export async function runScheduledJobs(): Promise<void> {
       draft: {
         select: {
           exportUrl: true,
+          headline: true,
+          renderedText: true,
         },
       },
     },
@@ -69,6 +73,8 @@ export async function runScheduledJobs(): Promise<void> {
 
   for (const post of posts) {
     const startedAt = Date.now()
+    // 030 FR-16: what the image shows of the headline at this attempt.
+    const headlineAtAttempt = headlineState(parseRenderedText(post.draft.renderedText), post.draft.headline)
     // The decided outcome, emitted once after the try/catch (006 FR-04), so an
     // analytics problem can never re-enter the failure branches below.
     let decided: Pick<PublishOutcome, "outcome" | "terminal" | "retryCount" | "errorReason"> | null = null
@@ -156,6 +162,7 @@ export async function runScheduledJobs(): Promise<void> {
         draftId: post.draftId,
         channel: post.channel,
         startedAt,
+        headlineState: headlineAtAttempt,
         ...(decided as Pick<PublishOutcome, "outcome" | "terminal" | "retryCount" | "errorReason">),
       })
     }

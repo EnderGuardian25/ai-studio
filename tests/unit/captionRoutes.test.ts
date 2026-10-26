@@ -19,6 +19,7 @@ const h = vi.hoisted(() => ({
   releaseDraftAction: vi.fn(),
   resolveModel: vi.fn(),
   writeCaptions: vi.fn(),
+  trackHeadlineEdited: vi.fn(),
 }))
 
 vi.mock('@/lib/prisma', () => ({ prisma: { draft: { findUnique: h.draftFindUnique } } }))
@@ -38,6 +39,7 @@ vi.mock('@/lib/brandkit/resolve', () => ({ resolveBrandKit: async () => null }))
 vi.mock('@/lib/campaign/briefing', () => ({ getActiveCampaignBriefing: async () => null }))
 vi.mock('@/lib/storage/minio', () => ({ resolveExportUrl: async () => null }))
 vi.mock('@/lib/drafts/revisions', () => ({ COMMITTED_REVISION: {}, resolveNotAppliedOutcome: async () => null }))
+vi.mock('@/lib/renderedText/track', () => ({ trackHeadlineEdited: h.trackHeadlineEdited }))
 vi.mock('@/lib/captions/generate', () => ({ writeCaptions: h.writeCaptions }))
 // 008: the route resolves the CAPTION model before its claim. The I/O wrapper
 // is a spy; by default it runs the REAL pure decideModel on a policy the test
@@ -90,7 +92,9 @@ beforeEach(() => {
   h.resolveCopyProvider.mockResolvedValue({})
   h.loadDraftCaptions.mockResolvedValue({ captions: [] })
   h.claimCaptionAction.mockResolvedValue(CLAIM)
-  h.settleCaptionAction.mockResolvedValue(undefined)
+  // 030: the settle reports whether it wrote the headline.
+  h.settleCaptionAction.mockResolvedValue({ headlineWritten: false, headlineBefore: null })
+  h.trackHeadlineEdited.mockResolvedValue(undefined)
   h.releaseDraftAction.mockResolvedValue(undefined)
   h.startDraftAction.mockResolvedValue(undefined)
   vi.spyOn(console, 'error').mockImplementation(() => {})
@@ -306,5 +310,38 @@ describe('regenerate-copy — 008 FR-09 stamp tier, resolved before the claim', 
     await onError(new Error('boom'))
     expect(h.settleCaptionAction).toHaveBeenCalledWith('d1', CLAIM, ['LINKEDIN'], { LINKEDIN: { ok: false, reason: 'boom' } })
     expect(h.settleCaptionAction.mock.calls[0]).toHaveLength(4)
+  })
+})
+
+// ── 030 FR-15: regenerate emits draft.headline_edited only when the settle wrote the headline ──
+
+describe('regenerate-copy — draft.headline_edited (030 FR-15)', () => {
+  beforeEach(() => {
+    h.startDraftAction.mockImplementation(async (_d: string, _u: string, _t: string, _a: unknown, work: () => Promise<unknown>) => {
+      await work()
+    })
+    h.writeCaptions.mockImplementation(async (_p: unknown, _b: unknown, targets: string[]) => ({
+      fields: Object.fromEntries(targets.map((t) => [t, { ok: true, text: `new ${t}` }])),
+      stamp: { model: 'm', substitutedFrom: null },
+    }))
+  })
+
+  it('emits once, via regenerate, with the value before, after the settle that wrote the headline', async () => {
+    h.settleCaptionAction.mockResolvedValue({ headlineWritten: true, headlineBefore: 'Old' })
+    await post(JSON.stringify({ headline: true }))
+    expect(h.trackHeadlineEdited).toHaveBeenCalledTimes(1)
+    expect(h.trackHeadlineEdited).toHaveBeenCalledWith({
+      draftId: 'd1',
+      teamId: 'team1',
+      userId: 'u1',
+      via: 'regenerate',
+      before: 'Old',
+    })
+    expect(h.settleCaptionAction.mock.invocationCallOrder[0]).toBeLessThan(h.trackHeadlineEdited.mock.invocationCallOrder[0])
+  })
+
+  it('emits nothing when the settle wrote no headline', async () => {
+    await post(JSON.stringify({ channel: 'LINKEDIN' }))
+    expect(h.trackHeadlineEdited).not.toHaveBeenCalled()
   })
 })

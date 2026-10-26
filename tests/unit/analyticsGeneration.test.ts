@@ -14,6 +14,7 @@ const fake = vi.hoisted(() => {
     events: [] as Array<Record<string, unknown>>,
     failInsert: false,
     failDesign: false,
+    headlineCheck: undefined as string | undefined,
   }
   const tx = {
     teamModelPolicy: { findUnique: async () => null },
@@ -75,7 +76,7 @@ vi.mock('@/lib/factsCheck/refresh', () => ({
   refreshFactsCheck: async () => {},
 }))
 vi.mock('@/lib/agent/pathA', () => ({
-  runPathADesign: async () => ({ htmlContent: '<html>a</html>', exportUrl: 'exports/a.png' }),
+  runPathADesign: async () => ({ htmlContent: '<html>a</html>', exportUrl: 'exports/a.png', headlineCheck: db.headlineCheck }),
   assertTemplateMatchesBrief: () => {},
 }))
 vi.mock('@/lib/agent/pathB', () => ({
@@ -84,6 +85,7 @@ vi.mock('@/lib/agent/pathB', () => ({
     return {
       htmlContent: '<html>b</html>',
       exportUrl: 'exports/b.png',
+      headlineCheck: db.headlineCheck,
       backgroundImageUrl: null,
       background: { url: null, skip: 'NO_PROVIDER' },
       composition: {
@@ -119,6 +121,7 @@ beforeEach(() => {
   db.events = []
   db.failInsert = false
   db.failDesign = false
+  db.headlineCheck = undefined
 })
 
 describe('generation.finished (FR-04)', () => {
@@ -208,5 +211,47 @@ describe('generation.finished (FR-04)', () => {
 
     db.failDesign = true
     await expect(sync()).rejects.toThrow('design exploded')
+  })
+})
+
+// 030 FR-17: the final render's headline check, so the unverified rate of fresh
+// generations is measured. Built from the stamp the design carries.
+describe('generation.finished headlineCheck (030 FR-17)', () => {
+  const run = async () => {
+    await runGenerationForDraft('d1', { userId: 'u1', teamId: 'team1', source: 'web' })
+    return (db.events[0].payload as Record<string, unknown>).headlineCheck
+  }
+
+  it("a verified stamp reports 'painted'", async () => {
+    db.headlineCheck = 'painted'
+    expect(await run()).toBe('painted')
+  })
+
+  it.each(['not-found', 'ambiguous', 'not-visible', 'not-checked'])('an unverified stamp reports its reason: %s', async (reason) => {
+    db.headlineCheck = reason
+    expect(await run()).toBe(reason)
+  })
+
+  it("a design that returned no check is stamped 'not-checked' and says so", async () => {
+    expect(await run()).toBe('not-checked')
+  })
+
+  it('a Path A design reports it too', async () => {
+    db.headlineCheck = 'painted'
+    db.draft = { id: 'd1', templateId: 't1', brief: { ...(brief as object), designMode: 'TEMPLATE', imageStyle: 'classic' } }
+    expect(await run()).toBe('painted')
+  })
+
+  it('is absent when there is no design (a failed run)', async () => {
+    db.failDesign = true
+    await runGenerationForDraft('d1', { userId: 'u1', teamId: 'team1', source: 'web' })
+    expect(db.events).toHaveLength(1)
+    expect(db.events[0].payload).not.toHaveProperty('headlineCheck')
+  })
+
+  it('the sync lifecycle (scheduler, MCP) carries it as well', async () => {
+    db.headlineCheck = 'not-visible'
+    await generateDraftForBrief(brief, { userId: null, teamId: 'team1', source: 'scheduler' })
+    expect(db.events[0].payload).toMatchObject({ headlineCheck: 'not-visible' })
   })
 })
