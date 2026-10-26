@@ -1276,3 +1276,15 @@ Mock mode (`MOCK_AI` + `MOCK_PUPPETEER`), a fresh team per case, serial. The act
 | TC-PF-08 | AC-17     | A FONT artifact entry (a non-catalogue name and URL) survives a save through the editor unchanged                                  |
 
 Locators adapted: `surfaces.test.ts` (the kit edit case) names the font combobox, because the Sinhala picker is a second combobox in the panel.
+
+### AK. Briefing design-rule upgrade (`briefing-upgrade.test.ts`, change 031 T10 — AC-27, AC-28)
+
+Mock mode (`MOCK_AI` + `MOCK_PUPPETEER`), a fresh campaign per case, serial. The route is `POST /api/campaigns/[id]/briefing/upgrade` (team admin only); the 007 `MOCK_AI` seam answers it, so the real detector and validation run and no model is called. The recorder (`GET/DELETE /api/test/model-calls`) shows a `briefing-upgrade` record on the `ASSISTANT_BRIEFING` surface. Every `page.waitForResponse` is created before its trigger. The kit host stays covered by §AC, unchanged.
+
+| Case     | AC    | What it checks                                                                                                                             |
+| -------- | ----- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| TC-BU-01 | AC-28 | In "Edit as new version" two vague phrases are flagged; Upgrade posts `{ text, baseVersion: 1 }` to the briefing route and lists two edits |
+| TC-BU-02 | AC-28 | Accepting an edit changes the textarea; "Save as new version" makes version 2, active, equal to the textarea                               |
+| TC-BU-03 | AC-28 | A team editor gets 403 from the route and the recorder has no `briefing-upgrade` entry                                                     |
+| TC-BU-04 | AC-28 | A stale `baseVersion` is 409 `STALE_BASE` with the active version and no recorder entry; the right base is 200                             |
+| TC-BU-05 | AC-28 | One `briefing-upgrade` record on `ASSISTANT_BRIEFING`, and no `kit-upgrade` record                                                         |

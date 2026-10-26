@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { parseBody, withTeamAdmin } from '@/lib/api/handler'
 import { withClaudeAuth } from '@/lib/agent/userToken'
 import { AssistantModelError } from '@/lib/campaign/briefingAssistant'
-import { runKitUpgrade } from '@/lib/kitUpgrade/upgrade'
+import { runRuleUpgrade } from '@/lib/kitUpgrade/upgrade'
 
 type Params = { id: string }
 
@@ -39,11 +39,14 @@ export const POST = withTeamAdmin<Params>(async (req, { params }, user) => {
 
   try {
     const result = await withClaudeAuth(user.userId, user.teamId, () =>
-      runKitUpgrade({
-        kit: { id: kit.id, colors, fonts },
+      runRuleUpgrade({
+        roleKit: { colors, fonts },
         text: body.data.text,
         teamId: user.teamId,
         userId: user.userId,
+        surface: 'ASSISTANT_BRANDKIT',
+        label: 'kit-upgrade',
+        logRef: { name: 'kit', id: kit.id },
       }),
     )
     if (result.status === 'parse-failed') {

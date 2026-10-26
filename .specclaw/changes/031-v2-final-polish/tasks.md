@@ -185,7 +185,7 @@
     - Templates name roles only; `containsForbidden` must hold.
     - **Gate:** tsc, lint, unit, the kit-upgrade E2E (§AC).
 
-- [ ] `T10` — `runRuleUpgrade`, the briefing upgrade route, the panel in the briefing editor; §AK
+- [x] `T10` — `runRuleUpgrade`, the briefing upgrade route, the panel in the briefing editor; §AK
   - Files: `src/lib/kitUpgrade/upgrade.ts`, `src/app/api/admin/brandkits/[id]/prompts/upgrade/route.ts`, `src/app/api/campaigns/[id]/briefing/upgrade/route.ts` (new), `src/components/campaigns/CampaignBriefingSection.tsx`, `src/components/textUpgrade/RuleReviewPanel.tsx`, `tests/unit/{ruleUpgrade,briefingUpgradeRoute}.test.ts`, `tests/e2e/briefing-upgrade.test.ts` (new), `docs/e2e-test-plan.md` (§AK)
   - Estimate: medium
   - Kind: impl

@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useCallback, useState } from 'react'
 import { toast } from 'sonner'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Sparkles, MessageSquareText } from 'lucide-react'
@@ -13,7 +13,9 @@ import { cn } from '@/lib/utils'
 import { SectionHead } from '@/components/ui/SectionHead'
 import { ICON, PILL_BADGE, SCROLL_FOCUS, SMALL_CAPS } from '@/components/ui/atoms'
 import { BriefingAssistantPanel } from '@/components/campaigns/BriefingAssistantPanel'
-import type { CampaignBriefing } from '@/lib/api-types'
+import { RuleReviewPanel } from '@/components/textUpgrade/RuleReviewPanel'
+import { useRuleReview } from '@/components/textUpgrade/useRuleReview'
+import type { CampaignBriefing, UpgradeResponse } from '@/lib/api-types'
 
 // Versioned campaign briefing editor — the campaign-level context injected
 // into every generation under this campaign (on top of the brand voice).
@@ -44,6 +46,18 @@ export function CampaignBriefingSection({ campaignId, isTeamAdmin }: CampaignBri
 
   const active = briefings.find(b => b.isActive)
 
+  const activeVersion = active?.version ?? 0
+  const request = useCallback(
+    (text: string) =>
+      apiFetch<UpgradeResponse>(`/api/campaigns/${campaignId}/briefing/upgrade`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, baseVersion: activeVersion }),
+      }),
+    [campaignId, activeVersion],
+  )
+  const review = useRuleReview({ text: draft, setText: setDraft, request })
+
   function invalidate() {
     return queryClient.invalidateQueries({ queryKey: ['campaigns', campaignId, 'briefing'] })
   }
@@ -58,6 +72,7 @@ export function CampaignBriefingSection({ campaignId, isTeamAdmin }: CampaignBri
         body: JSON.stringify({ content: draft }),
       })
       setDraft('')
+      review.reset()
       setView('active')
       await invalidate()
     } catch (e: unknown) {
@@ -88,6 +103,7 @@ export function CampaignBriefingSection({ campaignId, isTeamAdmin }: CampaignBri
 
   function applyAssistantDraft(text: string) {
     setDraft(text)
+    review.reset()
     setEnhanceResult(null)
     setView('new')
     setAssistantOpen(false)
@@ -150,7 +166,7 @@ export function CampaignBriefingSection({ campaignId, isTeamAdmin }: CampaignBri
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => { setDraft(active?.content ?? ''); setView('new') }}
+                onClick={() => { setDraft(active?.content ?? ''); review.reset(); setView('new') }}
               >
                 {active ? 'Edit as new version' : 'Write briefing'}
               </Button>
@@ -221,7 +237,7 @@ export function CampaignBriefingSection({ campaignId, isTeamAdmin }: CampaignBri
                     </div>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    <Button size="sm" onClick={() => { setDraft(enhanceResult.draft); setEnhanceResult(null) }}>
+                    <Button size="sm" onClick={() => { setDraft(enhanceResult.draft); review.reset(); setEnhanceResult(null) }}>
                       Accept suggestion
                     </Button>
                     <Button variant="ghost" size="sm" onClick={() => setEnhanceResult(null)}>
@@ -249,10 +265,14 @@ export function CampaignBriefingSection({ campaignId, isTeamAdmin }: CampaignBri
                     <Button variant="secondary" size="sm" onClick={enhance} disabled={enhancing}>
                       <Sparkles {...ICON} /> {enhancing ? 'Enhancing…' : 'Enhance with AI'}
                     </Button>
-                    <Button variant="ghost" size="sm" onClick={() => { setDraft(''); setEnhanceResult(null); setView('active') }}>
+                    <Button variant="ghost" size="sm" onClick={() => { setDraft(''); review.reset(); setEnhanceResult(null); setView('active') }}>
                       Cancel
                     </Button>
                   </div>
+                  <RuleReviewPanel
+                    review={review}
+                    staleBaseText="The briefing changed since you started; reload it."
+                  />
                   {enhancing && (
                     <p className="text-ui-xs text-fg-muted">
                       Rewriting with brand voice and campaign documents — this can take up to a minute.

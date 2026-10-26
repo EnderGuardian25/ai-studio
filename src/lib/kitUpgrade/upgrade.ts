@@ -1,6 +1,7 @@
 // The core of POST /api/admin/brandkits/[id]/prompts/upgrade (007 FR-05, FR-06,
-// FR-10, FR-11, FR-17). The route loads the kit and checks the base version;
-// this module takes the kit as an argument, so it imports no kit loader. One
+// FR-10, FR-11, FR-17) and of POST /api/campaigns/[id]/briefing/upgrade (031
+// FR-28, FR-29). The route loads the host's record and checks the base version;
+// this module takes the role kit as an argument, so it imports no loader. One
 // model call, no retry. The model proposes wording only: quote, kind, entry key
 // and provenance come from the detector and the dataset (validateProposals).
 import { z } from 'zod'
@@ -40,47 +41,57 @@ export type UpgradeResult =
 
 export type CallModel = (prompt: UpgradePrompt, model: ResolvedModel) => Promise<string>
 
-export interface RunKitUpgradeInput {
-  kit: RoleKit & { id: string }
+export type UpgradeSurface = 'ASSISTANT_BRANDKIT' | 'ASSISTANT_BRIEFING'
+export type UpgradeLabel = 'kit-upgrade' | 'briefing-upgrade'
+
+export interface RunRuleUpgradeInput {
+  roleKit: RoleKit
   text: string
   teamId: string
   userId: string | null
+  surface: UpgradeSurface
+  label: UpgradeLabel
+  /** Named in the log line only (for example `kit=<id>`); never sent to the model. */
+  logRef?: { name: string; id: string }
   /** Injected in unit tests; the default is the shared assistant text call. */
   callModel?: CallModel
 }
 
 const defaultCall =
-  (teamId: string): CallModel =>
+  (teamId: string, label: UpgradeLabel): CallModel =>
   (prompt, model) =>
     runBriefingModel(prompt.system, [{ role: 'user', content: prompt.user }], teamId, model, {
       maxTokens: MAX_TOKENS,
-      label: 'kit-upgrade',
+      label,
     })
 
+const refOf = (input: RunRuleUpgradeInput) =>
+  input.logRef ? ` ${input.logRef.name}=${input.logRef.id}` : ''
+
 function logCall(
-  input: RunKitUpgradeInput,
+  input: RunRuleUpgradeInput,
   candidates: Candidate[],
   edits: number,
   rejected: number,
 ): void {
   const entries = [...new Set(candidates.map((c) => c.entryKey))].join(',')
   console.log(
-    `[kit-upgrade] team=${input.teamId} kit=${input.kit.id} candidates=${candidates.length} edits=${edits} rejected=${rejected} entries=${entries}`,
+    `[${input.label}] team=${input.teamId}${refOf(input)} candidates=${candidates.length} edits=${edits} rejected=${rejected} entries=${entries}`,
   )
 }
 
-export async function runKitUpgrade(input: RunKitUpgradeInput): Promise<UpgradeResult> {
+export async function runRuleUpgrade(input: RunRuleUpgradeInput): Promise<UpgradeResult> {
   const { candidates } = detectVagueDesign(input.text)
   if (candidates.length === 0) {
     logCall(input, candidates, 0, 0)
     return { status: 'none', reason: 'no-candidates', rejected: [], candidates: 0 }
   }
 
-  const model = await resolveAssistantModel('ASSISTANT_BRANDKIT', input.teamId, input.userId)
+  const model = await resolveAssistantModel(input.surface, input.teamId, input.userId)
 
   let reply: string
   if (MOCK_AI) {
-    recordModelCall(modelCallFor(model, pipelineMode(), 'kit-upgrade'))
+    recordModelCall(modelCallFor(model, pipelineMode(), input.label))
     reply = buildMockKitUpgradeReply(
       candidates.map((c) => ({
         id: c.id,
@@ -95,22 +106,22 @@ export async function runKitUpgrade(input: RunKitUpgradeInput): Promise<UpgradeR
     })
     const prompt = buildUpgradePrompt({
       candidates: pairs,
-      roles: buildRoleList(input.kit),
+      roles: buildRoleList(input.roleKit),
       text: input.text,
     })
-    reply = await (input.callModel ?? defaultCall(input.teamId))(prompt, model)
+    reply = await (input.callModel ?? defaultCall(input.teamId, input.label))(prompt, model)
   }
 
   const parsed = extractFencedJson(reply, 'kitedits', replySchema)
   if (!parsed.ok) {
     const raw = reply.slice(0, RAW_LOG_CHARS).replace(/\r\n|\r|\n/g, '\\n')
     console.log(
-      `[kit-upgrade] parse-failed team=${input.teamId} kit=${input.kit.id} reason=${parsed.reason} reply=${raw}`,
+      `[${input.label}] parse-failed team=${input.teamId}${refOf(input)} reason=${parsed.reason} reply=${raw}`,
     )
     return { status: 'parse-failed', reason: parsed.reason }
   }
 
-  const { edits, rejected } = validateProposals(candidates, parsed.data, input.kit, input.text)
+  const { edits, rejected } = validateProposals(candidates, parsed.data, input.roleKit, input.text)
   logCall(input, candidates, edits.length, rejected.length)
 
   if (edits.length > 0) {

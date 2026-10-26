@@ -21,7 +21,16 @@ function plural(n: number, one: string, many: string): string {
   return `${n} ${n === 1 ? one : many}`
 }
 
-export function RuleReviewPanel({ review }: { review: RuleReview }) {
+const KIT_STALE_TEXT = 'The active version changed. Reload the page to start from it.'
+
+export function RuleReviewPanel({
+  review,
+  staleBaseText = KIT_STALE_TEXT,
+}: {
+  review: RuleReview
+  /** Shown under the error when the host's base version moved (STALE_BASE). */
+  staleBaseText?: string
+}) {
   const { flags, edits, outcome, error, notice } = review
   const rejected = outcome?.rejected ?? []
   const repeated = rejected.some((r) => r.reason === 'stale-quote')
@@ -88,7 +97,7 @@ export function RuleReviewPanel({ review }: { review: RuleReview }) {
         <Notice tone="error" role="alert">
           <p className="break-words">{error.message}</p>
           {error.code === 'STALE_BASE' && (
-            <p className="mt-1">The active version changed. Reload the page to start from it.</p>
+            <p className="mt-1">{staleBaseText}</p>
           )}
           {error.retryable && (
             <Button

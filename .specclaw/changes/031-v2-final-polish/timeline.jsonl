@@ -27,3 +27,5 @@
 {"ev":"stop","span":"W4","at":"2026-10-26T14:50:42Z","ts":1793026242,"status":"ok"}
 {"ev":"start","span":"W5","kind":"wave","label":"wave 5","at":"2026-10-26T14:51:06Z","ts":1793026266}
 {"ev":"start","span":"T9","kind":"task","label":"Typography entries and kit rules","parent":"W5","model":"sonnet","attempt":"1","at":"2026-10-26T14:51:06Z","ts":1793026266}
+{"ev":"stop","span":"T9","at":"2026-10-26T14:57:28Z","ts":1793026648,"status":"ok"}
+{"ev":"start","span":"T10","kind":"task","label":"Rule upgrade runner, briefing host, AK","parent":"W5","model":"sonnet","attempt":"1","at":"2026-10-26T14:57:31Z","ts":1793026651}
