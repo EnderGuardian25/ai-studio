@@ -3,7 +3,7 @@
 // (personal → team, no tier below team), driven through a scripted fake
 // `spawn` so no real `claude` process (or credit) is involved.
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest'
 
 const h = vi.hoisted(() => ({
   // Each entry scripts one spawned process, consumed FIFO.
@@ -309,4 +309,11 @@ describe('claudeAuth ALS context', () => {
     const seen = await runWithClaudeAuth(null, async () => currentClaudeAuth())
     expect(seen).toBeUndefined()
   })
+})
+
+// 031 FR-01: vitest workers are killed without an 'exit' event, so remove the
+// spawn cwd this file created.
+afterAll(async () => {
+  const m = (await import('@/lib/agent/claudeCli')) as { cleanupSpawnCwd?: () => void }
+  m.cleanupSpawnCwd?.()
 })

@@ -1,3 +1,5 @@
 {"ev":"stop","span":"propose","at":"2026-10-26T10:35:59Z","ts":1793010959,"status":"ok"}
 {"ev":"start","span":"plan","kind":"phase","label":"plan","at":"2026-10-26T11:05:57Z","ts":1793012757}
 {"ev":"stop","span":"plan","at":"2026-10-26T11:20:31Z","ts":1793013631,"status":"ok"}
+{"ev":"start","span":"W1","kind":"wave","label":"wave 1","at":"2026-10-26T12:18:31Z","ts":1793017111}
+{"ev":"start","span":"T1","kind":"task","label":"Temp-dir cleanup, lost-claim cleanup, AC-17","parent":"W1","model":"sonnet","attempt":"1","at":"2026-10-26T12:18:32Z","ts":1793017112}

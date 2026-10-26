@@ -15,7 +15,7 @@
 // event shapes below are the ones the local CLI 2.1.287 actually emitted
 // (see reports/T5.md).
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach, afterAll } from 'vitest'
 
 const h = vi.hoisted(() => ({
   // Each entry scripts one spawned process, consumed FIFO. `chunks` are emitted
@@ -559,4 +559,11 @@ describe('auth: model-written text never classifies as an auth failure', () => {
     expect((err as InstanceType<typeof ClaudeCliError>).exitCode).toBeNull()
     expect(isClaudeAuthFailure(err)).toBe(true)
   })
+})
+
+// 031 FR-01: vitest workers are killed without an 'exit' event, so remove the
+// spawn cwd this file created.
+afterAll(async () => {
+  const m = (await import('@/lib/agent/claudeCli')) as { cleanupSpawnCwd?: () => void }
+  m.cleanupSpawnCwd?.()
 })

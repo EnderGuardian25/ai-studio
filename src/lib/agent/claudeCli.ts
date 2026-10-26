@@ -1,5 +1,5 @@
 import { spawn } from "child_process"
-import { existsSync } from "node:fs"
+import { existsSync, rmSync } from "node:fs"
 import { mkdtemp, stat } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -134,8 +134,31 @@ function baseArgs(shell: boolean): string[] {
 // which would otherwise read as "Claude CLI not found". A vanished dir is
 // simply re-created.
 let spawnCwdPromise: Promise<string> | undefined
+// 031 FR-01: the exact path mkdtemp created last, removed when the process
+// exits. A re-created dir replaces the old one (the old one is already gone).
+let createdCwd: string | null = null
+let exitHookRegistered = false
+export function cleanupSpawnCwd(): void {
+  const dir = createdCwd
+  if (!dir) return
+  createdCwd = null
+  try {
+    rmSync(dir, { recursive: true, force: true })
+  } catch {
+    // an exit handler never throws
+  }
+}
 function freshSpawnCwd(): Promise<string> {
-  const created: Promise<string> = mkdtemp(join(tmpdir(), "bistec-cli-")).catch((err: unknown) => {
+  const created: Promise<string> = mkdtemp(join(tmpdir(), "bistec-cli-"))
+    .then((dir) => {
+      createdCwd = dir
+      if (!exitHookRegistered) {
+        exitHookRegistered = true
+        process.once("exit", cleanupSpawnCwd)
+      }
+      return dir
+    })
+    .catch((err: unknown) => {
     if (spawnCwdPromise === created) spawnCwdPromise = undefined
     throw err
   })

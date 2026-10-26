@@ -7,7 +7,7 @@ import { resolveBrandKit } from '@/lib/brandkit/resolve'
 import { getActiveCampaignBriefing } from '@/lib/campaign/briefing'
 import { runPathBDesign } from '@/lib/agent/pathB'
 import { stampFromCheck } from '@/lib/renderedText/stamp'
-import { currentRenderStamp, draftStampFields, revisionStampFields, withNextRevisionNumber } from '@/lib/drafts/revisions'
+import { currentRenderStamp, draftStampFields, revisionStampFields, withNextRevisionNumber, discardOnLostClaim } from '@/lib/drafts/revisions'
 import { briefPostStyleStamp } from '@/lib/agent/briefInput'
 import { resolveModel } from '@/lib/models/policy'
 import { modelError, parseRegenerateDesignBody } from '@/lib/models/requests'
@@ -139,39 +139,46 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
 
     // Append the NEW design as a revision and point the draft at it — so the user
     // can jump forward to it again after an Undo, not just back.
-    await withNextRevisionNumber(draft.id, async (tx, revisionNumber) => {
-      await tx.draftRevision.create({
-        data: {
-          draftId: draft.id,
-          revisionNumber,
-          instruction: 'Regenerated design',
-          htmlSnapshot: result.htmlContent,
-          exportUrl: result.exportUrl,
-          ...revisionStampFields(stamp),
-        },
+    // 031 FR-02: a lost claim rolls the write back, so the export THIS run
+    // uploaded (result.exportUrl, minted by runPathBDesign) is unused.
+    try {
+      await withNextRevisionNumber(draft.id, async (tx, revisionNumber) => {
+        await tx.draftRevision.create({
+          data: {
+            draftId: draft.id,
+            revisionNumber,
+            instruction: 'Regenerated design',
+            htmlSnapshot: result.htmlContent,
+            exportUrl: result.exportUrl,
+            ...revisionStampFields(stamp),
+          },
+        })
+        // 019: the guarded final write (last, see revisions.ts LOCK ORDER). A run
+        // the sweep cleared, or a newer claim superseded, throws and rolls back
+        // the revision insert above.
+        const { count } = await tx.draft.updateMany({
+          where: { id: draft.id, ...claimWhere(claim) },
+          data: {
+            htmlContent: result.htmlContent,
+            exportUrl: result.exportUrl,
+            // New background (or null when the pre-step skipped — clears the stale one).
+            imageUrl: result.backgroundImageUrl,
+            // 005 FR-07: this design was made from scratch, so its skip (or
+            // none) replaces whatever the previous render recorded.
+            ...generationSkipFields(result.background),
+            status: 'EXPORTED',
+            currentRevisionNumber: revisionNumber,
+            pendingConflict: Prisma.JsonNull,
+            ...draftStampFields(stamp),
+          },
+        })
+        if (count !== 1) throw new DraftClaimLostError()
+        return revisionNumber
       })
-      // 019: the guarded final write (last, see revisions.ts LOCK ORDER). A run
-      // the sweep cleared, or a newer claim superseded, throws and rolls back
-      // the revision insert above.
-      const { count } = await tx.draft.updateMany({
-        where: { id: draft.id, ...claimWhere(claim) },
-        data: {
-          htmlContent: result.htmlContent,
-          exportUrl: result.exportUrl,
-          // New background (or null when the pre-step skipped — clears the stale one).
-          imageUrl: result.backgroundImageUrl,
-          // 005 FR-07: this design was made from scratch, so its skip (or
-          // none) replaces whatever the previous render recorded.
-          ...generationSkipFields(result.background),
-          status: 'EXPORTED',
-          currentRevisionNumber: revisionNumber,
-          pendingConflict: Prisma.JsonNull,
-          ...draftStampFields(stamp),
-        },
-      })
-      if (count !== 1) throw new DraftClaimLostError()
-      return revisionNumber
-    })
+    } catch (err) {
+      await discardOnLostClaim(err, result.exportUrl || null, 'a lost claim')
+      throw err
+    }
   }, undefined, trace)
 
   return NextResponse.json({ ok: true }, { status: 202 })

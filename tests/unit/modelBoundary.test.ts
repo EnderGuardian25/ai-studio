@@ -23,7 +23,7 @@
 // real boundary-facing function — the runner's own wiring is pinned by
 // captionWriters / renderStamps / draftActionModels.
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach, afterAll } from 'vitest'
 
 const h = vi.hoisted(() => ({
   mode: 'cli' as 'api' | 'cli',
@@ -445,4 +445,11 @@ describe('AC-12: every surface reaches its boundary with its resolved arg', () =
       expectOneRecord('DESIGN_FREEFORM', 'OPUS', 'cli')
     })
   })
+})
+
+// 031 FR-01: vitest workers are killed without an 'exit' event, so remove the
+// spawn cwd this file created.
+afterAll(async () => {
+  const m = (await import('@/lib/agent/claudeCli')) as { cleanupSpawnCwd?: () => void }
+  m.cleanupSpawnCwd?.()
 })

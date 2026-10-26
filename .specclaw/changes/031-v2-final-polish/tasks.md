@@ -52,7 +52,7 @@
 
 ### Wave 1: H, the leftovers
 
-- [ ] `T1` — Temp-dir cleanup, one lost-claim cleanup, AC-17 recheck
+- [x] `T1` — Temp-dir cleanup, one lost-claim cleanup, AC-17 recheck
   - Files: `src/lib/agent/claudeCli.ts`, `src/lib/drafts/revisions.ts`, `src/app/api/drafts/[id]/regenerate-design/route.ts`, `tests/unit/claudeCliTempDir.test.ts` (new), `tests/unit/lostClaimCleanup.test.ts` (new)
   - Estimate: small
   - Kind: impl

@@ -462,6 +462,16 @@ async function removeUnusedExport(key: string, why: string) {
   }
 }
 
+// 031 FR-02: the one lost-claim cleanup. A DraftClaimLostError or a
+// RevisionConflictError is a throw that rolled the write back, so the export
+// this run uploaded (never a key read from a row) is unused.
+// Any other error leaves the object in place: the commit may have landed.
+export async function discardOnLostClaim(err: unknown, uploadedKey: string | null, _why: string): Promise<void> {
+  if (!uploadedKey) return
+  if (!(err instanceof DraftClaimLostError || err instanceof RevisionConflictError)) return
+  await removeUnusedExport(uploadedKey, err instanceof DraftClaimLostError ? 'a lost claim' : 'a revision conflict')
+}
+
 // 025 FR-16: the render argument for a stamp. null for a stamp with no
 // composites (no DB read). For a composite stamp it reads the draft's team and
 // the screenshot once; any failure to read or place it is a
@@ -600,9 +610,7 @@ export async function commitDraftRevision(
     // (the object is left in place): after e.g. a dropped connection the commit
     // may in fact have landed. Best-effort — a failed removal is logged and
     // never masks the conflict.
-    if ((err instanceof RevisionConflictError || err instanceof DraftClaimLostError) && uploadedKey) {
-      await removeUnusedExport(uploadedKey, err instanceof DraftClaimLostError ? 'a lost claim' : 'a revision conflict')
-    }
+    await discardOnLostClaim(err, uploadedKey, 'a lost claim')
     throw err
   }
 
@@ -1001,7 +1009,7 @@ export async function recordRejectedRender(
     }, TX_OPTIONS)
   } catch (err) {
     // The throw rolled the row back, so the export uploaded above is unused.
-    if (err instanceof DraftClaimLostError && exportKey) await removeUnusedExport(exportKey, 'a lost claim')
+    if (err instanceof DraftClaimLostError) await discardOnLostClaim(err, exportKey, 'a lost claim')
     throw err
   }
 

@@ -10,7 +10,7 @@
 // The CLI path runs through the REAL runClaudeCli with a scripted fake `spawn`,
 // so the Haiku pin is proven on the argv that would reach the `claude` binary.
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest'
 import type { DomElementFact } from '@/lib/agent/instructionClasses'
 
 const h = vi.hoisted(() => ({
@@ -862,4 +862,11 @@ describe('final F1 / I-2 — a text-reduction instruction must lower the visible
     expect(r).toEqual({ kind: 'pass' }) // the (scripted) add verifier said applied
     expect(modelCalls()).toBe(1)
   })
+})
+
+// 031 FR-01: vitest workers are killed without an 'exit' event, so remove the
+// spawn cwd this file created.
+afterAll(async () => {
+  const m = (await import('@/lib/agent/claudeCli')) as { cleanupSpawnCwd?: () => void }
+  m.cleanupSpawnCwd?.()
 })

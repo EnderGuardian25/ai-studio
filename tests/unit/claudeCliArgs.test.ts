@@ -16,7 +16,7 @@
 // are cheap to reach) with a scripted fake `spawn`, so the assertions are on
 // the argv / env that would reach the `claude` binary.
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach, afterAll } from 'vitest'
 
 const h = vi.hoisted(() => ({
   spawnCalls: [] as Array<{
@@ -847,4 +847,11 @@ describe('008 T5/T10: a ResolvedModel at the CLI boundary', () => {
     expect(h.spawnCalls).toHaveLength(0)
     expect(records).toHaveLength(0)
   })
+})
+
+// 031 FR-01: vitest workers are killed without an 'exit' event, so remove the
+// spawn cwd this file created.
+afterAll(async () => {
+  const m = (await import('@/lib/agent/claudeCli')) as { cleanupSpawnCwd?: () => void }
+  m.cleanupSpawnCwd?.()
 })

@@ -100,6 +100,7 @@ These are carried over from `verify-notes.md`. They are deliberate rulings or ac
 ## Open follow-ups
 
 1. **Re-check AC-17 after the node:22 merge.** Once PR #42 lands on `main` and `main` is merged into `v2`, rebuild the image. Confirm that `claude --version` prints `2.1.287` with no EBADENGINE warning, and re-run `scripts/cli-sandbox-check.mjs` (AC-16) in the rebuilt image.
+   - AC-17 rechecked under node:22 by 031 T1: `docker build -t bistec-studio:031 .` exit 0, EBADENGINE count 0; `claude --version` printed `2.1.287 (Claude Code)`. (`scripts/cli-sandbox-check.mjs` was not re-run.)
 2. **Empty `bistec-cli-*` temp dirs from unit runs.** Clean them up in a test teardown, or give the spawn-cwd tests an injectable temp root.
 3. **Live Gemini check.** Before the first real Gemini key is relied on, diff `gemini.ts` against https://ai.google.dev/api/generate-content and https://ai.google.dev/gemini-api/docs/image-generation (design R5), then make one live call.
 4. **Optional, minor:** AC-24's in-app reference to `docs/claude-account-setup.md` is a path, not a clickable link. If the doc is ever served or published, link it from `ClaudeConnectGuide.tsx`.

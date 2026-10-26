@@ -3,7 +3,7 @@
 // `diagnostic`, never model text (learning L8) — and a 401 is never a usage
 // limit. (The generationRunner errorReason prefix half of AC-08 is T9's.)
 
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest'
 import Anthropic from '@anthropic-ai/sdk'
 
 const h = vi.hoisted(() => ({ stdout: '', stderr: '', exitCode: 0 as number | null }))
@@ -191,4 +191,11 @@ describe('029: the usage-limit failure names itself', () => {
     const err = await run()
     expect(err.message).toBe('Claude CLI exited with code 1: boom')
   })
+})
+
+// 031 FR-01: vitest workers are killed without an 'exit' event, so remove the
+// spawn cwd this file created.
+afterAll(async () => {
+  const m = (await import('@/lib/agent/claudeCli')) as { cleanupSpawnCwd?: () => void }
+  m.cleanupSpawnCwd?.()
 })
