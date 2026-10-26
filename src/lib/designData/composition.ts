@@ -236,7 +236,7 @@ export const archetypes: ArchetypeMap = deepFreeze({
     summary:
       'One subject lit in the centre, the headline above it and the call to action below, on a plain dark background.',
     status: 'active',
-    current: 1,
+    current: 2,
     versions: {
       1: {
         role: 'hero',
@@ -268,7 +268,7 @@ export const archetypes: ArchetypeMap = deepFreeze({
           },
         },
       },
-      // 031 (T16), a CANDIDATE: not served until OP-031 passes (`current` stays 1). SQUARE only
+      // 031 (T16), served since T18: OP-031 passed (2 of 2 accepted, 2026-10-26). SQUARE only
       // differs from v1: both bands are pulled back from the subject, and the prompt says the
       // top and bottom 22% are a flat, plain backdrop. PORTRAIT and STORY are v1 unchanged.
       // Evidence: .specclaw/changes/031-v2-final-polish/look-check/evidence.md.

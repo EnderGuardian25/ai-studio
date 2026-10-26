@@ -6,7 +6,7 @@ import { ADMIN_EMAIL, ADMIN_PASSWORD, briefDraftIds, pageLogin } from '../helper
 import { archetypes } from '../../src/lib/designData/composition'
 
 // §AF — image looks (change 028, FR-05, FR-10 to FR-13, NFR-10; AC-10 to AC-14,
-// AC-18; TC-LOOK-01 to TC-LOOK-16). Adapted from §AA (hero-image.test.ts), with
+// AC-18; TC-LOOK-01 to TC-LOOK-20). Adapted from §AA (hero-image.test.ts), with
 // the same MOCK_AI + MOCK_PUPPETEER seams and the same `__MOCK_HERO_*__`
 // sentinels (no new sentinel):
 //   __MOCK_BG__            an image exists (a hero look needs it)
@@ -179,18 +179,19 @@ test.describe('§AF — image looks, generation and the stamp', () => {
     expect(draft.compositionNotice).toBeNull()
   })
 
-  for (const [id, key] of [
-    ['TC-LOOK-03', 'full-bleed-scene'],
-    ['TC-LOOK-04', 'spotlight'],
+  // 031 T18: spotlight is at contract v2 (OP-031 passed); full-bleed-scene is still v1.
+  for (const [id, key, version] of [
+    ['TC-LOOK-03', 'full-bleed-scene', 1],
+    ['TC-LOOK-04', 'spotlight', 2],
   ] as const) {
-    test(`${id}: ${key} at 1:1, 4:5 and 9:16 is kept with contract v1`, async () => {
+    test(`${id}: ${key} at 1:1, 4:5 and 9:16 is kept with contract v${version}`, async () => {
       for (const aspectRatio of SIZES) {
         const { draft } = await generate(t, `Look ${key} ${aspectRatio} __MOCK_BG__ ${tag()}`, {
           imageStyle: key,
           aspectRatio,
         })
         expect(draft.composition, aspectRatio).toEqual(KEPT(key))
-        expect(draft.composition!.contractVersion, aspectRatio).toBe(1)
+        expect(draft.composition!.contractVersion, aspectRatio).toBe(version)
         expect(draft.imageUrl, aspectRatio).toMatch(IMAGE_URL)
         expect(draft.compositionNotice, aspectRatio).toBeNull()
       }
@@ -348,8 +349,10 @@ test.describe('§AF — unattended surfaces are unchanged', () => {
   for (const [id, postStyle] of [
     ['TC-LOOK-15', 'event'],
     ['TC-LOOK-16', 'hiring'],
+    ['TC-LOOK-19', 'promotion'], // 031 T18
+    ['TC-LOOK-20', 'milestone'], // 031 T18
   ] as const) {
-    test(`${id}: a queue entry with postStyle ${postStyle} at 9:16 runs classic although the style now defaults to Full-bleed scene`, async () => {
+    test(`${id}: a queue entry with postStyle ${postStyle} at 9:16 runs classic although the style now defaults to a look`, async () => {
       const res = await admin.post(`/api/campaigns/${campaignId}/queue`, {
         topic: `Look queue ${postStyle} ${tag()}`,
         channels: ['INSTAGRAM'],
@@ -498,11 +501,13 @@ test.describe('§AF — the wizard picker', () => {
   })
 
   // T7 (FR-16, AC-20): the post styles whose default moved after OP-028.
-  for (const [id, postStyle] of [
-    ['TC-LOOK-13', 'event'],
-    ['TC-LOOK-14', 'hiring'],
+  for (const [id, postStyle, look] of [
+    ['TC-LOOK-13', 'event', 'full-bleed-scene'],
+    ['TC-LOOK-14', 'hiring', 'full-bleed-scene'],
+    ['TC-LOOK-17', 'promotion', 'spotlight'], // 031 T18
+    ['TC-LOOK-18', 'milestone', 'spotlight'], // 031 T18
   ] as const) {
-    test(`${id}: the ${postStyle} post style pre-fills Full-bleed scene at 1:1 and at 9:16, with the hint`, async ({ page }) => {
+    test(`${id}: the ${postStyle} post style pre-fills ${look} at 1:1 and at 9:16, with the hint`, async ({ page }) => {
       await pageLogin(page)
       await page.goto('/brief')
       await expect(page.getByRole('heading', { name: 'Select a campaign' })).toBeVisible({ timeout: 20_000 })
@@ -517,19 +522,19 @@ test.describe('§AF — the wizard picker', () => {
       await page.getByRole('button', { name: /1:1 Square/ }).click()
       await expect(page.getByTestId('image-style-from-style')).toHaveCount(0)
       await page.getByTestId(`post-style-${postStyle}`).click()
-      await expect(option('full-bleed-scene')).toHaveAttribute('aria-pressed', 'true')
+      await expect(option(look)).toHaveAttribute('aria-pressed', 'true')
       await expect(page.getByTestId('image-style-from-style')).toBeVisible()
 
       // An untouched pre-fill survives the size change.
       await page.getByRole('button', { name: /9:16 Story/ }).click()
-      await expect(option('full-bleed-scene')).toHaveAttribute('aria-pressed', 'true')
+      await expect(option(look)).toHaveAttribute('aria-pressed', 'true')
       await expect(page.getByTestId('image-style-from-style')).toBeVisible()
 
       // Picking the style afresh at 9:16 gives the same look.
       await page.getByTestId('post-style-general').click()
       await expect(option('classic')).toHaveAttribute('aria-pressed', 'true')
       await page.getByTestId(`post-style-${postStyle}`).click()
-      await expect(option('full-bleed-scene')).toHaveAttribute('aria-pressed', 'true')
+      await expect(option(look)).toHaveAttribute('aria-pressed', 'true')
     })
   }
 })

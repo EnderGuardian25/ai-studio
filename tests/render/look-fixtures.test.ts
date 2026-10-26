@@ -23,7 +23,7 @@ import {
   planComposition,
   type HeroPlan,
 } from '@/lib/designData'
-import { CANDIDATE_FIXTURES, LOOK_FIXTURES } from './lookFixtureTable'
+import { CANDIDATE_FIXTURES, LOOK_FIXTURES, SUPERSEDED_FIXTURES } from './lookFixtureTable'
 import { lookFixture } from './lookFixtures'
 
 describe('the look fixtures run in real Chromium', () => {
@@ -32,7 +32,7 @@ describe('the look fixtures run in real Chromium', () => {
   })
 })
 
-describe.each([...LOOK_FIXTURES, ...CANDIDATE_FIXTURES])('look fixture $id $kind', (spec) => {
+describe.each([...LOOK_FIXTURES, ...CANDIDATE_FIXTURES, ...SUPERSEDED_FIXTURES])('look fixture $id $kind', (spec) => {
   it('gets the verdict the check should give', async () => {
     const sizeContract = contractAt(spec.key, spec.version, spec.size)!
     const tone = contractVersionOf(spec.key, spec.version)!.textTone

@@ -225,7 +225,7 @@ describe('NFR-04: a stored key that does not resolve fails closed', () => {
   })
 
   it('briefPostStyleStamp is the key at the current version with the dataset revision', () => {
-    expect(briefPostStyleStamp(briefRow())).toEqual({ key: 'promotion', version: 1, revision: POST_STYLES_REVISION })
+    expect(briefPostStyleStamp(briefRow())).toEqual({ key: 'promotion', version: 2, revision: POST_STYLES_REVISION })
     expect(briefPostStyleStamp(briefRow({ postStyle: null }))).toBeNull()
   })
 })

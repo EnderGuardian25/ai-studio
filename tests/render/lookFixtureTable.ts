@@ -71,15 +71,15 @@ export const LOOK_FIXTURES: readonly FixtureSpec[] = [
   row('full-bleed-scene', 1, 'STORY', 'pass'),
   row('full-bleed-scene', 1, 'STORY', 'busy'),
   row('full-bleed-scene', 1, 'STORY', 'contrast'),
-  row('spotlight', 1, 'SQUARE', 'pass'),
-  row('spotlight', 1, 'SQUARE', 'busy'),
-  row('spotlight', 1, 'SQUARE', 'contrast'),
-  row('spotlight', 1, 'PORTRAIT', 'pass'),
-  row('spotlight', 1, 'PORTRAIT', 'busy'),
-  row('spotlight', 1, 'PORTRAIT', 'contrast'),
-  row('spotlight', 1, 'STORY', 'pass'),
-  row('spotlight', 1, 'STORY', 'busy'),
-  row('spotlight', 1, 'STORY', 'contrast'),
+  row('spotlight', 2, 'SQUARE', 'pass'),
+  row('spotlight', 2, 'SQUARE', 'busy'),
+  row('spotlight', 2, 'SQUARE', 'contrast'),
+  row('spotlight', 2, 'PORTRAIT', 'pass'),
+  row('spotlight', 2, 'PORTRAIT', 'busy'),
+  row('spotlight', 2, 'PORTRAIT', 'contrast'),
+  row('spotlight', 2, 'STORY', 'pass'),
+  row('spotlight', 2, 'STORY', 'busy'),
+  row('spotlight', 2, 'STORY', 'contrast'),
   row('device-screen', 1, 'SQUARE', 'pass'),
   row('device-screen', 1, 'SQUARE', 'busy'),
   row('device-screen', 1, 'SQUARE', 'contrast'),
@@ -104,12 +104,23 @@ export const LOOK_FIXTURES: readonly FixtureSpec[] = [
 ]
 
 // 031 T16: candidate contracts (a version above its look's `current`, not yet served). The render
-// suite runs these with the shipped rows. They join LOOK_FIXTURES when OP-031 passes and T18 moves
-// `current`; fixtureCompletenessProblems is unchanged and ignores them while `current` stays 1.
-export const CANDIDATE_FIXTURES: readonly FixtureSpec[] = [
-  row('spotlight', 2, 'SQUARE', 'pass'),
-  row('spotlight', 2, 'SQUARE', 'busy'),
-  row('spotlight', 2, 'SQUARE', 'contrast'),
+// suite runs these with the shipped rows. Empty since T18: OP-031 passed and spotlight@2 moved into
+// LOOK_FIXTURES (the v1 spotlight rows left with `current` 1 -> 2; v1 stays released in the dataset).
+export const CANDIDATE_FIXTURES: readonly FixtureSpec[] = []
+
+// 031 T18: released contracts below their look's `current`. They still resolve (a stamp names
+// them and refine reads the stamped version), so the render suite keeps proving the check on them.
+// fixtureCompletenessProblems ignores them: it wants exactly the current contracts.
+export const SUPERSEDED_FIXTURES: readonly FixtureSpec[] = [
+  row('spotlight', 1, 'SQUARE', 'pass'),
+  row('spotlight', 1, 'SQUARE', 'busy'),
+  row('spotlight', 1, 'SQUARE', 'contrast'),
+  row('spotlight', 1, 'PORTRAIT', 'pass'),
+  row('spotlight', 1, 'PORTRAIT', 'busy'),
+  row('spotlight', 1, 'PORTRAIT', 'contrast'),
+  row('spotlight', 1, 'STORY', 'pass'),
+  row('spotlight', 1, 'STORY', 'busy'),
+  row('spotlight', 1, 'STORY', 'contrast'),
 ]
 
 const KINDS: readonly FixtureKind[] = ['pass', 'busy', 'contrast']

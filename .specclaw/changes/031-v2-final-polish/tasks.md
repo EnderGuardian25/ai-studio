@@ -302,7 +302,7 @@
     - Run `--probe --slot-set op031`. The user gives each verdict on the render. Stop as soon as the verdict is decided.
     - Commit the ledger and the results; renders stay gitignored.
 
-- [ ] `T18` — Apply the OP-031 result
+- [x] `T18` — Apply the OP-031 result
   - Files: on a pass, `src/lib/designData/composition.ts`, `tests/render/lookFixtureTable.ts`, `src/lib/postStyles/styles.ts` and its hash table, `tests/unit/{lookDataset,lookCheckResults,lookFixtureCompleteness}.test.ts`, and the E2E cases pinning Promotion and Milestone defaults; on a fail, `tests/unit/lookCheckResults.test.ts` only
   - Estimate: small
   - Kind: impl

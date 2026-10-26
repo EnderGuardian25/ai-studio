@@ -117,6 +117,9 @@ describe('POST /api/admin/look-probe', () => {
     expect(h.generate.mock.calls[0][5].sizeContract.regions[0].rect).toEqual({ x: 0, y: 0, w: 100, h: 20 })
     h.generate.mockClear()
     await call({ key: 'spotlight', size: 'SQUARE' })
+    expect(h.generate.mock.calls[0][5]).toMatchObject({ contractVersion: 2 })
+    h.generate.mockClear()
+    await call({ key: 'spotlight', size: 'SQUARE', version: 1 })
     expect(h.generate.mock.calls[0][5]).toMatchObject({ contractVersion: 1 })
   })
 

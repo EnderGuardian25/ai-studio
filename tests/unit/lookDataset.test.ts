@@ -41,12 +41,12 @@ const HASHES: Record<string, string> = {
 }
 
 describe('the shipped dataset (AC-01, AC-02)', () => {
-  it('has five active looks at current 2, 2, 1, 1, 1', () => {
+  it('has five active looks at current 2, 2, 1, 2, 1', () => {
     expect(Object.values(archetypes).map((a) => [a.key, a.status, a.current])).toEqual([
       ['product-showcase', 'active', 2],
       ['editorial-split', 'active', 2],
       ['full-bleed-scene', 'active', 1],
-      ['spotlight', 'active', 1],
+      ['spotlight', 'active', 2],
       ['device-screen', 'active', 1],
     ])
   })
@@ -82,9 +82,9 @@ describe('the shipped dataset (AC-01, AC-02)', () => {
     }
   })
 
-  it('spotlight v2 is a candidate: current stays 1, PORTRAIT and STORY deep-equal v1, SQUARE differs (031 FR-47)', () => {
+  it('spotlight v2 is current (031 T18, OP-031 passed): PORTRAIT and STORY deep-equal v1, SQUARE differs (031 FR-47)', () => {
     const a = archetypes.spotlight
-    expect(a.current).toBe(1)
+    expect(a.current).toBe(2)
     expect(a.versions[2].sizes.PORTRAIT).toEqual(a.versions[1].sizes.PORTRAIT)
     expect(a.versions[2].sizes.STORY).toEqual(a.versions[1].sizes.STORY)
     expect(a.versions[2].sizes.SQUARE).not.toEqual(a.versions[1].sizes.SQUARE)

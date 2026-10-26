@@ -121,7 +121,7 @@ import { generateDraftForBrief, runGenerationForDraft } from '@/lib/agent/genera
 import { POST as regenerateDesign } from '@/app/api/drafts/[id]/regenerate-design/route'
 import { checklistPromptText, POST_STYLES_REVISION } from '@/lib/postStyles'
 
-const STAMP = { key: 'promotion', version: 1, revision: POST_STYLES_REVISION }
+const STAMP = { key: 'promotion', version: 2, revision: POST_STYLES_REVISION }
 const CLEAN = { headline: 'the headline', instagram: 'ig caption', linkedin: 'li caption' }
 
 const brief = (over: Record<string, unknown> = {}) =>

@@ -228,8 +228,8 @@ const HERO_GOLDEN = {
   },
 } as const
 
-function heroPlan(key: string, size: 'SQUARE' | 'PORTRAIT' | 'STORY'): HeroPlan {
-  const plan = planComposition({ imageStyle: key, aspectRatio: size })
+function heroPlan(key: string, size: 'SQUARE' | 'PORTRAIT' | 'STORY', version?: number): HeroPlan {
+  const plan = planComposition({ imageStyle: key, aspectRatio: size }, undefined, { version })
   if (plan.kind !== 'hero') throw new Error('expected a hero plan')
   return plan
 }
@@ -390,11 +390,45 @@ const NEW_GOLDEN = [
     design: spotBands(22, 422, 1498, 1920),
     refine: spotRefine(22),
   },
+  // 031 T18: spotlight v2 is current. PORTRAIT and STORY are v1 unchanged; SQUARE pulls the bands
+  // back to 20% and asks for a flat, plain backdrop in the top and bottom 22%.
+  {
+    key: 'spotlight',
+    size: 'SQUARE',
+    version: 2,
+    label: 'Spotlight',
+    dims: { width: 1080, height: 1080 },
+    image: `Subject: a single subject (an object, a product or an emblem) centred in the middle 50% of the frame, lit by one spotlight against a plain, dark background; the top 22% and bottom 22% are a flat, plain, dark backdrop with no texture or detail.
+The top 20% of the frame, full width ${dark}
+The bottom 20% of the frame, full width ${dark}`,
+    design: spotBands(20, 216, 864, 1080),
+    refine: spotRefine(20),
+  },
+  {
+    key: 'spotlight',
+    size: 'PORTRAIT',
+    version: 2,
+    label: 'Spotlight',
+    dims: { width: 1080, height: 1350 },
+    image: lit(42, 24),
+    design: spotBands(24, 324, 1026, 1350),
+    refine: spotRefine(24),
+  },
+  {
+    key: 'spotlight',
+    size: 'STORY',
+    version: 2,
+    label: 'Spotlight',
+    dims: { width: 1080, height: 1920 },
+    image: lit(56, 22),
+    design: spotBands(22, 422, 1498, 1920),
+    refine: spotRefine(22),
+  },
 ]
 
 describe.each(NEW_GOLDEN)('hero prompts (028): $key $size', (g) => {
-  const plan = heroPlan(g.key, g.size as 'SQUARE' | 'PORTRAIT' | 'STORY')
-  it('plans the current version and carries the golden image, design and refine text', () => {
+  const plan = heroPlan(g.key, g.size as 'SQUARE' | 'PORTRAIT' | 'STORY', g.version)
+  it('plans the golden version (a released v1 stays resolvable; 031 T18: spotlight v2 is current) and carries the golden image, design and refine text', () => {
     expect(plan.contractVersion).toBe(g.version)
     const p = buildBackgroundDecisionPrompt({
       ...dec,

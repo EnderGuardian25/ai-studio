@@ -156,8 +156,8 @@ test.afterAll(async () => {
 // ── The inputs: POST /api/briefs ────────────────────────────────────────────
 
 test.describe('Post style inputs: briefs', () => {
-  test('TC-PS-01: a style is stored with the style goal, the resolved tone and a classic image; the goal sent is ignored', async () => {
-    // 028 T7: hiring now defaults to full-bleed-scene (TC-LOOK-13 to 16); promotion still defaults to classic.
+  test('TC-PS-01: a style is stored with the style goal, the resolved tone and the default image of the style; the goal sent is ignored', async () => {
+    // 028 T7: hiring now defaults to full-bleed-scene (TC-LOOK-13 to 16); 031 T18: promotion and milestone default to spotlight (OP-031); tip still defaults to classic.
     const res = await postBrief(admin, { postStyle: 'promotion', goal: 'x-ignored' })
     expect(res.status()).toBe(201)
     const brief = await res.json()
@@ -165,7 +165,9 @@ test.describe('Post style inputs: briefs', () => {
     expect(brief.goal).toBeTruthy()
     expect(brief.goal).not.toBe('x-ignored')
     expect(brief.tone).toBeTruthy()
-    expect(brief.imageStyle).toBe('classic')
+    expect(brief.imageStyle).toBe('spotlight')
+    expect((await (await postBrief(admin, { postStyle: 'milestone' })).json()).imageStyle).toBe('spotlight')
+    expect((await (await postBrief(admin, { postStyle: 'tip' })).json()).imageStyle).toBe('classic')
 
     // An explicit tone is kept as sent.
     const toned = await (await postBrief(admin, { postStyle: 'event', tone: 'casual' })).json()
@@ -379,7 +381,7 @@ test.describe('Generation and the facts check', () => {
   test('TC-PS-10: the draft carries the post style and a facts check; GET returns { key, label, version }', async () => {
     const draft = await generate(admin, { postStyle: 'promotion' })
     expect(draft.status).toBe('EXPORTED')
-    expect(draft.postStyle).toMatchObject({ key: 'promotion', version: 1 })
+    expect(draft.postStyle).toMatchObject({ key: 'promotion', version: 2 })
     expect(draft.postStyle!.label).toBeTruthy()
     expect(draft.factsCheck).toMatchObject({ status: 'clear', flagged: [] })
   })

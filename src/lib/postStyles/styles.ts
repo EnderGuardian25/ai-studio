@@ -103,12 +103,36 @@ export const styles: Readonly<Record<PostStyleKey, PostStyle>> = deepFreeze({
     label: 'Promotion / deal',
     summary: 'An offer, a discount or a deal.',
     status: 'active',
-    current: 1,
+    current: 2,
     versions: {
       1: {
         goal: 'conversion',
         defaultTone: 'bold',
         defaultImageStyle: 'classic',
+        checklist: [
+          {
+            id: 'promotion.offer-if-stated',
+            scope: 'caption',
+            check: 'facts-check',
+            text: "State the offer, a price, a discount or percentage and an end date only if the brief states each one. If the brief gives no end date, write no urgency phrase ('today only', 'limited time', 'ends soon').",
+          },
+          {
+            id: 'promotion.open-cta',
+            scope: 'caption',
+            text: "If the brief states no price or end date, close with an open call to action such as 'Find out more' or 'Get in touch'.",
+          },
+          {
+            id: 'promotion.image-values',
+            scope: 'image',
+            check: 'facts-check',
+            text: 'Print a price, a percentage or an end date on the image only if the brief states it.',
+          },
+        ],
+      },
+      2: {
+        goal: 'conversion',
+        defaultTone: 'bold',
+        defaultImageStyle: 'spotlight',
         checklist: [
           {
             id: 'promotion.offer-if-stated',
@@ -326,12 +350,36 @@ export const styles: Readonly<Record<PostStyleKey, PostStyle>> = deepFreeze({
     label: 'Milestone',
     summary: 'A count, an anniversary or an achievement worth marking.',
     status: 'active',
-    current: 1,
+    current: 2,
     versions: {
       1: {
         goal: 'awareness',
         defaultTone: 'bold',
         defaultImageStyle: 'classic',
+        checklist: [
+          {
+            id: 'milestone.number-if-stated',
+            scope: 'caption',
+            check: 'facts-check',
+            text: 'State the milestone figure (a count, a year or an amount) only if the brief states it. Otherwise describe the milestone without a number.',
+          },
+          {
+            id: 'milestone.thank-audience',
+            scope: 'caption',
+            text: 'Thank the audience in one sentence.',
+          },
+          {
+            id: 'milestone.image-values',
+            scope: 'image',
+            check: 'facts-check',
+            text: 'Print a number or a year on the image only if the brief states it.',
+          },
+        ],
+      },
+      2: {
+        goal: 'awareness',
+        defaultTone: 'bold',
+        defaultImageStyle: 'spotlight',
         checklist: [
           {
             id: 'milestone.number-if-stated',

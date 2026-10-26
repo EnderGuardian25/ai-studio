@@ -33,10 +33,18 @@ const COMMITTED_HASHES: Record<string, string> = {
   // 028 T7: only the looks that passed OP-028 (full-bleed-scene) moved a default.
   'event@2': 'b6f870ec5f5717d233d93086a66b3b4bdd674d9b04d3ffcd0ac0b80311e437b1',
   'hiring@2': '7bdc7bc6a7fb936043ba439a1a2233d9b65cc6055169e534a9dcfabfdef76f0a',
+  // 031 T18: OP-031 passed spotlight@2:SQUARE, so Promotion and Milestone move to spotlight.
+  'promotion@2': '40afe8068c6a23db55bdc9ca3c0a5022690ae96d3cb4ba2006fd1015413fcb5f',
+  'milestone@2': 'c8dfcdd063be4628d1b3657386536b372f6f1b2c162ed30d3d7b32c8b69148a6',
 }
 
-// 028 T7: the styles whose current version is 2, and the look each now defaults to.
-const MOVED: Record<string, string> = { event: 'full-bleed-scene', hiring: 'full-bleed-scene' }
+// 028 T7 and 031 T18: the styles whose current version is 2, and the look each now defaults to.
+const MOVED: Record<string, string> = {
+  event: 'full-bleed-scene',
+  hiring: 'full-bleed-scene',
+  promotion: 'spotlight',
+  milestone: 'spotlight',
+}
 
 // The committed key list: keys are permanent, so a deletion fails the subset test.
 const COMMITTED_KEYS = [
@@ -241,7 +249,7 @@ describe('FR-02: immutability and the hash guard', () => {
 
   it('POST_STYLES_REVISION equals the sum of current, and adding a version raises it', () => {
     expect(POST_STYLES_REVISION).toBe(all.reduce((n, s) => n + s.current, 0))
-    expect(POST_STYLES_REVISION).toBe(10)
+    expect(POST_STYLES_REVISION).toBe(12)
     const copy = clone()
     copy.tip.versions[2] = copy.tip.versions[1]
     copy.tip.current = 2
