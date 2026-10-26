@@ -1,13 +1,73 @@
 # bistec-studio — Session Handoff
 
-**Date:** 2026-10-26 (latest: **030 stale-headline badge PROPOSED; deep panel CHANGES_REQUESTED; the user answered D1 to D5 (all recommendations); approval and plan next**; **025 hero product screenshots VERIFIED PASS 18/18**; earlier: **025 BUILT (T1 to T14)**; **025 OP-025 PASSED at all three sizes after Amendment A1 (screen detection)**; earlier 2026-10-25: **025 Group A built (T1 to T5)**; **028 image looks (027b) VERIFIED PASS 21/21: OP-028 ran (full-bleed-scene passed, spotlight failed) and T7 moved Event and Hiring; 029 CLI usage-limit message VERIFIED PASS 5/5; CI green at `5db8953`; next is 025**; earlier 2026-10-24: **027a post styles VERIFIED PASS 22/22**; **006 product observability VERIFIED PASS 17/17**; earlier: **007 VERIFIED PASS 22/22; 009 OP-1 PASSED 6 of 6 (local run); 006 planned; 026 VERIFIED PASS 11/11; draft PR #43 closed; 010 dropped**). Earlier 2026-10-23: **024 caption credential route VERIFIED PASS, 17/17 ACs**; gates: unit 3024/3024, render 47/47, E2E 431/3/0/0, CI green at `cd9d411` (runs 39837152549, 39837162772; the PR run passed on one rerun after a CI-runner Chromium launch timeout in the render harness)). 2026-10-21: **009 hero imagery Phase 1 VERIFIED PASS (25/25), commit `d3534e0`; OP-1 is the user's pending step**; before it: **023 scheduler heartbeat VERIFIED PASS**; gates: unit 2947/2947, render 47/47, E2E 422/3/0/0, CI green at `f8f063c` (runs 39604699552, 39604706638)). 2026-10-20: **020 Create post button, 019 claim token, 021 Graphite re-theme, 018 and 022 VERIFIED PASS; the build order is complete**. 2026-10-19: this repo adopted the fork's `v2` on 2026-10-18. The fork-era sections, 2026-10-07 to 2026-10-14, moved to [`fork-history.md`](fork-history.md). Previous: 2026-10-07 (005 verified PASS; 011 planned, wave 1 built). Previous: 2026-10-03 (004 finished and verified PARTIAL, Phase 0 only; 005 built 9/10, waiting on one operator check). Before that: 2026-09-28 (build session — 004 Waves 1–3 built, MinIO → silo, PR #42 + draft PR #43). Before that: 2026-09-23 (later, later the same day: proposal **012** per-channel captions + copy→caption rename, a floating **Create post** button folded into 011, and a launch-video legibility pass. Before that: planning session — proposals 008–011 + roadmap, 004 re-planned to 24 tasks incl. Phase 0, and the deploy pipeline found broken: Coolify 401 since 2026-09-15). Previous: 2026-07-28 (copy-edit status clobber fix).
+**Date:** 2026-10-26 (latest: **031 v2 final polish PROPOSED; deep panel CHANGES_REQUESTED; the user answered every BLOCK; approval and plan next**; **030 stale-headline badge VERIFIED PASS 20/20**; earlier: **030 PROPOSED, deep panel answered**; **025 hero product screenshots VERIFIED PASS 18/18**; earlier: **025 BUILT (T1 to T14)**; **025 OP-025 PASSED at all three sizes after Amendment A1 (screen detection)**; earlier 2026-10-25: **025 Group A built (T1 to T5)**; **028 image looks (027b) VERIFIED PASS 21/21: OP-028 ran (full-bleed-scene passed, spotlight failed) and T7 moved Event and Hiring; 029 CLI usage-limit message VERIFIED PASS 5/5; CI green at `5db8953`; next is 025**; earlier 2026-10-24: **027a post styles VERIFIED PASS 22/22**; **006 product observability VERIFIED PASS 17/17**; earlier: **007 VERIFIED PASS 22/22; 009 OP-1 PASSED 6 of 6 (local run); 006 planned; 026 VERIFIED PASS 11/11; draft PR #43 closed; 010 dropped**). Earlier 2026-10-23: **024 caption credential route VERIFIED PASS, 17/17 ACs**; gates: unit 3024/3024, render 47/47, E2E 431/3/0/0, CI green at `cd9d411` (runs 39837152549, 39837162772; the PR run passed on one rerun after a CI-runner Chromium launch timeout in the render harness)). 2026-10-21: **009 hero imagery Phase 1 VERIFIED PASS (25/25), commit `d3534e0`; OP-1 is the user's pending step**; before it: **023 scheduler heartbeat VERIFIED PASS**; gates: unit 2947/2947, render 47/47, E2E 422/3/0/0, CI green at `f8f063c` (runs 39604699552, 39604706638)). 2026-10-20: **020 Create post button, 019 claim token, 021 Graphite re-theme, 018 and 022 VERIFIED PASS; the build order is complete**. 2026-10-19: this repo adopted the fork's `v2` on 2026-10-18. The fork-era sections, 2026-10-07 to 2026-10-14, moved to [`fork-history.md`](fork-history.md). Previous: 2026-10-07 (005 verified PASS; 011 planned, wave 1 built). Previous: 2026-10-03 (004 finished and verified PARTIAL, Phase 0 only; 005 built 9/10, waiting on one operator check). Before that: 2026-09-28 (build session — 004 Waves 1–3 built, MinIO → silo, PR #42 + draft PR #43). Before that: 2026-09-23 (later, later the same day: proposal **012** per-channel captions + copy→caption rename, a floating **Create post** button folded into 011, and a launch-video legibility pass. Before that: planning session — proposals 008–011 + roadmap, 004 re-planned to 24 tasks incl. Phase 0, and the deploy pipeline found broken: Coolify 401 since 2026-09-15). Previous: 2026-07-28 (copy-edit status clobber fix).
 **Repo:** https://github.com/bistec-oss/studio, which `origin` points to. **The repo rules (branches, remotes, the `fork` remote; draft PR #43 was closed on 2026-10-23) are in [`CLAUDE.md`](../CLAUDE.md)'s top entry, which is authoritative.** This file does not repeat them.
 **Branch:** work continues on **`v2`**, pushed to `origin v2`. `main` is `671ad6e9` (PR #42) and deploys to company prod. `v2` → `main` is one PR, merged only on the user's go-ahead and after the pre-merge prod checklist below.
 **Production:** `https://studio.bistecglobal.com` serves company `main`. Its migration head is `20260728120000_heal_copy_edit_clobbered_drafts`. Merges to `main` build but do not deploy until the Coolify token is rotated (see CLAUDE.md).
 
 ---
 
-## ⏸️ 2026-10-26 — PICK UP HERE: 030 stale-headline badge is VERIFIED PASS (20/20 ACs, [verify-report](../.specclaw/changes/030-stale-headline-badge/verify-report.md)); nothing is mid-build. It was BUILT in T1 to T6
+## ⏸️ 2026-10-26 — PICK UP HERE: 031 (v2 final polish) is PROPOSED; the deep panel returned CHANGES_REQUESTED and the user answered every BLOCK; next: the user approves the proposal (architectural), then `/specclaw:plan 031-v2-final-polish`
+
+**State.** 030 is VERIFIED PASS (section below). The agreed roadmap order is complete. The user then asked (2026-10-26) for every remaining candidate and leftover as **one final change before the `v2` → `main` merge**: 031. Nothing is planned or built. The proposal is not yet approved; the last message to the user asked "Do you approve 031 as architectural?". Files are in `.specclaw/changes/031-v2-final-polish/`:
+
+- [`proposal.md`](../.specclaw/changes/031-v2-final-polish/proposal.md): groups A to H, two sets of user decisions (before drafting, and after the panel), and the 43 upheld panel findings under Open Questions;
+- [`party-report.md`](../.specclaw/changes/031-v2-final-polish/party-report.md): tier deep, 5 seats, 2 rounds, 10 spawns, **CHANGES_REQUESTED** (43 upheld: 5 BLOCK, 28 WARN, 10 NOTE; 1 withdrawn);
+- [`wording-scan.md`](../.specclaw/changes/031-v2-final-polish/wording-scan.md): the read-only UI wording scan, W-01 to W-41, which scopes group G.
+
+**The groups.**
+
+- **A, Apply to image.** No model call. It goes through `commitDraftRevision`, so Undo restores the styled HTML. It refuses `ambiguous`, uses `parse5` for source offsets only, and leaves visibility to the render. It starts with an 80% re-measure gate; below that it is built anyway and labelled "beta". It is offered only when the 030 state is `stale`.
+- **B, fonts.**
+  - The full Google Fonts catalogue as a committed snapshot, with its date and a refresh contract: a refresh never removes a family a kit uses (it marks it delisted). An unknown family gets Google's default request and a render note.
+  - Script fonts keyed by script; only Sinhala is offered, and it starts empty. Code puts them into the font stacks and the font request.
+  - Posts only, not the app UI.
+- **C, the personal image generation key.**
+  - It accepts OpenAI or Gemini through one shared prefix detector, and refuses an unknown prefix.
+  - The migration is an additive `provider` column defaulting to `OPENAI`; the down script deletes non-OpenAI rows.
+  - On a personal-key failure it falls back once to the team provider, and the draft shows a notice.
+  - The live Gemini call is skipped (still mock-only).
+- **D, Spotlight SQUARE v2 with OP-031.**
+  - At most 4 image calls, with its own `--out` and ledger.
+  - The 028 rule: the first 2 attempts both keep the look and the user accepts both; the other 2 calls are for an infra retry only.
+  - On a pass, Promotion and Milestone move to spotlight. On a fail, v1 stays served at SQUARE and they stay classic.
+- **E, 007 follow-ups.** A typography dataset (category and family-count rules checked in code), and the review panel in the campaign briefing editor.
+- **F, the assistants.** The briefing assistant's schedule uses post styles built from the dataset and validated. The brand-kit assistant applies its fonts, showing the previous values.
+- **G, wording.** W-01 to W-41, each fixed or dropped with a reason. The glossary is "post" not "brief" in the UI, Template/Freeform not Path A/B, Brand kit, Team settings, sentence case and US spelling. It lives in `DESIGN_SYSTEM.md`, with a deny-list test. Routes, API fields and DB names do not change.
+- **H, leftovers.** The 005 AC-17 recheck under node:22; `bistec-cli-*` temp dirs (delete exact paths only); the 019 orphaned PNG on regenerate design (one shared cleanup with `commitDraftRevision`); the 020 UI reference screenshots recaptured.
+
+**Out of scope:** 009 Phase 3, the live Gemini call, the app's own typography, a model-based Apply, and the merge itself.
+
+**Key decisions:**
+
+- **Nothing slips:** every group must pass before the merge. A failed OP-031 is a result, not a blocker.
+- **Build order:** the no-spend groups first (H, G, C), then B, E, F, then A, then D with OP-031 last. The full E2E suite also runs right after G.
+
+**Resume (in a new session).**
+
+1. Ask the user to approve 031 as **architectural**. On approval: `specclaw-set-phase .specclaw 031-v2-final-polish proposal approved --size architectural`.
+2. Run `/specclaw:plan 031-v2-final-polish`. The spec reads the Proposed Solution through both User Decisions sections. Every upheld panel finding maps to a requirement or a stated rule in a "Panel findings → where addressed" table, as 025 and 030 did. These were deferred to the spec:
+   - the two assistant block grammars;
+   - the Apply failure vocabulary (append-only, imported by the event schema; one `MOCK_*` sentinel per in-render code);
+   - Apply named by field (`apply-text` with `field: "headline"`), and whether the draft action value needs a migration;
+   - the briefing host's server route and auth;
+   - the glossary's applies / does-not-apply lists;
+   - the typography ranges, cited;
+   - OP-028's SQUARE `busy` evidence, read from `.specclaw/changes/028-image-looks/look-check/`;
+   - the font save-route validation (an exact catalogue family whose `scripts` include the key);
+   - the font Apply partial-failure rule.
+3. Build subagent-driven, one task at a time, on the cheapest workable model: an implementer, then `specclaw:code-reviewer`, then the orchestrator re-runs tsc, lint and unit and commits. Give implementers a focused brief, not the ~500 KB `specclaw-build-context` payload. Use the `## Verification` footer format the checker wants (`Command:` / `Exit:` / `Output (tail):`).
+4. OP-031 is the only real spend (at most 4 image calls) and runs on `bistec_studio_op1` on the user's go.
+5. Baseline before 031: unit 4253, render 134, lint 0 errors / 7 warnings, full clean mock E2E 559/3/0/0, CI green at `57fce05` (run 40291119564). The next free migration timestamp follows `20261027120000_rendered_text`.
+
+**Lessons from 030 that apply here:**
+
+- A mock that replaces `renderHtmlToPng` but not `renderPost` launches a real Chromium in unit tests, which times out on CI (`57fce05`).
+- A notice button that repeats a page action needs a contextual accessible name, or strict-mode locators in older suites match two buttons.
+- Run the full E2E suite before closing a UI task.
+- `npm run lint` ignores `.specclaw/` (`0069333`).
+
+## 2026-10-26 — 030 stale-headline badge is VERIFIED PASS (superseded as the pickup point by the 031 section above) (20/20 ACs, [verify-report](../.specclaw/changes/030-stale-headline-badge/verify-report.md)); nothing is mid-build. It was BUILT in T1 to T6
 
 **State.** 030 is built on `v2`, T1 to T6, and nothing is mid-build. Its files are in `.specclaw/changes/030-stale-headline-badge/` (the spec has 18 FR, 8 NFR and 20 AC; `reports/` and `reviews/` hold each task's record). The decisions D1 to D5 are under "User Decisions" in [`proposal.md`](../.specclaw/changes/030-stale-headline-badge/proposal.md) and govern the spec. No real model or image call was made.
 

@@ -1,7 +1,9 @@
 # bistec-studio roadmap — changes 004–025
 
 **Updated:** 2026-10-25 · **Branch:** all of this lands on `v2` (see Branching at the bottom); handoff in `docs/handoff.md` top section.
-**Status (2026-10-26, verified):** **030** stale-headline badge is **VERIFIED PASS (20/20 ACs)** ([verify-report](changes/030-stale-headline-badge/verify-report.md)); the agreed order (027a → 028 → 029 → 025 → 030) is complete. Apply to image is a later change, gated on the 030 events (D1).
+**Status (2026-10-26, latest):** **031** v2 final polish is **proposed** (groups A to H: Apply to image, the Google Fonts catalogue and script fonts, the personal image generation key, Spotlight SQUARE v2 with OP-031, the 007 follow-ups, the assistants, the wording scan W-01 to W-41, and the leftovers). The deep panel returned CHANGES_REQUESTED and the user answered every BLOCK; nothing slips before the merge. Next: approval, then `/specclaw:plan 031-v2-final-polish` (the 031 section of `docs/handoff.md`). It is the last change before the `v2` → `main` merge.
+
+**(Superseded) Status (2026-10-26, verified):** **030** stale-headline badge is **VERIFIED PASS (20/20 ACs)** ([verify-report](changes/030-stale-headline-badge/verify-report.md)); the agreed order (027a → 028 → 029 → 025 → 030) is complete. Apply to image is a later change, gated on the 030 events (D1).
 
 **(Superseded) Status (2026-10-26, built):** **030** stale-headline badge is **BUILT** (T1 to T6: the stamp, the four states, the badge, the publish line and the events); `/specclaw:verify 030-stale-headline-badge` is next. Apply to image is a later change, gated on the 030 events (D1).
 
