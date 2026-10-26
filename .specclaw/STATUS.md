@@ -1,7 +1,7 @@
 # 🦞 SpecClaw Dashboard
 
 **Project:** bistec-studio
-**Last Updated:** 2026-10-26 01:48 UTC
+**Last Updated:** 2026-10-26 02:03 UTC
 
 _1 unnumbered change · run `/specclaw:renumber` to order them_
 
@@ -30,7 +30,7 @@ _1 unnumbered change · run `/specclaw:renumber` to order them_
 - 🔍 **022-prod-data-and-deploy-restore** ▫ — verify PASS | 4/4 tasks (100%) | 0 failed | 5h22m
 - 🔍 **023-scheduler-heartbeat** ▫ — verify PASS | 3/3 tasks (100%) | 0 failed | PR #43 closed | 5h24m
 - 🔍 **024-caption-credential-route** ▣ — verify PASS | 4/4 tasks (100%) | 0 failed | PR #43 closed | 6h45m
-- 🔍 **025-hero-reference-images** ▣ — verify PASS | 14/14 tasks (100%) | 0 failed | PR #43 closed | 80h4m
+- 🔍 **025-hero-reference-images** ▣ — verify PASS | 14/14 tasks (100%) | 0 failed | PR #43 closed | 80h11m
 - 🔍 **026-drop-whatsapp-caption-refine-under-preview** ▫ — verify PASS | 3/3 tasks (100%) | 0 failed | PR #43 closed | 1h53m
 - 🔍 **027-post-styles** ▣ — verify PASS | 8/8 tasks (100%) | 0 failed | PR #43 closed | 4h9m
 - 🔍 **028-image-looks** ▣ — verify PASS | 7/7 tasks (100%) | 0 failed | PR #43 closed | 12h57m
@@ -39,6 +39,7 @@ _1 unnumbered change · run `/specclaw:renumber` to order them_
 ## Pending Proposals
 
 - 📋 **010-whatsapp-channel-posting** — proposal ready, awaiting planning
+- 📋 **030-stale-headline-badge** — proposal ready, awaiting planning
 
 ## Recently Completed
 
