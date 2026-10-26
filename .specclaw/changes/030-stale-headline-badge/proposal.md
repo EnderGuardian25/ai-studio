@@ -135,3 +135,21 @@ What this shows:
 - (party-visionary, WARN) The null-stamp branch can never retire, because restore keeps bringing it back, so the null rule chosen now is permanent.
 - (party-visionary, NOTE) The apply event has no method field, so the match-rate data mixes once the named alternative ships.
 - (party-visionary, NOTE) Rebuttal to party-po's stamp-free alternative: a read-time parse rule changes the verdict on old drafts every time the matcher is tuned.
+
+## User Decisions (2026-10-26, after the deep panel)
+
+The user answered the panel's decisions (the handoff's 030 section). These answers govern the spec; the Proposed Solution above is read through them.
+
+- **D1, scope: badge first, Apply later.** This change ships the stamp, the stale badge (remedies: Edit inline and Regenerate design) and the events. **Apply to image is out of scope here.** It becomes a later change, gated on what the events show (how often headlines are edited after a design, and how often a match would succeed). That defers the Apply route, the splice module, the `parse5` dependency (Open Question 3) and Open Questions 1 and 5 to that change.
+- **D2, the stamp records the headline verified as painted.** At every design write that renders a PNG (first generation, regenerate design, refine, inline edit, Override, adopt, and restore, which copies the revision's stamp), the real render checks in the page that the draft's headline is painted visibly in exactly one element. The check is geometric, as 025 does for the composite: a non-empty box inside the canvas, computed `display`, `visibility` and `opacity` that render it, no clipping or overflow, and `elementFromPoint` returning that element. The comparison uses one shared normaliser (whitespace, case, `<br>`, `text-transform`). The stamp is the headline with `verified: true` when the check passes, and `verified: false` when it does not. An unverified stamp is never read as fresh. Under `MOCK_PUPPETEER`, a parse-based stand-in plus a `MOCK_*` sentinel reaches the unverified path. An inline edit that fixes the headline therefore clears the badge.
+- **D3, drafts from before 030 show nothing.** A null stamp gets no badge, no note and no parse at read time. Restore can bring a null back, so this rule is a permanent contract, not a transition.
+- **D4, the stamp's shape (the recommendation; not asked, adopted unless the user objects).** One JSONB stamp keyed by field, `renderedText: { headline: { text, verified } }`, on `Draft` and `DraftRevision`, with staleness that loops over the keys. A later CTA or kicker field is then one more key with no migration.
+- **D5, the publish side: record, warn and flag. Never a gate.**
+  - The publish event records whether the image was stale, for interactive and scheduled publishes.
+  - The publish dialog shows one line whenever the draft is stale.
+  - When a headline edit lands on a draft with a pending scheduled post, the badge says so.
+- **Adopted from the panel by default:**
+  - one closed reason vocabulary shared by the API response, the badge and the events;
+  - a stated rule for case-only edits;
+  - the full writer and file list in the spec;
+  - the badge states only what the stamp knows (not stale, stale, or the image cannot be confirmed).
