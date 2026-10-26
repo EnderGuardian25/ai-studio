@@ -1,9 +1,12 @@
 {
   "change": "032-fork-folio-restore",
-  "phase": "proposal",
+  "phase": "tasks",
   "branch": "",
   "size": "architectural",
   "phases": {
-    "proposal": { "status": "approved", "at": "2026-10-26T20:07:11Z" }
+    "proposal": { "status": "approved", "at": "2026-10-26T20:07:11Z" },
+    "spec": { "status": "done", "at": "2026-10-26T20:27:42Z" },
+    "design": { "status": "done", "at": "2026-10-26T20:29:42Z" },
+    "tasks": { "status": "done", "at": "2026-10-26T20:30:34Z" }
   }
 }
