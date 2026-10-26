@@ -444,7 +444,9 @@ async function scenario3() {
 // reads as openai after the migrations, and the resolver serves it as the
 // personal tier. The one place this script runs app code: a tsx child process
 // (env and database pinned to the scratch database) does the encrypting and the
-// resolving, so the row holds a real ciphertext.
+// resolving, so the row holds a real ciphertext. Node 22 (CI) does not expose
+// the named exports of the tsx-compiled CJS module, so each call falls back to
+// m.default.
 const TSX_CLI = join(ROOT, 'node_modules', 'tsx', 'dist', 'cli.mjs')
 const KEY_PLAINTEXT = 'sk-upgrade-scenario-key-000000'
 const CRYPTO_ENV = { TOKEN_ENCRYPTION_KEY: 'd'.repeat(64) }
@@ -463,7 +465,7 @@ async function scenario4() {
   await freshScratch()
   mustDeploy('before 031 C', deployFromTemp(ALL_MIGRATIONS.filter((m) => m < PERSONAL_KEY_MIGRATION)))
   await seedMainBase()
-  const enc = runTsx(`import('@/lib/crypto').then((m) => console.log(m.encrypt(${JSON.stringify(KEY_PLAINTEXT)})))`)
+  const enc = runTsx(`import('@/lib/crypto').then((m) => console.log((m.encrypt ?? m.default.encrypt)(${JSON.stringify(KEY_PLAINTEXT)})))`)
   if (enc.status !== 0 || !enc.stdout) {
     failures.push(`could not encrypt the seed key:\n${enc.output}`)
     return { failures, detail: '' }
@@ -481,7 +483,7 @@ async function scenario4() {
 
   const res = runTsx(
     `import('@/providers/registry').then(async (m) => {
-       const r = await m.resolveImageProviderWithSource({ teamId: ${JSON.stringify(TEAM)}, userId: ${JSON.stringify(USER)} })
+       const r = await (m.resolveImageProviderWithSource ?? m.default.resolveImageProviderWithSource)({ teamId: ${JSON.stringify(TEAM)}, userId: ${JSON.stringify(USER)} })
        console.log(JSON.stringify({ tier: r && r.tier, providerName: r && r.providerName, apiKeyMatches: !!r && r.provider.client.apiKey === ${JSON.stringify(KEY_PLAINTEXT)} }))
        process.exit(0)
      })`,
