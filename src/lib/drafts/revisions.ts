@@ -10,6 +10,9 @@ import type { BackgroundSkipFields } from '@/lib/drafts/backgroundNotice'
 import type { ResolvedModel } from '@/lib/models/resolve'
 import { compositionStampSchema, parseCompositionStamp, type CompositionStamp } from '@/lib/designData'
 import { parsePostStyleStamp, postStyleStampSchema, type PostStyleStamp } from '@/lib/postStyles'
+import { parseRenderedText, renderedTextColumn, stampFromCheck, type RenderedText } from '@/lib/renderedText/stamp'
+import { designHeadline } from '@/lib/captions/headline'
+import type { HeadlineCheck } from '@/lib/renderedText/vocab'
 import { canonicalCompositeHtml } from '@/lib/composite/insert'
 import { CompositePlacementError, CompositeRenderError, type CompositeRender } from '@/lib/composite/render'
 
@@ -55,6 +58,12 @@ import { CompositePlacementError, CompositeRenderError, type CompositeRender } f
 // 027 FR-05: it also carries the post-style stamp ({ key, version, revision }),
 // one JSON value on both tables. null is "no style" (a pre-027 row, or a brief
 // with no style) or unknown, as for the composition.
+//
+// 030 FR-04: it also carries the rendered-text stamp (the headline the real
+// render visibly painted, or why that could not be confirmed), one JSON value
+// on both tables. null is "unknown" (a pre-030 row), as for the composition.
+// A render writer builds it from its render's check (stampFromCheck); a restore
+// or an adopt carries the row's own.
 export interface RenderStamp {
   promptVersion: string | null
   fontSet: string | null
@@ -62,6 +71,7 @@ export interface RenderStamp {
   modelSubstitutedFrom: string | null
   composition: CompositionStamp | null
   postStyle: PostStyleStamp | null
+  renderedText: RenderedText | null
 }
 
 // The model half of a RenderStamp, as stored. A render made now takes it from
@@ -100,12 +110,15 @@ export function draftModelStamp(draft: {
 // model is known for this render; history reads it as "unknown", the 004 rule.
 // 009: `composition` has no default, so a caller that forgets it is a type
 // error: pass the run's stamp, a carried one, or null for "unknown".
+// 030: `renderedText` is the same, required: the stamp built from the render's
+// own check (stampFromCheck), a carried one, or null.
 // 027: `postStyle` is the same, required for the same reason: the run's stamp
 // (briefPostStyleStamp), a carried one (draftPostStyleStamp), or null.
 export function currentRenderStamp(
   model: ResolvedModel | ModelStamp | null,
   composition: CompositionStamp | null,
   postStyle: PostStyleStamp | null,
+  renderedText: RenderedText | null,
 ): RenderStamp {
   return {
     promptVersion: PROMPT_VERSION,
@@ -113,6 +126,7 @@ export function currentRenderStamp(
     ...modelStampOf(model),
     composition,
     postStyle,
+    renderedText,
   }
 }
 
@@ -153,6 +167,7 @@ export function revisionStampFields(stamp: RenderStamp): {
   modelSubstitutedFrom: string | null
   composition: Prisma.InputJsonValue | typeof Prisma.DbNull
   postStyle: Prisma.InputJsonValue | typeof Prisma.DbNull
+  renderedText: Prisma.InputJsonValue | typeof Prisma.DbNull
 } {
   return {
     promptVersion: stamp.promptVersion,
@@ -161,6 +176,7 @@ export function revisionStampFields(stamp: RenderStamp): {
     modelSubstitutedFrom: stamp.modelSubstitutedFrom,
     composition: toJsonColumn(stamp.composition),
     postStyle: postStyleColumn(stamp.postStyle),
+    renderedText: renderedTextColumn(stamp.renderedText),
   }
 }
 
@@ -173,6 +189,7 @@ export function draftStampFields(stamp: RenderStamp): {
   designModelSubstitutedFrom: string | null
   composition: Prisma.InputJsonValue | typeof Prisma.DbNull
   postStyle: Prisma.InputJsonValue | typeof Prisma.DbNull
+  renderedText: Prisma.InputJsonValue | typeof Prisma.DbNull
 } {
   return {
     promptVersion: stamp.promptVersion,
@@ -181,6 +198,7 @@ export function draftStampFields(stamp: RenderStamp): {
     designModelSubstitutedFrom: stamp.modelSubstitutedFrom,
     composition: toJsonColumn(stamp.composition),
     postStyle: postStyleColumn(stamp.postStyle),
+    renderedText: renderedTextColumn(stamp.renderedText),
   }
 }
 
@@ -197,6 +215,7 @@ export function restoredRenderStamp(
     model?: string | null
     modelSubstitutedFrom?: string | null
     composition?: unknown
+    renderedText?: unknown
   },
   rerendered: boolean,
   // 027: the draft's CURRENT post-style stamp, carried (a restore moves the
@@ -212,6 +231,9 @@ export function restoredRenderStamp(
     // 009: the row's own stamp (null on a legacy row, or one that no longer parses).
     composition: parseCompositionStamp(revision.composition),
     postStyle,
+    // 030: the row's own stamp, also when re-rendered (FR-04): a row old enough
+    // to need a re-render predates 030, so this is null there.
+    renderedText: parseRenderedText(revision.renderedText),
   }
 }
 
@@ -460,6 +482,22 @@ export async function compositeRenderForDraft(
   }
 }
 
+// What one render returns: the PNG and, when a headline was given, its check.
+interface RenderResult {
+  png: Buffer
+  headlineCheck: HeadlineCheck | null
+}
+
+// The on-image headline a render of this draft is checked against: the stored
+// headline, else the brief topic (designHeadline, the one rule). One read.
+async function draftHeadlineText(draftId: string): Promise<string> {
+  const row = await prisma.draft.findUnique({
+    where: { id: draftId },
+    select: { headline: true, brief: { select: { topic: true } } },
+  })
+  return designHeadline({ headline: row?.headline ?? null }, { topic: row?.brief?.topic ?? '' }).text
+}
+
 // Renders `html` for a draft with this stamp; a failed composite check is a
 // CompositePlacementError and any other error passes through.
 export async function renderDraftHtml(
@@ -468,11 +506,14 @@ export async function renderDraftHtml(
   composition: CompositionStamp | null,
   width: number,
   height: number,
-): Promise<Buffer> {
+  // 030: the headline to check against the render, or null for a render that
+  // stamps nothing (restore's re-render, the export).
+  headline: string | null,
+): Promise<RenderResult> {
   const composites = await compositeRenderForDraft(draftId, composition, { width, height })
-  const { renderHtmlToPng } = await import('@/lib/renderer/puppeteer')
+  const { renderPost } = await import('@/lib/renderer/puppeteer')
   try {
-    return await renderHtmlToPng(html, width, height, composites)
+    return await renderPost(html, width, height, composites, headline === null ? null : { headline })
   } catch (err) {
     if (err instanceof CompositeRenderError) throw new CompositePlacementError(err)
     throw err
@@ -506,13 +547,18 @@ export async function commitDraftRevision(
   // unchanged, and the stamp columns are never updated after insert. An
   // unknown row reads as null here and the guard inside the transaction
   // refuses it. 008: a fresh commit's model is the caller's (args.model).
-  const stamp = adoptRejectedRevisionId
+  // 030: a fresh commit's rendered-text stamp comes from the render's own check,
+  // known only after the render below, so the composition (all the canonical
+  // HTML needs) is settled first and the full stamp is built after the render.
+  const adopted = adoptRejectedRevisionId
     ? await rejectedRenderStamp(draftId, adoptRejectedRevisionId, args.postStyle)
-    : currentRenderStamp(args.model ?? null, args.composition, args.postStyle)
+    : null
+  const composition = adopted ? adopted.composition : args.composition
 
   // 025 FR-16: the stored document is canonical for this stamp (the one
   // composite element at the stamped rect, or none), whoever wrote it.
-  const html = canonicalCompositeHtml(args.html, stamp.composition, { width, height })
+  const html = canonicalCompositeHtml(args.html, composition, { width, height })
+  let stamp: RenderStamp | null = adopted
 
   let finalExportKey = args.exportKey
   // Set only when THIS call rendered + uploaded the export — the only object
@@ -521,12 +567,25 @@ export async function commitDraftRevision(
   let uploadedKey: string | null = null
   if (!finalExportKey) {
     const { uploadObject, exportKey, BUCKET_EXPORTS } = await import('@/lib/storage/minio')
-    const buffer = await renderDraftHtml(draftId, html, stamp.composition, width, height)
+    // 030: the headline is read before the render, so the check and the stamp
+    // describe the same value (one indexed read, next to a 1 to 2 s render).
+    const headline = await draftHeadlineText(draftId)
+    const rendered = await renderDraftHtml(draftId, html, composition, width, height, headline)
+    stamp = currentRenderStamp(
+      args.model ?? null,
+      args.composition,
+      args.postStyle,
+      stampFromCheck(headline, rendered.headlineCheck ?? 'not-checked'),
+    )
     finalExportKey = exportKey('refine', draftId)
-    await uploadObject(buffer, BUCKET_EXPORTS, finalExportKey, 'image/png')
+    await uploadObject(rendered.png, BUCKET_EXPORTS, finalExportKey, 'image/png')
     uploadedKey = finalExportKey
   }
   const committedExportKey: string = finalExportKey
+  // A caller-supplied export with no adopt id: nothing here saw its pixels, so
+  // the stamp carries no rendered text.
+  const finalStamp: RenderStamp =
+    stamp ?? currentRenderStamp(args.model ?? null, args.composition, args.postStyle, null)
 
   let revision: { id: string; revisionNumber: number }
   try {
@@ -570,7 +629,7 @@ export async function commitDraftRevision(
         instruction,
         htmlSnapshot: html,
         exportUrl: committedExportKey,
-        ...revisionStampFields(stamp),
+        ...revisionStampFields(finalStamp),
       },
       select: { id: true },
     })
@@ -606,7 +665,7 @@ export async function commitDraftRevision(
       exportUrl: committedExportKey,
       currentRevisionNumber: revisionNumber,
       pendingConflict: Prisma.JsonNull,
-      ...draftStampFields(stamp),
+      ...draftStampFields(finalStamp),
       ...(backgroundImageUrl ? { imageUrl: backgroundImageUrl } : {}),
       ...backgroundSkip,
     }
@@ -668,7 +727,14 @@ async function rejectedRenderStamp(
 ): Promise<RenderStamp> {
   const row = await prisma.draftRevision.findFirst({
     where: { id: revisionId, draftId },
-    select: { promptVersion: true, fontSet: true, model: true, modelSubstitutedFrom: true, composition: true },
+    select: {
+      promptVersion: true,
+      fontSet: true,
+      model: true,
+      modelSubstitutedFrom: true,
+      composition: true,
+      renderedText: true,
+    },
   })
   return {
     promptVersion: row?.promptVersion ?? null,
@@ -677,6 +743,7 @@ async function rejectedRenderStamp(
     modelSubstitutedFrom: row?.modelSubstitutedFrom ?? null,
     composition: parseCompositionStamp(row?.composition),
     postStyle,
+    renderedText: parseRenderedText(row?.renderedText),
   }
 }
 
@@ -871,7 +938,16 @@ export async function recordRejectedRender(
   // F3: the rejected row carries the stamp of ITS render, so a later "Use
   // anyway" can reinstate it. The draft's stamp is untouched: its current
   // render did not change. 008: with the attempt's model.
-  const stamp = currentRenderStamp(args.model ?? null, args.composition, args.postStyle)
+  // 030: the rendered-text stamp comes from the render's check when a render
+  // happens; a row with no render (no usable document, or a render that failed)
+  // is stamped not-checked.
+  const headline = await draftHeadlineText(draftId)
+  let stamp = currentRenderStamp(
+    args.model ?? null,
+    args.composition,
+    args.postStyle,
+    stampFromCheck(headline, 'not-checked'),
+  )
   // 025 FR-16: canonical for the stamp, like a commit's. An unusable document
   // (no html) is kept as the model wrote it.
   const html = args.html ? canonicalCompositeHtml(args.html, stamp.composition, { width, height }) : args.html
@@ -881,9 +957,10 @@ export async function recordRejectedRender(
   if (html) {
     try {
       const { uploadObject, exportKey: mintExportKey, BUCKET_EXPORTS } = await import('@/lib/storage/minio')
-      const buffer = await renderDraftHtml(draftId, html, stamp.composition, width, height)
+      const rendered = await renderDraftHtml(draftId, html, stamp.composition, width, height, headline)
       const key = mintExportKey('refine', draftId)
-      await uploadObject(buffer, BUCKET_EXPORTS, key, 'image/png')
+      await uploadObject(rendered.png, BUCKET_EXPORTS, key, 'image/png')
+      stamp = { ...stamp, renderedText: stampFromCheck(headline, rendered.headlineCheck ?? 'not-checked') }
       exportKey = key
       exported = 'stored'
     } catch (err) {

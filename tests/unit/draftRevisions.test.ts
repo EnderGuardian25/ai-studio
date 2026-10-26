@@ -30,6 +30,8 @@ interface Row {
   composition?: unknown
   // 027: the post-style stamp (a JSON value, or Prisma.DbNull for none).
   postStyle?: unknown
+  // 030: the rendered-text stamp (a JSON value, or Prisma.DbNull for none).
+  renderedText?: unknown
   fontSet?: string | null
   promptVersion?: string | null
   // 008 FR-08: the model whose output the row's HTML is.
@@ -38,6 +40,15 @@ interface Row {
 }
 
 const fake = vi.hoisted(() => {
+  // 030: what the render mock returns as its headline check, and what it was asked to check.
+  const renderState = () => ({
+    calls: 0,
+    fail: false,
+    composites: [] as unknown[],
+    failWith: null as Error | null,
+    check: 'painted' as string,
+    headlines: [] as Array<string | null>,
+  })
   const db = {
     rows: [] as Row[],
     draftUpdates: [] as Array<{ where: unknown; data: Record<string, unknown> }>,
@@ -51,7 +62,12 @@ const fake = vi.hoisted(() => {
     // The draft's revision pointer — the element-edit CAS (expectedRevisionNumber,
     // change 004 T23 fix round 1) guards on it.
     currentRevisionNumber: null as number | null,
-    render: { calls: 0, fail: false, composites: [] as unknown[], failWith: null as Error | null },
+    render: renderState(),
+    // 030: the draft's stored headline and its brief topic (designHeadline's inputs),
+    // and the order of headline reads against renders.
+    headline: 'Launch Day' as string | null,
+    topic: 'Brief topic',
+    events: [] as string[],
     // 025: what compositeRenderForCanvas was asked for.
     composite: { calls: [] as unknown[], fail: false },
     uploads: [] as string[],
@@ -224,7 +240,12 @@ const fake = vi.hoisted(() => {
         applyDraft(args)
         return { count: 1 }
       },
-      findUnique: async () => {
+      findUnique: async (args?: { select?: Record<string, unknown> }) => {
+        // 030: the headline read is not a lock-order op; it is recorded apart.
+        if (args?.select && 'headline' in args.select) {
+          db.events.push('headline-read')
+          return { headline: db.headline, brief: { topic: db.topic } }
+        }
         db.ops.push('draft.findUnique')
         return {
           pendingAction: db.pendingAction,
@@ -266,18 +287,26 @@ const fake = vi.hoisted(() => {
       }
     },
   }
-  return { db, client }
+  return { db, client, renderState }
 })
 const db = fake.db
 vi.mock('@/lib/prisma', () => ({ prisma: fake.client }))
 vi.mock('@/lib/renderer/fontSet', () => ({ getFontSetId: () => 'fonts-test' }))
 vi.mock('@/lib/renderer/puppeteer', () => ({
-  renderHtmlToPng: async (_html: string, _w: number, _h: number, composites: unknown) => {
+  renderPost: async (
+    _html: string,
+    _w: number,
+    _h: number,
+    composites: unknown,
+    check: { headline: string } | null,
+  ) => {
     fake.db.render.calls++
+    fake.db.events.push('render')
     fake.db.render.composites.push(composites)
+    fake.db.render.headlines.push(check ? check.headline : null)
     if (fake.db.render.failWith) throw fake.db.render.failWith
     if (fake.db.render.fail) throw new Error('Chromium crashed')
-    return Buffer.from('png')
+    return { png: Buffer.from('png'), headlineCheck: check ? fake.db.render.check : null }
   },
 }))
 vi.mock('@/lib/composite/assets', () => ({
@@ -372,7 +401,10 @@ beforeEach(() => {
   db.notAppliedRevisionId = null
   db.pendingAction = null
   db.claimId = null
-  db.render = { calls: 0, fail: false, composites: [], failWith: null }
+  db.render = fake.renderState()
+  db.headline = 'Launch Day'
+  db.topic = 'Brief topic'
+  db.events = []
   db.composite = { calls: [], fail: false }
   db.uploads = []
   db.deletes = []
@@ -1197,7 +1229,7 @@ const STAMP_V2 = {
   fontSet: 'fonts-v2',
   model: 'claude-sonnet-4-6',
   modelSubstitutedFrom: null,
-  composition: null, postStyle: null,
+  composition: null, postStyle: null, renderedText: null,
 }
 
 describe('restoreDraftToRevision (F2 — restore guard)', () => {
@@ -1239,12 +1271,12 @@ describe('restoreDraftToRevision (F2 — restore guard)', () => {
 
 describe('F3 render stamps: every revision write records the render it holds', () => {
   it('currentRenderStamp is the prompt version + the installed font set (+ the 008 model, null when unknown)', () => {
-    expect(currentRenderStamp(null, null, null)).toEqual({
+    expect(currentRenderStamp(null, null, null, null)).toEqual({
       promptVersion: PROMPT_VERSION,
       fontSet: 'fonts-test',
       model: null,
       modelSubstitutedFrom: null,
-      composition: null, postStyle: null,
+      composition: null, postStyle: null, renderedText: null,
     })
   })
 
@@ -1330,7 +1362,7 @@ describe("F3 restore: the draft takes the restored revision's stamp", () => {
       fontSet: 'fonts-old',
       model: null,
       modelSubstitutedFrom: null,
-      composition: null, postStyle: null,
+      composition: null, postStyle: null, renderedText: null,
     })
   })
 
@@ -1340,7 +1372,7 @@ describe("F3 restore: the draft takes the restored revision's stamp", () => {
       fontSet: null,
       model: null,
       modelSubstitutedFrom: null,
-      composition: null, postStyle: null,
+      composition: null, postStyle: null, renderedText: null,
     })
   })
 
@@ -1352,7 +1384,7 @@ describe("F3 restore: the draft takes the restored revision's stamp", () => {
       fontSet: 'fonts-test',
       model: null,
       modelSubstitutedFrom: null,
-      composition: null, postStyle: null,
+      composition: null, postStyle: null, renderedText: null,
     })
   })
 })
@@ -1512,7 +1544,7 @@ describe('008 FR-08: commitDraftRevision / recordRejectedRender record the model
 
   it('currentRenderStamp takes the internal / resolved model as its arg, never the key', () => {
     const m = internalModel('INTERNAL_VERIFIER', 'api')
-    expect(currentRenderStamp(m, null, null)).toMatchObject({ model: m.arg, modelSubstitutedFrom: null })
+    expect(currentRenderStamp(m, null, null, null)).toMatchObject({ model: m.arg, modelSubstitutedFrom: null })
   })
 })
 
@@ -1742,13 +1774,14 @@ describe('009 composition stamp: every revision writer carries it', () => {
   })
 
   it('revisionStampFields is the revision row’s four old fields plus composition', () => {
-    expect(revisionStampFields(currentRenderStamp(null, KEPT_STAMP, null))).toEqual({
+    expect(revisionStampFields(currentRenderStamp(null, KEPT_STAMP, null, null))).toEqual({
       promptVersion: PROMPT_VERSION,
       fontSet: 'fonts-test',
       model: null,
       modelSubstitutedFrom: null,
       composition: KEPT_STAMP,
       postStyle: Prisma.DbNull,
+      renderedText: Prisma.DbNull,
     })
   })
 })
@@ -1841,7 +1874,7 @@ describe('027 post-style stamp: every revision writer carries it', () => {
   })
 
   it('currentRenderStamp requires it and the field helpers write it as a column value', () => {
-    const stamp = currentRenderStamp(null, null, STYLE_STAMP)
+    const stamp = currentRenderStamp(null, null, STYLE_STAMP, null)
     expect(stamp.postStyle).toEqual(STYLE_STAMP)
     expect(revisionStampFields(stamp).postStyle).toEqual(STYLE_STAMP)
     expect(draftStampFields(stamp).postStyle).toEqual(STYLE_STAMP)
@@ -1991,5 +2024,109 @@ describe('025 composite stamp: every re-render writer places the screenshot from
       }),
     ).rejects.toThrow(/screenshot URL/)
     expect(db.draftUpdates).toEqual([])
+  })
+})
+
+// ── 030 FR-04 (AC-04): the rendered-text stamp in every revision writer ─────
+// A render that happens here is checked against the draft's own headline (read
+// BEFORE the render, else the brief topic) and stamped from that check. A
+// carried render (adopt, restore) keeps its row's stamp; an export stamps none.
+describe('030 rendered-text stamp: commit, rejected render, adopt, restore', () => {
+  const painted = { headline: { text: 'Launch Day', verified: true } }
+  const commit = (over: Record<string, unknown> = {}) =>
+    commitDraftRevision({
+      draftId: 'd1', instruction: 'edit', html: '<html><body>x</body></html>', width: 1080, height: 1080,
+      composition: null, postStyle: null, ...over,
+    })
+  const rowOf = (id: string) => db.rows.find((r) => r.id === id)!
+
+  it('an inline-edit-like commit checks the draft headline, read before the render, and stamps both rows', async () => {
+    db.rows = [committed('d1', 1)]
+    const { revisionId } = await commit()
+    expect(db.render.headlines).toEqual(['Launch Day'])
+    expect(db.events).toEqual(['headline-read', 'render'])
+    expect(rowOf(revisionId).renderedText).toEqual(painted)
+    expect(db.draftUpdates.at(-1)!.data.renderedText).toEqual(painted)
+  })
+
+  it('a refine-like (claimed) commit does the same, and a failed check is stamped with its reason', async () => {
+    db.rows = [committed('d1', 1)]
+    db.pendingAction = CLAIM.action
+    db.claimId = CLAIM.claimId
+    db.render.check = 'not-visible'
+    const { revisionId } = await commit({ claim: CLAIM })
+    const want = { headline: { text: 'Launch Day', verified: false, reason: 'not-visible' } }
+    expect(rowOf(revisionId).renderedText).toEqual(want)
+    expect(db.draftUpdates.at(-1)!.data.renderedText).toEqual(want)
+  })
+
+  it('a draft with a null headline is checked against the brief topic', async () => {
+    db.rows = [committed('d1', 1)]
+    db.headline = null
+    db.topic = 'Brief topic'
+    const { revisionId } = await commit()
+    expect(db.render.headlines).toEqual(['Brief topic'])
+    expect(rowOf(revisionId).renderedText).toEqual({ headline: { text: 'Brief topic', verified: true } })
+  })
+
+  it('a rejected render does the same, for its own row, and leaves the draft stamp alone', async () => {
+    db.rows = [committed('d1', 1)]
+    const { revisionId } = await recordHeld(rejectArgs())
+    expect(db.render.headlines).toEqual(['Launch Day'])
+    expect(rowOf(revisionId).renderedText).toEqual(painted)
+    expect(db.draftUpdates.at(-1)!.data).not.toHaveProperty('renderedText')
+  })
+
+  it('a rejected render whose render fails is stamped not-checked; one with no document too', async () => {
+    db.rows = [committed('d1', 1)]
+    db.render.fail = true
+    const failed = await recordHeld(rejectArgs())
+    expect(rowOf(failed.revisionId).renderedText).toEqual({
+      headline: { text: 'Launch Day', verified: false, reason: 'not-checked' },
+    })
+    const none = await recordHeld(rejectArgs({ html: null, unusableHtml: '<p>cut off' }))
+    expect(rowOf(none.revisionId).renderedText).toEqual({
+      headline: { text: 'Launch Day', verified: false, reason: 'not-checked' },
+    })
+  })
+
+  it('adopt carries the rejected row\'s own stamp and renders nothing', async () => {
+    db.rows = [committed('d1', 1)]
+    const r = rejected('d1')
+    r.renderedText = { headline: { text: 'Old headline', verified: false, reason: 'not-found' } }
+    db.rows.push(r)
+    db.notAppliedRevisionId = r.id
+    const { revisionId } = await commit({ exportKey: r.exportUrl!, adoptRejectedRevisionId: r.id })
+    const want = { headline: { text: 'Old headline', verified: false, reason: 'not-found' } }
+    expect(rowOf(revisionId).renderedText).toEqual(want)
+    expect(db.draftUpdates.at(-1)!.data.renderedText).toEqual(want)
+    expect(db.render.calls).toBe(0)
+  })
+
+  it('adopt of a pre-030 row carries null (SQL NULL), never a stamp made now', async () => {
+    db.rows = [committed('d1', 1)]
+    const r = rejected('d1')
+    db.rows.push(r)
+    db.notAppliedRevisionId = r.id
+    const { revisionId } = await commit({ exportKey: r.exportUrl!, adoptRejectedRevisionId: r.id })
+    expect(rowOf(revisionId).renderedText).toBe(Prisma.DbNull)
+    expect(db.draftUpdates.at(-1)!.data.renderedText).toBe(Prisma.DbNull)
+  })
+
+  it('restore carries the revision\'s stamp (also when re-rendered); a pre-030 row is null', () => {
+    const own = { headline: { text: 'Then', verified: true } }
+    expect(restoredRenderStamp({ renderedText: own }, false, null).renderedText).toEqual(own)
+    expect(restoredRenderStamp({ renderedText: own }, true, null).renderedText).toEqual(own)
+    expect(restoredRenderStamp({}, false, null).renderedText).toBeNull()
+    expect(restoredRenderStamp({ renderedText: { headline: { text: 1 } } }, false, null).renderedText).toBeNull()
+  })
+
+  it('restoreDraftToRevision writes the carried stamp (SQL NULL for a pre-030 row)', async () => {
+    db.currentRevisionNumber = 3
+    const own = { headline: { text: 'Then', verified: true } }
+    await restoreDraftToRevision('d1', 2, '<html>v2</html>', 'exports/d1-2.png', restoredRenderStamp({ renderedText: own }, false, null))
+    expect(db.draftUpdates.at(-1)!.data.renderedText).toEqual(own)
+    await restoreDraftToRevision('d1', 2, '<html>v2</html>', 'exports/d1-2.png', restoredRenderStamp({}, false, null))
+    expect(db.draftUpdates.at(-1)!.data.renderedText).toBe(Prisma.DbNull)
   })
 })

@@ -223,7 +223,7 @@ const SURFACES: Array<{ surface: Surface; reply: string; run: () => Promise<unkn
     reply: HTML,
     run: async () => {
       const model = await resolved(surface)
-      const opts = { systemPrompt: 's', userMessage: 'u', briefId: 'b1', model }
+      const opts = { systemPrompt: 's', userMessage: 'u', briefId: 'b1', model, headline: 'h' }
       return h.mode === 'cli' ? runDesignAgentCli(opts) : runDesignAgent(opts)
     },
   })),

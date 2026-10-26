@@ -6,6 +6,7 @@ import { canAccessContent } from '@/lib/authz/visibility'
 import { resolveBrandKit } from '@/lib/brandkit/resolve'
 import { getActiveCampaignBriefing } from '@/lib/campaign/briefing'
 import { runPathBDesign } from '@/lib/agent/pathB'
+import { stampFromCheck } from '@/lib/renderedText/stamp'
 import { currentRenderStamp, draftStampFields, revisionStampFields, withNextRevisionNumber } from '@/lib/drafts/revisions'
 import { briefPostStyleStamp } from '@/lib/agent/briefInput'
 import { resolveModel } from '@/lib/models/policy'
@@ -120,7 +121,14 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
     // new revision row and the draft (008: with the model that made it).
     // 027: and the post style the brief's key resolved to for this run (the
     // image rules runPathBDesign applied), at the dataset's current version.
-    const stamp = currentRenderStamp(model, result.composition, briefPostStyleStamp(draft.brief))
+    // 030: and the headline the real render painted, checked against the
+    // headline this design was made from.
+    const stamp = currentRenderStamp(
+      model,
+      result.composition,
+      briefPostStyleStamp(draft.brief),
+      stampFromCheck(headline.text, result.headlineCheck ?? 'not-checked'),
+    )
 
     // The Undo target is whatever revision is currently live. The design history
     // is an append-only log, so the live state is already the current revision —

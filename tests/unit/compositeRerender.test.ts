@@ -154,7 +154,7 @@ beforeEach(() => {
   h.commit.mockResolvedValue({ revisionId: 'rev-3', exportKey: 'exports/r.png', revisionNumber: 3 })
   h.reject.mockResolvedValue({ revisionId: 'rej-1', exportKey: null })
   h.refineApi.mockResolvedValue('<html>reply</html>')
-  h.renderDraftHtml.mockResolvedValue(Buffer.from('png'))
+  h.renderDraftHtml.mockResolvedValue({ png: Buffer.from('png'), headlineCheck: null })
   vi.spyOn(console, 'warn').mockImplementation(() => {})
   vi.spyOn(console, 'info').mockImplementation(() => {})
 })
@@ -258,7 +258,10 @@ describe('export and restore render with the stamp', () => {
     const call = h.renderDraftHtml.mock.calls[0]
     expect(call[0]).toBe('d1')
     expect(call[2].composites[0].rect).toEqual(RECT)
+    // 030 FR-04: an export checks no headline and leaves renderedText out of its write.
+    expect(call[5]).toBeNull()
     expect(h.updates).toHaveLength(1)
+    expect((h.updates[0] as { data: Record<string, unknown> }).data).not.toHaveProperty('renderedText')
 
     h.updates = []
     h.renderDraftHtml.mockRejectedValue(new CompositePlacementError(new Error('gone')))
@@ -275,6 +278,8 @@ describe('export and restore render with the stamp', () => {
       })
     expect((await call()).status).toBe(200)
     expect(h.renderDraftHtml.mock.calls[0][2].composites[0].rect).toEqual(RECT)
+    // 030: the re-render checks no headline (the restored row's own stamp is carried).
+    expect(h.renderDraftHtml.mock.calls[0][5]).toBeNull()
 
     h.renderDraftHtml.mockRejectedValue(new CompositePlacementError(new Error('gone')))
     const res = await call()

@@ -28,7 +28,15 @@ vi.mock('@/lib/agent/tools', () => ({
   toolGetBrandKitContext: vi.fn(),
 }))
 vi.mock('@/lib/agent/claudeCli', () => ({ runClaudeCli: h.runClaudeCli }))
-vi.mock('@/lib/renderer/puppeteer', () => ({ renderHtmlToPng: h.renderHtmlToPng }))
+// 030: the runners render through renderPost; it delegates to the same spy so the
+// composites argument stays observable as the fourth call argument.
+vi.mock('@/lib/renderer/puppeteer', () => ({
+  renderHtmlToPng: h.renderHtmlToPng,
+  renderPost: async (html: string, w: number, ht: number, c: unknown, check: unknown) => ({
+    png: await h.renderHtmlToPng(html, w, ht, c),
+    headlineCheck: check ? 'painted' : null,
+  }),
+}))
 vi.mock('@/lib/storage/minio', () => ({
   uploadObject: h.uploadObject,
   exportKey: () => 'exports/cli/x.png',
@@ -53,7 +61,7 @@ const finalText = (text = '<html><body>prose-only</body></html>') => ({
   usage,
 })
 const insert = (html: string) => html.replace('</body>', '<i data-inserted></i></body>')
-const base = { systemPrompt: 's', userMessage: 'u', briefId: 'b', model, width: 1080, height: 1080 }
+const base = { systemPrompt: 's', userMessage: 'u', briefId: 'b', model, width: 1080, height: 1080, headline: 'Headline' }
 
 beforeEach(() => {
   h.responses.length = 0
@@ -86,7 +94,7 @@ describe('the API loop never returns an unchecked composite (NFR-08)', () => {
     const out = await runDesignAgent({ ...base, postProcess: insert, composites })
     expect(out.htmlContent).toContain('data-inserted')
     expect(out.exportUrl).toBe('exports/a.png')
-    expect(h.toolRenderHtml).toHaveBeenCalledWith(expect.stringContaining('data-inserted'), 1080, 1080, composites)
+    expect(h.toolRenderHtml).toHaveBeenCalledWith(expect.stringContaining('data-inserted'), 1080, 1080, composites, 'Headline')
   })
 
   it('a failure after two passing renders carries every export the run uploaded', async () => {

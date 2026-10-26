@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk"
 import type { MessageParam, ToolUseBlock, ToolResultBlockParam, Tool } from "@anthropic-ai/sdk/resources/messages"
 import type { DesignAgentOptions, DesignAgentResult, GenerationActor } from "./types"
+import type { HeadlineCheck } from "@/lib/renderedText/vocab"
 import { AgentToolLimitError, AgentTimeoutError, AgentTruncatedError } from "./types"
 import { toolGenerateImage, toolRenderHtml, toolGetBrandKitContext } from "./tools"
 import { restoreInlineAssets, missingTokens } from "./inlineAssets"
@@ -74,7 +75,8 @@ async function executeTool(
   briefId: string,
   actor?: GenerationActor,
   aspectRatio?: AspectRatio,
-  composites: CompositeRender | null = null
+  composites: CompositeRender | null = null,
+  headline = ""
 ): Promise<unknown> {
   switch (name) {
     case "generateImage":
@@ -84,7 +86,8 @@ async function executeTool(
         input.html as string,
         input.width as number,
         input.height as number,
-        composites
+        composites,
+        headline
       )
     case "getBrandKitContext":
       return toolGetBrandKitContext((input.briefId as string | undefined) ?? briefId)
@@ -113,6 +116,7 @@ export async function runDesignAgent(options: RunDesignAgentOptions): Promise<De
     actor,
     postProcess,
     composites = null,
+    headline,
   } = options
   // The whole tool-use loop's budget — maxToolCalls alone doesn't bound slow
   // image generations + renders. Every turn's request is also bounded by it
@@ -130,12 +134,12 @@ export async function runDesignAgent(options: RunDesignAgentOptions): Promise<De
       throw new Error("Mock generation failure (__FAIL_GEN_ALWAYS__ sentinel)")
     }
     if (userMessage.includes("conflict_test")) {
-      return { htmlContent: buildMockConflict(), exportUrl: "", toolCallCount: 0 }
+      return { htmlContent: buildMockConflict(), exportUrl: "", toolCallCount: 0, headlineCheck: null }
     }
-    const mockHtml = buildMockHtml(`${systemPrompt}\n${userMessage}`, width, height)
+    const mockHtml = buildMockHtml(`${systemPrompt}\n${userMessage}`, width, height, headline)
     const html = postProcess ? postProcess(mockHtml) : mockHtml
-    const { key } = await toolRenderHtml(html, width, height, composites)
-    return { htmlContent: html, exportUrl: key, toolCallCount: 1 }
+    const { key, headlineCheck } = await toolRenderHtml(html, width, height, composites, headline)
+    return { htmlContent: html, exportUrl: key, toolCallCount: 1, headlineCheck }
   }
 
   const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY })
@@ -152,6 +156,8 @@ export async function runDesignAgent(options: RunDesignAgentOptions): Promise<De
   let iteration = 0
   let lastHtml = ""
   let lastExportUrl = ""
+  // 030: the check of the last render (null until one happens).
+  let lastHeadlineCheck: HeadlineCheck | null = null
   // Every export this run uploaded (025: the composite fallback deletes them all).
   const uploadedKeys: string[] = []
 
@@ -246,13 +252,15 @@ export async function runDesignAgent(options: RunDesignAgentOptions): Promise<De
           briefId,
           actor,
           nearestAspectRatio(width, height),
-          composites
+          composites,
+          headline
         )
 
         if (block.name === "renderHtml") {
           lastHtml = (toolInput as { html: string }).html
           // Persist the object KEY (signed per read), not the transient URL.
           lastExportUrl = (result as { key: string }).key
+          lastHeadlineCheck = (result as { headlineCheck: HeadlineCheck | null }).headlineCheck
           uploadedKeys.push(lastExportUrl)
         }
 
@@ -286,7 +294,7 @@ export async function runDesignAgent(options: RunDesignAgentOptions): Promise<De
     }
   }
 
-  return { htmlContent: lastHtml, exportUrl: lastExportUrl, toolCallCount }
+  return { htmlContent: lastHtml, exportUrl: lastExportUrl, toolCallCount, headlineCheck: lastHeadlineCheck }
 }
 
 // ── Refine mode (change 004 Phase 2, T17) ────────────────────────────────────
@@ -323,7 +331,7 @@ const textOf = (content: Anthropic.Messages.ContentBlock[]) =>
 // is no default model). Every turn goes through createMessage, bounded by its
 // surface timeout (FR-12), and the mock seam records it.
 export async function runDesignAgentRefine(
-  options: Omit<DesignAgentOptions, "inlineAssets"> & {
+  options: Omit<DesignAgentOptions, "inlineAssets" | "headline"> & {
     model: ResolvedModel
     refine: RefineModeOptions
   },

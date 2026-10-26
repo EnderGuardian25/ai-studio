@@ -39,7 +39,8 @@ export const POST = withTeamAuth(async (req: NextRequest, _ctx, user) => {
   let buffer: Buffer
   try {
     // 025 FR-16: the draft's own stamp decides the screenshot.
-    buffer = await renderDraftHtml(draftId, draft.htmlContent, draftCompositionStamp(draft), width, height)
+    // 030 FR-04: an export re-renders the same HTML and leaves renderedText alone.
+    buffer = (await renderDraftHtml(draftId, draft.htmlContent, draftCompositionStamp(draft), width, height, null)).png
   } catch (err) {
     if (err instanceof CompositePlacementError) {
       return NextResponse.json({ error: err.message, code: 'composite-not-placed' }, { status: 422 })

@@ -19,6 +19,8 @@ const fake = vi.hoisted(() => {
     revisionCreates: [] as Array<Record<string, unknown>>,
     draft: null as null | Record<string, unknown>,
     policy: null as null | Record<string, unknown>,
+    // 030: the check the mocked design runners report for their render.
+    check: 'painted' as string | null,
   }
   const tx = {
     teamModelPolicy: { findUnique: async () => db.policy },
@@ -102,7 +104,7 @@ vi.mock('@/lib/factsCheck/refresh', () => ({
   refreshFactsCheck: async () => {},
 }))
 vi.mock('@/lib/agent/pathA', () => ({
-  runPathADesign: async () => ({ htmlContent: '<html>a</html>', exportUrl: 'exports/a.png' }),
+  runPathADesign: async () => ({ htmlContent: '<html>a</html>', exportUrl: 'exports/a.png', headlineCheck: fake.db.check }),
   assertTemplateMatchesBrief: () => {},
 }))
 // 009 FR-12: Path B returns the run's composition stamp; every writer carries it.
@@ -117,6 +119,7 @@ vi.mock('@/lib/agent/pathB', () => ({
     htmlContent: '<html>b</html>',
     exportUrl: 'exports/b.png',
     backgroundImageUrl: null,
+    headlineCheck: fake.db.check,
     composition: {
       requestedArchetype: 'product-showcase',
       appliedArchetype: 'product-showcase',
@@ -173,6 +176,7 @@ beforeEach(() => {
   db.revisionCreates = []
   db.draft = null
   db.policy = null
+  db.check = 'painted'
 })
 
 describe('generation v1 "Original design" revision', () => {
@@ -206,6 +210,42 @@ describe('generation v1 "Original design" revision', () => {
     const classic = { requestedArchetype: 'classic', appliedArchetype: 'classic', contractVersion: null, imageQuality: 'default' }
     expect(db.revisionCreates[0].composition).toEqual(classic)
     expect(db.draftWrites.find((w) => w.data.status === 'EXPORTED')!.data.composition).toEqual(classic)
+  })
+})
+
+// 030 FR-04 / AC-04: generation stamps what the render's check said about the
+// headline the design was made from (the validated caption-step headline).
+describe('030 rendered-text stamp: generation', () => {
+  const painted = { headline: { text: 'the headline', verified: true } }
+
+  it('sync and async generation stamp the revision and the draft from the check', async () => {
+    await generateDraftForBrief(brief, { userId: null, teamId: 'team1', source: 'scheduler' })
+    expect(db.revisionCreates[0].renderedText).toEqual(painted)
+    expect(db.draftWrites.find((w) => w.op === 'create')!.data.renderedText).toEqual(painted)
+
+    db.revisionCreates = []
+    db.draftWrites = []
+    db.draft = { id: 'd1', templateId: null, brief }
+    await runGenerationForDraft('d1', { userId: 'u1', teamId: 'team1', source: 'web' })
+    expect(db.revisionCreates[0].renderedText).toEqual(painted)
+    expect(db.draftWrites.find((w) => w.data.status === 'EXPORTED')!.data.renderedText).toEqual(painted)
+  })
+
+  it('a failed check is stamped unverified with its reason, on both rows', async () => {
+    db.check = 'not-found'
+    await generateDraftForBrief(brief, { userId: null, teamId: 'team1', source: 'scheduler' })
+    const want = { headline: { text: 'the headline', verified: false, reason: 'not-found' } }
+    expect(db.revisionCreates[0].renderedText).toEqual(want)
+    expect(db.draftWrites.find((w) => w.op === 'create')!.data.renderedText).toEqual(want)
+  })
+
+  it('a run that rendered nothing (no check) is stamped not-checked, never painted', async () => {
+    db.check = null
+    db.draft = { id: 'd1', templateId: 't1', brief: { ...(brief as object), designMode: 'TEMPLATE' } }
+    await runGenerationForDraft('d1', { userId: 'u1', teamId: 'team1', source: 'web' })
+    expect(db.revisionCreates[0].renderedText).toEqual({
+      headline: { text: 'the headline', verified: false, reason: 'not-checked' },
+    })
   })
 })
 
@@ -246,6 +286,29 @@ describe('regenerate-design', () => {
     // 009: the new run's composition stamp (re-resolved from the brief) is the one stored.
     expect(db.revisionCreates[0].composition).toEqual(KEPT)
     expect(db.draftWrites.at(-1)!.data.composition).toEqual(KEPT)
+  })
+
+  it('030: stamps from its check against designHeadline (the stored headline, else the brief topic)', async () => {
+    db.draft = {
+      id: 'd1', teamId: 'team1', brief, headline: 'Stored headline', htmlContent: '<html>v1</html>',
+      exportUrl: 'exports/v1.png', currentRevisionNumber: 1,
+    }
+    await regenerateDesign(req, ctx)
+    const stored = { headline: { text: 'Stored headline', verified: true } }
+    expect(db.revisionCreates[0].renderedText).toEqual(stored)
+    expect(db.draftWrites.at(-1)!.data.renderedText).toEqual(stored)
+
+    db.revisionCreates = []
+    db.draftWrites = []
+    db.check = 'ambiguous'
+    db.draft = {
+      id: 'd1', teamId: 'team1', brief: { ...(brief as object), topic: 'Topic fallback' }, headline: null,
+      htmlContent: '<html>v1</html>', exportUrl: 'exports/v1.png', currentRevisionNumber: 1,
+    }
+    await regenerateDesign(req, ctx)
+    const fallback = { headline: { text: 'Topic fallback', verified: false, reason: 'ambiguous' } }
+    expect(db.revisionCreates[0].renderedText).toEqual(fallback)
+    expect(db.draftWrites.at(-1)!.data.renderedText).toEqual(fallback)
   })
 
   it('008: with no design stamp, resolves DESIGN_FREEFORM from the team default before the claim', async () => {
@@ -328,30 +391,31 @@ describe('RenderStamp.model (008 FR-08, D4)', () => {
   })()
 
   it('currentRenderStamp(model) carries the arg that crossed the boundary and the refused value', () => {
-    expect(currentRenderStamp(resolved, null, null)).toEqual({
+    expect(currentRenderStamp(resolved, null, null, null)).toEqual({
       ...STAMP,
       model: 'claude-sonnet-5-5',
       modelSubstitutedFrom: 'OPUS',
-      composition: null, postStyle: null,
+      composition: null, postStyle: null, renderedText: null,
     })
-    expect(currentRenderStamp(null, null, null)).toEqual({ ...STAMP, model: null, modelSubstitutedFrom: null, composition: null, postStyle: null })
+    expect(currentRenderStamp(null, null, null, null)).toEqual({ ...STAMP, model: null, modelSubstitutedFrom: null, composition: null, postStyle: null, renderedText: null })
   })
 
   it('draftStampFields maps model → designModel, and nothing else changes name', () => {
-    expect(draftStampFields(currentRenderStamp(resolved, null, null))).toEqual({
+    expect(draftStampFields(currentRenderStamp(resolved, null, null, null))).toEqual({
       ...STAMP,
       designModel: 'claude-sonnet-5-5',
       designModelSubstitutedFrom: 'OPUS',
       // 009: no composition stamp is SQL NULL, not a JSON null.
       composition: Prisma.DbNull,
       postStyle: Prisma.DbNull,
+      renderedText: Prisma.DbNull,
     })
   })
 
   it("restoredRenderStamp copies the revision's own model, whether or not its PNG is re-rendered (A6)", () => {
     const row = { promptVersion: 'pv-old', fontSet: 'fonts-old', model: 'claude-sonnet-4-6', modelSubstitutedFrom: 'HAIKU' }
-    expect(restoredRenderStamp(row, false, null)).toEqual({ ...row, composition: null, postStyle: null })
-    expect(restoredRenderStamp(row, true, null)).toEqual({ ...row, fontSet: 'fonts-test', composition: null, postStyle: null })
+    expect(restoredRenderStamp(row, false, null)).toEqual({ ...row, composition: null, postStyle: null, renderedText: null })
+    expect(restoredRenderStamp(row, true, null)).toEqual({ ...row, fontSet: 'fonts-test', composition: null, postStyle: null, renderedText: null })
     // A pre-008 row reads as unknown, never as the current model.
     expect(restoredRenderStamp({ promptVersion: 'pv', fontSet: 'f' }, false, null)).toMatchObject({
       model: null,

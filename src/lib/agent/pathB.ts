@@ -234,7 +234,7 @@ export async function runPathBDesign(
         ? { postProcess: (h: string) => insertComposite(h, screen, { width, height }), composites: render }
         : {}
     return isCliMode()
-      ? runDesignAgentCli({ systemPrompt, userMessage, briefId: brief.id, width, height, model, ...insert })
+      ? runDesignAgentCli({ systemPrompt, userMessage, briefId: brief.id, width, height, model, headline, ...insert })
       : runDesignAgent({
           systemPrompt,
           userMessage,
@@ -244,6 +244,7 @@ export async function runPathBDesign(
           width,
           height,
           actor,
+          headline,
           ...insert,
         })
   }

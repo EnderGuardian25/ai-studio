@@ -70,7 +70,7 @@
 
 ### Wave 3: The stamp on every writer
 
-- [ ] `T3` — The migration, the stamp helpers and every FR-04 writer, plus the writer guard
+- [x] `T3` — The migration, the stamp helpers and every FR-04 writer, plus the writer guard
   - Files: `prisma/schema.prisma`, `prisma/migrations/20261027120000_rendered_text/migration.sql` (new), `prisma/rollback/030-stale-headline-badge.down.sql` (new), `src/lib/drafts/revisions.ts`, `src/lib/agent/{types,designAgent,designAgentCli,tools,pathA,pathB,generateDraft}.ts`, `src/app/api/drafts/[id]/regenerate-design/route.ts`, `src/app/api/drafts/[id]/revisions/[rev]/restore/route.ts`, `src/app/api/generate/export/route.ts`, `tests/unit/renderedTextWriters.test.ts` (new), adapted `renderStamps`, `draftRevisions`, `compositeGeneration`, `compositeRerender`, `postStylesWriters`, `heroSeams` tests as needed
   - Estimate: large
   - Kind: migration

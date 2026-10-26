@@ -611,6 +611,9 @@ model Draft {
   // 027: the post style stamp { key, version, revision } of the last generation or
   // regeneration, validated in src/lib/postStyles/stamp.ts. Null = before 027.
   postStyle       Json?
+  // 030: the text the live render visibly painted, { headline: { text, verified, reason? } },
+  // validated in src/lib/renderedText/stamp.ts. Null = rendered before 030.
+  renderedText    Json?
   // 027: the facts-check result (numbers and places only, no text). Null = never checked.
   factsCheck      Json?
   createdAt       DateTime        @default(now())
@@ -834,6 +837,8 @@ model DraftRevision {
   composition          Json?
   // 027: the post style stamp at this row's render. Null = before 027.
   postStyle            Json?
+  // 030: the text this row's render visibly painted. Null = rendered before 030.
+  renderedText         Json?
   // Drafts whose current not-applied outcome references this rejected row.
   notAppliedOn   Draft[]  @relation("DraftNotAppliedRevision")
 

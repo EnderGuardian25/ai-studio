@@ -26,7 +26,10 @@ vi.mock('@/lib/testHooks', async (importOriginal) => {
   }
 })
 vi.mock('@/lib/agent/claudeCli', () => ({ runClaudeCli: h.runClaudeCli }))
-vi.mock('@/lib/renderer/puppeteer', () => ({ renderHtmlToPng: vi.fn(async () => Buffer.from('png')) }))
+vi.mock('@/lib/renderer/puppeteer', () => ({
+  renderHtmlToPng: vi.fn(async () => Buffer.from('png')),
+  renderPost: vi.fn(async () => ({ png: Buffer.from('png'), headlineCheck: 'painted' })),
+}))
 vi.mock('@/lib/storage/minio', () => ({ uploadObject: vi.fn(), exportKey: () => 'k', BUCKET_EXPORTS: 'exports' }))
 vi.mock('@/lib/agent/tools', () => ({
   toolRenderHtml: h.toolRenderHtml,
@@ -170,7 +173,7 @@ describe('008: runDesignAgent / runDesignAgentRefine on a ResolvedModel', () => 
   it('the runDesignAgent MOCK_AI branch records the model it was handed before returning (design §7)', async () => {
     h.mockAi = true
     h.toolRenderHtml.mockResolvedValue({ key: 'exports/k.png', url: 'u' })
-    const result = await runDesignAgent({ ...base, model: OPUS })
+    const result = await runDesignAgent({ ...base, headline: 'h', model: OPUS })
     expect(result.exportUrl).toBe('exports/k.png')
     expect(records).toEqual([
       expect.objectContaining({ surface: 'DESIGN_FREEFORM', key: 'OPUS', arg: 'claude-opus-5-5', label: 'design' }),
@@ -179,7 +182,7 @@ describe('008: runDesignAgent / runDesignAgentRefine on a ResolvedModel', () => 
 
   it('the real loop sends model.arg through createMessage, with the entry max_tokens floor', async () => {
     h.create.mockResolvedValue({ content: [{ type: 'text', text: '<html>final</html>' }], stop_reason: 'end_turn', usage })
-    const result = await runDesignAgent({ ...base, model: OPUS })
+    const result = await runDesignAgent({ ...base, headline: 'h', model: OPUS })
     expect(result.htmlContent).toBe('<html>final</html>')
     expect(h.create.mock.calls[0][0]).toMatchObject({ model: 'claude-opus-5-5', max_tokens: 16000 })
     expect(records).toEqual([expect.objectContaining({ surface: 'DESIGN_FREEFORM', label: 'design' })])
@@ -194,7 +197,7 @@ describe('008: runDesignAgent / runDesignAgentRefine on a ResolvedModel', () => 
       stop_reason: 'end_turn',
       usage,
     })
-    expect((await runDesignAgent({ ...base, model: OPUS })).htmlContent).toBe('<html>t</html>')
+    expect((await runDesignAgent({ ...base, headline: 'h', model: OPUS })).htmlContent).toBe('<html>t</html>')
   })
 
   // T10: the "a string keeps the old call" half is gone with the string path.

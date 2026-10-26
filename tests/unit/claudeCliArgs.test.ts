@@ -102,7 +102,10 @@ vi.mock('@/lib/agent/config', async (importOriginal) => ({
   isCliMode: () => true,
 }))
 // runDesignAgentCli renders + uploads after the CLI call — not under test here.
-vi.mock('@/lib/renderer/puppeteer', () => ({ renderHtmlToPng: vi.fn(async () => Buffer.from('png')) }))
+vi.mock('@/lib/renderer/puppeteer', () => ({
+  renderHtmlToPng: vi.fn(async () => Buffer.from('png')),
+  renderPost: vi.fn(async () => ({ png: Buffer.from('png'), headlineCheck: 'painted' })),
+}))
 vi.mock('@/lib/storage/minio', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/storage/minio')>()),
   uploadObject: vi.fn(async () => {}),
@@ -246,7 +249,7 @@ describe('AC-13: every text-mode call site spawns with --tools "" and never --al
     it('design — runDesignAgentCli', async () => {
       h.stdout = '<!doctype html><html><body>x</body></html>'
       await inAuth(() =>
-        runDesignAgentCli({ systemPrompt: 's', userMessage: 'u', briefId: 'b1', model: siteModel('DESIGN_FREEFORM') }),
+        runDesignAgentCli({ systemPrompt: 's', userMessage: 'u', briefId: 'b1', model: siteModel('DESIGN_FREEFORM'), headline: 'h' }),
       )
       expectNoTools(h.spawnCalls[0].args, '')
     })

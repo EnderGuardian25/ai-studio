@@ -70,7 +70,8 @@ export const POST = withTeamAuth<Params>(async (_req, { params }, user) => {
     let buffer: Buffer
     try {
       // 025 FR-16: the revision's own stamp decides the screenshot.
-      buffer = await renderDraftHtml(params.id, revision.htmlSnapshot, stamp.composition, width, height)
+      // 030: a restore stamps nothing from this render (the row's own stamp is carried).
+      buffer = (await renderDraftHtml(params.id, revision.htmlSnapshot, stamp.composition, width, height, null)).png
     } catch (err) {
       if (err instanceof CompositePlacementError) {
         return NextResponse.json({ error: err.message, code: 'composite-not-placed' }, { status: 422 })

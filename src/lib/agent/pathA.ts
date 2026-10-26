@@ -104,6 +104,7 @@ export async function runPathADesign(
         width,
         height,
         model,
+        headline,
       })
     : runDesignAgent({
         systemPrompt,
@@ -115,5 +116,6 @@ export async function runPathADesign(
         width,
         height,
         actor,
+        headline,
       })
 }

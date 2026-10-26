@@ -6,6 +6,7 @@ import { resolveCopyProvider } from '@/providers/registry'
 import { briefPostStyleStamp, buildBriefInput } from '@/lib/agent/briefInput'
 import { runPathADesign, assertTemplateMatchesBrief } from '@/lib/agent/pathA'
 import { runPathBDesign } from '@/lib/agent/pathB'
+import { stampFromCheck } from '@/lib/renderedText/stamp'
 import { currentRenderStamp, draftStampFields, revisionStampFields, type RenderStamp } from '@/lib/drafts/revisions'
 import { classicStamp } from '@/lib/designData'
 import { humanizeGenerationError } from '@/lib/agent/generationErrors'
@@ -159,7 +160,13 @@ async function produceDesign(
       // Path A has no background step: nothing was skipped.
       backgroundSkip: generationSkipFields(null),
       // 009: a Path A draft is classic (and gives the evidence its denominator).
-      stamp: currentRenderStamp(model, classicStamp(), briefPostStyleStamp(brief)),
+      stamp: currentRenderStamp(
+        model,
+        classicStamp(),
+        briefPostStyleStamp(brief),
+        // 030 FR-04: the render's own check (null = no render ran: not-checked).
+        stampFromCheck(headline, result.headlineCheck ?? 'not-checked'),
+      ),
     }
   }
   const result = await runPathBDesign(brief, kit!, headline, campaignBriefing, actor, model, { onBeforeDesign })
@@ -170,7 +177,12 @@ async function produceDesign(
     backgroundSkip: generationSkipFields(result.background),
     // 009 FR-12: the run's composition stamp (the image style asked for, the
     // one applied, why not), resolved by runPathBDesign.
-    stamp: currentRenderStamp(model, result.composition, briefPostStyleStamp(brief)),
+    stamp: currentRenderStamp(
+      model,
+      result.composition,
+      briefPostStyleStamp(brief),
+      stampFromCheck(headline, result.headlineCheck ?? 'not-checked'),
+    ),
   }
 }
 

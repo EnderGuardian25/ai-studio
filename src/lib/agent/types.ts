@@ -1,4 +1,5 @@
 import type { AnalyticsSource } from '@prisma/client'
+import type { HeadlineCheck } from "@/lib/renderedText/vocab"
 import type { CompositeRender } from '@/lib/composite/render'
 
 // The identity ON WHOSE BEHALF a generation/refine call runs — NOT necessarily
@@ -59,12 +60,17 @@ export interface DesignAgentOptions {
   // element. Absent: today's behaviour, byte for byte.
   postProcess?: (html: string) => string
   composites?: CompositeRender | null
+  // 030 FR-05: the on-image headline the real render is checked against. Required,
+  // so a design writer must choose what it checks.
+  headline: string
 }
 
 export interface DesignAgentResult {
   htmlContent: string
   exportUrl: string
   toolCallCount: number
+  // 030: the check of the final render (null when the run rendered nothing).
+  headlineCheck: HeadlineCheck | null
 }
 
 export class AgentToolLimitError extends Error {

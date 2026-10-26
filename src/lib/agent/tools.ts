@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma"
-import { renderHtmlToPng } from "@/lib/renderer/puppeteer"
+import { renderPost } from "@/lib/renderer/puppeteer"
+import type { HeadlineCheck } from "@/lib/renderedText/vocab"
 import { uploadObject, resolveExportUrl, persistDataUrlImage, exportKey, BUCKET_EXPORTS } from "@/lib/storage/minio"
 import { resolveImageProvider } from "@/providers/registry"
 import { imageSizeFor } from "@/providers/imageCapabilities"
@@ -52,14 +53,16 @@ export async function toolRenderHtml(
   width: number,
   height: number,
   // 025: the composite argument (null for every render with no screenshot).
-  composites: CompositeRender | null
-): Promise<{ url: string; key: string }> {
-  const buffer = await renderHtmlToPng(html, width, height, composites)
+  composites: CompositeRender | null,
+  // 030: the headline the render is checked against.
+  headline: string
+): Promise<{ url: string; key: string; headlineCheck: HeadlineCheck | null }> {
+  const { png: buffer, headlineCheck } = await renderPost(html, width, height, composites, { headline })
   const key = exportKey("design", "agent")
   await uploadObject(buffer, BUCKET_EXPORTS, key, "image/png")
   // The export PNG stays private. Return a signed URL for the agent's reference
   // plus the object key, which the caller persists as Draft.exportUrl.
-  return { url: (await resolveExportUrl(key))!, key }
+  return { url: (await resolveExportUrl(key))!, key, headlineCheck }
 }
 
 export async function toolGetBrandKitContext(briefId: string): Promise<BrandKitContext> {

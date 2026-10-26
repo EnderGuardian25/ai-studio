@@ -2,11 +2,11 @@ import type { DesignAgentOptions, DesignAgentResult } from "./types"
 import { runClaudeCli } from "./claudeCli"
 import { extractHtmlDocument } from "./htmlDocument"
 import { restoreInlineAssets, missingTokens } from "./inlineAssets"
-import { renderHtmlToPng } from "@/lib/renderer/puppeteer"
+import { renderPost } from "@/lib/renderer/puppeteer"
 import { uploadObject, exportKey, BUCKET_EXPORTS } from "@/lib/storage/minio"
 import type { ResolvedModel } from "@/lib/models/resolve"
 
-type CliAgentOptions = Pick<DesignAgentOptions, "systemPrompt" | "userMessage" | "briefId" | "inlineAssets" | "width" | "height" | "postProcess" | "composites"> & {
+type CliAgentOptions = Pick<DesignAgentOptions, "systemPrompt" | "userMessage" | "briefId" | "inlineAssets" | "width" | "height" | "postProcess" | "composites" | "headline"> & {
   // 008 FR-07: the DESIGN_TEMPLATE / DESIGN_FREEFORM model the caller resolved.
   // The CLI runs exactly its arg, and the spawn's timeout is its surface timeout.
   model: ResolvedModel
@@ -31,6 +31,7 @@ export async function runDesignAgentCli(options: CliAgentOptions): Promise<Desig
     model,
     postProcess,
     composites = null,
+    headline,
   } = options
 
   const prompt = `${systemPrompt}\n\n${userMessage}`
@@ -73,12 +74,12 @@ export async function runDesignAgentCli(options: CliAgentOptions): Promise<Desig
 
   // Render HTML → PNG → MinIO (same pipeline as the export route). A failed
   // composite check throws before anything is uploaded.
-  const png = await renderHtmlToPng(html, width, height, composites)
+  const { png, headlineCheck } = await renderPost(html, width, height, composites, { headline })
   const key = exportKey("cli", briefId)
   await uploadObject(png, BUCKET_EXPORTS, key, "image/png")
 
   // Persist the object key; it is signed per read.
-  return { htmlContent: html, exportUrl: key, toolCallCount: 0 }
+  return { htmlContent: html, exportUrl: key, toolCallCount: 0, headlineCheck }
 }
 
 // ── Refine mode (change 004 Phase 2, T17) ────────────────────────────────────
