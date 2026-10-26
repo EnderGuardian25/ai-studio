@@ -110,3 +110,20 @@ describe('suggestionFor', () => {
     expect(suggestionFor({ entryKey: 'nope' })).toBeNull()
   })
 })
+
+describe('031 FR-26: the typography triggers', () => {
+  const keys = (t: string) => detectVagueDesign(t).candidates.map((c) => c.entryKey)
+
+  it('flags the vague type phrases', () => {
+    expect(keys('Make the headline big.')).toEqual(['type-scale'])
+    expect(keys('Use a big headline.')).toEqual(['type-scale'])
+    expect(keys('Keep the text readable.')).toEqual(['body-min-size'])
+    expect(keys('Use readable body text.')).toEqual(['body-min-size'])
+    expect(keys('A tight headline works best.')).toEqual(['heading-line-height'])
+  })
+
+  it('does not flag measurable type rules or unrelated words', () => {
+    expect(keys('The headline is 2.5× the body text size.')).toEqual([])
+    expect(keys('Set the headline in the headline font.')).toEqual([])
+  })
+})

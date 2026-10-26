@@ -581,6 +581,7 @@ export interface AdminBrandKitDetail {
   scriptFonts?: Record<string, string> | null
   // 031 FR-25: the date of the font list the picker searches.
   fontCatalogueDate?: string
+  typographyFindings?: Array<{ code: string; detail: string }>
   logoUrl: string | null
   isDefault: boolean
   prompts: BrandKitPrompt[]

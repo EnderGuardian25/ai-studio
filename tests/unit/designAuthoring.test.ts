@@ -1,22 +1,25 @@
 // 007 AC-04: the authoring dataset invariants.
 import { describe, it, expect } from 'vitest'
 import { entries, fillTemplate, getEntry } from '@/lib/designData/authoring/entries'
+import { setProvenance } from '@/lib/designData/authoring/validate'
 import { isMeasurable } from '@/lib/designData/authoring/measurable'
 
 describe('authoring dataset', () => {
-  it('has exactly the seven v1 keys and no typography category', () => {
+  it('has exactly the ten keys and five categories', () => {
     expect(entries.map((e) => e.key).sort()).toEqual([
+      'body-min-size',
       'canvas-share',
       'edge-blend',
       'element-scale',
+      'heading-line-height',
       'logo-clear-space',
       'margin-even',
       'mark-size-match',
+      'type-scale',
       'whitespace-share',
     ])
-    expect(entries.some((e) => (e.category as string) === 'typography')).toBe(false)
     expect(new Set(entries.map((e) => e.category))).toEqual(
-      new Set(['size', 'spacing', 'proportion', 'colour-share']),
+      new Set(['size', 'spacing', 'proportion', 'colour-share', 'typography']),
     )
   })
 
@@ -62,5 +65,14 @@ describe('authoring dataset', () => {
     expect(getEntry('edge-blend')?.category).toBe('proportion')
     expect(getEntry('nope')).toBeUndefined()
     expect(fillTemplate('a {x} b {y}', { x: 1 })).toBe('a 1 b {y}')
+  })
+
+  it('each typography mockReplacement carries dataset provenance (the x unit matches)', () => {
+    for (const k of ['type-scale', 'body-min-size', 'heading-line-height']) {
+      expect(setProvenance(k, getEntry(k)!.mockReplacement), k).toBe('dataset')
+    }
+    expect(setProvenance('type-scale', 'The headline is 9× the body text size.')).toBe(
+      'unverified',
+    )
   })
 })

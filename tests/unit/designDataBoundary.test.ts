@@ -118,7 +118,7 @@ describe('AC-16 / NFR-07: the pure files import no server module', () => {
         .filter((f) => f.includes('designData/authoring'))
         .map((f) => f.split('/').pop()!.replace('.ts', ''))
         .sort(),
-    ).toEqual(['detect', 'entries', 'index', 'measurable', 'roles', 'validate'])
+    ).toEqual(['detect', 'entries', 'index', 'measurable', 'roles', 'typography', 'validate'])
   })
 
   it('imports no prisma, minio, env, fs, puppeteer or runtime @prisma/client', () => {

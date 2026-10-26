@@ -25,3 +25,5 @@
 {"ev":"start","span":"T8","kind":"task","label":"Font picker, Sinhala picker, AJ","parent":"W4","model":"sonnet","attempt":"1","at":"2026-10-26T14:28:27Z","ts":1793024906}
 {"ev":"stop","span":"T8","at":"2026-10-26T14:50:42Z","ts":1793026242,"status":"ok"}
 {"ev":"stop","span":"W4","at":"2026-10-26T14:50:42Z","ts":1793026242,"status":"ok"}
+{"ev":"start","span":"W5","kind":"wave","label":"wave 5","at":"2026-10-26T14:51:06Z","ts":1793026266}
+{"ev":"start","span":"T9","kind":"task","label":"Typography entries and kit rules","parent":"W5","model":"sonnet","attempt":"1","at":"2026-10-26T14:51:06Z","ts":1793026266}

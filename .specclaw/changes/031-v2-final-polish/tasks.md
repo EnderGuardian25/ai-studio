@@ -173,7 +173,7 @@
 
 ### Wave 5: E, typography and the second host
 
-- [ ] `T9` — Typography entries and the coded kit rules
+- [x] `T9` — Typography entries and the coded kit rules
   - Files: `src/lib/designData/authoring/{entries,measurable,typography}.ts`, `src/app/api/admin/brandkits/[id]/route.ts` (GET `typographyFindings`), `src/components/admin/brandkits/FontEditor.tsx` or `KitDetail.tsx` (warnings), `src/lib/testHooks.ts` (if a mock replacement needs it), `tests/unit/{designAuthoring,kitTypography,designDetect}.test.ts`
   - Estimate: medium
   - Kind: impl

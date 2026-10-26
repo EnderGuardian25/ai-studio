@@ -68,7 +68,8 @@ export function setProvenance(entryKey: string, replacement: string): Provenance
   if (spans.length === 0) return 'unverified'
   for (const span of spans) {
     const { numbers, unit } = spanFacts(span.text)
-    const ranges = Object.values(entry.ranges).filter((r) => r.unit === unit)
+    const norm = (u: string) => (u === '×' ? 'x' : u)
+    const ranges = Object.values(entry.ranges).filter((r) => norm(r.unit) === norm(unit))
     if (ranges.length === 0) return 'unverified'
     if (!numbers.every((n) => ranges.some((r) => n >= r.min && n <= r.max))) return 'unverified'
   }

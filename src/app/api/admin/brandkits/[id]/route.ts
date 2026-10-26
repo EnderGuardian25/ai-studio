@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { prisma } from '@/lib/prisma'
 import { withTeamAdmin, parseBody } from '@/lib/api/handler'
 import { CATALOGUE_DATE, findFamily } from '@/lib/fonts/catalogue'
+import { checkKitTypography } from '@/lib/designData/authoring/typography'
 import { validateKitFonts, validateScriptFonts } from '@/lib/fonts/validateKitFonts'
 
 type Params = { id: string }
@@ -22,7 +23,14 @@ export const GET = withTeamAdmin<Params>(async (_req, { params }, user) => {
     return NextResponse.json({ error: 'Not found' }, { status: 404 })
   }
   // 031 FR-25: the date of the font list the picker searches.
-  return NextResponse.json({ ...kit, fontCatalogueDate: CATALOGUE_DATE })
+  // 031 FR-27: non-blocking typography findings, computed here so the lookup stays on the server.
+  const kitFonts = Array.isArray(kit.fonts) ? (kit.fonts as Array<{ name: string }>) : []
+  const scriptFonts =
+    kit.scriptFonts && typeof kit.scriptFonts === 'object' && !Array.isArray(kit.scriptFonts)
+      ? (kit.scriptFonts as Record<string, string>)
+      : null
+  const typographyFindings = checkKitTypography({ fonts: kitFonts, scriptFonts }, findFamily)
+  return NextResponse.json({ ...kit, fontCatalogueDate: CATALOGUE_DATE, typographyFindings })
 })
 
 const patchSchema = z.object({

@@ -3,10 +3,10 @@
 // names a public convention; nothing here is copied from an installed skill.
 //
 // Deliberately absent: composition (which side an image sits on, region shares,
-// archetype keys), which 009 owns, and typography, a follow-up change.
+// archetype keys), which 009 owns.
 // Pure and client-safe.
 
-export type Category = 'size' | 'spacing' | 'proportion' | 'colour-share'
+export type Category = 'size' | 'spacing' | 'proportion' | 'colour-share' | 'typography'
 
 export interface SlotRange {
   min: number
@@ -36,6 +36,10 @@ const W = String.raw`[\p{L}-]+`
 // An ambiguous single word matches only with a design noun within three words.
 const near = (words: string, nouns: string) =>
   String.raw`\b(?:${words})\b(?:\s+${W}){0,2}?\s+(?:${nouns})\b`
+
+// The same pairing in the other order: "make the headline big".
+const nearAfter = (nouns: string, words: string) =>
+  String.raw`\b(?:${nouns})\b(?:\s+${W}){0,2}?\s+(?:${words})\b`
 
 export const entries: readonly AuthoringEntry[] = [
   {
@@ -149,6 +153,61 @@ export const entries: readonly AuthoringEntry[] = [
       'A fade width as a share of the canvas width turns "soft" into a gradient the render can be measured against.',
     mockReplacement: 'blend that fades across 10 to 15% of the canvas width',
     source: 'Image-masking convention: a gradient mask as a share of the layout width.',
+  },
+  {
+    key: 'type-scale',
+    category: 'typography',
+    label: 'Headline scale',
+    triggers: [
+      near('big|bigger|large|larger|huge|oversized|small|tiny', 'headlines?|headings?|titles?'),
+      nearAfter('headlines?|headings?|titles?', 'big|bigger|large|larger|huge|oversized|small|tiny'),
+    ],
+    form: 'insert',
+    template: 'The headline is {ratio}× the body text size.',
+    defaults: { ratio: 2.5 },
+    ranges: { ratio: { min: 1.5, max: 4, unit: '×' } },
+    rationale:
+      'A headline-to-body ratio is a number a render can be held to; "big" leaves the size to the model.',
+    mockReplacement: 'The headline is 2.5× the body text size.',
+    source:
+      'modular-scale practice (Tim Brown, "More Meaningful Typography", A List Apart, 2011): headline-to-body steps of about 1.5 to 4 at social-post sizes; recorded as a team convention',
+  },
+  {
+    key: 'body-min-size',
+    category: 'typography',
+    label: 'Body text size',
+    triggers: [
+      near('readable|legible|small|tiny', 'text|body|copy|type|captions?|subtext'),
+      nearAfter('text|body|copy|captions?|subtext', 'readable|legible'),
+    ],
+    form: 'insert',
+    template: 'Body text is at least {px} px on the {width} px wide canvas.',
+    defaults: { px: 28, width: 1080 },
+    ranges: { px: { min: 24, max: 40, unit: 'px' }, width: { min: 1080, max: 1080, unit: 'px' } },
+    rationale:
+      'A minimum pixel size on a named canvas width keeps body text readable at phone feed size.',
+    mockReplacement: 'Body text is at least 28 px on the 1080 px wide canvas.',
+    source:
+      'team convention (031): readable at phone feed size; every current canvas is 1080 px wide',
+  },
+  {
+    key: 'heading-line-height',
+    category: 'typography',
+    label: 'Headline line height',
+    triggers: [
+      near(
+        'tight|tighter|loose|looser|compact',
+        'headlines?|headings?|titles?|leading|line[- ]height|line spacing',
+      ),
+      nearAfter('headlines?|headings?|titles?', 'tight|tighter|loose|looser|compact'),
+    ],
+    form: 'insert',
+    template: 'Headline line height is {lh}× its size.',
+    defaults: { lh: 1.1 },
+    ranges: { lh: { min: 0.95, max: 1.3, unit: '×' } },
+    rationale: '"Tight" is a mood; a line height as a multiple of the type size is a value.',
+    mockReplacement: 'Headline line height is 1.1× its size.',
+    source: 'common display-type practice; a team convention',
   },
 ]
 

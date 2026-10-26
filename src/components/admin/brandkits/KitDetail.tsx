@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 import { Plus, Pencil, Trash2, Star, Upload, ToggleLeft, ToggleRight, Sparkles, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
+import { Notice } from '@/components/ui/Notice'
 import { FieldLabel } from '@/components/ui/FieldLabel'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { SectionHead } from '@/components/ui/SectionHead'
@@ -401,6 +402,13 @@ export function KitDetail({ kit, onRefresh }: KitDetailProps) {
                 </li>
               )}
             </ul>
+          )}
+          {kit.typographyFindings && kit.typographyFindings.length > 0 && (
+            <Notice tone="warning" role="status" className="mt-3 space-y-1">
+              {kit.typographyFindings.map((f) => (
+                <p key={f.code + f.detail}>{f.detail}</p>
+              ))}
+            </Notice>
           )}
           {kit.fontCatalogueDate && (
             <p className="mt-3 text-ui-xs text-fg-muted">Font list from {kit.fontCatalogueDate}</p>
