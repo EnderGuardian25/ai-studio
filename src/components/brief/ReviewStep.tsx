@@ -136,7 +136,7 @@ export function ReviewStep({
 
   return (
     <div>
-      <StepHead title={<>Review &amp; Generate</>}>
+      <StepHead index={4} title={<>Review &amp; Generate</>}>
         Check your post before generating it.
       </StepHead>
 

@@ -31,7 +31,7 @@ function statusPill(info: OpenAiKeyInfo) {
   return <StatusChip tone="published">Connected</StatusChip>
 }
 
-export function OpenAiKeyCard() {
+export function OpenAiKeyCard({ numeral }: { numeral?: string }) {
   const confirm = useConfirm()
   const queryClient = useQueryClient()
   const [key, setKey] = useState('')
@@ -81,7 +81,7 @@ export function OpenAiKeyCard() {
   return (
     // A bezel card (021 design.md §8), its head the study's .card-hd.
     <section className="surface-bezel min-w-0 p-5">
-      <SectionHead title="Image generation key" className="mb-3">
+      <SectionHead numeral={numeral} title="Image generation key" className="mb-3">
         {!isLoading && statusPill(info)}
       </SectionHead>
 

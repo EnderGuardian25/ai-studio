@@ -98,7 +98,7 @@
     - Settle `PILL_BADGE`'s Folio value (design §3.2) and record it.
     - Unit tests that import removed names (`designTokens`, `contrast`, `uiPrimitives`) may fail until T7; list them in the report. tsc and lint must pass.
 
-- [ ] `T6` — Restore the other 021-only screens
+- [x] `T6` — Restore the other 021-only screens
   - Files: the "Pages" and "Screens" lines of design §2.1
   - Estimate: medium
   - Kind: refactor

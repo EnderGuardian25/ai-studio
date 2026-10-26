@@ -92,7 +92,7 @@ export function SizeDesignStep({
   const letterbox = compositeSource ? screenshotWillLetterbox(aspectRatio, compositeSource) : false
   return (
     <div>
-      <StepHead title={<>Size &amp; Design</>}>
+      <StepHead index={1} title={<>Size &amp; Design</>}>
         Choose the post size, which brand kit to use, and how the design is generated.
         You&apos;ll pick where to publish (Instagram / LinkedIn) at publish time.
       </StepHead>

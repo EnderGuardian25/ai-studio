@@ -9,7 +9,6 @@ import { toast } from 'sonner'
 import { apiFetch } from '@/lib/apiFetch'
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser'
 import { cn } from '@/lib/utils'
-import { FOCUS, ICON, ICON_SM } from '@/components/ui/atoms'
 
 // Sits above the nav sections in the sidebar. Most users belong to exactly
 // one team — a static label costs nothing and avoids a pointless dropdown.
@@ -60,10 +59,9 @@ export function TeamSwitcher() {
   }
 
 
-  // The study's .team (021 design.md §5): a --surface-2 card with a hairline
-  // ring, an initials avatar on the canvas (decorative: the name follows it),
-  // the team name at 13 px / 600 over the viewer's role. The static label
-  // (one team) has no chevron; the switcher shows an up-down one.
+  // Folio (DESIGN_SYSTEM.md §8.6): the team name in the display face over the
+  // viewer's role, with a 1 px --line-subtle rule beneath. No icon on the
+  // static label; the switcher shows an up-down icon.
   const roleLabel = !activeTeam
     ? null
     : isSuperAdmin
@@ -73,20 +71,18 @@ export function TeamSwitcher() {
         : teamRole === 'EDITOR'
           ? 'Editor'
           : null
-  const card =
-    'flex w-full items-center gap-2.5 p-2 rounded-ui-md bg-surface-raised text-left text-fg ring-1 ring-inset ring-line-subtle'
+  const block = 'mx-5 mb-[22px] pb-4 border-b border-line-subtle font-text text-fg'
   const name = (
-    <>
-      <TeamAvatar name={activeTeam?.name ?? ''} />
-      <span className="min-w-0 flex-1">
-        <span className="block truncate text-ui-sm font-semibold leading-tight">{label}</span>
-        {roleLabel && <span className="block text-ui-2xs text-fg-muted">{roleLabel}</span>}
+    <span className="min-w-0">
+      <span className="block truncate font-display text-ui-base font-medium leading-tight [font-variation-settings:'opsz'_24]">
+        {label}
       </span>
-    </>
+      {roleLabel && <span className="block text-ui-xs text-fg-muted">{roleLabel}</span>}
+    </span>
   )
 
   if (teams.length === 1) {
-    return <div className={card}>{name}</div>
+    return <div className={block}>{name}</div>
   }
 
   return (
@@ -97,37 +93,37 @@ export function TeamSwitcher() {
           disabled={switching}
           aria-label="Switch team"
           className={cn(
-            card,
-            'transition-shadow duration-fast ease-standard hover:ring-line',
-            FOCUS,
+            block,
+            'grid w-[calc(100%-40px)] grid-cols-[1fr_auto] items-end gap-2 text-left',
+            'rounded-ui-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus',
             'disabled:opacity-50 disabled:cursor-not-allowed',
           )}
         >
           {name}
-          <ChevronsUpDown {...ICON} aria-hidden="true" className="flex-shrink-0 text-fg-muted" />
+          <ChevronsUpDown size={15} strokeWidth={1.4} aria-hidden="true" className="mb-0.5 text-fg-muted" />
         </button>
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>
-        {/* .surface-raised: the opaque menu (011 FR-08, the study's .menu),
-            popping from its top-left anchor; under reduced motion globals.css
-            swaps the pop for a 150 ms fade. */}
+        {/* .surface-raised: opaque menu (FR-08) with the §8.7 item styles;
+            under reduced motion globals.css swaps the drop for a 150 ms fade. */}
         <DropdownMenu.Content
           align="start"
           sideOffset={6}
-          className="surface-raised z-50 min-w-56 max-w-72 origin-top-left p-1.5 animate-pop"
+          className="surface-raised z-50 min-w-56 max-w-72 py-1.5 animate-drop"
         >
           {teams.map(team => (
             <DropdownMenu.Item
               key={team.id}
               onSelect={() => selectTeam(team.id)}
               className={cn(
-                'flex items-center gap-2.5 px-2.5 py-2 rounded-ui-sm cursor-pointer outline-none',
-                'text-ui-sm text-fg',
+                'flex items-center gap-2.5 px-3.5 py-[7px] cursor-pointer outline-none',
+                'font-text text-ui-sm text-fg',
                 'data-[highlighted]:bg-canvas',
               )}
             >
               <Check
-                {...ICON_SM}
+                size={15}
+                strokeWidth={1.4}
                 aria-hidden="true"
                 className={cn('flex-shrink-0 text-accent', team.id === activeTeamId ? 'opacity-100' : 'opacity-0')}
               />
@@ -137,22 +133,5 @@ export function TeamSwitcher() {
         </DropdownMenu.Content>
       </DropdownMenu.Portal>
     </DropdownMenu.Root>
-  )
-}
-
-// The team's initials avatar (the study's .team-av): a 32 px canvas tile with
-// up to two letters, the first letters of the first two words ("Hearts
-// Academy" → "HA") or the first two of a one-word name. Decorative: the team
-// name always follows it. Shared with /choose-team.
-export function TeamAvatar({ name }: { name: string }) {
-  const words = name.trim().split(/\s+/).filter(Boolean)
-  const letters = words.length > 1 ? words[0][0] + words[1][0] : (words[0] ?? '').slice(0, 2)
-  return (
-    <span
-      aria-hidden="true"
-      className="grid h-8 w-8 flex-shrink-0 place-items-center rounded-[10px] bg-canvas text-[13px] font-bold"
-    >
-      {letters.toUpperCase()}
-    </span>
   )
 }

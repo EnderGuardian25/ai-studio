@@ -29,6 +29,7 @@ export function ImagesStep({
   return (
     <div>
       <StepHead
+        index={3}
         title={<>Images <span className="font-normal text-ui-sm text-fg-muted">(optional)</span></>}
       >
         Attach images to use in the design. Choose how each one is used: embed it directly in the design, or use it as style inspiration only.

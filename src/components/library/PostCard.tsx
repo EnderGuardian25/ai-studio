@@ -8,7 +8,6 @@ import { StatusChip } from '@/components/ui/StatusChip'
 import { ImageLightbox } from '@/components/ui/ImageLightbox'
 import type { AspectRatio } from '@prisma/client'
 import { aspectClassFor } from '@/lib/aspectRatio'
-import { FOCUS, ICON, ICON_BUTTON } from '@/components/ui/atoms'
 import { channelLabel } from '@/lib/channels'
 
 interface PostSummary {
@@ -42,10 +41,9 @@ type ChipStatus = 'draft' | 'exported' | 'scheduled' | 'published' | 'failed'
 
 // The expand button sits on the post image, which can be any colour, so it
 // uses fixed ink-on-paper values that read in both themes (DESIGN_SYSTEM.md
-// §8.12, the study's .expand): 32 × 32, radius 10 px, inset 10 px, with its
-// own drop shadow. Shown on hover or keyboard focus, as before.
+// §8.12): 30 × 30, inset 10 px. Shown on hover or keyboard focus, as before.
 const EXPAND_BUTTON =
-  'absolute top-2.5 right-2.5 inline-flex h-control-sm w-control-sm items-center justify-center rounded-[10px] bg-[#fbfaf8] text-[#181816] shadow-[0_4px_12px_-4px_rgb(0_0_0/0.3)] opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity duration-fast ease-standard focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus' // ui-exception: drawn on the post image, fixed ink-on-paper per DESIGN_SYSTEM.md §8.12
+  'absolute top-2.5 right-2.5 inline-flex h-control-sm w-control-sm items-center justify-center rounded-ui-sm border border-[#211c18] bg-[#fffefb] text-[#211c18] opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity duration-fast ease-standard focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus' // ui-exception: drawn on the post image, fixed ink-on-paper per DESIGN_SYSTEM.md §8.12
 
 function deriveStatus(draft: PostCardDraft): ChipStatus {
   if (draft.posts.length === 0) {
@@ -65,14 +63,14 @@ export function PostCard({ draft, isTeamAdmin, onPublish, onViewHistory, onDelet
   const [showPreview, setShowPreview] = useState(false)
 
   return (
-    <div className="surface flex flex-col min-w-0 p-2.5 transition-shadow duration-base ease-standard hover:shadow-raised">
-      {/* The tile is a card (.surface, radius-lg); the thumbnail inside it
-          stays square-cornered, with no filter, tint, crop change or hover
-          scale: the post is shown as rendered (DESIGN_SYSTEM.md §8.12,
-          021 A3). */}
+    <div className="flex flex-col min-w-0">
+      {/* The thumbnail, framed like a contact-sheet frame (DESIGN_SYSTEM.md
+          §8.12): a 1 px --line-subtle outline 3 px out (--line on hover), no
+          box, no rounding. The post image itself is shown as rendered — no
+          filter, tint, crop change or hover scale. */}
       <Link
         href={`/drafts/${draft.id}`}
-        className={`relative ${aspectClassFor(draft.brief.aspectRatio)} w-full block group overflow-hidden bg-canvas ${FOCUS}`}
+        className={`relative ${aspectClassFor(draft.brief.aspectRatio)} w-full block group overflow-hidden bg-surface outline outline-1 outline-offset-[3px] outline-line-subtle hover:outline-line transition-[outline-color] duration-fast ease-standard focus-visible:outline-2 focus-visible:outline-focus`}
       >
         {draft.exportUrl ? (
           <>
@@ -94,20 +92,20 @@ export function PostCard({ draft, isTeamAdmin, onPublish, onViewHistory, onDelet
                 setShowPreview(true)
               }}
             >
-              <Maximize2 {...ICON} aria-hidden />
+              <Maximize2 size={15} strokeWidth={1.4} />
             </button>
           </>
         ) : (
           <div className="w-full h-full flex items-center justify-center">
-            <ImageIcon size={36} strokeWidth={1.6} aria-hidden className="text-fg-muted opacity-40" />
+            <ImageIcon size={36} strokeWidth={1.4} className="text-fg-muted opacity-40" />
           </div>
         )}
       </Link>
 
       {/* Title, then a muted meta line with the status on the right */}
-      <div className="flex flex-col gap-1.5 px-1.5 pt-3 pb-1">
+      <div className="flex flex-col gap-1.5 pt-4">
         <p
-          className="text-ui-base font-semibold leading-snug text-fg line-clamp-2"
+          className="font-display text-ui-lg font-medium leading-snug text-fg line-clamp-2"
           title={draft.brief.topic}
         >
           {draft.brief.topic}
@@ -135,7 +133,7 @@ export function PostCard({ draft, isTeamAdmin, onPublish, onViewHistory, onDelet
         </div>
 
         {/* Actions. The floating Create post button is the view's one
-            primary (§8.2), so Publish is secondary here and History ghost. */}
+            primary (§8.2), so Publish is Outline here and History is Text. */}
         <div className="flex items-center gap-2 pt-2">
           {isTeamAdmin && (
             <Button
@@ -159,10 +157,10 @@ export function PostCard({ draft, isTeamAdmin, onPublish, onViewHistory, onDelet
               type="button"
               aria-label={`Delete ${draft.brief.topic}`}
               title="Delete post"
-              className={`ml-auto ${ICON_BUTTON} hover:bg-surface-raised hover:text-status-failed ${FOCUS}`}
+              className="ml-auto inline-flex h-control-sm w-control-sm items-center justify-center rounded-ui-md text-fg-muted transition-colors duration-fast ease-standard hover:text-status-failed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
               onClick={() => onDelete(draft.id)}
             >
-              <Trash2 {...ICON} aria-hidden />
+              <Trash2 size={15} strokeWidth={1.4} />
             </button>
           )}
         </div>

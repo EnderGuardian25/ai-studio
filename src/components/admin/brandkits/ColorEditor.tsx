@@ -27,14 +27,14 @@ export function ColorEditor({ colors, onChange }: ColorEditorProps) {
     <div className="space-y-2">
       <div className="flex flex-wrap gap-2">
         {colors.map(c => (
-          <div key={c} className="flex items-center gap-1.5 rounded-ui-pill bg-canvas py-0.5 pl-1 pr-0.5 ring-1 ring-inset ring-line-subtle">
+          <div key={c} className="flex items-center gap-1.5 rounded-ui-sm border border-line-subtle bg-surface py-0.5 pl-1.5 pr-0.5">
             <ColorSwatch color={c} />
             <span className="font-mono text-ui-xs text-fg">{c}</span>
             <button
               type="button"
               onClick={() => onChange(colors.filter(x => x !== c))}
               aria-label={`Remove color ${c}`}
-              className={`inline-flex h-6 w-6 items-center justify-center rounded-ui-pill text-fg-muted transition-colors duration-fast ease-standard hover:bg-surface-raised hover:text-status-failed ${FOCUS}`}
+              className={`inline-flex h-6 w-6 items-center justify-center rounded-ui-sm text-fg-muted transition-colors duration-fast ease-standard hover:text-status-failed ${FOCUS}`}
             >×</button>
           </div>
         ))}

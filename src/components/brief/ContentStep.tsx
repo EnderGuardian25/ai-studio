@@ -64,7 +64,7 @@ export function ContentStep({ topic, setTopic, prompt, setPrompt, goal, tone, se
 
   return (
     <div>
-      <StepHead title={<>Description &amp; caption direction</>}>
+      <StepHead index={2} title={<>Description &amp; caption direction</>}>
         Give the post a short topic, describe what it&apos;s about, then check the tone.
       </StepHead>
 

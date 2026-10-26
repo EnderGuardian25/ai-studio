@@ -13,7 +13,7 @@ import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 
 const BASE = '9f829456'
-const T6_DONE = false
+const T6_DONE = true
 
 // FR-11: byte-identical to BASE.
 const BYTE_IDENTICAL = ['src/app/globals.css', 'src/app/layout.tsx', 'tailwind.config.ts', 'src/components/Logo.tsx']
