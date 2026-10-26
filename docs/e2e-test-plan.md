@@ -1,7 +1,7 @@
 # bistec-studio — E2E Test Plan
 
 **Created:** 2026-06-23
-**Status:** ✅ Full §6 catalog implemented **and green**. **Latest full clean mock gate (change 025 T12, 2026-10-26): 548/3/0/0.** The 006 T6 gate before it was 473/3/0/1 (the one flaky was a Playwright worker-process crash in `regression.test.ts` H7, not an assertion; that suite then re-ran clean 3 of 3) (the 026 gate before it was 444 / 3 / 0 / 0; the 009 gate, 2026-10-21, was 422 passed / 3 skipped / 0 failed / 0 flaky) (the 023 gate before it was 405 / 3 / 0 / 0; the 016 gate was 386 / 3 / 0 / 0). The older counts below are history. **Unit as of 2026-07-27 (PR #40): 322/322.** The CI gate (`.github/workflows/e2e.yml`) passed on PRs #38, #39 and #40. Last full _local_ run with recorded counts (2026-07-22, `feature/team-tenancy` branch, post TC-REG-H7a de-flake): **171 passed, 4 skipped, 0 failed** (175 tests total; 0 flaky — TC-REG-H7a's parallel-fire assertion was rewritten to a timing-robust integrity invariant, see below), unit **264/264** at that time.
+**Status:** ✅ Full §6 catalog implemented **and green**. **Latest full clean mock gate (change 031 T19, 2026-10-26): 598/3/0/0.** The 025 T12 gate before it was 548/3/0/0. The 006 T6 gate before it was 473/3/0/1 (the one flaky was a Playwright worker-process crash in `regression.test.ts` H7, not an assertion; that suite then re-ran clean 3 of 3) (the 026 gate before it was 444 / 3 / 0 / 0; the 009 gate, 2026-10-21, was 422 passed / 3 skipped / 0 failed / 0 flaky) (the 023 gate before it was 405 / 3 / 0 / 0; the 016 gate was 386 / 3 / 0 / 0). The older counts below are history. **Unit as of 2026-07-27 (PR #40): 322/322.** The CI gate (`.github/workflows/e2e.yml`) passed on PRs #38, #39 and #40. Last full _local_ run with recorded counts (2026-07-22, `feature/team-tenancy` branch, post TC-REG-H7a de-flake): **171 passed, 4 skipped, 0 failed** (175 tests total; 0 flaky — TC-REG-H7a's parallel-fire assertion was rewritten to a timing-robust integrity invariant, see below), unit **264/264** at that time.
 
 Last full run on `main` (2026-07-13, post brief-draft-recovery §P): **132 passed, 0 failed, 7 skipped** (`npm run test:e2e:mock`; the machine lacked `BISTEC_API_KEYS` in `.env.test`, so 3 §J ACP-auth cases skipped on top of the 4 intentional skips below — CI sets the keys as job env and runs them). The 2026-07-13 feature batch added `async-generation.test.ts` (F1 async + retry), a version back/forward-jump case (F2), F4 auto-scheduling cases in `campaign-scheduling.test.ts`, `brandkit-assistant.test.ts` (F5), and `image-to-template.test.ts` (F6); generation-dependent suites now poll via the `waitForDraft` helper (generation is async). A GitHub Actions gate (`.github/workflows/e2e.yml`) runs the whole suite — including the §K security-fix regressions — on every PR and push to `main`, and is **green as of 2026-07-13** (it had been red for weeks on a bad CI `TOKEN_ENCRYPTION_KEY` — it MUST be a valid 64-char hex string, else `crypto.ts` throws and the credential-encrypting routes 500). Runs on GitHub-hosted `ubuntu-latest` with the actions on the Node 24 runtime.
 
@@ -1066,7 +1066,7 @@ Mock mode (`MOCK_AI` + `MOCK_PUPPETEER`). Every case runs on the existing hero s
 | TC-LOOK-01 | `product-showcase` at 9:16 is kept with contract version 2, the image set, no notice; the same stamp on the draft and its first revision                                                                                                                                                                                                                 |
 | TC-LOOK-02 | `editorial-split` at 9:16 is kept with contract version 2                                                                                                                                                                                                                                                                                                |
 | TC-LOOK-03 | `full-bleed-scene` at SQUARE, PORTRAIT and 9:16 is kept with contract version 1                                                                                                                                                                                                                                                                          |
-| TC-LOOK-04 | `spotlight` at SQUARE, PORTRAIT and 9:16 is kept with contract version 1                                                                                                                                                                                                                                                                                 |
+| TC-LOOK-04 | `spotlight` at SQUARE, PORTRAIT and 9:16 is kept with contract version 2 (031 T18: spotlight v2 is current; v1 stays resolvable, see the render suite's `SUPERSEDED_FIXTURES`)                                                                                                                                                                           |
 | TC-LOOK-05 | `full-bleed-scene` with `__MOCK_HERO_BUSY__`: classic, reason `busy`, the notice names "Full-bleed scene", `imageUrl` still set (the hero image is reused)                                                                                                                                                                                               |
 | TC-LOOK-06 | `spotlight` with `__MOCK_HERO_CONTRAST__`: classic, reason `contrast`, the notice names "Spotlight"                                                                                                                                                                                                                                                      |
 | TC-LOOK-07 | `spotlight` with `__MOCK_HERO_LAYOUT__`: kept, `observations: ['layout-violation']`, the composition notice shows it                                                                                                                                                                                                                                     |
@@ -1079,6 +1079,10 @@ Mock mode (`MOCK_AI` + `MOCK_PUPPETEER`). Every case runs on the existing hero s
 | TC-LOOK-14 | T7: the same for the Hiring post style                                                                                                                                                                                                                                                                                                                   |
 | TC-LOOK-15 | T7: a queue entry with `postStyle: 'event'` at 9:16, through the generation tick, still stores `imageStyle: 'classic'` and a classic stamp                                                                                                                                                                                                               |
 | TC-LOOK-16 | T7: the same for `postStyle: 'hiring'`                                                                                                                                                                                                                                                                                                                   |
+| TC-LOOK-17 | 031 T18: the wizard pre-fills Spotlight for a Promotion post, and the resumed draft keeps it (`imageStyle` spotlight, STORY)                                                                                                                                                                                                                             |
+| TC-LOOK-18 | 031 T18: the same for a Milestone post                                                                                                                                                                                                                                                                                                                   |
+| TC-LOOK-19 | 031 T18: a queue entry with `postStyle: 'promotion'` at 9:16, through the generation tick, still stores `imageStyle: 'classic'` and a classic stamp                                                                                                                                                                                                      |
+| TC-LOOK-20 | 031 T18: the same for `postStyle: 'milestone'`                                                                                                                                                                                                                                                                                                           |
 
 **AC-to-case table.** Unit and render tests cover the rest of the mechanism; the cases above cover the end-to-end behaviour.
 
@@ -1183,41 +1187,44 @@ CI gate: **`.github/workflows/e2e.yml`** runs the whole suite (§A–§AA, inclu
 
 ## 9. Coverage traceability
 
-| Finding(s)                                                      | Guarded by                                                                             |
-| --------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| H1 ACP/MCP auth                                                 | TC-ACP-01/02/03                                                                        |
-| H2 IDOR                                                         | TC-AGUI-06, TC-LIB-01, ownership asserts across D/E/F                                  |
-| H3 library leak                                                 | TC-LIB-01                                                                              |
-| H4 admin gating                                                 | TC-AUTH-05, TC-PUB-09, TC-BK-08, TC-RES-05                                             |
-| H5 publish button                                               | TC-UI-03                                                                               |
-| H7 atomicity                                                    | TC-PUB-02/03, TC-REG-H7a/b/c                                                           |
-| H8 upload validation                                            | TC-BK-07                                                                               |
-| H9 indexes                                                      | TC-REG-H9                                                                              |
-| H10 storage                                                     | TC-BK-04, TC-GEN-05, TC-PUB-08, TC-LIB-05, TC-ACP-05, TC-REG-H10a/b/c, TC-UI-04        |
-| H11 puppeteer                                                   | TC-REG-H11a/b/c                                                                        |
-| H12 scheduler                                                   | TC-PUB-04, TC-REG-H12a/b/c                                                             |
-| H13 /api/me                                                     | TC-AUTH-04                                                                             |
-| M1 atomic default                                               | TC-BK-02, TC-PROV-06                                                                   |
-| M4 soft-delete resolve                                          | TC-RES-04                                                                              |
-| M5 artifact sync                                                | TC-BK-06                                                                               |
-| M6 ACP validation                                               | TC-ACP-03                                                                              |
-| M9 middleware prefix                                            | TC-AUTH-07                                                                             |
-| M10 key prefix mask                                             | TC-PROV-04                                                                             |
-| M11 bounded lists                                               | TC-RES-06                                                                              |
-| M12 brief validation                                            | TC-GEN-03/04                                                                           |
-| L1 IG header / system user                                      | TC-ACP-04                                                                              |
-| L2 shared helpers                                               | TC-REG-L2                                                                              |
-| Known Issue (oversized template)                                | TC-GEN-06                                                                              |
-| Change 004 refine fidelity (AC-08 → AC-20b)                     | §U TC-REJ-01…04, §V TC-FID-01…17, T18/T19 in `refine-not-applied.test.ts` (see §V map) |
-| Change 005 skipped-background notice (AC-01, AC-08 → AC-11)     | §BG TC-BG-01…10, TC-GEN-05 (see §BG map)                                               |
-| Change 012 per-channel captions (AC-12 → AC-24)                 | §W TC-CAP-01…20, TC-ASYNC-10 (see §W map)                                              |
-| Change 008 model selection, wave 1 (AC-15 → AC-23)              | §Y TC-MODEL-01…12, `a11y` /team axe (see §Y map)                                       |
-| Change 008 model selection, wave 2 (AC-27 → AC-31, AC-33)       | §Y TC-MODEL-13…20, `a11y` /drafts/[id] axe (see §Y wave-2 map)                         |
-| Change 020 Create post button off the draft page (AC-01, AC-02) | `create-post-button.test.ts` AC-01, AC-01b, AC-02b (see the 020 update note after §X)  |
-| Change 009 hero imagery (AC-04, AC-05, AC-12 to AC-19, AC-21)   | §AA TC-HERO-01…16, `a11y` draft page and `/brief` axe (see §AA map)                    |
-| Change 030 stale-headline badge (AC-11 → AC-19)                 | §AH TC-HL-01…10, `a11y` "AC-19: a draft page with the stale-headline badge" (see §AH)  |
-| Change 031 personal image generation key (AC-12)                | §AI TC-IK-01…06 (see §AI)                                                              |
-| Change 031 Apply to image (AC-38 → AC-40)                       | §AM TC-AP-01…10 (see §AM)                                                              |
+| Finding(s)                                                             | Guarded by                                                                             |
+| ---------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| H1 ACP/MCP auth                                                        | TC-ACP-01/02/03                                                                        |
+| H2 IDOR                                                                | TC-AGUI-06, TC-LIB-01, ownership asserts across D/E/F                                  |
+| H3 library leak                                                        | TC-LIB-01                                                                              |
+| H4 admin gating                                                        | TC-AUTH-05, TC-PUB-09, TC-BK-08, TC-RES-05                                             |
+| H5 publish button                                                      | TC-UI-03                                                                               |
+| H7 atomicity                                                           | TC-PUB-02/03, TC-REG-H7a/b/c                                                           |
+| H8 upload validation                                                   | TC-BK-07                                                                               |
+| H9 indexes                                                             | TC-REG-H9                                                                              |
+| H10 storage                                                            | TC-BK-04, TC-GEN-05, TC-PUB-08, TC-LIB-05, TC-ACP-05, TC-REG-H10a/b/c, TC-UI-04        |
+| H11 puppeteer                                                          | TC-REG-H11a/b/c                                                                        |
+| H12 scheduler                                                          | TC-PUB-04, TC-REG-H12a/b/c                                                             |
+| H13 /api/me                                                            | TC-AUTH-04                                                                             |
+| M1 atomic default                                                      | TC-BK-02, TC-PROV-06                                                                   |
+| M4 soft-delete resolve                                                 | TC-RES-04                                                                              |
+| M5 artifact sync                                                       | TC-BK-06                                                                               |
+| M6 ACP validation                                                      | TC-ACP-03                                                                              |
+| M9 middleware prefix                                                   | TC-AUTH-07                                                                             |
+| M10 key prefix mask                                                    | TC-PROV-04                                                                             |
+| M11 bounded lists                                                      | TC-RES-06                                                                              |
+| M12 brief validation                                                   | TC-GEN-03/04                                                                           |
+| L1 IG header / system user                                             | TC-ACP-04                                                                              |
+| L2 shared helpers                                                      | TC-REG-L2                                                                              |
+| Known Issue (oversized template)                                       | TC-GEN-06                                                                              |
+| Change 004 refine fidelity (AC-08 → AC-20b)                            | §U TC-REJ-01…04, §V TC-FID-01…17, T18/T19 in `refine-not-applied.test.ts` (see §V map) |
+| Change 005 skipped-background notice (AC-01, AC-08 → AC-11)            | §BG TC-BG-01…10, TC-GEN-05 (see §BG map)                                               |
+| Change 012 per-channel captions (AC-12 → AC-24)                        | §W TC-CAP-01…20, TC-ASYNC-10 (see §W map)                                              |
+| Change 008 model selection, wave 1 (AC-15 → AC-23)                     | §Y TC-MODEL-01…12, `a11y` /team axe (see §Y map)                                       |
+| Change 008 model selection, wave 2 (AC-27 → AC-31, AC-33)              | §Y TC-MODEL-13…20, `a11y` /drafts/[id] axe (see §Y wave-2 map)                         |
+| Change 020 Create post button off the draft page (AC-01, AC-02)        | `create-post-button.test.ts` AC-01, AC-01b, AC-02b (see the 020 update note after §X)  |
+| Change 009 hero imagery (AC-04, AC-05, AC-12 to AC-19, AC-21)          | §AA TC-HERO-01…16, `a11y` draft page and `/brief` axe (see §AA map)                    |
+| Change 030 stale-headline badge (AC-11 → AC-19)                        | §AH TC-HL-01…10, `a11y` "AC-19: a draft page with the stale-headline badge" (see §AH)  |
+| Change 031 personal image generation key (AC-12)                       | §AI TC-IK-01…06 (see §AI)                                                              |
+| Change 031 Apply to image (AC-38 → AC-40)                              | §AM TC-AP-01…10 (see §AM)                                                              |
+| Change 031 post fonts (AC-17, AC-18, AC-22 → AC-24)                    | §AJ TC-PF-01…08 (see §AJ)                                                              |
+| Change 031 briefing design-rule upgrade (AC-27, AC-28)                 | §AK TC-BU-01…05 (see §AK)                                                              |
+| Change 031 assistants: schedule styles, brand-kit fonts (AC-30, AC-32) | §AL TC-AS-01…06 (see §AL)                                                              |
 
 > Items with no behavioral surface (M2 init race, M3 stdin, M7 polling, M8 crypto guards, M13 dead code) are best covered by unit tests; M7 polling can optionally be a UI test (draft auto-refresh while `IN_PROGRESS`).
 

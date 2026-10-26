@@ -198,6 +198,20 @@ npm run dev   # http://localhost:3000
 
 ---
 
+### Refresh the Google Fonts list (031, operator step)
+
+The font picker and the font request read a snapshot in `src/lib/fonts/catalogue.json` (dated in the file; the kit page shows the date). The snapshot is not fetched at runtime and is never refreshed in CI. Refresh it by hand when a family you need is missing or the snapshot is old:
+
+```bash
+node scripts/refresh-google-fonts.mjs   # one fetch of Google's public font metadata, no key
+git diff --stat src/lib/fonts/catalogue.json
+git add src/lib/fonts/catalogue.json && git commit -m "Refresh the Google Fonts snapshot"
+```
+
+The script never removes a family: one that Google no longer lists is kept and marked `delisted`. If the fetch fails, the script exits non-zero and writes nothing; there is no fallback list. Run `npx vitest run tests/unit/fonts*.test.ts` after the refresh.
+
+---
+
 ## 7. Test mode without an Anthropic API key
 
 Set `DESIGN_PROVIDER=cli` in `.env` to route design generation through the local

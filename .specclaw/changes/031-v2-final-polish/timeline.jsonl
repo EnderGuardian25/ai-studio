@@ -49,3 +49,7 @@
 {"ev":"start","span":"T16","kind":"task","label":"Spotlight evidence, v2 contract, runner","parent":"W8","model":"sonnet","attempt":"1","at":"2026-10-26T16:25:53Z","ts":1793031953}
 {"ev":"stop","span":"T16","at":"2026-10-26T16:41:31Z","ts":1793032891,"status":"ok"}
 {"ev":"start","span":"T18","kind":"task","label":"Apply the OP-031 pass","parent":"W8","model":"sonnet","attempt":"1","at":"2026-10-26T17:17:19Z","ts":1793035039}
+{"ev":"stop","span":"T18","at":"2026-10-26T17:38:32Z","ts":1793036312,"status":"ok"}
+{"ev":"stop","span":"W8","at":"2026-10-26T17:38:33Z","ts":1793036313,"status":"ok"}
+{"ev":"start","span":"W9","kind":"wave","label":"wave 9","at":"2026-10-26T17:38:36Z","ts":1793036316}
+{"ev":"start","span":"T19","kind":"task","label":"Docs, screenshots, full gate, CI","parent":"W9","model":"haiku","attempt":"1","at":"2026-10-26T17:38:37Z","ts":1793036317}

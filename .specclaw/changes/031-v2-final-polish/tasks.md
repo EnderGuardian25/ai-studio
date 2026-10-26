@@ -315,7 +315,7 @@
 
 ### Wave 9: Close
 
-- [ ] `T19` — Docs, screenshots, the W table, the full gate and CI
+- [x] `T19` — Docs, screenshots, the W table, the full gate and CI
   - Files: `docs/handoff.md`, `CLAUDE.md`, `docs/e2e-test-plan.md`, `.specclaw/ROADMAP.md`, `docs/ui-reference/screen-light.png`, `docs/ui-reference/screen-dark.png`, `reports/T3.md` (owned rows filled), `docs/cold-start.md` (the font refresh operator step)
   - Estimate: medium
   - Kind: docs

@@ -523,6 +523,7 @@ They are driven by `__MOCK_BG__` / `__MOCK_BG_FAIL__`, `__MOCK_FONT_MISSING__`, 
 - **L3.** Script fonts reach only declarations that exist. A design with no `font-family` uses the OS fallback (the Noto Sans Sinhala package in the image).
 - **L4.** The snapshot ages; the refresh is an operator step (handoff).
 - **L5.** The typography prose rules are checked as text, like the other 007 entries; only FR-27's two rules are checked against the kit's fonts.
+- **L6.** The Apply in-render check reads innerText, so an old headline painted only through CSS ::before/::after content is not detected (031 T14; AC-37's ::after fixture became a second DOM element).
 
 ## Dependencies
 
