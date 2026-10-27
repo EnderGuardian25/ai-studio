@@ -532,3 +532,20 @@ AC-03 expected 404 for a trailing-slash auth path, but Next.js answers 308 to th
 When a spec asserts a status for path variants, account for the framework's own normalisation (trailing slash, redirects) first
 
 ---
+
+## [L32] best_practice — check-report reads only the last '## Verification' block ...
+
+**When:** 2026-10-27 17:32 UTC
+**Category:** best_practice
+**Priority:** low
+**Status:** pending
+
+### Detail
+
+check-report reads only the last '## Verification' block and needs Command:/Exit:/Output lines; a prose list of several commands under that heading fails
+
+### Action
+
+Put the multi-command summary under another heading and end with one Command/Exit/Output footer from a real run
+
+---
