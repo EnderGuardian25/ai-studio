@@ -168,7 +168,7 @@
   - Depends: T8
   - Notes: design §7. Suites: `brand-kit.test.ts`, `kit-upgrade.test.ts`, the campaign and queue suites, `surfaces.test.ts` (drawers), and the axe suite.
 
-- [ ] `T10` — G4 team, settings and admin
+- [x] `T10` — G4 team, settings and admin
   - Files: G4's files and new components; DESIGN_SYSTEM.md §8.26, §8.27; `audit.md`; tests named by its rows
   - Estimate: medium
   - Kind: impl

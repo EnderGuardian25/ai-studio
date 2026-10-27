@@ -20,7 +20,7 @@ import {
   FOCUS,
   ICON,
   ICON_BUTTON,
-  PILL_BADGE,
+  ICON_SM,
   ROW,
   SMALL_CAPS,
   SUB_HEAD,
@@ -242,7 +242,11 @@ function ProviderCard({
         <div className="flex flex-wrap items-center gap-2">
           <span className="min-w-0 truncate text-ui-base font-medium text-fg" title={provider.label}>{provider.label}</span>
           <span className={TAG}>{provider.slot === 'COPY' ? 'Captions' : 'Images'}</span>
-          {provider.isDefault && <span className={PILL_BADGE}>Default</span>}
+          {provider.isDefault && (
+            <span className={`flex items-center gap-1 ${SMALL_CAPS} text-accent`}>
+              <Star {...ICON_SM} fill="currentColor" aria-hidden="true" /> Default
+            </span>
+          )}
           {serving !== undefined && (
             <span data-testid="copy-row-serving" data-serving={serving ? 'true' : 'false'}>
               <StatusChip tone={serving ? 'published' : 'draft'}>

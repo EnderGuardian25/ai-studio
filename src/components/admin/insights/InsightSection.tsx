@@ -1,6 +1,6 @@
 import React from 'react'
 import { SectionHead } from '@/components/ui/SectionHead'
-import { SUB_HEAD } from '@/components/ui/atoms'
+import { BLOCK, EYEBROW, SUB_HEAD } from '@/components/ui/atoms'
 
 interface InsightSectionProps {
   id: string
@@ -11,15 +11,18 @@ interface InsightSectionProps {
   children: React.ReactNode
 }
 
-// One page section (§6): opened by the 2 px ink rule, labelled by its heading.
+// One page section (§6, §8.27): the head over the 2 px ink rule, then a body
+// holding the question and the content. Labelled by its heading; no numeral.
 export function InsightSection({ id, title, question, tail, children }: InsightSectionProps) {
   return (
-    <div className="min-w-0 border-t-2 border-fg pt-4" role="region" aria-labelledby={`${id}-h`} data-testid={`section-${id}`}>
-      <SectionHead id={`${id}-h`} title={title} className="mb-1">
+    <div className="min-w-0" role="region" aria-labelledby={`${id}-h`} data-testid={`section-${id}`}>
+      <SectionHead id={`${id}-h`} title={title} className="mb-3">
         {tail}
       </SectionHead>
-      <p className="mb-4 text-ui-sm text-fg-muted">{question}</p>
-      <div className="flex flex-col gap-5">{children}</div>
+      <div className={BLOCK}>
+        <p className="mb-4 text-ui-sm text-fg-muted">{question}</p>
+        <div className="flex flex-col gap-5">{children}</div>
+      </div>
     </div>
   )
 }
@@ -34,12 +37,15 @@ export function Block({ title, children }: { title: string; children: React.Reac
   )
 }
 
-/** A labelled figure (a count or a rate). */
+/** A labelled figure (a count or a rate): Folio's KPI, an eyebrow over a display numeral on a ruled row. */
 export function Stat({ label, value, testId }: { label: string; value: React.ReactNode; testId?: string }) {
   return (
-    <div className="min-w-0">
-      <div className="text-ui-xs text-fg-muted">{label}</div>
-      <div data-testid={testId} className="text-ui-lg font-semibold tabular-nums">
+    <div className="min-w-0 border-b border-line-subtle py-4">
+      <div className={EYEBROW}>{label}</div>
+      <div
+        data-testid={testId}
+        className="mt-2 font-display text-ui-2xl font-normal leading-none tabular-nums [font-variation-settings:'opsz'_144]"
+      >
         {value}
       </div>
     </div>
