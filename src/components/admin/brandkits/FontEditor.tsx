@@ -6,7 +6,7 @@ import { apiFetch } from '@/lib/apiFetch'
 import type { FontFamily } from '@/lib/fonts/types'
 import { inputClasses, fieldEdge } from '@/components/ui/Input'
 import { cn } from '@/lib/utils'
-import { FOCUS, TAG } from '@/components/ui/atoms'
+import { EYEBROW, FOCUS } from '@/components/ui/atoms'
 import { FieldLabel } from '@/components/ui/FieldLabel'
 
 // ─── Font Editor ─────────────────────────────────────────────────────────────
@@ -100,7 +100,7 @@ export function FontEditor({ fonts, onChange }: FontEditorProps) {
         {fonts.map((f, i) => (
           <div key={f.name} className="flex max-w-full items-center gap-1.5 rounded-ui-sm border border-line-subtle bg-surface py-0.5 pl-2 pr-0.5">
             <span className="min-w-0 break-words text-ui-sm text-fg">{f.name}</span>
-            {i < 2 && <span className={TAG}>{i === 0 ? 'Heading' : 'Body'}</span>}
+            {i < 2 && <span className={EYEBROW}>{i === 0 ? 'Heading' : 'Body'}</span>}
             <button
               type="button"
               onClick={() => onChange(fonts.filter(x => x.name !== f.name))}
@@ -152,8 +152,8 @@ export function FontEditor({ fonts, onChange }: FontEditorProps) {
                     }`}
                   >
                     <span>{f.family}</span>
-                    <span className={TAG}>{f.category}</span>
-                    {f.delisted && <span className={TAG}>No longer on Google Fonts</span>}
+                    <span className="text-ui-xs text-fg-muted">{f.category}</span>
+                    {f.delisted && <span className="text-ui-xs text-fg-muted">No longer on Google Fonts</span>}
                   </button>
                 </li>
               ))}

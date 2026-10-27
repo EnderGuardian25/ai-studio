@@ -7,7 +7,6 @@ import { FileText, Loader2, Paperclip, Send, Trash2, ArrowUp, ArrowDown, Calenda
 import { Button } from '@/components/ui/Button'
 import { Drawer } from '@/components/ui/Modal'
 import { FieldLabel } from '@/components/ui/FieldLabel'
-import { Select } from '@/components/ui/Select'
 import { postStyleLabel, postStyleOptions } from '@/components/campaigns/postStyleOptions'
 import { ModelPicker } from '@/components/ui/ModelPicker'
 import { ApiError, apiFetch } from '@/lib/apiFetch'
@@ -446,12 +445,20 @@ export function BriefingAssistantPanel({ campaignId, open, onClose, onApply }: B
                       onChange={e => updateRow(i, { generateAt: e.target.value })}
                       className={`${COMPACT_FIELD} max-w-full`}
                     />
-                    <Select
+                    <select
                       aria-label="Post style"
-                      options={postStyleOptions('General', row.postStyle).filter(o => o.value !== '')}
                       value={row.postStyle}
                       onChange={e => updateRow(i, { postStyle: e.target.value, proposedStyle: undefined })}
-                    />
+                      className={`${COMPACT_FIELD} max-w-full`}
+                    >
+                      {postStyleOptions('General', row.postStyle)
+                        .filter(o => o.value !== '')
+                        .map(o => (
+                          <option key={o.value} value={o.value}>
+                            {o.label}
+                          </option>
+                        ))}
+                    </select>
                     <span className="break-words text-ui-2xs text-fg-muted">
                       {row.tone} · {row.postAction === 'HOLD' ? 'hold for review' : row.postAction.toLowerCase()}
                     </span>

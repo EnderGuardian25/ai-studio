@@ -716,35 +716,35 @@ A look that is not available is disabled with its reason, never hidden. Light an
 - **Flagged list:** ruled rows (`divide-y` on `--line-subtle`, 10 px padding), not cards. A row holds the quoted phrase in `font-mono` `--text-sm` 600, its rule label as a `TAG` (§8.18), a `--text-xs` `--fg-muted` "Try:" line, and a ghost small "Dismiss" `Button` at the right (its `aria-label` names the phrase).
 - **Upgrade:** a secondary small `Button` with a 15 px `Sparkles` icon, "Upgrade", showing "Upgrading…" while it runs.
 - **Notices:** each is a `Notice` (§8.18). A failed call is `tone="error" role="alert"` with a "Try again" secondary small `Button` when it can be retried. A warning is `tone="warning" role="status"`. The neutral tone (`--surface-1` fill, `--line` ring) carries the "nothing to upgrade" and "suggestions failed the checks" lines.
-- **Proposed edits:** ruled rows again. Each is a `role="group"` with a `TAG` for the kind ("Replace" or "Add after") and one for its provenance, then the sentence (a replaced quote struck through in `--fg-muted`, the new wording in `ins` 600 with no underline), the rationale (`--text-xs` `--fg-muted`), an unverified-number `Notice tone="warning"`, and the action row: an Ink small "Accept" and a ghost small "Reject", or a `TAG` "Accepted" or "Rejected" once settled.
+- **Proposed edits:** ruled rows again. Each is a `role="group"` with the kind ("Replace" or "Add after") and the provenance as two small-caps `EYEBROW` words (no box), then the sentence (a replaced quote struck through in `--fg-muted`, the new wording in `ins` 600 with no underline), the rationale (`--text-xs` `--fg-muted`), an unverified-number `Notice tone="warning"`, and the action row: an Ink small "Accept" and a ghost small "Reject", or, once settled, a small-caps status word (`SMALL_CAPS`): "Accepted" in `--status-published`, "Rejected" in `--fg-muted`, as the refine log's status words (§8.14). The rule label on a flagged row keeps its `TAG`.
 
-**Atoms and tokens.** `SUB_HEAD`, `TAG`, `ICON`, `Notice`, `Button`; the row rules are `--line-subtle`. The panel has no fill, ring or shadow of its own, and no bezel: it reads as part of the editor's section.
+**Atoms and tokens.** `SUB_HEAD`, `EYEBROW`, `SMALL_CAPS`, `TAG` (the rule label only), `ICON`, `Notice`, `Button`; the row rules are `--line-subtle`. The panel has no fill, ring or shadow of its own, and no bezel: it reads as part of the editor's section.
 
-| State        | Look                                                      |
-| ------------ | --------------------------------------------------------- |
-| No flags     | the head count only; no list                              |
-| Flagged      | the ruled list, one row per phrase                        |
-| Upgrading    | the Upgrade button disabled with its working label        |
-| Edit pending | Accept (Ink) and Reject (ghost) side by side              |
-| Edit stale   | Accept disabled, a `--text-xs` `--fg-muted` line says why |
-| Edit settled | the "Accepted" or "Rejected" `TAG` replaces the buttons   |
+| State        | Look                                                          |
+| ------------ | ------------------------------------------------------------- |
+| No flags     | the head count only; no list                                  |
+| Flagged      | the ruled list, one row per phrase                            |
+| Upgrading    | the Upgrade button disabled with its working label            |
+| Edit pending | Accept (Ink) and Reject (ghost) side by side                  |
+| Edit stale   | Accept disabled, a `--text-xs` `--fg-muted` line says why     |
+| Edit settled | the "Accepted" or "Rejected" status word replaces the buttons |
 
 **Light and dark.** The same classes serve both themes: the notice tints and `--fg-muted` text are the pairs §3.3 checks.
 
 ### 8.25 The script font picker
 
-`ScriptFontPicker` (`src/components/admin/brandkits/`) is the one control for the font a brand kit uses for Sinhala text. It shows only while the kit is in edit mode, in the Fonts section ("iii."), under the `FontEditor`.
+`ScriptFontPicker` (`src/components/admin/brandkits/ScriptFontPicker.tsx`) is the one control for the font a brand kit uses for Sinhala text. It shows only while the kit is in edit mode, in the Fonts section ("iii."), under the `FontEditor`.
 
 **Anatomy.** One `Select` (§8.3) labelled "Sinhala font" (`FieldLabel` above it), with the first option "None (system font)" and then each family that carries the script, read from `GET /api/fonts?script=sinhala` through React Query (key `['fonts', 'script', 'sinhala']`, five minutes fresh). A stored family the list no longer holds is added as an option so it still shows as selected. The two blocks in the section are `space-y-4` apart.
 
-**Atoms and tokens.** The field is the `Select` of §8.3: 1 px `--line` edge, `--radius-sm`, `--surface-2` fill, the chevron `background-image`, the focus ring of §9. The picker adds no class of its own.
+**Atoms and tokens.** The field is the `Select` of §8.3: 1 px `--line` edge, `--radius-sm`, `--surface-2` fill, the chevron `background-image`, the focus ring of §9. The picker adds no class of its own: its only primitives are `Select` and `FieldLabel`.
 
-| State                   | Look                                                                                  |
-| ----------------------- | ------------------------------------------------------------------------------------- |
-| None chosen             | "None (system font)" selected                                                         |
-| Family chosen           | the family's name selected; Save writes `scriptFonts.sinhala`                         |
-| List loading            | the options hold "None" and the stored family only; the full list fills in on arrival |
-| Read-only (not editing) | no select: the Fonts list shows the family as a ruled row with a "Sinhala" `TAG`      |
+| State                   | Look                                                                                                                                                     |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| None chosen             | "None (system font)" selected                                                                                                                            |
+| Family chosen           | the family's name selected; Save writes `scriptFonts.sinhala`                                                                                            |
+| List loading            | the options hold "None" and the stored family only; the full list fills in on arrival                                                                    |
+| Read-only (not editing) | no select: `KitDetail`'s Fonts list shows the family as a ruled row with a "Sinhala" `TAG` (the Heading and Body roles in that list are `EYEBROW` words) |
 
 **Light and dark.** Identical.
 

@@ -15,7 +15,7 @@ import { channelLabel } from '@/lib/channels'
 import { relativeTime } from '@/lib/format'
 import { QueueEntryModal } from './QueueEntryModal'
 import { SectionHead } from '@/components/ui/SectionHead'
-import { FOCUS, ICON, ICON_SM, ICON_BUTTON, SCROLL_FOCUS, TABLE_HEAD_ROW, TEXT_LINK } from '@/components/ui/atoms'
+import { FOCUS, ICON, ICON_BUTTON, SCROLL_FOCUS, TABLE_HEAD_ROW, TEXT_LINK } from '@/components/ui/atoms'
 import type { ScheduledGeneration, GenerationStatus, SchedulerStatus } from '@/lib/api-types'
 
 // Planned-posts queue under a campaign: table of scheduled generations with
@@ -129,7 +129,7 @@ export function ScheduledQueueSection({ campaignId, resolvedKitId, isTeamAdmin }
           tone="warning"
           role="status"
           data-testid="scheduler-offline-banner"
-          icon={<AlertTriangle {...ICON_SM} aria-hidden />}
+          icon={<AlertTriangle {...ICON} className="mt-0.5 flex-shrink-0" aria-hidden />}
           className="mb-3"
         >
           <p className="font-semibold">Scheduler offline</p>

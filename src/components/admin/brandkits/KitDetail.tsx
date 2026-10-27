@@ -9,7 +9,7 @@ import { Notice } from '@/components/ui/Notice'
 import { FieldLabel } from '@/components/ui/FieldLabel'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { SectionHead } from '@/components/ui/SectionHead'
-import { COMPACT_FIELD, FOCUS, ICON, ICON_BUTTON, SECTION_HEAD, TAG } from '@/components/ui/atoms'
+import { COMPACT_FIELD, EYEBROW, FOCUS, ICON, ICON_BUTTON, SECTION_HEAD, TAG } from '@/components/ui/atoms'
 import { apiFetch } from '@/lib/apiFetch'
 import type { AspectRatio } from '@prisma/client'
 import { ASPECT_LABELS, ASPECT_VALUES, dimensionsLabel } from '@/lib/aspectRatio'
@@ -389,7 +389,7 @@ export function KitDetail({ kit, onRefresh }: KitDetailProps) {
               {fonts.map((f, i) => (
                 <li key={f.name} className="flex flex-wrap items-center gap-2 break-words border-b border-line-subtle py-2 text-ui-sm text-fg">
                   <span>{f.name}</span>
-                  {i < 2 && <span className={TAG}>{i === 0 ? 'Heading' : 'Body'}</span>}
+                  {i < 2 && <span className={EYEBROW}>{i === 0 ? 'Heading' : 'Body'}</span>}
                 </li>
               ))}
               {kit.scriptFonts?.sinhala && (

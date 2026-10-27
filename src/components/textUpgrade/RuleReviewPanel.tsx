@@ -7,7 +7,7 @@ import React from 'react'
 import { Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Notice } from '@/components/ui/Notice'
-import { ICON, SUB_HEAD, TAG } from '@/components/ui/atoms'
+import { EYEBROW, ICON, SMALL_CAPS, SUB_HEAD, TAG } from '@/components/ui/atoms'
 import type { RuleReview } from './useRuleReview'
 
 const PROVENANCE_LABEL = {
@@ -143,8 +143,8 @@ export function RuleReviewPanel({
             <li key={edit.id} className="py-3">
               <div role="group" aria-label={`Edit for ${edit.quote}`} className="min-w-0 space-y-2">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className={TAG}>{edit.kind === 'replace' ? 'Replace' : 'Add after'}</span>
-                  <span className={TAG}>{PROVENANCE_LABEL[edit.provenance]}</span>
+                  <span className={EYEBROW}>{edit.kind === 'replace' ? 'Replace' : 'Add after'}</span>
+                  <span className={EYEBROW}>{PROVENANCE_LABEL[edit.provenance]}</span>
                 </div>
                 {/* An insert removes nothing, so only a replace strikes its quote. */}
                 <p className="break-words text-ui-sm text-fg">
@@ -173,8 +173,12 @@ export function RuleReviewPanel({
                   </p>
                 )}
                 <div className="flex flex-wrap items-center gap-2">
-                  {status === 'accepted' && <span className={TAG}>Accepted</span>}
-                  {status === 'rejected' && <span className={TAG}>Rejected</span>}
+                  {status === 'accepted' && (
+                    <span className={`${SMALL_CAPS} text-status-published`}>Accepted</span>
+                  )}
+                  {status === 'rejected' && (
+                    <span className={`${SMALL_CAPS} text-fg-muted`}>Rejected</span>
+                  )}
                   {(status === 'pending' || status === 'stale') && (
                     <>
                       <Button

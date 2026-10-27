@@ -160,7 +160,7 @@
   - Depends: T7
   - Notes: design §7. Suites: `post-styles.test.ts`, `image-looks.test.ts`, the wizard and dashboard suites, `surfaces.test.ts` (shell), and the axe suite.
 
-- [ ] `T9` — G3 campaigns and kits
+- [x] `T9` — G3 campaigns and kits
   - Files: G3's files and new components; DESIGN_SYSTEM.md §8.24, §8.25; `audit.md`; tests named by its rows
   - Estimate: large
   - Kind: impl
