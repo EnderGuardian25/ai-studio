@@ -91,7 +91,7 @@
     - Run against a clean mock server into `ui-captures/033-t2/` (gitignored). Confirm each state's files and the three notices by viewing the PNGs.
     - Report any `skipped` state and stop if one of the three notices is unreachable.
 
-- [ ] `T3` — The three known items
+- [x] `T3` — The three known items
   - Files: `src/components/layout/AppShell.tsx`, `src/components/admin/brandkits/BrandKitAssistantPanel.tsx`, `src/components/campaigns/BriefingAssistantPanel.tsx`, `src/app/(app)/drafts/[id]/page.tsx`, `tests/e2e/surfaces.test.ts`
   - Estimate: small
   - Kind: impl

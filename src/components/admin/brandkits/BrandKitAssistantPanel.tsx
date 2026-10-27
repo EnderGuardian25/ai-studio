@@ -504,9 +504,9 @@ export function BrandKitAssistantPanel({ kitId, open, onClose, onApplied }: Bran
               type="submit"
               disabled={!input.trim() || pending}
               aria-label="Send"
-              title="Send"
               className="inline-flex flex-shrink-0 items-center gap-2 whitespace-nowrap border-l border-line bg-fg px-4 font-text text-ui-sm font-semibold text-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus disabled:cursor-not-allowed disabled:opacity-50"
             >
+              Send
               {pending ? <Loader2 {...ICON} className="animate-spin" aria-hidden /> : <Send {...ICON} aria-hidden />}
             </button>
           </div>

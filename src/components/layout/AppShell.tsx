@@ -4,21 +4,7 @@ import React, { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import * as Dialog from '@radix-ui/react-dialog'
-import {
-  BookOpen,
-  Building2,
-  FolderOpen,
-  LineChart,
-  LayoutDashboard,
-  LogOut,
-  Megaphone,
-  Menu,
-  Palette,
-  UserCog,
-  Users,
-  X,
-  type LucideIcon,
-} from 'lucide-react'
+import { Menu, X } from 'lucide-react'
 import { ThemeToggle } from '@/components/theme/ThemeToggle'
 import { Logo } from '@/components/Logo'
 import { ConfirmProvider } from '@/components/ui/ConfirmDialog'
@@ -29,13 +15,10 @@ import { useCurrentUser } from '@/lib/hooks/useCurrentUser'
 import { authClient } from '@/lib/auth-client'
 import { EYEBROW, FOCUS, ICON } from '@/components/ui/atoms'
 
-// Folio nav is text only, no icons (DESIGN_SYSTEM.md §8.6). The items still
-// carry an icon, but it is drawn `hidden`: the restyle adds and removes no
-// element, and each link's name is its label.
+// Folio nav is text only, no icons (DESIGN_SYSTEM.md §8.6); each link's name is its label.
 interface NavItem {
   label: string
   href: string
-  icon: LucideIcon
   adminOnly?: boolean
   superAdminOnly?: boolean
 }
@@ -49,31 +32,31 @@ const NAV_SECTIONS: NavSection[] = [
   {
     label: 'Create',
     items: [
-      { label: 'Dashboard', href: '/',         icon: LayoutDashboard },
-      { label: 'Library',   href: '/library',  icon: BookOpen },
+      { label: 'Dashboard', href: '/' },
+      { label: 'Library',   href: '/library' },
     ],
   },
   {
     label: 'Organize',
     items: [
-      { label: 'Projects',  href: '/projects',  icon: FolderOpen },
-      { label: 'Campaigns', href: '/campaigns', icon: Megaphone },
+      { label: 'Projects',  href: '/projects' },
+      { label: 'Campaigns', href: '/campaigns' },
     ],
   },
   {
     label: 'Admin',
     items: [
-      { label: 'Brand kits',    href: '/admin/brandkits', icon: Palette,   adminOnly: true },
-      { label: 'Team settings', href: '/team',            icon: Building2, adminOnly: true },
-      { label: 'Users',         href: '/admin/users',     icon: Users,     superAdminOnly: true },
-      { label: 'Teams',         href: '/admin/teams',     icon: Building2, superAdminOnly: true },
-      { label: 'Insights',      href: '/admin/insights',  icon: LineChart, superAdminOnly: true },
+      { label: 'Brand kits',    href: '/admin/brandkits', adminOnly: true },
+      { label: 'Team settings', href: '/team',            adminOnly: true },
+      { label: 'Users',         href: '/admin/users',     superAdminOnly: true },
+      { label: 'Teams',         href: '/admin/teams',     superAdminOnly: true },
+      { label: 'Insights',      href: '/admin/insights',  superAdminOnly: true },
     ],
   },
 ]
 
 // Pinned to the sidebar's bottom area, above Sign out.
-const SETTINGS_ITEM: NavItem = { label: 'Settings', href: '/settings', icon: UserCog }
+const SETTINGS_ITEM: NavItem = { label: 'Settings', href: '/settings' }
 
 // Folio nav item (DESIGN_SYSTEM.md §8.6): --fg-muted text, --fg on hover.
 // Shared by the links and the Sign out button.
@@ -106,7 +89,6 @@ function NavLink({ item, onClick }: { item: NavItem; onClick?: () => void }) {
       aria-current={isActive ? 'page' : undefined}
       className={`${NAV_ITEM} ${isActive ? NAV_CURRENT : NAV_IDLE}`}
     >
-      <item.icon {...ICON} aria-hidden="true" className="hidden" />
       {item.label}
     </Link>
   )
@@ -179,7 +161,6 @@ function Sidebar({ onClose }: { onClose?: () => void }) {
           disabled={signingOut}
           className={`${NAV_ITEM} text-fg-muted hover:text-fg disabled:opacity-50 disabled:cursor-not-allowed`}
         >
-          <LogOut {...ICON} aria-hidden="true" className="hidden" />
           {signingOut ? 'Signing out…' : 'Sign out'}
         </button>
       </div>

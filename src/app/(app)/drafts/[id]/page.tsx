@@ -88,6 +88,10 @@ const EXPAND_BADGE =
 // aligned. The current one is ringed by its thumbnail's ink outline.
 const VERSION_CELL = 'block w-full min-w-0 text-left'
 
+// A proof-plate crop mark (DESIGN_SYSTEM.md §8.12): 18 px, 1 px --line, inset
+// 20 px from its corner; each mark draws two of its four edges.
+const CROP = 'pointer-events-none absolute h-[18px] w-[18px] border-line'
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function DraftDetailPage() {
@@ -476,6 +480,11 @@ export default function DraftDetailPage() {
         <div className="flex min-w-0 flex-col gap-3.5">
           {/* ── The stage (§8.12): the proof plate holding the post ─────────── */}
           <section aria-label="Preview" className="relative min-w-0 border border-line-subtle bg-surface-raised p-5 sm:p-10">
+            {/* Crop marks (§8.12), from sm up: below it the p-5 gutter is narrower than a mark. */}
+            <span aria-hidden className={`${CROP} left-5 top-5 border-l border-t max-sm:hidden`} />
+            <span aria-hidden className={`${CROP} right-5 top-5 border-r border-t max-sm:hidden`} />
+            <span aria-hidden className={`${CROP} bottom-5 left-5 border-b border-l max-sm:hidden`} />
+            <span aria-hidden className={`${CROP} bottom-5 right-5 border-b border-r max-sm:hidden`} />
             <div className="mb-[18px] flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
               <span className={EYEBROW}>Preview</span>
               <span className="text-ui-xs text-fg-muted">
