@@ -60,12 +60,12 @@ The launch command is `tsx src/mcp/server.ts` (npm script: `npm run mcp`). Regis
     "bistec-studio": {
       "command": "npx",
       "args": ["tsx", "src/mcp/server.ts"],
-      "cwd": "/absolute/path/to/designer",
+      "cwd": "/absolute/path/to/ai-studio",
       "env": {
         "MCP_API_KEY": "bstk_<the-plaintext-shown-once>",
         "DATABASE_URL": "postgresql://…",
-        "MINIO_ENDPOINT": "http://localhost:9000",
-        "MINIO_PUBLIC_ENDPOINT": "http://localhost:9000",
+        "MINIO_ENDPOINT": "http://localhost:9100",
+        "MINIO_PUBLIC_ENDPOINT": "http://localhost:9100",
         "MINIO_ACCESS_KEY": "…",
         "MINIO_SECRET_KEY": "…"
         // …plus every other var the app's src/lib/env.ts requires

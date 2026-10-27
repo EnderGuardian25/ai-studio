@@ -12,7 +12,7 @@ T1 writes the docs. T2 records state (roadmap, history, the CLAUDE.md pick-up) a
 
 ### Wave 1 — the docs
 
-- [ ] `T1` — README, deploy guide, MCP/ACP guide, CLAUDE.md stack line
+- [x] `T1` — README, deploy guide, MCP/ACP guide, CLAUDE.md stack line
   - Files: `README.md`, `docs/deploy.md`, `docs/mcp-acp-guide.md`, `CLAUDE.md`
   - Estimate: small
   - Kind: docs

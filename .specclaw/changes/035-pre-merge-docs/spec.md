@@ -57,7 +57,7 @@ Docs only. Bring the documents a reader of `main` meets first up to date with `v
 ## Acceptance Criteria
 
 - **AC-01 (FR-01).**
-  - `README.md` contains no `Next.js 14`, no `React 18`, no `npx prisma migrate deploy` and no `103 passing`.
+  - `README.md` contains no `Next.js 14`, no `React 18` and no `103 passing`, and no step runs a bare `npx prisma migrate deploy` (amended at build, T1: the README keeps a one-line warning that names the command).
   - It contains `npm run db:migrate` and links `docs/deploy.md`.
   - Every script it names exists in `package.json`.
 - **AC-02 (FR-02, NFR-02).** `docs/deploy.md` exists and covers every FR-02 item. Each variable it names is in `src/lib/env.ts`, `.env.example`, `docker-compose.yml` or `docker-entrypoint.sh`. Each file and command it names exists.

@@ -47,12 +47,12 @@ History (not instructions) is in [`docs/history.md`](docs/history.md).
 
 ## What this project is
 
-A Next.js 14 + TypeScript web app that turns a brief into a finished, on-brand, ready-to-publish social media post (Instagram + LinkedIn). Two generation paths:
+A Next.js 16 + TypeScript web app that turns a brief into a finished, on-brand, ready-to-publish social media post (Instagram + LinkedIn). Two generation paths:
 
 - **Path A** — HTML/CSS brand template (stored in DB), Claude agent fills it → Puppeteer renders PNG
 - **Path B** — Claude agent generates freeform HTML/CSS design → Puppeteer renders PNG
 
-Stack: Next.js 14, TypeScript, Prisma, PostgreSQL, MinIO, better-auth (self-hosted), Docker Compose. Puppeteer (headless Chromium) for HTML→PNG rendering. Claude agent harness (Anthropic SDK tool-use loop) drives design generation.
+Stack: Next.js 16, TypeScript, Prisma, PostgreSQL, MinIO, better-auth (self-hosted), Docker Compose. Puppeteer (headless Chromium) for HTML→PNG rendering. Claude agent harness (Anthropic SDK tool-use loop) drives design generation.
 
 ## Key reference documents
 
