@@ -30,3 +30,4 @@
 {"ev":"stop","span":"T11","at":"2026-10-27T04:58:29Z","ts":1793077109,"status":"ok"}
 {"ev":"stop","span":"T12","at":"2026-10-27T05:31:18Z","ts":1793079078,"status":"ok"}
 {"ev":"stop","span":"W3","at":"2026-10-27T05:31:18Z","ts":1793079078,"status":"ok"}
+{"ev":"start","span":"verify-1793093205","kind":"phase","label":"verify","at":"2026-10-27T09:26:46Z","ts":1793093206}

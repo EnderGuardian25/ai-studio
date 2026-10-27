@@ -1,6 +1,6 @@
 {
   "change": "032-fork-folio-restore",
-  "phase": "build",
+  "phase": "verify",
   "branch": "v2",
   "size": "architectural",
   "phases": {
@@ -8,6 +8,7 @@
     "spec": { "status": "done", "at": "2026-10-26T20:27:42Z" },
     "design": { "status": "done", "at": "2026-10-26T20:29:42Z" },
     "tasks": { "status": "done", "at": "2026-10-26T20:30:34Z" },
-    "build": { "status": "in-progress", "at": "2026-10-26T20:38:27Z" }
+    "build": { "status": "in-progress", "at": "2026-10-26T20:38:27Z" },
+    "verify": { "status": "partial", "at": "2026-10-27T09:34:42Z", "verdict": "PARTIAL" }
   }
 }
