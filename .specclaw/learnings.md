@@ -515,3 +515,20 @@ capture-ui right after a source edit under next dev can shoot a stale stylesheet
 Load the edited page once (or run its E2E) before capturing, and zoom-check new small marks before trusting a capture
 
 ---
+
+## [L31] spec_gap — AC-03 expected 404 for a trailing-slash auth path, but Ne...
+
+**When:** 2026-10-27 17:31 UTC
+**Category:** spec_gap
+**Priority:** low
+**Status:** pending
+
+### Detail
+
+AC-03 expected 404 for a trailing-slash auth path, but Next.js answers 308 to the canonical path before any route handler runs
+
+### Action
+
+When a spec asserts a status for path variants, account for the framework's own normalisation (trailing slash, redirects) first
+
+---
