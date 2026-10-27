@@ -103,7 +103,7 @@
     - `check-ui-invariants.mjs` will report the removed nav-icon attributes (`aria-hidden`). Write their permit tokens into the report; T4 records them as the `closed` rows.
     - Run `surfaces.test.ts`, the draft-page suites and the axe suite. Capture the sidebar, both drawers and the draft page in both themes.
 
-- [ ] `T4` — The audit
+- [x] `T4` — The audit
   - Files: `.specclaw/changes/033-folio-fidelity-pass/audit.md`
   - Estimate: large
   - Kind: docs

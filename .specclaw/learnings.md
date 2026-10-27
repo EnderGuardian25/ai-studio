@@ -498,3 +498,20 @@ A notice that offers an action already on the page (Edit inline, Regenerate desi
 Give action buttons inside notices contextual accessible names (keep the visible label as the start of the name) and run the full suite, not only the new one, before closing a UI task
 
 ---
+
+## [L30] best_practice — capture-ui right after a source edit under next dev can s...
+
+**When:** 2026-10-27 12:40 UTC
+**Category:** best_practice
+**Priority:** medium
+**Status:** pending
+
+### Detail
+
+capture-ui right after a source edit under next dev can shoot a stale stylesheet: new Tailwind utilities (left-5 etc.) were missing, so absolute crop marks stacked at their static position
+
+### Action
+
+Load the edited page once (or run its E2E) before capturing, and zoom-check new small marks before trusting a capture
+
+---
