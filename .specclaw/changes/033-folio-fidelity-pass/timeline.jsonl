@@ -1,0 +1,30 @@
+{"ev":"start","span":"propose","kind":"phase","label":"propose","at":"2026-10-27T11:26:38Z","ts":1793100398}
+{"ev":"stop","span":"propose","at":"2026-10-27T11:31:51Z","ts":1793100712,"status":"ok"}
+{"ev":"start","span":"plan","kind":"phase","label":"plan","at":"2026-10-27T11:42:01Z","ts":1793101321}
+{"ev":"stop","span":"plan","at":"2026-10-27T11:47:06Z","ts":1793101626,"status":"ok"}
+{"ev":"start","span":"W1","kind":"wave","label":"wave 1","at":"2026-10-27T11:54:11Z","ts":1793102051}
+{"ev":"start","span":"T1","kind":"task","label":"The behaviour-invariant check","parent":"W1","model":"sonnet","attempt":"1","at":"2026-10-27T11:54:11Z","ts":1793102051}
+{"ev":"stop","span":"T1","at":"2026-10-27T12:03:52Z","ts":1793102632,"status":"ok"}
+{"ev":"start","span":"T2","kind":"task","label":"Capture coverage","parent":"W1","model":"sonnet","attempt":"1","at":"2026-10-27T12:04:08Z","ts":1793102648}
+{"ev":"stop","span":"T2","at":"2026-10-27T12:19:16Z","ts":1793103556,"status":"ok"}
+{"ev":"start","span":"T3","kind":"task","label":"The three known items","parent":"W1","model":"haiku","attempt":"1","at":"2026-10-27T12:20:18Z","ts":1793103618}
+{"ev":"stop","span":"T3","at":"2026-10-27T12:40:24Z","ts":1793104824,"status":"ok"}
+{"ev":"start","span":"T4","kind":"task","label":"The audit","parent":"W1","model":"opus","attempt":"1","at":"2026-10-27T12:40:47Z","ts":1793104847}
+{"ev":"stop","span":"T4","at":"2026-10-27T13:08:50Z","ts":1793106530,"status":"ok"}
+{"ev":"stop","span":"T5","at":"2026-10-27T13:51:46Z","ts":1793109106,"status":"ok"}
+{"ev":"stop","span":"W1","at":"2026-10-27T13:51:47Z","ts":1793109107,"status":"ok"}
+{"ev":"start","span":"W2","kind":"wave","label":"wave 2","at":"2026-10-27T13:52:06Z","ts":1793109126}
+{"ev":"start","span":"T6","kind":"task","label":"Folio primitives","parent":"W2","model":"orchestrator","attempt":"1","at":"2026-10-27T13:52:06Z","ts":1793109126}
+{"ev":"stop","span":"T6","at":"2026-10-27T13:52:26Z","ts":1793109146,"status":"ok"}
+{"ev":"start","span":"T7","kind":"task","label":"G1 draft page","parent":"W2","model":"sonnet","attempt":"1","at":"2026-10-27T13:52:41Z","ts":1793109161}
+{"ev":"stop","span":"T7","at":"2026-10-27T14:10:54Z","ts":1793110254,"status":"ok"}
+{"ev":"start","span":"T8","kind":"task","label":"G2 create flow and shell","parent":"W2","model":"sonnet","attempt":"1","at":"2026-10-27T14:11:24Z","ts":1793110284}
+{"ev":"stop","span":"T8","at":"2026-10-27T14:22:41Z","ts":1793110961,"status":"ok"}
+{"ev":"start","span":"T9","kind":"task","label":"G3 campaigns and kits","parent":"W2","model":"sonnet","attempt":"1","at":"2026-10-27T14:22:58Z","ts":1793110978}
+{"ev":"stop","span":"T9","at":"2026-10-27T14:33:44Z","ts":1793111624,"status":"ok"}
+{"ev":"start","span":"T10","kind":"task","label":"G4 team, settings and admin","parent":"W2","model":"sonnet","attempt":"1","at":"2026-10-27T14:34:00Z","ts":1793111640}
+{"ev":"stop","span":"T10","at":"2026-10-27T14:46:01Z","ts":1793112361,"status":"ok"}
+{"ev":"start","span":"T11","kind":"task","label":"Final gate, screenshots, docs and push","parent":"W2","model":"orchestrator","attempt":"1","at":"2026-10-27T14:47:13Z","ts":1793112432}
+{"ev":"stop","span":"T11","at":"2026-10-27T15:14:54Z","ts":1793114094,"status":"ok"}
+{"ev":"stop","span":"W2","at":"2026-10-27T15:14:54Z","ts":1793114094,"status":"ok"}
+{"ev":"start","span":"verify-1793116127","kind":"phase","label":"verify","at":"2026-10-27T15:48:47Z","ts":1793116127}

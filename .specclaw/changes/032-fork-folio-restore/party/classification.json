@@ -1,0 +1,10 @@
+{
+  "tier": "deep",
+  "domains": ["ops"],
+  "rationale": "Re-themes about 150 to 200 files from Graphite back to Folio, with Graphite-to-Folio mappings for components that never existed in Folio, and deletes the release workflow docker-publish.yml, which changes release machinery.",
+  "signals": {
+    "blast_radius": "About 150 to 200 files across src/components, src/app, tests, the guards, DESIGN_SYSTEM.md, the Dockerfile and entrypoint, CI workflows, compose and the E2E DB scripts, and the docs",
+    "unresolved": "Open question 1 (restore folio.ts x3 or keep the 021 atoms.ts and classes.ts structure) changes the file list, and the 023-031 UI has no Folio reference to restyle against",
+    "irreversibility": "Git-revertible in principle, but it is a large re-theme with many UI and a11y tests asserting on styling, and deleting the deploy workflow plus the port and compose-project change alter how the fork is built and run"
+  }
+}

@@ -1,0 +1,10 @@
+$ docker compose ls
+NAME                STATUS              CONFIG FILES
+ai-studio           running(2)          D:\ai-studio\docker-compose.yml,D:\ai-studio\docker-compose.override.yml
+designer            running(2)          D:\Bistec\studio\docker-compose.yml,D:\Bistec\studio\docker-compose.override.yml
+
+$ docker ps
+designer-minio-1	Up 18 seconds (healthy)	0.0.0.0:9000->9000/tcp, [::]:9000->9000/tcp, 127.0.0.1:9001->9001/tcp
+designer-postgres-1	Up 17 seconds (healthy)	127.0.0.1:5432->5432/tcp
+ai-studio-postgres-1	Up About a minute (healthy)	127.0.0.1:5442->5432/tcp
+ai-studio-minio-1	Up About a minute (healthy)	0.0.0.0:9100->9000/tcp, [::]:9100->9000/tcp, 127.0.0.1:9101->9001/tcp

@@ -8,13 +8,40 @@ Follow this top-to-bottom on a fresh machine or after `docker compose down -v` /
 
 ---
 
+## The fork's stack
+
+This repo runs its own Docker stack, so it can run beside another clone of the project without a port, volume or database clash. The defaults live in `.env.example`.
+
+| Variable                                                                                                       | Default                                                | Meaning                                                                 |
+| -------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------ | ----------------------------------------------------------------------- |
+| `COMPOSE_PROJECT_NAME`                                                                                         | `ai-studio`                                            | the Compose project (containers, network and volumes are named from it) |
+| `POSTGRES_HOST_PORT`                                                                                           | `5442`                                                 | Postgres on the host                                                    |
+| `MINIO_HOST_PORT` / `MINIO_CONSOLE_HOST_PORT`                                                                  | `9100` / `9101`                                        | MinIO API and console on the host                                       |
+| `POSTGRES_DB`                                                                                                  | `ai_studio` in `.env`, `ai_studio_test` in `.env.test` | database name                                                           |
+| `DATABASE_URL`                                                                                                 | `postgresql://bistec:<pw>@localhost:5442/ai_studio`    | repeats the port: Node's `--env-file` does not expand `${...}`          |
+| `MINIO_ENDPOINT`, `MINIO_PUBLIC_ENDPOINT`                                                                      | `http://localhost:9100`                                | the app's MinIO address                                                 |
+| `COMPOSE_TEST_PROJECT_NAME`, `POSTGRES_TEST_HOST_PORT`, `MINIO_TEST_HOST_PORT`, `MINIO_TEST_CONSOLE_HOST_PORT` | `ai-studio-test`, `5443`, `9110`, `9111`               | the optional test compose file                                          |
+
+Commands:
+
+- `docker compose up -d postgres minio` starts the infra of the `ai-studio` project. A bare `docker compose up -d` also builds and starts the `app` and `scheduler` containers, which local dev does not use.
+- `npm run db:migrate` applies the migrations. Never run a bare `npx prisma migrate deploy`: the npm script runs the preflight first.
+- `npm run db:seed` seeds the admin and the demo kit (also behind the preflight).
+- `npm run test:e2e:db -- --reset` drops `ai_studio_test` (with `WITH (FORCE)`; it refuses any name that does not end in `_test`), then creates, migrates and seeds it. Use it for every clean E2E gate. Without `--reset` it keeps the database.
+
+**The preflight** (`scripts/stack-preflight.mjs`, run first by `db:migrate`, `db:seed`, `test:e2e:db` and `test:upgrade`) refuses to continue when the env points at another clone's stack: a compose project named `designer`, a local Postgres on 5432 or 5433, a local MinIO on 9000 or 9010, a database named `bistec_studio` or `bistec_studio_test`, or a `DATABASE_URL` or MinIO port that disagrees with `POSTGRES_HOST_PORT` or `MINIO_HOST_PORT`. It prints the refusal and never prints a value. A non-local host such as `postgres:5432` is accepted.
+
+**Running another clone's stack at the same time:** each clone sets its own `COMPOSE_PROJECT_NAME` and its own ports in its `.env`, so the two projects share nothing. `docker compose ls` lists both.
+
+---
+
 ## 0. Preflight — verify the working environment
 
 Run these and confirm each before starting the dev server. If any fails, fix it in the matching section below.
 
 ```bash
 node --version          # expect v22+ (needed for --env-file); repo tested on v24
-docker ps               # expect bistec_studio_postgres AND a minio container, both Up
+docker compose ps       # expect the ai-studio postgres AND minio services, both Up
 test -f .env && echo ".env present" || echo "MISSING .env"
 npx prisma migrate status   # expect "Database schema is up to date!"
 ```
@@ -22,11 +49,11 @@ npx prisma migrate status   # expect "Database schema is up to date!"
 Quick connectivity probes (host → containers):
 
 ```bash
-# Postgres reachable on 5432?
+# Postgres reachable on the host port (5442 by default)?
 node --env-file=.env -e "const{PrismaClient}=require('@prisma/client');new PrismaClient().\$queryRaw\`SELECT 1\`.then(()=>console.log('DB OK')).catch(e=>{console.error('DB FAIL',e.message);process.exit(1)})"
 
-# MinIO reachable on 9000? (must be PUBLISHED to host for host-side dev — see §3 gotcha)
-curl -sf http://localhost:9000/minio/health/live && echo "MinIO OK" || echo "MinIO UNREACHABLE on :9000"
+# MinIO reachable on 9100? (published by docker-compose.override.yml)
+curl -sf http://localhost:9100/minio/health/live && echo "MinIO OK" || echo "MinIO UNREACHABLE on :9100"
 ```
 
 > **⚠️ Admin credentials are PER-MACHINE.** Each dev machine has its own Postgres, so the
@@ -74,7 +101,7 @@ cp .env.example .env
 
 ```bash
 # --- Add these to .env (must match the credentials inside DATABASE_URL) ---
-POSTGRES_DB=bistec_studio
+POSTGRES_DB=ai_studio
 POSTGRES_USER=bistec
 POSTGRES_PASSWORD=bistec
 ```
@@ -101,7 +128,7 @@ PUPPETEER_EXECUTABLE_PATH=C:\Program Files\Google\Chrome\Application\chrome.exe
 > exempt. If you rotate the credentials, update `.env` **and `.env.test`** together (compose derives
 > the container's root creds from these same vars), or storage E2E cases fail on MinIO auth.
 
-**For real design generation:** the dev machines run **CLI mode** (`DESIGN_PROVIDER=cli`) — no `ANTHROPIC_API_KEY` needed or set; Claude auth comes from the logged-in `claude` session by default, see §7. `ANTHROPIC_API_KEY` only matters if you switch to API mode (`DESIGN_PROVIDER=claude-html`).
+**For real design generation:** the dev machines run **CLI mode** (`DESIGN_PROVIDER=cli`) — no `ANTHROPIC_API_KEY` needed or set; CLI mode needs a **personal or team Claude token** (connected in-app at `/settings` or `/team`; there is no env or logged-in-session fallback). Setup guide: [`docs/claude-account-setup.md`](claude-account-setup.md). See also §7. `ANTHROPIC_API_KEY` only matters if you switch to API mode (`DESIGN_PROVIDER=claude-html`).
 
 **Credentials no longer live in `.env`.** Personal Claude/OpenAI credentials are connected at **`/settings`**; a team's shared credentials (Claude, OpenAI, Instagram/LinkedIn social channels, and MCP/ACP API keys) are set at **`/team`** by a team admin, in-app, once you're signed in. For social channel setup specifically, follow **[`docs/social-publishing-setup.md`](social-publishing-setup.md)** (account setup for both channels, the Cloudflare-tunnel image path Instagram needs, and the full posting sequence) — just enter the resulting tokens at `/team` instead of `.env`.
 
@@ -111,28 +138,20 @@ PUPPETEER_EXECUTABLE_PATH=C:\Program Files\Google\Chrome\Application\chrome.exe
 
 ```bash
 docker compose up -d postgres minio
-docker ps   # confirm both are Up
+docker compose ps   # confirm both are Up
 ```
 
 ### Known gotchas (these bite on a cold start)
 
-1. **`POSTGRES_*` vars must be in `.env`.** `docker-compose.yml` interpolates `${POSTGRES_DB/USER/PASSWORD}` from `.env`; if absent, Postgres initializes with the wrong/empty credentials and `DATABASE_URL` (`bistec:bistec@.../bistec_studio`) won't connect. Set them as in §2.
+1. **`POSTGRES_*` vars must be in `.env`.** `docker-compose.yml` interpolates `${POSTGRES_DB/USER/PASSWORD}` from `.env`; if absent, Postgres initializes with the wrong/empty credentials and `DATABASE_URL` (`bistec:bistec@.../ai_studio`) won't connect. Set them as in §2.
 
-2. **MinIO port 9000 is not published to the host by the committed compose file.** It only `expose`s 9000 (container-to-container) and maps the console to `127.0.0.1:9001`. A host-side `npm run dev` connects to `http://localhost:9000` and will fail. For host development, publish 9000 — either add `ports: ["9000:9000"]` to the `minio` service, or run it standalone:
-
-   ```bash
-   docker run -d --name bistec_studio_minio -p 9000:9000 -p 9001:9001 \
-     -e MINIO_ROOT_USER=minioadmin -e MINIO_ROOT_PASSWORD=minioadmin \
-     -v minio_data:/data pgsty/silo:RELEASE.2026-09-16T00-00-00Z@sha256:635197cb9f36d01bee221d34d1c7d7960f6a95c48b0b6c01d99cd13bdae51a46 server /data --console-address ":9001"
-   ```
-
-   (This matches the WSL2 `docker run` workaround noted in the handoff.) MinIO buckets are auto-created by the app on first use — no manual setup.
+2. **MinIO is published on 9100.** `docker-compose.override.yml` publishes the API on `${MINIO_HOST_PORT:-9100}`, and `docker-compose.yml` publishes the console on `127.0.0.1:${MINIO_CONSOLE_HOST_PORT:-9101}`, so a host-side `npm run dev` reaches `http://localhost:9100` (the `MINIO_ENDPOINT` in `.env.example`). MinIO buckets are auto-created by the app on first use — no manual setup.
 
 3. **MinIO credentials.** The server falls back to `minioadmin`/`minioadmin` by default, which matches `MINIO_ACCESS_KEY`/`MINIO_SECRET_KEY` in `.env.example`. If you set custom `MINIO_ROOT_USER`/`MINIO_ROOT_PASSWORD`, update `MINIO_ACCESS_KEY`/`MINIO_SECRET_KEY` to match.
 
 > ### 🔒 Security invariant — never publicly expose MinIO port 9000 in production
 >
-> H10 made the `generated-images` and `brand-kits` buckets **anonymously public-read** (stable unsigned URLs). This is safe **only because** MinIO's port 9000 is never reachable from the public internet — the committed `docker-compose.yml` deliberately `expose`s 9000 internally (container-to-container) instead of publishing it, and binds the console to `127.0.0.1:9001`. The `-p 9000:9000` publishing in gotcha #2 above is a **host-dev convenience only**.
+> H10 made the `generated-images` and `brand-kits` buckets **anonymously public-read** (stable unsigned URLs). This is safe **only because** MinIO's port 9000 is never reachable from the public internet — the committed `docker-compose.yml` deliberately `expose`s 9000 internally (container-to-container) instead of publishing it, and binds the console to `127.0.0.1:${MINIO_CONSOLE_HOST_PORT:-9101}`. The override's API publishing on `${MINIO_HOST_PORT:-9100}` in gotcha #2 above is a **host-dev convenience only**.
 > **In production, MinIO must sit behind the app / on a private network — do not bind 9000 to a public interface and do not put it behind a public CDN/reverse proxy.** Doing so makes those two buckets world-readable across all users. If a deployment ever needs MinIO assets served publicly, switch those buckets to app-mediated signed reads (the pattern the private `EXPORTS` bucket already uses via `resolveExportUrl`) before exposing the port. (See `docs/handoff.md` → Security review for the full rationale.)
 
 ---
@@ -140,7 +159,7 @@ docker ps   # confirm both are Up
 ## 4. Apply migrations + generate the Prisma client
 
 ```bash
-npx prisma migrate deploy   # applies committed migrations to the fresh DB
+npm run db:migrate         # applies committed migrations to the fresh DB (runs the stack preflight first)
 npx prisma generate         # regenerates the client (also runs on npm install)
 npx prisma migrate status   # expect: "Database schema is up to date!"
 ```
@@ -158,8 +177,11 @@ kit's `createdBy` resolves to a real admin id). Both are idempotent. Result:
 
 - Admin login: username **`adminBTG`**. The initial password is **printed once by the seed script** (set `SEED_ADMIN_PASSWORD` beforehand to choose it; otherwise a random one is generated) — change it after first login. **The password is per-machine** (each dev machine has its own DB — see the §0 warning); the person setting up the machine picks and owns it. The account is a **SUPER_ADMIN** (can manage users at `/admin/users`); sign-in is by username since the username switch — the email `admin@bisteccare.lk` is internal (and still works in the login form as a legacy fallback). A password can be reset directly via better-auth's hash + `internalAdapter.updatePassword` (see `PATCH /api/admin/users/[id]` for the in-app flow; super-admin accounts must be reset via script/DB since the API refuses super-admin targets).
 - Default **"Bistec"** brand kit: Glacier palette, Inter + JetBrains Mono (Google Fonts), active brand-voice prompt v1
+- A **"Bistec"** team, created by `seed-brandkit.mjs` to hold that kit. **Since change 016 the migrations create no team:** a fresh database has zero teams until something creates one. `npm run db:seed` is a dev demo seed, not part of a fresh system's boot.
+  - **Without the demo content** (a fresh system: run only `node --env-file=.env scripts/seed-admin.mjs`): sign in as the super admin; the dashboard says there are no teams yet and links to **`/admin/teams`** to create the first one.
+  - **With the seed:** the super admin works in the Bistec team straight away (super admins act in any live team). Editors need a membership, added at `/admin/teams`.
 
-Optional: seed a 3:4 portrait template on the default kit so Path A has a portrait option out of the box (the brief filters templates by the chosen size):
+Optional: seed a 4:5 portrait template on the default kit so Path A has a portrait option out of the box (the brief filters templates by the chosen size):
 
 ```bash
 node --env-file=.env scripts/seed-portrait-template.mjs   # idempotent
@@ -195,6 +217,20 @@ npm run dev   # http://localhost:3000
 
 ---
 
+### Refresh the Google Fonts list (031, operator step)
+
+The font picker and the font request read a snapshot in `src/lib/fonts/catalogue.json` (dated in the file; the kit page shows the date). The snapshot is not fetched at runtime and is never refreshed in CI. Refresh it by hand when a family you need is missing or the snapshot is old:
+
+```bash
+node scripts/refresh-google-fonts.mjs   # one fetch of Google's public font metadata, no key
+git diff --stat src/lib/fonts/catalogue.json
+git add src/lib/fonts/catalogue.json && git commit -m "Refresh the Google Fonts snapshot"
+```
+
+The script never removes a family: one that Google no longer lists is kept and marked `delisted`. If the fetch fails, the script exits non-zero and writes nothing; there is no fallback list. Run `npx vitest run tests/unit/fonts*.test.ts` after the refresh.
+
+---
+
 ## 7. Test mode without an Anthropic API key
 
 Set `DESIGN_PROVIDER=cli` in `.env` to route design generation through the local
@@ -225,8 +261,7 @@ draft pages all work; Puppeteer rendering, `generateImage`, and MinIO upload are
 > MinIO's own community images are gone everywhere: `docker.io/minio/minio` was deleted
 > from Docker Hub on 2026-09-11, and `quay.io/minio/minio` has refused anonymous pulls
 > since 2026-09-24. silo is a maintained drop-in fork — same on-disk format, same `server`
-> argv, same env vars — see `docs/minio-silo-migration.md` for the full rationale (incl.
-> CVE-2026-40344) and the Coolify rollout/rollback steps. Do NOT pin back to a pre-2025
+> argv, same env vars (see CVE-2026-40344). Do NOT pin back to a pre-2025
 > release regardless of which image you run — the volume's on-disk format ("xl meta
 > version 3") makes older images crash-loop with `decodeXLHeaders: Unknown xl meta version 3`.
 

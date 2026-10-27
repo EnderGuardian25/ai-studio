@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "sig": "2759400379 7185",
+  "tier": "deep",
+  "tier_source": "classifier",
+  "rationale": "Re-themes about 150 to 200 files from Graphite back to Folio, with Graphite-to-Folio mappings for components that never existed in Folio, and deletes the release workflow docker-publish.yml, which changes release machinery.",
+  "domains": ["ops"],
+  "seats": [
+    { "role": "party-po", "model": "sonnet" },
+    { "role": "party-architect", "model": "opus" },
+    { "role": "party-ba", "model": "sonnet" },
+    { "role": "party-security", "model": "opus" },
+    { "role": "party-visionary", "model": "opus" }
+  ],
+  "dropped": []
+}

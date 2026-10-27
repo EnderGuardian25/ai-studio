@@ -218,7 +218,7 @@ test.describe('§P Brief draft autosave & recovery', () => {
     // (twenty ~4 KB image URLs slip past the field caps).
     const bigImages = Array.from({ length: 20 }, (_, i) => ({
       id: `img${i}`,
-      url: `http://localhost:9000/generated-images/briefs/u/${'a'.repeat(4000)}-${i}.png`,
+      url: `http://localhost:9100/generated-images/briefs/u/${'a'.repeat(4000)}-${i}.png`,
       filename: `${i}.png`,
       intent: 'embed',
     }))

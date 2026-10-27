@@ -1,0 +1,7 @@
+exit=0
+duration_s=16
+log=.specclaw/changes/034-close-open-signup/logs/lint-npm-run-lint-300468.log
+head=3937dccab2804fec148943876d4bca9f7906d86a
+dirty=true
+cmd=npm run lint
+interrupted=false

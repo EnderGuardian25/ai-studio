@@ -1,0 +1,7 @@
+exit=0
+duration_s=15
+log=.specclaw/changes/034-close-open-signup/logs/test-npm-run-test-unit-304972.log
+head=93e9c7f41a6d73f8737fbf4649ab95ceeff84957
+dirty=true
+cmd=npm run test:unit
+interrupted=false

@@ -1,0 +1,7 @@
+exit=0
+duration_s=15
+log=.specclaw/changes/032-fork-folio-restore/logs/test-npm-run-test-unit-179218.log
+head=88a77469c3419d8736fe783f8ea21a74d78445f8
+dirty=true
+cmd=npm run test:unit
+interrupted=false

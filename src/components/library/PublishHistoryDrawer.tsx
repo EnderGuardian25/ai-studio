@@ -3,7 +3,6 @@
 import React, { useState } from 'react'
 import { ExternalLink, RotateCcw } from 'lucide-react'
 import { Drawer } from '@/components/ui/Modal'
-import { GlassPanel } from '@/components/ui/GlassPanel'
 import { Button } from '@/components/ui/Button'
 import { StatusChip } from '@/components/ui/StatusChip'
 import { channelLabel } from '@/lib/channels'
@@ -66,9 +65,10 @@ export function PublishHistoryDrawer({
   return (
     <Drawer open onClose={onClose} title="Publish History">
         {/* Body */}
-        <div className="px-5 py-4 space-y-3">
+        {/* Ruled rows, not boxes (DESIGN_SYSTEM.md §6) */}
+        <div className="px-5 py-2 divide-y divide-line-subtle">
           {posts.length === 0 ? (
-            <p className="text-sm text-light-text-muted dark:text-dark-text-muted text-center py-8">
+            <p className="text-ui-sm text-fg-muted text-center py-8">
               No publish history yet.
             </p>
           ) : (
@@ -83,17 +83,17 @@ export function PublishHistoryDrawer({
                   : null
 
               return (
-                <GlassPanel key={post.id} className="p-3 flex flex-col gap-2">
+                <div key={post.id} className="py-4 flex flex-col gap-2">
                   {/* Top row: channel + status */}
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-sm font-medium text-light-text dark:text-dark-text">
+                    <span className="font-display text-ui-lg font-medium text-fg">
                       {channelLabel(post.channel)}
                     </span>
                     <StatusChip status={chipStatus} />
                   </div>
 
                   {/* Date */}
-                  <p className="text-xs font-mono text-light-text-muted dark:text-dark-text-muted">
+                  <p className="text-ui-xs tabular-nums text-fg-muted">
                     {formatDateTime(displayDate)}
                   </p>
 
@@ -103,16 +103,16 @@ export function PublishHistoryDrawer({
                       href={platformUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 text-xs text-primary dark:text-primary-light hover:underline"
+                      className="self-start inline-flex items-center gap-1 rounded-ui-sm text-ui-xs text-accent underline decoration-line underline-offset-4 hover:decoration-accent focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
                     >
                       View on {channelLabel(post.channel)}
-                      <ExternalLink size={11} />
+                      <ExternalLink size={12} strokeWidth={1.4} />
                     </a>
                   )}
 
-                  {/* Error reason */}
+                  {/* Error reason, on the failed tint the chips use (0.10) */}
                   {isFailed && post.errorReason && (
-                    <p className="text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-lg px-2 py-1">
+                    <p className="text-ui-xs text-status-failed bg-status-failed/10 rounded-ui-sm px-2 py-1">
                       {post.errorReason}
                     </p>
                   )}
@@ -126,11 +126,11 @@ export function PublishHistoryDrawer({
                       disabled={retrying === post.id}
                       className="self-start"
                     >
-                      <RotateCcw size={12} />
+                      <RotateCcw size={13} strokeWidth={1.4} />
                       {retrying === post.id ? 'Retrying…' : 'Retry'}
                     </Button>
                   )}
-                </GlassPanel>
+                </div>
               )
             })
           )}

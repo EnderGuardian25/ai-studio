@@ -1,0 +1,10 @@
+{
+  "tier": "standard",
+  "domains": [],
+  "rationale": "Roughly 70 UI files across many screens change in look only (markup, visible text and layout of Folio screens), with behaviour frozen by the guard rule and an empty NFR-01 diff, so the panel need not be deep even though the file count is large.",
+  "signals": {
+    "blast_radius": "About 60 Folio-era screens and components under src/app/(app), src/app/(auth) and src/components, plus 12 new components and DESIGN_SYSTEM.md; every edit is markup or class change, with no route, API, Prisma, provider, scheduler, MCP, ACP or analytics change.",
+    "unresolved": "The number of audit rows classed as look is unknown until the audit runs, and a few ambiguous 018-031 edits mixing look and arrangement go to the user to rule on; these change how many fixes get made, not which subsystem is touched or what is built.",
+    "irreversibility": "Pure presentation and test-selector edits that a git revert undoes cleanly, with no migrated data and no removed capability; the main risk is breaking E2E selectors or axe checks, which the full gate covers."
+  }
+}

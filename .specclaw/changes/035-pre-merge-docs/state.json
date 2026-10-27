@@ -1,0 +1,12 @@
+{
+  "change": "035-pre-merge-docs",
+  "phase": "verify",
+  "branch": "",
+  "size": "bounded",
+  "phases": {
+    "proposal": { "status": "approved", "at": "2026-10-27T18:15:28Z" },
+    "spec": { "status": "done", "at": "2026-10-27T18:16:28Z" },
+    "tasks": { "status": "done", "at": "2026-10-27T18:16:31Z" },
+    "verify": { "status": "passed", "at": "2026-10-27T19:04:53Z", "verdict": "PASS" }
+  }
+}

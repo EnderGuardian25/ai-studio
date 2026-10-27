@@ -1,0 +1,17 @@
+{
+  "change": "034-close-open-signup",
+  "phase": "verify",
+  "branch": "v2",
+  "size": "bounded",
+  "phases": {
+    "proposal": { "status": "approved", "at": "2026-10-27T17:09:31Z" },
+    "spec": { "status": "done", "at": "2026-10-27T17:16:52Z" },
+    "tasks": { "status": "done", "at": "2026-10-27T17:17:14Z" },
+    "build": {
+      "status": "done",
+      "at": "2026-10-27T17:31:40Z",
+      "tasks": { "done": 2, "total": 2, "failed": 0 }
+    },
+    "verify": { "status": "passed", "at": "2026-10-27T18:07:01Z", "verdict": "PASS" }
+  }
+}

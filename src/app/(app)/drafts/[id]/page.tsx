@@ -18,18 +18,39 @@ import {
 } from 'lucide-react'
 import { ImageLightbox } from '@/components/ui/ImageLightbox'
 import { Button } from '@/components/ui/Button'
-import { GlassPanel } from '@/components/ui/GlassPanel'
+import { Panel } from '@/components/ui/Panel'
 import { StatusChip } from '@/components/ui/StatusChip'
 import { PublishDialog } from '@/components/library/PublishDialog'
-import { CopyEditor } from '@/components/drafts/CopyEditor'
+import { CaptionPanels } from '@/components/drafts/CaptionPanels'
 import { RefinementPanel } from '@/components/drafts/RefinementPanel'
 import { InlineEditModal } from '@/components/drafts/InlineEditModal'
-import { apiFetch } from '@/lib/apiFetch'
+import { BackgroundNotice } from '@/components/drafts/BackgroundNotice'
+import { Notice } from '@/components/ui/Notice'
+import { CompositionNotice } from '@/components/drafts/CompositionNotice'
+import { GeneratedWith, PostStyleLine } from '@/components/drafts/GeneratedWith'
+import { FactsCheckNotice } from '@/components/drafts/FactsCheckNotice'
+import { HeadlineImageNotice } from '@/components/drafts/HeadlineImageNotice'
+import { ModelPicker } from '@/components/ui/ModelPicker'
+import { PageTitle } from '@/components/ui/PageHead'
+import { EYEBROW, FOCUS, ICON, PILL_BADGE, SUB_HEAD } from '@/components/ui/atoms'
+import { ApiError, apiFetch } from '@/lib/apiFetch'
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser'
 import { useUndoableAction } from '@/lib/hooks/useUndoableAction'
-import type { DraftAction, DraftDetail } from '@/lib/api-types'
-import { aspectClassFor } from '@/lib/aspectRatio'
+import { useConfirm } from '@/components/ui/ConfirmDialog'
+import { applyFailureNotice, APPLY_FAILURES, type ApplyFailure } from '@/lib/applyText'
+import type { DraftDetail } from '@/lib/api-types'
+import { ASPECT_LABELS, aspectClassFor, dimensionsFor } from '@/lib/aspectRatio'
+import { channelLabel } from '@/lib/channels'
 import { formatDateTime } from '@/lib/format'
+import type { ModelKey } from '@/lib/models/catalogue'
+import { generatedWith } from '@/lib/models/stampLabel'
+
+// The words on the preview overlay while a design action runs (no ellipsis).
+function designOverlayLabel(action: DraftDetail['pendingAction']): string {
+  if (action === 'REFINE') return 'Refining design'
+  if (action === 'APPLY_TEXT') return 'Applying headline'
+  return 'Regenerating design'
+}
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -39,14 +60,36 @@ interface Revision {
   instruction: string
   exportUrl: string | null
   createdAt: string
+  // 008 FR-16: the model whose output this version's HTML is (null = unknown).
+  model: string | null
+  // …and the refused value it replaced, or null (FR-20's "(substituted)").
+  modelSubstitutedFrom: string | null
 }
 
-const STATUS_TO_CHIP: Record<DraftDetail['status'], 'draft' | 'exported' | 'published' | 'failed'> = {
-  IN_PROGRESS: 'draft',
-  EXPORTED: 'exported',
-  PUBLISHED: 'published',
-  FAILED: 'failed',
-}
+const STATUS_TO_CHIP: Record<DraftDetail['status'], 'draft' | 'exported' | 'published' | 'failed'> =
+  {
+    IN_PROGRESS: 'draft',
+    EXPORTED: 'exported',
+    PUBLISHED: 'published',
+    FAILED: 'failed',
+  }
+
+// The revision list's retry backoff after a failed fetch (018 FR-06).
+const REVISION_RETRY_DELAYS_MS = [2000, 4000, 8000]
+
+// The expand badge sits on the post image, which can be any colour, so it
+// uses fixed ink-on-paper values that read in both themes (§8.12): 30 × 30,
+// inset 10 px, shown while the post is hovered or keyboard-focused.
+const EXPAND_BADGE =
+  'absolute right-2.5 top-2.5 inline-flex h-[30px] w-[30px] items-center justify-center rounded-ui-sm border border-[#211c18] bg-[#fffefb] text-[#211c18] opacity-0 transition-opacity duration-fast ease-standard group-hover:opacity-100 group-focus-visible:opacity-100' // ui-exception: drawn on the post image, fixed ink-on-paper per DESIGN_SYSTEM.md §8.12
+
+// A version cell (§8.13): the thumbnail over the number and label, left
+// aligned. The current one is ringed by its thumbnail's ink outline.
+const VERSION_CELL = 'block w-full min-w-0 text-left'
+
+// A proof-plate crop mark (DESIGN_SYSTEM.md §8.12): 18 px, 1 px --line, inset
+// 20 px from its corner; each mark draws two of its four edges.
+const CROP = 'pointer-events-none absolute h-[18px] w-[18px] border-line'
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
@@ -66,6 +109,16 @@ export default function DraftDetailPage() {
   const [showPreview, setShowPreview] = useState(false)
   const [showInlineEdit, setShowInlineEdit] = useState(false)
   const [regenDesign, setRegenDesign] = useState(false)
+  const [applyingText, setApplyingText] = useState(false)
+  const confirm = useConfirm()
+  // 008 FR-20: the design regenerate's model pick (undefined = the current
+  // design's stamp, A5) and a refused pick's 400 message.
+  const [designModel, setDesignModel] = useState<ModelKey | undefined>(undefined)
+  const [designModelError, setDesignModelError] = useState<string | undefined>(undefined)
+  const pickDesignModel = useCallback((next: ModelKey | undefined) => {
+    setDesignModel(next)
+    setDesignModelError(undefined)
+  }, [])
   // Snapshot = revisionNumber of the design taken before the last regenerate (Undo target).
   const designUndo = useUndoableAction<number>(async (rev) => {
     await apiFetch(`/api/drafts/${draftId}/revisions/${rev}/restore`, { method: 'POST' })
@@ -83,11 +136,14 @@ export default function DraftDetailPage() {
     }
   }, [draftId])
 
-  const fetchRevisions = useCallback(async () => {
+  // Resolves true when the list loaded, false when the request failed.
+  const fetchRevisions = useCallback(async (): Promise<boolean> => {
     try {
       setRevisions(await apiFetch<Revision[]>(`/api/drafts/${draftId}/revisions`))
+      return true
     } catch {
       // Non-fatal — revision list is supplementary.
+      return false
     }
   }, [draftId])
 
@@ -105,16 +161,46 @@ export default function DraftDetailPage() {
     return () => clearInterval(timer)
   }, [draft?.status, draft?.pendingAction, fetchDraft])
 
-  // When a background action completes (pendingAction non-null → null) it may
-  // have created a new revision — refresh the revision list.
-  const prevPendingActionRef = useRef<DraftAction | null>(null)
+  // The revision list follows the draft: whenever the current revision is not
+  // in the loaded list (a background refine or regenerate created it),
+  // refetch the list. State, not a pendingAction non-null → null edge — an
+  // action that finishes before its post-202 refetch is served is never seen
+  // running, so that edge never comes (change 015). One request per missing
+  // number, so a list that still lacks it can't loop. A request that FAILED
+  // resets the guard and tries again after 2, 4 then 8 s (018 FR-06); a
+  // success that still lacks the number is never retried.
+  const requestedRevisionRef = useRef<number | null>(null)
+  const revisionRetryRef = useRef<{ revision: number | null; tries: number }>({
+    revision: null,
+    tries: 0,
+  })
+  const revisionRetryTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [revisionRetryTick, setRevisionRetryTick] = useState(0)
   useEffect(() => {
-    const prev = prevPendingActionRef.current
-    prevPendingActionRef.current = draft?.pendingAction ?? null
-    if (prev != null && draft?.pendingAction == null) {
-      fetchRevisions()
-    }
-  }, [draft?.pendingAction, fetchRevisions])
+    const current = draft?.currentRevisionNumber
+    if (current == null || revisions.some((r) => r.revisionNumber === current)) return
+    if (requestedRevisionRef.current === current) return
+    requestedRevisionRef.current = current
+    void fetchRevisions().then((ok) => {
+      if (ok) return
+      const prior = revisionRetryRef.current
+      const tries = prior.revision === current ? prior.tries : 0
+      if (tries >= REVISION_RETRY_DELAYS_MS.length) return
+      revisionRetryRef.current = { revision: current, tries: tries + 1 }
+      revisionRetryTimer.current = setTimeout(() => {
+        // Only while this number is still the one asked for.
+        if (requestedRevisionRef.current !== current) return
+        requestedRevisionRef.current = null
+        setRevisionRetryTick((t) => t + 1)
+      }, REVISION_RETRY_DELAYS_MS[tries])
+    })
+  }, [draft?.currentRevisionNumber, revisions, fetchRevisions, revisionRetryTick])
+  useEffect(
+    () => () => {
+      if (revisionRetryTimer.current) clearTimeout(revisionRetryTimer.current)
+    },
+    [],
+  )
 
   function refreshAfterChange() {
     fetchDraft()
@@ -168,19 +254,74 @@ export default function DraftDetailPage() {
     // The action runs in the background (202, no payload) — capture the Undo
     // target (the revision we're on right now) BEFORE firing. Legacy drafts
     // without a revision pointer have nothing to undo to.
+    const previousUndo = designUndo.snapshot
+    if (draft.currentRevisionNumber != null) {
+      designUndo.capture(draft.currentRevisionNumber)
+    } else {
+      designUndo.clear()
+    }
+    setDesignModelError(undefined)
+    try {
+      // {} or { model }: an undefined pick is dropped, so the server resolves
+      // the stamp default (A5).
+      await apiFetch(`/api/drafts/${draftId}/regenerate-design`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: designModel }),
+      })
+      // Refetch immediately to pick up pendingAction; the poll takes over.
+      await fetchDraft()
+    } catch (e: unknown) {
+      // A refused model pick (400, nothing claimed) shows on the design
+      // picker, not as a toast, and puts back the Undo target it replaced.
+      if (e instanceof ApiError && e.code === 'MODEL_NOT_ALLOWED') {
+        setDesignModelError(e.message)
+        if (previousUndo === null) designUndo.clear()
+        else designUndo.capture(previousUndo)
+      } else {
+        toast.error(e instanceof Error ? e.message : 'Failed to regenerate design')
+      }
+    } finally {
+      setRegenDesign(false)
+    }
+  }
+
+  // 031 FR-44: put the new headline on the image (no model call). A refusal is a
+  // 422 before anything is claimed; a render-time failure arrives later as
+  // pendingActionError. Undo is captured first, as for regenerate.
+  async function handleApplyText() {
+    if (!draft) return
+    const oldText = draft.headlineImage?.renderedHeadline ?? ''
+    const confirmed = await confirm({
+      title: 'Apply to image',
+      description: `Replace “${oldText}” with “${draft.headline ?? ''}” in the image. Styling inside the headline (for example a colored word or a line break) becomes plain text. Undo brings the old version back.`,
+      confirmLabel: 'Apply to image',
+      danger: false,
+    })
+    if (!confirmed) return
+    setApplyingText(true)
+    const previousUndo = designUndo.snapshot
     if (draft.currentRevisionNumber != null) {
       designUndo.capture(draft.currentRevisionNumber)
     } else {
       designUndo.clear()
     }
     try {
-      await apiFetch(`/api/drafts/${draftId}/regenerate-design`, { method: 'POST' })
-      // Refetch immediately to pick up pendingAction; the poll takes over.
+      await apiFetch(`/api/drafts/${draftId}/apply-text`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ field: 'headline' }),
+      })
       await fetchDraft()
     } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : 'Failed to regenerate design')
+      // Nothing was claimed or written: put back the Undo target it replaced.
+      if (previousUndo === null) designUndo.clear()
+      else designUndo.capture(previousUndo)
+      const code = e instanceof ApiError ? e.code : undefined
+      const known = (APPLY_FAILURES as readonly string[]).includes(code ?? '')
+      toast.error(known ? applyFailureNotice(code as ApplyFailure) : e instanceof Error ? e.message : 'Could not apply the headline')
     } finally {
-      setRegenDesign(false)
+      setApplyingText(false)
     }
   }
 
@@ -189,320 +330,446 @@ export default function DraftDetailPage() {
   // An async action (regenerate/refine) is running in the background.
   const actionPending = draft?.pendingAction != null
   const designActionPending =
-    draft?.pendingAction === 'REGENERATE_DESIGN' || draft?.pendingAction === 'REFINE'
+    draft?.pendingAction === 'REGENERATE_DESIGN' ||
+    draft?.pendingAction === 'REFINE' ||
+    draft?.pendingAction === 'APPLY_TEXT'
   const isFailed = draft?.status === 'FAILED'
-  // Copy resolves independently of the image: show it the moment it's written,
-  // even while the design is still rendering. The skeleton stands in for copy
-  // that hasn't been WRITTEN YET, which only happens before the design exists
-  // (generation writes copy first) — a draft that already has a design has
-  // finished generating, so empty copy there is a deliberate deletion and must
-  // show the editable field, never a skeleton the user can't type into.
-  const copyPending = isGenerating && !draft?.copyText && !draft?.htmlContent
   const ready = draft?.status === 'EXPORTED' || draft?.status === 'PUBLISHED'
 
   if (loading) {
     return (
       <div className="flex items-center justify-center py-32">
-        <Loader2 size={28} className="animate-spin text-primary dark:text-primary-light" />
+        <Loader2 size={28} strokeWidth={1.4} className="animate-spin text-fg-muted" />
       </div>
     )
   }
 
   if (error || !draft) {
     return (
-      <GlassPanel className="p-12 text-center max-w-md mx-auto mt-12">
-        <p className="text-sm text-light-text dark:text-dark-text mb-3">
-          {error ?? 'Draft not found.'}
-        </p>
+      <Panel className="mx-auto mt-12 max-w-md p-12 text-center">
+        <p className="mb-3 text-ui-sm text-fg">{error ?? 'Draft not found.'}</p>
         <Link href="/library">
           <Button variant="secondary" size="sm">
-            <ArrowLeft size={14} /> Back to Library
+            <ArrowLeft {...ICON} /> Back to library
           </Button>
         </Link>
-      </GlassPanel>
+      </Panel>
     )
   }
 
+  const { width, height } = dimensionsFor(draft.brief.aspectRatio)
+  const ratioShort = ASPECT_LABELS[draft.brief.aspectRatio ?? 'SQUARE'].split(' ')[0]
+  const currentRevision = revisions.find((r) => r.revisionNumber === draft.currentRevisionNumber)
+  // The versions read left to right, oldest first, like the study (§8.13);
+  // the API lists newest first.
+  const versions = [...revisions].sort((a, b) => a.revisionNumber - b.revisionNumber)
+  // Regenerate design's Undo — Path B only, like the button itself.
+  const showUndo = designUndo.snapshot !== null
   return (
     <>
-      <div className="flex items-center justify-between mb-6">
-        <div className="min-w-0">
-          <Link
-            href="/library"
-            className="text-xs text-light-text-muted dark:text-dark-text-muted hover:text-primary dark:hover:text-primary-light inline-flex items-center gap-1 mb-1"
-          >
-            <ArrowLeft size={12} /> Library
-          </Link>
-          <h1 className="text-2xl font-bold text-light-text dark:text-dark-text truncate">
-            {draft.brief.topic}
-          </h1>
-          <p className="text-sm text-light-text-muted dark:text-dark-text-muted mt-0.5">
-            {draft.brief.channels.join(' · ')}
-            {draft.brandKitName ? ` · ${draft.brandKitName}` : ''}
-          </p>
+      {/* The page head (021 FR-11): the back link, the eyebrow, the h1 and the
+          meta row on the left, the action bar below them, full width above the
+          grid. It comes before the stage, so it is also first in the tab order. */}
+      <div className="mb-5">
+        <Link
+          href="/library"
+          className={`mb-6 inline-flex items-center gap-1.5 text-ui-sm text-fg-muted underline decoration-line underline-offset-4 transition-colors duration-fast ease-standard hover:text-fg ${FOCUS}`}
+        >
+          <ArrowLeft {...ICON} aria-hidden /> Library
+        </Link>
+        <p className={EYEBROW}>
+          Draft{draft.brandKitName ? ` · ${draft.brandKitName}` : ''}
+        </p>
+        <PageTitle className="mb-3 mt-2 break-words">{draft.brief.topic}</PageTitle>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-ui-sm text-fg-muted">
+          <StatusChip status={STATUS_TO_CHIP[draft.status]} />
+          <span>
+            {draft.brief.channels.map(channelLabel).join(', ')} · {ratioShort}
+          </span>
         </div>
-        <StatusChip status={STATUS_TO_CHIP[draft.status]} />
+
+        {/* The action bar (§8.17, within FR-12): every control stays a visible
+            button with its own name, Publish the one primary. The design action
+            on the left; the rest on the right. No More menu and no Refine
+            button (021 A5). It wraps, never scrolls. */}
+        <div className="mt-6 flex flex-wrap items-center gap-2 border-b border-t-2 border-b-line-subtle border-t-fg py-3.5">
+          {/* Regenerate design — Path B (freeform) only. Produces a fresh design
+              variant; the prior one is saved to history and offered as Undo. */}
+          {isPathB && (
+            <Button
+              variant="secondary"
+              onClick={handleRegenerateDesign}
+              disabled={regenDesign || designUndo.undoing || !draft.htmlContent || actionPending}
+              title="Generate a brand-new design from the same brief"
+            >
+              {regenDesign || draft.pendingAction === 'REGENERATE_DESIGN' ? (
+                <Loader2 {...ICON} className="animate-spin" />
+              ) : (
+                <Sparkles {...ICON} />
+              )}
+              Regenerate design
+            </Button>
+          )}
+          <div className="ml-auto flex flex-wrap justify-end gap-2">
+            {ready && (
+              <Button
+                variant="secondary"
+                onClick={() => setShowInlineEdit(true)}
+                disabled={actionPending || !draft.htmlContent}
+                title="Manually edit text and images, then re-export"
+              >
+                <Pencil {...ICON} /> Edit inline
+              </Button>
+            )}
+            <Button
+              variant="secondary"
+              onClick={handleExport}
+              disabled={exporting || !draft.htmlContent || actionPending}
+            >
+              {exporting ? <Loader2 {...ICON} className="animate-spin" /> : <Download {...ICON} />}
+              {draft.exportUrl ? 'Re-export' : 'Export'}
+            </Button>
+            {isTeamAdmin && (
+              <Button
+                variant="primary"
+                disabled={!draft.exportUrl || actionPending}
+                onClick={() => setShowPublish(true)}
+              >
+                Publish
+              </Button>
+            )}
+          </div>
+        </div>
+        {/* The design regenerate's model (008 FR-20), pre-selected from the
+            current design's stamp (FR-09). Path B only, like the button. */}
+        {isPathB && ready && (
+          <ModelPicker
+            id="draft-design-model"
+            surface="DESIGN_FREEFORM"
+            context={{ stamp: draft.designModel, designPath: 'B' }}
+            value={designModel}
+            onChange={pickDesignModel}
+            label="Design model"
+            disabled={regenDesign || designUndo.undoing || actionPending}
+            error={designModelError}
+            className="mt-3 sm:max-w-xs"
+          />
+        )}
+        {isPathB && regenDesign && (
+          <p className="mt-3 flex items-center gap-1.5 text-ui-xs text-fg-muted">
+            <Loader2 {...ICON} className="animate-spin" /> Designing a new variant — up to a minute…
+          </p>
+        )}
+
+        {/* A background action failed — surface the error inline; the
+            buttons above are re-enabled so the user can simply re-trigger.
+            Claiming a new run does not clear the message (it is hidden
+            while that run is pending); the run settling does: success
+            clears it, a failure replaces it. */}
+        {draft.pendingActionError && !actionPending && (
+          <p className="mt-3 flex items-start gap-1.5 text-ui-xs text-status-failed">
+            <AlertTriangle {...ICON} className="mt-0.5 flex-shrink-0" />
+            <span className="line-clamp-3">{draft.pendingActionError}</span>
+          </p>
+        )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left column */}
-        <div className="lg:col-span-8 space-y-6">
-          {copyPending ? (
-            <GlassPanel className="p-4">
-              <h3 className="text-xs font-semibold uppercase tracking-widest text-light-text-muted dark:text-dark-text-muted mb-3">
-                Copy
-              </h3>
-              <div className="space-y-2.5 animate-pulse" aria-label="Generating copy" role="status">
-                <div className="h-4 w-3/4 rounded bg-light-border/50 dark:bg-dark-border/50" />
-                <div className="h-4 w-full rounded bg-light-border/50 dark:bg-dark-border/50" />
-                <div className="h-4 w-5/6 rounded bg-light-border/50 dark:bg-dark-border/50" />
-                <div className="h-4 w-2/3 rounded bg-light-border/50 dark:bg-dark-border/50" />
+      {/* The grid (021 FR-11, 026 FR-08): the stage and Refine design left, the
+          captions right from xl (1280 px); one column below it: Preview,
+          Refine design, Captions. */}
+      <div className="grid grid-cols-1 items-start gap-10 xl:grid-cols-[0.92fr_1.08fr] xl:gap-14">
+        <div className="min-w-0 divide-y divide-line-subtle">
+          {/* ── The stage (§8.12): the proof plate holding the post ─────────── */}
+          <section aria-label="Preview" className="min-w-0">
+            {/* The proof plate (§8.12): paper, a hairline edge, crop marks. */}
+            <div className="relative border border-line-subtle bg-surface-raised p-10">
+              <span aria-hidden className={`${CROP} left-5 top-5 border-l border-t`} />
+              <span aria-hidden className={`${CROP} right-5 top-5 border-r border-t`} />
+              <span aria-hidden className={`${CROP} bottom-5 left-5 border-b border-l`} />
+              <span aria-hidden className={`${CROP} bottom-5 right-5 border-b border-r`} />
+
+              {/* The post, at its own aspect ratio, never cropped, rounded or
+                restyled (021 A3): its immediate wrapper is square too. */}
+              <div
+                className={`relative ${aspectClassFor(draft.brief.aspectRatio)} w-full bg-surface`}
+              >
+                {draft.exportUrl ? (
+                  <button
+                    onClick={() => setShowPreview(true)}
+                    aria-label="View full screen"
+                    title="View full screen"
+                    className={`group relative block h-full w-full cursor-zoom-in ${FOCUS}`}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={draft.exportUrl}
+                      alt={draft.brief.topic}
+                      className="block h-full w-full object-contain"
+                    />
+                    <span aria-hidden className={EXPAND_BADGE}>
+                      <Maximize2 {...ICON} />
+                    </span>
+                  </button>
+                ) : isGenerating ? (
+                  <div
+                    className="absolute inset-0 flex animate-pulse flex-col items-center justify-center gap-3 bg-surface"
+                    aria-label="Generating design"
+                    role="status"
+                  >
+                    <Loader2 size={28} strokeWidth={1.4} className="animate-spin text-fg-muted" />
+                    <span className="text-ui-xs text-fg-muted">Designing your post…</span>
+                  </div>
+                ) : isFailed ? (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-6 text-center">
+                    <AlertTriangle size={28} strokeWidth={1.4} className="text-status-failed" />
+                    <span className="text-ui-sm font-semibold text-fg">Generation failed</span>
+                    <span className="line-clamp-3 text-ui-xs text-fg-muted">
+                      {draft.failureReason ?? 'Something went wrong while generating this post.'}
+                    </span>
+                    <Button variant="secondary" size="sm" onClick={handleRetry} disabled={retrying}>
+                      {retrying ? (
+                        <Loader2 {...ICON} className="animate-spin" />
+                      ) : (
+                        <RotateCcw {...ICON} />
+                      )}
+                      Retry
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex h-full w-full flex-col items-center justify-center gap-2">
+                    <ImageIcon size={32} strokeWidth={1.4} className="text-fg-muted" />
+                    <span className="text-ui-xs text-fg-muted">No preview available</span>
+                  </div>
+                )}
+                {/* In-progress overlay for background design actions — the current
+                  image stays visible underneath (NOT the generation skeleton).
+                  The words sit on an opaque label, never on the scrim (§4.2). */}
+                {designActionPending && (
+                  <div
+                    className="absolute inset-0 flex flex-col items-center justify-center bg-scrim/40"
+                    aria-label={
+                      designOverlayLabel(draft.pendingAction)
+                    }
+                    role="status"
+                  >
+                    <span className="surface-raised flex items-center gap-2 px-3 py-2 text-ui-xs font-semibold text-fg">
+                      <Loader2 {...ICON} className="animate-spin" />
+                      {designOverlayLabel(draft.pendingAction)}…
+                    </span>
+                  </div>
+                )}
               </div>
-              <p className="mt-3 text-xs text-light-text-muted dark:text-dark-text-muted flex items-center gap-1.5">
-                <Loader2 size={11} className="animate-spin" /> Writing the copy…
-              </p>
-            </GlassPanel>
-          ) : (
-            <CopyEditor draft={draft} onSaved={() => fetchDraft()} onActionStarted={fetchDraft} />
-          )}
+            </div>
+
+            {/* The caption line beneath the plate (§8.12). */}
+            <div className="mt-3.5 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 text-ui-xs text-fg-muted">
+              <span className="min-w-0 break-words">
+                <i className="font-display text-ui-sm text-fg">Preview</i>
+                {currentRevision && (
+                  <span>
+                    , v{currentRevision.revisionNumber} of {revisions.length} —{' '}
+                    {currentRevision.instruction}
+                  </span>
+                )}
+              </span>
+              <span className="whitespace-nowrap">
+                {width} × {height} · {ratioShort}
+              </span>
+            </div>
+
+            {/* 008 FR-20: the model that made the current design. */}
+            {!isFailed && (
+              <GeneratedWith
+                stamp={draft.designModel}
+                substitutedFrom={draft.designModelSubstitutedFrom}
+                className="mt-1"
+              />
+            )}
+
+            {/* 027 FR-13: the post style the draft was made with. */}
+            {!isFailed && <PostStyleLine style={draft.postStyle} className="mt-0.5" />}
+
+            {/* 005 FR-07: why this design has no AI background, when that
+              was not the model's choice. Non-blocking. */}
+            {draft.backgroundSkipped && <BackgroundNotice skipped={draft.backgroundSkipped} />}
+
+            {/* 031 FR-14: the user's own image key failed and the team's provider
+              made the image. Non-blocking. */}
+            {draft.imageSourceNotice && (
+              <Notice tone="warning" role="status" data-testid="image-source-notice" className="mt-4">
+                <p className="text-ui-xs text-fg">{draft.imageSourceNotice.message}</p>
+              </Notice>
+            )}
+
+            {/* 031 FR-24: the render could not load a post font and used a
+              fallback. Non-blocking. */}
+            {draft.fontNotice && (
+              <Notice tone="warning" role="status" data-testid="font-notice" className="mt-4">
+                <p className="text-ui-xs text-fg">{draft.fontNotice.message}</p>
+              </Notice>
+            )}
+
+            {/* 009 FR-15: the image style asked for was not (fully) applied. */}
+            {draft.compositionNotice && <CompositionNotice notice={draft.compositionNotice} />}
+
+            {/* 027 FR-13: values the post states that the brief does not. Never blocks. */}
+            <FactsCheckNotice check={draft.factsCheck} />
+
+            {/* 030 FR-13: the image does not show the current headline. Never blocks. */}
+            {draft.headlineImage && (
+              <HeadlineImageNotice
+                image={draft.headlineImage}
+                canEditInline={ready && !!draft.htmlContent}
+                canRegenerate={isPathB && !!draft.htmlContent}
+                canApply={ready && !!draft.htmlContent}
+                disabled={actionPending || regenDesign || applyingText || designUndo.undoing}
+                onEditInline={() => setShowInlineEdit(true)}
+                onRegenerateDesign={handleRegenerateDesign}
+                onApply={handleApplyText}
+              />
+            )}
+
+            {/* The versions (§8.13): a thumbnail at the post's ratio, the number,
+              the instruction. The current one is ringed in ink with a "Current"
+              badge. No previous/next arrows (021 A5). */}
+            <div className="mb-2.5 mt-7 flex items-baseline justify-between gap-3 border-b border-fg pb-2">
+              <h2 className={SUB_HEAD}>Revision History</h2>
+              {/* Regenerate design's Undo, beside the versions (§8.17). Any design
+                  action with a snapshot offers it (031 FR-42). */}
+              {showUndo && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={designUndo.undo}
+                  disabled={regenDesign || designUndo.undoing || actionPending}
+                  title="Go back to the previous design"
+                >
+                  {designUndo.undoing ? (
+                    <Loader2 {...ICON} className="animate-spin" />
+                  ) : (
+                    <Undo2 {...ICON} />
+                  )}
+                  Undo
+                </Button>
+              )}
+            </div>
+            {revisions.length === 0 ? (
+              <p className="text-ui-sm text-fg-muted">No revisions yet.</p>
+            ) : (
+              <ul aria-label="Versions" className="grid grid-cols-4 gap-3 sm:gap-5">
+                {versions.map((r) => {
+                  const isCurrent = r.revisionNumber === draft.currentRevisionNumber
+                  // 008 FR-20: the model that made this version. The cell is too
+                  // narrow for the sentence, so it shows the name and keeps the
+                  // sentence for the tooltip and screen readers.
+                  const madeWith = generatedWith(r.model, r.modelSubstitutedFrom)
+                  const frame = (
+                    <>
+                      {/* A version's own render, shown as rendered (§8.12): square. */}
+                      <span
+                        className={[
+                          `relative block w-full max-w-[72px] ${aspectClassFor(draft.brief.aspectRatio)} bg-surface`,
+                          'outline outline-offset-[3px] transition-[outline-color] duration-fast ease-standard',
+                          isCurrent
+                            ? 'outline-2 outline-fg'
+                            : 'outline-1 outline-line-subtle group-hover:outline-line',
+                        ].join(' ')}
+                      >
+                        {r.exportUrl && (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={r.exportUrl}
+                            alt=""
+                            className="block h-full w-full object-contain"
+                          />
+                        )}
+                      </span>
+                      <span className="block w-full min-w-0">
+                        <span className="mt-2.5 flex flex-wrap items-baseline gap-x-1.5 font-display text-ui-base font-medium text-fg">
+                          v{r.revisionNumber}
+                          {isCurrent && <span className={`${PILL_BADGE} font-text`}>Current</span>}
+                          {restoringRev === r.revisionNumber && (
+                            <Loader2 {...ICON} className="animate-spin self-center text-fg-muted" />
+                          )}
+                        </span>
+                        <span className="line-clamp-2 break-words text-ui-xs leading-snug text-fg-muted">
+                          {r.instruction}
+                        </span>
+                        <span className="mt-0.5 block text-ui-2xs leading-snug text-fg-muted">
+                          {formatDateTime(r.createdAt)}
+                        </span>
+                        {madeWith && (
+                          <span
+                            className="mt-0.5 block break-words text-ui-2xs leading-snug text-fg-muted"
+                            title={madeWith.text}
+                          >
+                            <span className="sr-only">Generated with </span>
+                            {madeWith.name}
+                            {madeWith.substitutedTitle && (
+                              <>
+                                {' '}
+                                <span title={madeWith.substitutedTitle}>(substituted)</span>
+                                <span className="sr-only">: {madeWith.substitutedTitle}</span>
+                              </>
+                            )}
+                          </span>
+                        )}
+                      </span>
+                    </>
+                  )
+                  return (
+                    <li key={r.id} className="min-w-0">
+                      {/* Cells are narrow, so the clamped instruction is repeated in
+                        the tooltip; the accessible name stays "Switch to vN". */}
+                      {isCurrent ? (
+                        <div
+                          aria-current="true"
+                          title={r.instruction ?? undefined}
+                          className={VERSION_CELL}
+                        >
+                          {frame}
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleRestore(r.revisionNumber)}
+                          disabled={restoringRev !== null || actionPending}
+                          aria-label={`Switch to v${r.revisionNumber}`}
+                          title={`Switch to v${r.revisionNumber}${r.instruction ? ` — ${r.instruction}` : ''}`}
+                          className={`group ${VERSION_CELL} disabled:cursor-not-allowed disabled:opacity-50 ${FOCUS}`}
+                        >
+                          {frame}
+                        </button>
+                      )}
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
+          </section>
+
           {/* Refinement only makes sense once there's a rendered design to refine. */}
           {ready && (
             <RefinementPanel
               draftId={draftId}
+              designPath={isPathB ? 'B' : 'A'}
               pendingAction={draft.pendingAction}
               pendingActionError={draft.pendingActionError}
               conflict={draft.conflict}
+              notApplied={draft.notApplied}
               currentRevisionNumber={draft.currentRevisionNumber}
               onActionStarted={fetchDraft}
               onRefined={refreshAfterChange}
             />
           )}
-          {ready && (
-            <div>
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={() => setShowInlineEdit(true)}
-                disabled={actionPending || !draft.htmlContent}
-                title="Manually edit text and images, then re-export"
-              >
-                <Pencil size={13} /> Edit inline
-              </Button>
-            </div>
-          )}
         </div>
 
-        {/* Right column */}
-        <div className="lg:col-span-4 space-y-6">
-          {/* Preview */}
-          <GlassPanel className="p-4">
-            <h3 className="text-xs font-semibold uppercase tracking-widest text-light-text-muted dark:text-dark-text-muted mb-3">
-              Preview
-            </h3>
-            <div className={`relative ${aspectClassFor(draft.brief.aspectRatio)} w-full rounded-xl overflow-hidden bg-light-border/30 dark:bg-dark-border/30`}>
-              {draft.exportUrl ? (
-                <button
-                  onClick={() => setShowPreview(true)}
-                  aria-label="View full screen"
-                  title="View full screen"
-                  className="group block w-full h-full cursor-zoom-in focus:outline-none"
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={draft.exportUrl}
-                    alt={draft.brief.topic}
-                    className="w-full h-full object-contain"
-                  />
-                  <span className="absolute top-2 right-2 p-1.5 rounded-lg bg-black/40 text-white opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Maximize2 size={14} />
-                  </span>
-                </button>
-              ) : isGenerating ? (
-                <div
-                  className="absolute inset-0 flex flex-col items-center justify-center gap-3 animate-pulse bg-gradient-to-br from-light-border/40 to-transparent dark:from-dark-border/40"
-                  aria-label="Generating design"
-                  role="status"
-                >
-                  <Loader2 size={28} className="animate-spin text-primary/70 dark:text-primary-light/70" />
-                  <span className="text-xs text-light-text-muted dark:text-dark-text-muted">
-                    Designing your post…
-                  </span>
-                </div>
-              ) : isFailed ? (
-                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-6 text-center">
-                  <AlertTriangle size={28} className="text-red-500" />
-                  <span className="text-sm font-medium text-light-text dark:text-dark-text">
-                    Generation failed
-                  </span>
-                  <span className="text-xs text-light-text-muted dark:text-dark-text-muted line-clamp-3">
-                    {draft.failureReason ?? 'Something went wrong while generating this post.'}
-                  </span>
-                  <Button variant="secondary" size="sm" onClick={handleRetry} disabled={retrying}>
-                    {retrying ? <Loader2 size={13} className="animate-spin" /> : <RotateCcw size={13} />}
-                    Retry
-                  </Button>
-                </div>
-              ) : (
-                <div className="w-full h-full flex flex-col items-center justify-center gap-2">
-                  <ImageIcon size={32} className="text-light-text-muted dark:text-dark-text-muted opacity-40" />
-                  <span className="text-xs text-light-text-muted dark:text-dark-text-muted">
-                    No preview available
-                  </span>
-                </div>
-              )}
-              {/* In-progress overlay for background design actions — the current
-                  image stays visible underneath (NOT the generation skeleton). */}
-              {designActionPending && (
-                <div
-                  className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/45 backdrop-blur-sm"
-                  aria-label={draft.pendingAction === 'REFINE' ? 'Refining design' : 'Regenerating design'}
-                  role="status"
-                >
-                  <Loader2 size={28} className="animate-spin text-white/90" />
-                  <span className="text-xs font-medium text-white/90">
-                    {draft.pendingAction === 'REFINE' ? 'Refining design…' : 'Regenerating design…'}
-                  </span>
-                </div>
-              )}
-            </div>
-
-            {/* A background action failed — surface the error inline; the
-                buttons below are re-enabled so the user can simply re-trigger
-                (which clears this message). */}
-            {draft.pendingActionError && !actionPending && (
-              <p className="mt-3 text-xs text-red-500 flex items-start gap-1.5">
-                <AlertTriangle size={13} className="flex-shrink-0 mt-0.5" />
-                <span className="line-clamp-3">{draft.pendingActionError}</span>
-              </p>
-            )}
-
-            {/* Export / publish bar */}
-            <div className="flex gap-2 mt-3">
-              <Button
-                variant="secondary"
-                size="sm"
-                className="flex-1"
-                onClick={handleExport}
-                disabled={exporting || !draft.htmlContent || actionPending}
-              >
-                {exporting ? (
-                  <Loader2 size={13} className="animate-spin" />
-                ) : (
-                  <Download size={13} />
-                )}
-                {draft.exportUrl ? 'Re-export' : 'Export'}
-              </Button>
-              {isTeamAdmin && (
-                <Button
-                  variant="primary"
-                  size="sm"
-                  className="flex-1"
-                  disabled={!draft.exportUrl || actionPending}
-                  onClick={() => setShowPublish(true)}
-                >
-                  Publish
-                </Button>
-              )}
-            </div>
-
-            {/* Regenerate design — Path B (freeform) only. Produces a fresh design
-                variant; the prior one is saved to history and offered as Undo. */}
-            {isPathB && (
-              <div className="mt-2 flex gap-2">
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  className="flex-1"
-                  onClick={handleRegenerateDesign}
-                  disabled={regenDesign || designUndo.undoing || !draft.htmlContent || actionPending}
-                  title="Generate a brand-new design from the same brief"
-                >
-                  {regenDesign || draft.pendingAction === 'REGENERATE_DESIGN' ? (
-                    <Loader2 size={13} className="animate-spin" />
-                  ) : (
-                    <Sparkles size={13} />
-                  )}
-                  Regenerate design
-                </Button>
-                {designUndo.snapshot !== null && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={designUndo.undo}
-                    disabled={regenDesign || designUndo.undoing || actionPending}
-                    title="Go back to the previous design"
-                  >
-                    {designUndo.undoing ? <Loader2 size={13} className="animate-spin" /> : <Undo2 size={13} />}
-                    Undo
-                  </Button>
-                )}
-              </div>
-            )}
-            {isPathB && regenDesign && (
-              <p className="mt-2 text-xs text-light-text-muted dark:text-dark-text-muted flex items-center gap-1.5">
-                <Loader2 size={11} className="animate-spin" /> Designing a new variant — up to a minute…
-              </p>
-            )}
-          </GlassPanel>
-
-          {/* Revision history */}
-          <GlassPanel className="p-4">
-            <h3 className="text-xs font-semibold uppercase tracking-widest text-light-text-muted dark:text-dark-text-muted mb-3">
-              Revision History
-            </h3>
-            {revisions.length === 0 ? (
-              <p className="text-sm text-light-text-muted dark:text-dark-text-muted">
-                No revisions yet.
-              </p>
-            ) : (
-              <ul className="space-y-2 max-h-80 overflow-y-auto">
-                {revisions.map((r) => {
-                  const isCurrent = r.revisionNumber === draft.currentRevisionNumber
-                  return (
-                  <li
-                    key={r.id}
-                    className={[
-                      'glass-input rounded-xl px-3 py-2 flex items-start justify-between gap-2',
-                      isCurrent ? 'ring-1 ring-primary/60 dark:ring-primary-light/60' : '',
-                    ].join(' ')}
-                  >
-                    <div className="min-w-0">
-                      <p className="text-xs text-light-text dark:text-dark-text line-clamp-2">
-                        <span className="font-mono text-light-text-muted dark:text-dark-text-muted">
-                          v{r.revisionNumber}
-                        </span>{' '}
-                        {r.instruction}
-                      </p>
-                      <p className="text-[11px] text-light-text-muted dark:text-dark-text-muted mt-0.5">
-                        {formatDateTime(r.createdAt)}
-                      </p>
-                    </div>
-                    {isCurrent ? (
-                      <span className="flex-shrink-0 text-[10px] font-semibold uppercase tracking-wider px-2 py-1 rounded-lg bg-primary/10 dark:bg-primary-light/10 text-primary dark:text-primary-light">
-                        Current
-                      </span>
-                    ) : (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleRestore(r.revisionNumber)}
-                        disabled={restoringRev !== null || actionPending}
-                        className="flex-shrink-0"
-                        title={`Switch to v${r.revisionNumber}`}
-                      >
-                        {restoringRev === r.revisionNumber ? (
-                          <Loader2 size={12} className="animate-spin" />
-                        ) : (
-                          <RotateCcw size={12} />
-                        )}
-                      </Button>
-                    )}
-                  </li>
-                  )
-                })}
-              </ul>
-            )}
-          </GlassPanel>
+        {/* ── The cards (§8.14): the captions ───────────────────────────── */}
+        <div className="min-w-0 divide-y divide-line-subtle">
+          {/* Captions resolve independently of the image, each panel by its own
+              row: a skeleton only while that row is PENDING, so empty text on a
+              written row is always an editable field (TC-ASYNC-10). */}
+          <CaptionPanels draft={draft} onSaved={() => fetchDraft()} onActionStarted={fetchDraft} />
         </div>
       </div>
 
@@ -521,7 +788,13 @@ export default function DraftDetailPage() {
       {showPublish && (
         <PublishDialog
           draftId={draftId}
-          onClose={() => setShowPublish(false)}
+          headlineState={draft.headlineImage?.state}
+          onClose={() => {
+            // A partial failure closes here, not via onSuccess, and the
+            // channels that did publish can change the draft's status.
+            setShowPublish(false)
+            fetchDraft()
+          }}
           onSuccess={() => {
             setShowPublish(false)
             fetchDraft()
@@ -529,14 +802,18 @@ export default function DraftDetailPage() {
         />
       )}
 
-      {/* Manual inline edit — sandboxed iframe, text + image edits, synchronous save. */}
-      {draft.htmlContent && (
+      {/* Manual inline edit — sandboxed iframe; whole-document text + image
+          edits, or single-element edits (change 004 T24). Mounted per open so
+          the modal reads html + revision pointer from THIS draft read, once. */}
+      {draft.htmlContent && showInlineEdit && (
         <InlineEditModal
           open={showInlineEdit}
           onClose={() => setShowInlineEdit(false)}
           draftId={draftId}
           html={draft.htmlContent}
+          baseRevisionNumber={draft.currentRevisionNumber}
           aspectRatio={draft.brief.aspectRatio}
+          compositeKey={draft.composition?.composites?.[0]?.source.key ?? null}
           onSaved={refreshAfterChange}
         />
       )}

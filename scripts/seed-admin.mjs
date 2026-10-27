@@ -11,7 +11,7 @@
  *   2. The fixed test password, ONLY when the target is the test environment:
  *      NODE_ENV=test, SEED_FIXED_CREDENTIALS=true (set by
  *      scripts/setup-test-db.mjs), or DATABASE_URL points at a *_test database
- *      (covers CI, which seeds bistec_studio_test directly). The E2E helpers in
+ *      (covers CI, which seeds ai_studio_test directly). The E2E helpers in
  *      tests/helpers/api.ts log in with these fixed credentials.
  *   3. Otherwise a random 16-char password, printed ONCE below — change it
  *      after first login.
@@ -34,7 +34,7 @@ function generatePassword() {
   return Array.from(bytes, (b) => alphabet[b % alphabet.length]).join("")
 }
 
-// True when DATABASE_URL names a *_test database (e.g. bistec_studio_test).
+// True when DATABASE_URL names a *_test database (e.g. ai_studio_test).
 function targetsTestDatabase() {
   try {
     return new URL(process.env.DATABASE_URL ?? "").pathname.replace(/^\//, "").endsWith("_test")

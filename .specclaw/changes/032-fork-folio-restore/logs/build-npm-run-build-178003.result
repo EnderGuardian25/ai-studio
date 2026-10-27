@@ -1,0 +1,7 @@
+exit=0
+duration_s=35
+log=.specclaw/changes/032-fork-folio-restore/logs/build-npm-run-build-178003.log
+head=88a77469c3419d8736fe783f8ea21a74d78445f8
+dirty=true
+cmd=npm run build
+interrupted=false
