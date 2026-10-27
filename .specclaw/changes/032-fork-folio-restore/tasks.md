@@ -151,7 +151,7 @@ Each group task: restyle its files (design §5 "How to restyle a file"), remove 
   - Model: sonnet
   - Depends: T10
 
-- [ ] `T12` — Screenshots, W3 gate, docs, scan and push
+- [x] `T12` — Screenshots, W3 gate, docs, scan and push
   - Files: `tests/unit/uiTokenGuard.test.ts` (`W3_DONE = true`), `docs/ui-reference/screen-light.png`, `docs/ui-reference/screen-dark.png`, `CLAUDE.md` (Current state), `docs/e2e-test-plan.md` (counts), `reports/pre-push-scan.md`, `reports/T12.md`
   - Estimate: medium (one full E2E run)
   - Kind: test

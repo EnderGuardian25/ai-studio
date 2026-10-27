@@ -1,0 +1,23 @@
+== tsc start 10:39:27
+== tsc exit=0 10:39:32
+== lint start 10:39:32
+== lint exit=0 10:39:44
+== unit start 10:39:44
+== unit exit=0 10:39:54
+== render start 10:39:54
+== render exit=0 10:42:06
+== upgrade start 10:42:06
+== upgrade exit=0 10:43:06
+== folio start 10:43:06
+== folio exit=0 10:43:07
+== e2edb start 10:43:07
+== e2edb exit=0 10:43:28
+== server up after 1 tries 10:43:32
+== e2e start 10:43:32
+== e2e exit=0 10:58:11
+MOCK_EXIT=0
+== refshots exit=1
+== capture exit=0
+== build start 10:59:30
+== build exit=0 10:59:50
+== GATE DONE 10:59:51

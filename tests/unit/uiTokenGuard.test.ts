@@ -92,7 +92,7 @@ const GRAPHITE_DENY: Array<{ label: string; re: RegExp; codeOnly?: true }> = [
 // restyled yet (032 design §2.2). Each is exempt from GRAPHITE_DENY and from
 // the shared-name guard until its W3 task removes it. W3's last task sets
 // W3_DONE and the list must then be empty.
-const W3_DONE = false
+const W3_DONE = true
 const PENDING_RESTYLE: readonly string[] = []
 
 const SHARED_NAME =
