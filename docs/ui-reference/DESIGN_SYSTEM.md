@@ -647,11 +647,11 @@ The page heads, section heads, notices and field labels are shared components in
 
 ### 8.20 The draft-page notices: image style, image key, fonts and facts check
 
-Four notices sit under the post in the Preview section, in this order: the background notice (008, §8.19's neighbour), the image-key notice, the font notice and the image-style notice, then the facts check and the stale-headline badge (§8.21). Each is a `Notice` (§8.18) with `tone="warning"` and `role="status"`: a heads-up about a working post, never a blocker (Publish stays enabled).
+The notices sit under the post, its caption line and the "Generated with" lines, in the Preview section's proof column (§8.12), in this order: the background notice (`BackgroundNotice`, 008), the image-key notice, the font notice, the image-style notice (`CompositionNotice`), the facts check and the stale-headline badge (§8.21). The image-key and font notices are drawn in `drafts/[id]/page.tsx`; the others have their own file in `src/components/drafts/`. Each is a `Notice` (§8.18) with `tone="warning"` and `role="status"`: a heads-up about a working post, never a blocker (Publish stays enabled).
 
-**Anatomy.** A `Notice` with a 15 px `ICON` (a lucide `LayoutTemplate` for the image style, `ShieldAlert` for the facts check, `Type` for the headline, `ImageOff` for the background) at `mt-0.5`, then a body. The body is a `font-semibold` title line (the image-style notice's reads "Image style", the facts check's "Facts check") and a `mt-1 text-ui-xs text-fg` line carrying the message. The image-key and font notices have the message line only. The caller adds `mt-4`.
+**Anatomy: the one draft-notice form.** Every draft notice, in every file, is this form: a `Notice` with `icon={<Icon {...ICON} className="mt-0.5 flex-shrink-0" aria-hidden="true" />}` (a lucide `LayoutTemplate` for the image style, `ShieldAlert` for the facts check, `Type` for the headline, `ImageOff` for the background), then a body of a `font-semibold` title line (the image-style notice's reads "Image style", the facts check's "Facts check", the headline's "Headline", the background's "No AI background") and a `mt-1 text-ui-xs text-fg` message line. Each carries its `data-testid`, and a `data-reason`, `data-status` or `data-state` where it has one. The image-key and font notices have the message line only. The notice itself is `mt-4`.
 
-**Atoms and tokens.** `Notice` carries the fill and the ring: `--status-scheduled` text on its 10 % fill, ringed in `currentColor` (§3.2, the pair §3.3 checks), radius `--radius-sm`. Message text is `--fg` on that fill. A value quoted in a notice is `font-mono break-all`. No notice has a bezel, a pill or a shadow.
+**Atoms and tokens.** `Notice` carries the fill and the ring: `--status-scheduled` text on its 10 % fill, ringed in `currentColor` (§3.2, the pair §3.3 checks), radius `--radius-sm`. Message text is `--fg` on that fill. A value quoted in a notice is in the body face, `font-semibold tabular-nums break-all`: JetBrains Mono is for code only (§5.1). No notice has a bezel, a pill, a boxed mark or a shadow.
 
 **The image-style notice** (`CompositionNotice`) shows the fixed per-reason line for the look that was not applied. Its `data-reason` names the reason; a `composite-*` reason is a product screenshot that could not be placed, and the post fell back to the classic look.
 
@@ -659,17 +659,17 @@ Four notices sit under the post in the Preview section, in this order: the backg
 
 ### 8.21 The facts-check notice and the stale-headline badge
 
-**The facts-check notice** (`FactsCheckNotice`) is the §8.20 anatomy with the title "Facts check". When the check is `flagged` it lists each value as `<code class="font-mono break-all">` with its source in parentheses, then the fixed advice sentence; when the check could not run it shows one message line. It renders nothing for a clear check or one that was never run.
+**The facts-check notice** (`FactsCheckNotice`) is the §8.20 anatomy with the title "Facts check". When the check is `flagged` it lists each value as `<span class="font-semibold tabular-nums break-all">` with its source in parentheses, then the fixed advice sentence; when the check could not run it shows one message line. It renders nothing for a clear check or one that was never run.
 
 **The stale-headline badge** (`HeadlineImageNotice`) is a §8.20 notice with the title "Headline" and the `Type` icon. Under the title are the headline line, an optional reason line and an optional scheduled-post line, each `mt-1 text-ui-xs text-fg`. Then an action row, `mt-3 flex flex-wrap gap-2`, of secondary small `Button`s (§8.2), each with its own `aria-label`:
 
-| Action               | When it shows                                                              |
-| -------------------- | -------------------------------------------------------------------------- |
-| Edit inline          | Always; disabled when the draft cannot be edited inline or an action runs. |
-| Regenerate design    | Freeform posts with a design.                                              |
-| Apply to image       | Only while the headline is `stale` (no model call; a confirm dialog first). |
+| Action            | When it shows                                                               |
+| ----------------- | --------------------------------------------------------------------------- |
+| Edit inline       | Always; disabled when the draft cannot be edited inline or an action runs.  |
+| Regenerate design | Freeform posts with a design.                                               |
+| Apply to image    | Only while the headline is `stale` (no model call; a confirm dialog first). |
 
-"Apply to image" can carry a "Beta" chip, `ml-1.5 rounded-ui-sm border border-line px-1.5 text-ui-2xs font-semibold text-fg-muted`, only while the re-measure sits below its bar; today the chip is off. The badge and the three buttons are disabled while any draft action runs. Nothing renders for a `fresh` or `unknown` headline.
+"Apply to image" can carry a "Beta" mark, a small-caps word with no box (`ml-1.5 text-fg-muted` plus `SMALL_CAPS`, §7.1 has no pill chips), only while the re-measure sits below its bar; today the mark is off. The badge and the three buttons are disabled while any draft action runs. Nothing renders for a `fresh` or `unknown` headline.
 
 **States.** `stale` and `unconfirmed` both show the badge (the text differs). The Apply confirm uses the confirm dialog (§8.10) with the old and new headline in curly quotes. A failed apply names the reason in a toast, and a render-time failure arrives as the page's failure line. Light and dark are identical.
 
@@ -681,12 +681,12 @@ Four notices sit under the post in the Preview section, in this order: the backg
 
 **Atoms and tokens.** The card is a ruled control, not a panel: a 1 px `--line` edge on the page ground, `--radius-md`, text in `--fg`. No shadow, no blur.
 
-| State        | Look                                                                                                         |
-| ------------ | ------------------------------------------------------------------------------------------------------------ |
-| Idle         | transparent fill, 1 px `--line` edge                                                                         |
-| Hover        | the edge turns `--fg`                                                                                        |
-| Selected     | `--surface-2` fill and a 2 px ink frame (the `--fg` border plus an inset 1 px `--fg` ring), the check showing |
-| Focus        | the §9 outline (`FOCUS`), 2 px `--focus` at 2 px offset, on the card that holds the tab stop                  |
+| State    | Look                                                                                                          |
+| -------- | ------------------------------------------------------------------------------------------------------------- |
+| Idle     | transparent fill, 1 px `--line` edge                                                                          |
+| Hover    | the edge turns `--fg`                                                                                         |
+| Selected | `--surface-2` fill and a 2 px ink frame (the `--fg` border plus an inset 1 px `--fg` ring), the check showing |
+| Focus    | the §9 outline (`FOCUS`), 2 px `--focus` at 2 px offset, on the card that holds the tab stop                  |
 
 **Light and dark.** The same classes serve both themes: `--line`, `--fg` and `--surface-2` switch with the `.dark` class and keep the 3:1 edge of §3.3.
 
@@ -698,11 +698,11 @@ The "Image style" section of the same step (`SizeDesignStep`, Freeform only) pic
 
 **Atoms and tokens.** As §8.22. Sections are ruled apart by `SECTION` (`py-6`, a 1 px `--line-subtle` rule above); an empty state is the `.surface` panel at `--text-sm` `--fg-muted`.
 
-| State                 | Look                                                                            |
-| --------------------- | ------------------------------------------------------------------------------- |
-| Idle, hover, selected | as the post style card (§8.22)                                                  |
+| State                  | Look                                                                                |
+| ---------------------- | ----------------------------------------------------------------------------------- |
+| Idle, hover, selected  | as the post style card (§8.22)                                                      |
 | Disabled (unsupported) | `disabled:opacity-60`, `cursor-not-allowed`, no hover change; the reason line shows |
-| Focus                 | the §9 outline                                                                  |
+| Focus                  | the §9 outline                                                                      |
 
 A look that is not available is disabled with its reason, never hidden. Light and dark are identical.
 
@@ -720,14 +720,14 @@ A look that is not available is disabled with its reason, never hidden. Light an
 
 **Atoms and tokens.** `SUB_HEAD`, `TAG`, `ICON`, `Notice`, `Button`; the row rules are `--line-subtle`. The panel has no fill, ring or shadow of its own, and no bezel: it reads as part of the editor's section.
 
-| State        | Look                                                                                     |
-| ------------ | ---------------------------------------------------------------------------------------- |
-| No flags     | the head count only; no list                                                             |
-| Flagged      | the ruled list, one row per phrase                                                       |
-| Upgrading    | the Upgrade button disabled with its working label                                       |
-| Edit pending | Accept (Ink) and Reject (ghost) side by side                                             |
-| Edit stale   | Accept disabled, a `--text-xs` `--fg-muted` line says why                                |
-| Edit settled | the "Accepted" or "Rejected" `TAG` replaces the buttons                                  |
+| State        | Look                                                      |
+| ------------ | --------------------------------------------------------- |
+| No flags     | the head count only; no list                              |
+| Flagged      | the ruled list, one row per phrase                        |
+| Upgrading    | the Upgrade button disabled with its working label        |
+| Edit pending | Accept (Ink) and Reject (ghost) side by side              |
+| Edit stale   | Accept disabled, a `--text-xs` `--fg-muted` line says why |
+| Edit settled | the "Accepted" or "Rejected" `TAG` replaces the buttons   |
 
 **Light and dark.** The same classes serve both themes: the notice tints and `--fg-muted` text are the pairs §3.3 checks.
 
@@ -739,12 +739,12 @@ A look that is not available is disabled with its reason, never hidden. Light an
 
 **Atoms and tokens.** The field is the `Select` of §8.3: 1 px `--line` edge, `--radius-sm`, `--surface-2` fill, the chevron `background-image`, the focus ring of §9. The picker adds no class of its own.
 
-| State              | Look                                                                                  |
-| ------------------ | ------------------------------------------------------------------------------------- |
-| None chosen        | "None (system font)" selected                                                         |
-| Family chosen      | the family's name selected; Save writes `scriptFonts.sinhala`                         |
-| List loading       | the options hold "None" and the stored family only; the full list fills in on arrival |
-| Read-only (not editing) | no select: the Fonts list shows the family as a ruled row with a "Sinhala" `TAG`  |
+| State                   | Look                                                                                  |
+| ----------------------- | ------------------------------------------------------------------------------------- |
+| None chosen             | "None (system font)" selected                                                         |
+| Family chosen           | the family's name selected; Save writes `scriptFonts.sinhala`                         |
+| List loading            | the options hold "None" and the stored family only; the full list fills in on arrival |
+| Read-only (not editing) | no select: the Fonts list shows the family as a ruled row with a "Sinhala" `TAG`      |
 
 **Light and dark.** Identical.
 
@@ -756,14 +756,14 @@ A look that is not available is disabled with its reason, never hidden. Light an
 
 **Atoms and tokens.** `SectionHead`, `BLOCK`, `SegmentedToggle`, `Button`, `Notice`, `QueryError`. The card has no fill, ring or shadow of its own: like every `/team` section it is a numbered head over a ruled body, 48 px (`gap-12`) from the next.
 
-| State          | Look                                                                                                          |
-| -------------- | ------------------------------------------------------------------------------------------------------------- |
-| Loading        | "Loading…" in `--text-sm` `--fg-muted`                                                                         |
-| Ready          | one `--text-sm` `--fg` line: "Captions run on <route>."                                                        |
-| No route chosen | the same line says the server default applies; no "Use the default" button                                     |
-| Not ready      | `Notice tone="warning" role="status"` with the server's message and "New captions fail until this is fixed."   |
-| Save failed    | `Notice tone="error" role="alert"` with the server's message                                                   |
-| Load failed    | `QueryError` with Retry                                                                                        |
+| State           | Look                                                                                                         |
+| --------------- | ------------------------------------------------------------------------------------------------------------ |
+| Loading         | "Loading…" in `--text-sm` `--fg-muted`                                                                       |
+| Ready           | one `--text-sm` `--fg` line: "Captions run on <route>."                                                      |
+| No route chosen | the same line says the server default applies; no "Use the default" button                                   |
+| Not ready       | `Notice tone="warning" role="status"` with the server's message and "New captions fail until this is fixed." |
+| Save failed     | `Notice tone="error" role="alert"` with the server's message                                                 |
+| Load failed     | `QueryError` with Retry                                                                                      |
 
 **Light and dark.** The same classes serve both themes (`--fg`, `--line`, and the notice tints §3.3 checks).
 
@@ -777,14 +777,14 @@ A look that is not available is disabled with its reason, never hidden. Light an
 
 **The rate bar** (`RateBar`) draws a rate as a 64 × 6 px `--radius-sm` track in `--line-subtle` with an `--accent` fill, then the number in `--text-sm` tabular figures. The number is always visible text; the bar is decorative (`aria-hidden`), so a rate is never carried by colour alone.
 
-| State            | Look                                                                                      |
-| ---------------- | ----------------------------------------------------------------------------------------- |
-| Loading          | "Loading insights…" (`role="status"`, `--text-sm` `--fg-muted`)                            |
-| Empty table      | the table's empty line; the section and its head stay                                     |
-| Rate unknown     | an empty track and the placeholder number                                                 |
-| Events lost      | `Notice tone="warning" role="status"` above the lost-events table                         |
-| Retention health | a `StatusChip` in the section tail: `published`, `failed` or `draft`                       |
-| Not a super admin | `GateNotice` ("Requires super admin"), nothing else                                       |
+| State             | Look                                                                 |
+| ----------------- | -------------------------------------------------------------------- |
+| Loading           | "Loading insights…" (`role="status"`, `--text-sm` `--fg-muted`)      |
+| Empty table       | the table's empty line; the section and its head stay                |
+| Rate unknown      | an empty track and the placeholder number                            |
+| Events lost       | `Notice tone="warning" role="status"` above the lost-events table    |
+| Retention health  | a `StatusChip` in the section tail: `published`, `failed` or `draft` |
+| Not a super admin | `GateNotice` ("Requires super admin"), nothing else                  |
 
 **Light and dark.** Identical: the track, rules and text are tokens that switch with `.dark`.
 

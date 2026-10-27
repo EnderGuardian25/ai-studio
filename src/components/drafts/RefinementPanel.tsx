@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/Button'
 import { Notice } from '@/components/ui/Notice'
 import { ModelPicker } from '@/components/ui/ModelPicker'
 import { SectionHead } from '@/components/ui/SectionHead'
-import { FOCUS, ICON, ICON_SM, SCROLL_FOCUS, SMALL_CAPS } from '@/components/ui/atoms'
+import { FOCUS, ICON, SCROLL_FOCUS, SMALL_CAPS } from '@/components/ui/atoms'
 import { NotAppliedCard } from '@/components/drafts/NotAppliedCard'
 import { ApiError, apiFetch } from '@/lib/apiFetch'
 import type { DraftAction, DraftNotApplied } from '@/lib/api-types'
@@ -266,18 +266,38 @@ export function RefinementPanel({
           </p>
         ) : (
           <ol>
-            {messages.map((m) => (
-              <li key={m.id} className="grid grid-cols-[22px_minmax(0,1fr)_auto] items-start gap-3 border-b border-line-subtle py-2.5">
-                <StatusDisc status={m.status} />
+            {messages.map((m, i) => (
+              <li
+                key={m.id}
+                className="grid grid-cols-[40px_minmax(0,1fr)_auto] gap-3 border-b border-line-subtle py-2.5"
+              >
+                <span aria-hidden className="font-display text-ui-base italic text-fg-muted">
+                  № {i + 1}
+                </span>
                 <div className="min-w-0">
                   <p className="break-words text-ui-base leading-snug text-fg">{m.instruction}</p>
-                  <p className="mt-0.5 text-ui-xs text-fg-muted">
-                    {m.status === 'pending' && <span>Applying…</span>}
-                    {m.status === 'applied' && <span className={`text-status-published ${SMALL_CAPS}`}>Applied</span>}
-                    {m.status === 'conflict' && <span className={`text-status-scheduled ${SMALL_CAPS}`}>Brand conflict</span>}
+                  <div className="mt-0.5 flex items-center gap-1.5 text-ui-xs">
+                    {m.status === 'pending' && (
+                      <span className="flex items-center gap-1.5 text-fg-muted">
+                        <Loader2 {...ICON} className="animate-spin" aria-hidden /> Applying…
+                      </span>
+                    )}
+                    {m.status === 'applied' && (
+                      <span className={`flex items-center gap-1 text-status-published ${SMALL_CAPS}`}>
+                        <Check {...ICON} aria-hidden /> Applied
+                      </span>
+                    )}
+                    {m.status === 'conflict' && (
+                      <span className={`flex items-center gap-1 text-status-scheduled ${SMALL_CAPS}`}>
+                        <AlertTriangle {...ICON} aria-hidden /> Brand conflict
+                      </span>
+                    )}
                     {m.status === 'not-applied' && (
-                      <span className={`text-status-scheduled ${SMALL_CAPS}`} title={m.detail}>
-                        Not applied
+                      <span
+                        className={`flex items-center gap-1 text-status-scheduled ${SMALL_CAPS}`}
+                        title={m.detail}
+                      >
+                        <AlertTriangle {...ICON} aria-hidden /> Not applied
                       </span>
                     )}
                     {m.status === 'error' && (
@@ -285,7 +305,7 @@ export function RefinementPanel({
                         Failed: {m.detail}
                       </span>
                     )}
-                  </p>
+                  </div>
                 </div>
                 <time dateTime={m.sentAt.toISOString()} className="pt-0.5 text-ui-xs text-fg-muted">
                   {m.sentAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -363,14 +383,14 @@ export function RefinementPanel({
         <button
           type="submit"
           aria-label="Send"
-          title="Send"
           disabled={busy || !input.trim()}
           className="inline-flex flex-shrink-0 items-center gap-2 whitespace-nowrap border-l border-line bg-fg px-4 font-text text-ui-sm font-semibold text-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus disabled:cursor-not-allowed disabled:opacity-50"
         >
+          Send
           {running || pendingAction === 'REFINE' ? (
-            <Loader2 {...ICON_SM} className="animate-spin" aria-hidden />
+            <Loader2 {...ICON} className="animate-spin" aria-hidden />
           ) : (
-            <SendIcon {...ICON_SM} aria-hidden />
+            <SendIcon {...ICON} aria-hidden />
           )}
         </button>
       </form>
@@ -390,24 +410,5 @@ export function RefinementPanel({
         className="mt-3 sm:max-w-xs"
       />
     </section>
-  )
-}
-
-// A refine row's status marker: 22 px, the status colour on its 10 % tint
-// (the pair §3.3 checks), with a check or an alert; a spinner while it runs.
-function StatusDisc({ status }: { status: RefineMessage['status'] }) {
-  const tone =
-    status === 'pending'
-      ? 'bg-canvas text-fg-muted'
-      : status === 'applied'
-        ? 'bg-status-published/10 text-status-published'
-        : status === 'error'
-          ? 'bg-status-failed/10 text-status-failed'
-          : 'bg-status-scheduled/10 text-status-scheduled'
-  const Icon = status === 'pending' ? Loader2 : status === 'applied' ? Check : AlertTriangle
-  return (
-    <span aria-hidden className={`mt-px inline-flex size-[22px] items-center justify-center rounded-ui-sm ${tone}`}>
-      <Icon {...ICON_SM} className={status === 'pending' ? 'animate-spin' : undefined} />
-    </span>
   )
 }

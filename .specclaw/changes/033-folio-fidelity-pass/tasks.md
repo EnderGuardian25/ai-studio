@@ -144,7 +144,7 @@
     - List every importer of each changed primitive, run their suites, and capture their screens.
     - Stop and ask if `Panel` or `SectionHead` (pinned) would have to change.
 
-- [ ] `T7` — G1 draft page
+- [x] `T7` — G1 draft page
   - Files: G1's files (design §2.1) and new components (§2.2); `docs/ui-reference/DESIGN_SYSTEM.md` §8.20, §8.21; `audit.md`; tests named by its rows
   - Estimate: large
   - Kind: impl

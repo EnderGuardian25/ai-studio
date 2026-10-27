@@ -6,7 +6,7 @@ import { headlineNoticeText } from '@/lib/renderedText/noticeText'
 import { APPLY_TEXT_BETA } from '@/lib/applyText'
 import { Notice } from '@/components/ui/Notice'
 import { Button } from '@/components/ui/Button'
-import { ICON } from '@/components/ui/atoms'
+import { ICON, SMALL_CAPS } from '@/components/ui/atoms'
 
 export interface HeadlineImageNoticeProps {
   image: HeadlineImage
@@ -69,7 +69,7 @@ export function HeadlineImageNotice({
           <Button variant="secondary" size="sm" onClick={onApply} disabled={disabled} aria-label="Apply the new headline to the image">
             Apply to image
             {beta && (
-              <span data-testid="apply-beta-chip" className="ml-1.5 rounded-ui-sm border border-line px-1.5 text-ui-2xs font-semibold text-fg-muted">
+              <span data-testid="apply-beta-chip" className={`ml-1.5 text-fg-muted ${SMALL_CAPS}`}>
                 Beta
               </span>
             )}

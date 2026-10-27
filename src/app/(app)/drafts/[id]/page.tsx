@@ -15,7 +15,6 @@ import {
   Maximize2,
   AlertTriangle,
   Pencil,
-  Clock,
 } from 'lucide-react'
 import { ImageLightbox } from '@/components/ui/ImageLightbox'
 import { Button } from '@/components/ui/Button'
@@ -33,7 +32,7 @@ import { FactsCheckNotice } from '@/components/drafts/FactsCheckNotice'
 import { HeadlineImageNotice } from '@/components/drafts/HeadlineImageNotice'
 import { ModelPicker } from '@/components/ui/ModelPicker'
 import { PageTitle } from '@/components/ui/PageHead'
-import { EYEBROW, FOCUS, ICON, ICON_SM, PILL_BADGE, SUB_HEAD } from '@/components/ui/atoms'
+import { EYEBROW, FOCUS, ICON, PILL_BADGE, SUB_HEAD } from '@/components/ui/atoms'
 import { ApiError, apiFetch } from '@/lib/apiFetch'
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser'
 import { useUndoableAction } from '@/lib/hooks/useUndoableAction'
@@ -366,48 +365,34 @@ export default function DraftDetailPage() {
   const versions = [...revisions].sort((a, b) => a.revisionNumber - b.revisionNumber)
   // Regenerate design's Undo — Path B only, like the button itself.
   const showUndo = designUndo.snapshot !== null
-  // The meta row (the study's .meta): channels, kit and size, split by 3 px dots.
-  const meta = [
-    draft.brief.channels.map(channelLabel).join(' · '),
-    draft.brandKitName,
-    ratioShort,
-  ].filter((m): m is string => Boolean(m))
-
   return (
     <>
-      {/* The page head (021 FR-11, the study's .page-head): the back link, the
-          h1 and the meta row on the left, the action bar on the right. It
-          comes before the stage, so it is also first in the tab order. */}
-      <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between lg:gap-6">
-        <div className="min-w-0">
-          <Link
-            href="/library"
-            className={`mb-2 inline-flex items-center gap-1.5 text-ui-sm text-fg-muted underline decoration-line underline-offset-4 transition-colors duration-fast ease-standard hover:text-fg ${FOCUS}`}
-          >
-            <ArrowLeft {...ICON} aria-hidden /> Library
-          </Link>
-          {/* The page eyebrow stays (021 A7); the kit is in the meta row below. */}
-          <p className={EYEBROW}>Draft</p>
-          <PageTitle className="mt-2 break-words lg:truncate">
-            <span title={draft.brief.topic}>{draft.brief.topic}</span>
-          </PageTitle>
-          <div className="mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-ui-sm text-fg-muted">
-            <StatusChip status={STATUS_TO_CHIP[draft.status]} />
-            {meta.map((m, i) => (
-              <React.Fragment key={i}>
-                {i > 0 && (
-                  <span aria-hidden className="size-[3px] flex-shrink-0 rounded-full bg-fg-muted" />
-                )}
-                <span>{m}</span>
-              </React.Fragment>
-            ))}
-          </div>
+      {/* The page head (021 FR-11): the back link, the eyebrow, the h1 and the
+          meta row on the left, the action bar below them, full width above the
+          grid. It comes before the stage, so it is also first in the tab order. */}
+      <div className="mb-5">
+        <Link
+          href="/library"
+          className={`mb-6 inline-flex items-center gap-1.5 text-ui-sm text-fg-muted underline decoration-line underline-offset-4 transition-colors duration-fast ease-standard hover:text-fg ${FOCUS}`}
+        >
+          <ArrowLeft {...ICON} aria-hidden /> Library
+        </Link>
+        <p className={EYEBROW}>
+          Draft{draft.brandKitName ? ` · ${draft.brandKitName}` : ''}
+        </p>
+        <PageTitle className="mb-3 mt-2 break-words">{draft.brief.topic}</PageTitle>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-ui-sm text-fg-muted">
+          <StatusChip status={STATUS_TO_CHIP[draft.status]} />
+          <span>
+            {draft.brief.channels.map(channelLabel).join(', ')} · {ratioShort}
+          </span>
         </div>
 
         {/* The action bar (§8.17, within FR-12): every control stays a visible
-            button with its own name, Publish the one primary. No More menu
-            and no Refine button (021 A5). It wraps, never scrolls. */}
-        <div className="flex flex-shrink-0 flex-wrap items-center gap-2">
+            button with its own name, Publish the one primary. The design action
+            on the left; the rest on the right. No More menu and no Refine
+            button (021 A5). It wraps, never scrolls. */}
+        <div className="mt-6 flex flex-wrap items-center gap-2 border-b border-t-2 border-b-line-subtle border-t-fg py-3.5">
           {/* Regenerate design — Path B (freeform) only. Produces a fresh design
               variant; the prior one is saved to history and offered as Undo. */}
           {isPathB && (
@@ -425,144 +410,171 @@ export default function DraftDetailPage() {
               Regenerate design
             </Button>
           )}
-          {ready && (
+          <div className="ml-auto flex flex-wrap justify-end gap-2">
+            {ready && (
+              <Button
+                variant="secondary"
+                onClick={() => setShowInlineEdit(true)}
+                disabled={actionPending || !draft.htmlContent}
+                title="Manually edit text and images, then re-export"
+              >
+                <Pencil {...ICON} /> Edit inline
+              </Button>
+            )}
             <Button
               variant="secondary"
-              onClick={() => setShowInlineEdit(true)}
-              disabled={actionPending || !draft.htmlContent}
-              title="Manually edit text and images, then re-export"
+              onClick={handleExport}
+              disabled={exporting || !draft.htmlContent || actionPending}
             >
-              <Pencil {...ICON} /> Edit inline
+              {exporting ? <Loader2 {...ICON} className="animate-spin" /> : <Download {...ICON} />}
+              {draft.exportUrl ? 'Re-export' : 'Export'}
             </Button>
-          )}
-          <Button
-            variant="secondary"
-            onClick={handleExport}
-            disabled={exporting || !draft.htmlContent || actionPending}
-          >
-            {exporting ? <Loader2 {...ICON} className="animate-spin" /> : <Download {...ICON} />}
-            {draft.exportUrl ? 'Re-export' : 'Export'}
-          </Button>
-          {isTeamAdmin && (
-            <Button
-              variant="primary"
-              disabled={!draft.exportUrl || actionPending}
-              onClick={() => setShowPublish(true)}
-            >
-              Publish
-            </Button>
-          )}
+            {isTeamAdmin && (
+              <Button
+                variant="primary"
+                disabled={!draft.exportUrl || actionPending}
+                onClick={() => setShowPublish(true)}
+              >
+                Publish
+              </Button>
+            )}
+          </div>
         </div>
+        {/* The design regenerate's model (008 FR-20), pre-selected from the
+            current design's stamp (FR-09). Path B only, like the button. */}
+        {isPathB && ready && (
+          <ModelPicker
+            id="draft-design-model"
+            surface="DESIGN_FREEFORM"
+            context={{ stamp: draft.designModel, designPath: 'B' }}
+            value={designModel}
+            onChange={pickDesignModel}
+            label="Design model"
+            disabled={regenDesign || designUndo.undoing || actionPending}
+            error={designModelError}
+            className="mt-3 sm:max-w-xs"
+          />
+        )}
+        {isPathB && regenDesign && (
+          <p className="mt-3 flex items-center gap-1.5 text-ui-xs text-fg-muted">
+            <Loader2 {...ICON} className="animate-spin" /> Designing a new variant — up to a minute…
+          </p>
+        )}
+
+        {/* A background action failed — surface the error inline; the
+            buttons above are re-enabled so the user can simply re-trigger.
+            Claiming a new run does not clear the message (it is hidden
+            while that run is pending); the run settling does: success
+            clears it, a failure replaces it. */}
+        {draft.pendingActionError && !actionPending && (
+          <p className="mt-3 flex items-start gap-1.5 text-ui-xs text-status-failed">
+            <AlertTriangle {...ICON} className="mt-0.5 flex-shrink-0" />
+            <span className="line-clamp-3">{draft.pendingActionError}</span>
+          </p>
+        )}
       </div>
-
-      {isPathB && regenDesign && (
-        <p className="mb-4 flex items-center gap-1.5 text-ui-xs text-fg-muted">
-          <Loader2 {...ICON} className="animate-spin" /> Designing a new variant — up to a minute…
-        </p>
-      )}
-
-      {/* A background action failed — surface the error inline; the
-          buttons above are re-enabled so the user can simply re-trigger.
-          Claiming a new run does not clear the message (it is hidden
-          while that run is pending); the run settling does: success
-          clears it, a failure replaces it. */}
-      {draft.pendingActionError && !actionPending && (
-        <p className="mb-4 flex items-start gap-1.5 text-ui-xs text-status-failed">
-          <AlertTriangle {...ICON} className="mt-0.5 flex-shrink-0" />
-          <span className="line-clamp-3">{draft.pendingActionError}</span>
-        </p>
-      )}
 
       {/* The grid (021 FR-11, 026 FR-08): the stage and Refine design left, the
           captions right from xl (1280 px); one column below it: Preview,
           Refine design, Captions. */}
-      <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[0.92fr_1.08fr]">
-        <div className="flex min-w-0 flex-col gap-3.5">
+      <div className="grid grid-cols-1 items-start gap-10 xl:grid-cols-[0.92fr_1.08fr] xl:gap-14">
+        <div className="min-w-0 divide-y divide-line-subtle">
           {/* ── The stage (§8.12): the proof plate holding the post ─────────── */}
-          <section aria-label="Preview" className="relative min-w-0 border border-line-subtle bg-surface-raised p-5 sm:p-10">
-            {/* Crop marks (§8.12), from sm up: below it the p-5 gutter is narrower than a mark. */}
-            <span aria-hidden className={`${CROP} left-5 top-5 border-l border-t max-sm:hidden`} />
-            <span aria-hidden className={`${CROP} right-5 top-5 border-r border-t max-sm:hidden`} />
-            <span aria-hidden className={`${CROP} bottom-5 left-5 border-b border-l max-sm:hidden`} />
-            <span aria-hidden className={`${CROP} bottom-5 right-5 border-b border-r max-sm:hidden`} />
-            <div className="mb-[18px] flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
-              <span className={EYEBROW}>Preview</span>
-              <span className="text-ui-xs text-fg-muted">
-                {width} × {height}
-                {currentRevision && ` · v${currentRevision.revisionNumber} of ${revisions.length}`}
-              </span>
+          <section aria-label="Preview" className="min-w-0">
+            {/* The proof plate (§8.12): paper, a hairline edge, crop marks. */}
+            <div className="relative border border-line-subtle bg-surface-raised p-10">
+              <span aria-hidden className={`${CROP} left-5 top-5 border-l border-t`} />
+              <span aria-hidden className={`${CROP} right-5 top-5 border-r border-t`} />
+              <span aria-hidden className={`${CROP} bottom-5 left-5 border-b border-l`} />
+              <span aria-hidden className={`${CROP} bottom-5 right-5 border-b border-r`} />
+
+              {/* The post, at its own aspect ratio, never cropped, rounded or
+                restyled (021 A3): its immediate wrapper is square too. */}
+              <div
+                className={`relative ${aspectClassFor(draft.brief.aspectRatio)} w-full bg-surface`}
+              >
+                {draft.exportUrl ? (
+                  <button
+                    onClick={() => setShowPreview(true)}
+                    aria-label="View full screen"
+                    title="View full screen"
+                    className={`group relative block h-full w-full cursor-zoom-in ${FOCUS}`}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={draft.exportUrl}
+                      alt={draft.brief.topic}
+                      className="block h-full w-full object-contain"
+                    />
+                    <span aria-hidden className={EXPAND_BADGE}>
+                      <Maximize2 {...ICON} />
+                    </span>
+                  </button>
+                ) : isGenerating ? (
+                  <div
+                    className="absolute inset-0 flex animate-pulse flex-col items-center justify-center gap-3 bg-surface"
+                    aria-label="Generating design"
+                    role="status"
+                  >
+                    <Loader2 size={28} strokeWidth={1.4} className="animate-spin text-fg-muted" />
+                    <span className="text-ui-xs text-fg-muted">Designing your post…</span>
+                  </div>
+                ) : isFailed ? (
+                  <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-6 text-center">
+                    <AlertTriangle size={28} strokeWidth={1.4} className="text-status-failed" />
+                    <span className="text-ui-sm font-semibold text-fg">Generation failed</span>
+                    <span className="line-clamp-3 text-ui-xs text-fg-muted">
+                      {draft.failureReason ?? 'Something went wrong while generating this post.'}
+                    </span>
+                    <Button variant="secondary" size="sm" onClick={handleRetry} disabled={retrying}>
+                      {retrying ? (
+                        <Loader2 {...ICON} className="animate-spin" />
+                      ) : (
+                        <RotateCcw {...ICON} />
+                      )}
+                      Retry
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex h-full w-full flex-col items-center justify-center gap-2">
+                    <ImageIcon size={32} strokeWidth={1.4} className="text-fg-muted" />
+                    <span className="text-ui-xs text-fg-muted">No preview available</span>
+                  </div>
+                )}
+                {/* In-progress overlay for background design actions — the current
+                  image stays visible underneath (NOT the generation skeleton).
+                  The words sit on an opaque label, never on the scrim (§4.2). */}
+                {designActionPending && (
+                  <div
+                    className="absolute inset-0 flex flex-col items-center justify-center bg-scrim/40"
+                    aria-label={
+                      designOverlayLabel(draft.pendingAction)
+                    }
+                    role="status"
+                  >
+                    <span className="surface-raised flex items-center gap-2 px-3 py-2 text-ui-xs font-semibold text-fg">
+                      <Loader2 {...ICON} className="animate-spin" />
+                      {designOverlayLabel(draft.pendingAction)}…
+                    </span>
+                  </div>
+                )}
+              </div>
             </div>
 
-            {/* The post, at its own aspect ratio, never cropped, rounded or
-              restyled (021 A3): its immediate wrapper is square too. */}
-            <div
-              className={`relative mx-auto ${aspectClassFor(draft.brief.aspectRatio)} w-full max-w-[392px] bg-surface`}
-            >
-              {draft.exportUrl ? (
-                <button
-                  onClick={() => setShowPreview(true)}
-                  aria-label="View full screen"
-                  title="View full screen"
-                  className={`group relative block h-full w-full cursor-zoom-in ${FOCUS}`}
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={draft.exportUrl}
-                    alt={draft.brief.topic}
-                    className="block h-full w-full object-contain"
-                  />
-                  <span aria-hidden className={EXPAND_BADGE}>
-                    <Maximize2 {...ICON} />
+            {/* The caption line beneath the plate (§8.12). */}
+            <div className="mt-3.5 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 text-ui-xs text-fg-muted">
+              <span className="min-w-0 break-words">
+                <i className="font-display text-ui-sm text-fg">Preview</i>
+                {currentRevision && (
+                  <span>
+                    , v{currentRevision.revisionNumber} of {revisions.length} —{' '}
+                    {currentRevision.instruction}
                   </span>
-                </button>
-              ) : isGenerating ? (
-                <div
-                  className="absolute inset-0 flex animate-pulse flex-col items-center justify-center gap-3 bg-surface"
-                  aria-label="Generating design"
-                  role="status"
-                >
-                  <Loader2 size={28} strokeWidth={1.4} className="animate-spin text-fg-muted" />
-                  <span className="text-ui-xs text-fg-muted">Designing your post…</span>
-                </div>
-              ) : isFailed ? (
-                <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-6 text-center">
-                  <AlertTriangle size={28} strokeWidth={1.4} className="text-status-failed" />
-                  <span className="text-ui-sm font-semibold text-fg">Generation failed</span>
-                  <span className="line-clamp-3 text-ui-xs text-fg-muted">
-                    {draft.failureReason ?? 'Something went wrong while generating this post.'}
-                  </span>
-                  <Button variant="secondary" size="sm" onClick={handleRetry} disabled={retrying}>
-                    {retrying ? (
-                      <Loader2 {...ICON} className="animate-spin" />
-                    ) : (
-                      <RotateCcw {...ICON} />
-                    )}
-                    Retry
-                  </Button>
-                </div>
-              ) : (
-                <div className="flex h-full w-full flex-col items-center justify-center gap-2">
-                  <ImageIcon size={32} strokeWidth={1.4} className="text-fg-muted" />
-                  <span className="text-ui-xs text-fg-muted">No preview available</span>
-                </div>
-              )}
-              {/* In-progress overlay for background design actions — the current
-                image stays visible underneath (NOT the generation skeleton).
-                The words sit on an opaque label, never on the scrim (§4.2). */}
-              {designActionPending && (
-                <div
-                  className="absolute inset-0 flex flex-col items-center justify-center bg-scrim/40"
-                  aria-label={
-                    designOverlayLabel(draft.pendingAction)
-                  }
-                  role="status"
-                >
-                  <span className="surface-raised flex items-center gap-2 px-3 py-2 text-ui-xs font-semibold text-fg">
-                    <Loader2 {...ICON} className="animate-spin" />
-                    {designOverlayLabel(draft.pendingAction)}…
-                  </span>
-                </div>
-              )}
+                )}
+              </span>
+              <span className="whitespace-nowrap">
+                {width} × {height} · {ratioShort}
+              </span>
             </div>
 
             {/* 008 FR-20: the model that made the current design. */}
@@ -570,12 +582,12 @@ export default function DraftDetailPage() {
               <GeneratedWith
                 stamp={draft.designModel}
                 substitutedFrom={draft.designModelSubstitutedFrom}
-                className="mt-4 text-center"
+                className="mt-1"
               />
             )}
 
             {/* 027 FR-13: the post style the draft was made with. */}
-            {!isFailed && <PostStyleLine style={draft.postStyle} className="mt-1 text-center" />}
+            {!isFailed && <PostStyleLine style={draft.postStyle} className="mt-0.5" />}
 
             {/* 005 FR-07: why this design has no AI background, when that
               was not the model's choice. Non-blocking. */}
@@ -620,7 +632,27 @@ export default function DraftDetailPage() {
             {/* The versions (§8.13): a thumbnail at the post's ratio, the number,
               the instruction. The current one is ringed in ink with a "Current"
               badge. No previous/next arrows (021 A5). */}
-            <h2 className={`${SUB_HEAD} mb-2.5 mt-7 border-b border-fg pb-2`}>Revision History</h2>
+            <div className="mb-2.5 mt-7 flex items-baseline justify-between gap-3 border-b border-fg pb-2">
+              <h2 className={SUB_HEAD}>Revision History</h2>
+              {/* Regenerate design's Undo, beside the versions (§8.17). Any design
+                  action with a snapshot offers it (031 FR-42). */}
+              {showUndo && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={designUndo.undo}
+                  disabled={regenDesign || designUndo.undoing || actionPending}
+                  title="Go back to the previous design"
+                >
+                  {designUndo.undoing ? (
+                    <Loader2 {...ICON} className="animate-spin" />
+                  ) : (
+                    <Undo2 {...ICON} />
+                  )}
+                  Undo
+                </Button>
+              )}
+            </div>
             {revisions.length === 0 ? (
               <p className="text-ui-sm text-fg-muted">No revisions yet.</p>
             ) : (
@@ -714,53 +746,6 @@ export default function DraftDetailPage() {
                 })}
               </ul>
             )}
-
-            {/* The note and Undo (the study's .vnote). */}
-            {(versions.length > 1 || showUndo) && (
-              <div className="mt-3.5 flex flex-wrap items-center gap-x-2 gap-y-1 px-1 text-ui-xs text-fg-muted">
-                {versions.length > 1 && (
-                  <span className="flex min-w-0 items-center gap-2">
-                    <Clock {...ICON_SM} aria-hidden className="flex-shrink-0" />
-                    Switching is instant — each version keeps its own export.
-                  </span>
-                )}
-                {showUndo && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="ml-auto"
-                    onClick={designUndo.undo}
-                    disabled={regenDesign || designUndo.undoing || actionPending}
-                    title="Go back to the previous design"
-                  >
-                    {designUndo.undoing ? (
-                      <Loader2 {...ICON_SM} className="animate-spin" />
-                    ) : (
-                      <Undo2 {...ICON_SM} />
-                    )}
-                    Undo
-                  </Button>
-                )}
-              </div>
-            )}
-
-            {/* The design regenerate's model (008 FR-20), pre-selected from the
-              current design's stamp (FR-09). Path B only, like the button. */}
-            {isPathB && ready && (
-              <div className="mt-5 border-t border-line-subtle pt-4">
-                <ModelPicker
-                  id="draft-design-model"
-                  surface="DESIGN_FREEFORM"
-                  context={{ stamp: draft.designModel, designPath: 'B' }}
-                  value={designModel}
-                  onChange={pickDesignModel}
-                  label="Design model"
-                  disabled={regenDesign || designUndo.undoing || actionPending}
-                  error={designModelError}
-                  className="sm:max-w-xs"
-                />
-              </div>
-            )}
           </section>
 
           {/* Refinement only makes sense once there's a rendered design to refine. */}
@@ -780,7 +765,7 @@ export default function DraftDetailPage() {
         </div>
 
         {/* ── The cards (§8.14): the captions ───────────────────────────── */}
-        <div className="flex min-w-0 flex-col gap-3.5">
+        <div className="min-w-0 divide-y divide-line-subtle">
           {/* Captions resolve independently of the image, each panel by its own
               row: a skeleton only while that row is PENDING, so empty text on a
               written row is always an editable field (TC-ASYNC-10). */}

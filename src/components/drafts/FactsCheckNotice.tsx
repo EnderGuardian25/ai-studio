@@ -32,7 +32,7 @@ export function FactsCheckNotice({ check }: FactsCheckNoticeProps) {
           {notice.items.map((item, i) => (
             <span key={`${item.value}-${item.where}-${i}`}>
               {i > 0 && ', '}
-              <code className="font-mono break-all">{item.value}</code> ({item.where})
+              <span className="font-semibold tabular-nums break-all">{item.value}</span> ({item.where})
             </span>
           ))}
           . {FLAGGED_ADVICE}
