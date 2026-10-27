@@ -16,3 +16,10 @@ export const CRUMB_CURRENT = 'min-w-0 break-words font-medium text-fg'
 // The aside's ruled blocks (brand kit, details): a small-caps h2 (EYEBROW plus
 // mb-3) over a --line-subtle rule; the column opens with a 2 px --fg rule (§6).
 export const ASIDE_BLOCK = 'border-b border-line-subtle py-4'
+
+// A row in the campaigns and projects lists: ruled below on --line-subtle
+// under the list's 2 px --fg rule (§6).
+export const LIST_ROW = 'flex min-w-0 items-start gap-3 border-b border-line-subtle py-3.5'
+
+// The list itself: two columns from lg, opened by the 2 px --fg rule (§6).
+export const LIST = 'grid grid-cols-1 border-t-2 border-fg lg:grid-cols-2 lg:gap-x-12'

@@ -2,7 +2,7 @@
 
 // The review panel (007 FR-12, FR-13, FR-14): the live flagged list, the
 // Upgrade button and one card per proposed edit. It renders a RuleReview from
-// useRuleReview and uses the Graphite atoms only.
+// useRuleReview and uses the shared Folio atoms only.
 import React from 'react'
 import { Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/Button'

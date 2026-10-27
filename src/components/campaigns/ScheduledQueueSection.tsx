@@ -116,9 +116,8 @@ export function ScheduledQueueSection({ campaignId, resolvedKitId, isTeamAdmin }
   }
 
   return (
-    // A bezel card (021 design.md §8), its head the study's .card-hd.
-    <section className="surface-bezel min-w-0 p-5">
-      <SectionHead title={`Planned Posts (${entries.length})`} className="mb-3">
+    <section className="pb-8 pt-[22px]">
+      <SectionHead numeral="ii." title={`Planned Posts (${entries.length})`} className="mb-3">
         {/* Outline, not primary: the briefing's Save is the view's one primary. */}
         <Button variant="secondary" size="sm" onClick={() => setModal({ open: true })}>
           <Plus {...ICON} /> Plan a post
@@ -146,9 +145,8 @@ export function ScheduledQueueSection({ campaignId, resolvedKitId, isTeamAdmin }
           — using the campaign briefing plus the post&apos;s specifics.
         </p>
       ) : (
-        // A ruled data table (§8.15, the study's .ct): sentence-case muted
-        // headers and --line-subtle rows. It scrolls inside its own container
-        // at narrow widths, so the container is a focusable, labelled region
+        // A Folio data table (§8.15). It scrolls inside its own container at
+        // narrow widths, so the container is a focusable, labelled region
         // (WCAG 2.1.1) with an inset focus ring that the overflow can't clip.
         // `relative` makes it the containing block of the sr-only Actions
         // header, which would otherwise widen the page at 375 px.
@@ -156,7 +154,7 @@ export function ScheduledQueueSection({ campaignId, resolvedKitId, isTeamAdmin }
           tabIndex={0}
           role="region"
           aria-label="Planned posts"
-          className={`relative overflow-x-auto ${SCROLL_FOCUS}`}
+          className={`relative overflow-x-auto border-t-2 border-fg ${SCROLL_FOCUS}`}
         >
           <table className="w-full min-w-[720px] text-ui-sm">
             <thead>
@@ -171,7 +169,7 @@ export function ScheduledQueueSection({ campaignId, resolvedKitId, isTeamAdmin }
             </thead>
             <tbody>
               {entries.map(entry => (
-                <tr key={entry.id} className="border-b border-line-subtle align-top last:border-b-0">
+                <tr key={entry.id} className="border-b border-line-subtle align-top">
                   <td className="py-2.5 pr-3">
                     <p className="break-words font-medium text-fg">{entry.topic}</p>
                     <p className="text-ui-xs text-fg-muted">

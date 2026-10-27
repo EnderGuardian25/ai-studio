@@ -13,7 +13,7 @@ import { ModelPicker } from '@/components/ui/ModelPicker'
 import { ApiError, apiFetch } from '@/lib/apiFetch'
 import type { ModelKey } from '@/lib/models/catalogue'
 import { CHANNEL_VALUES } from '@/lib/channels'
-import { COMPACT_FIELD, EYEBROW, FOCUS, ICON, ICON_BUTTON, ICON_SM, SCROLL_FOCUS } from '@/components/ui/atoms'
+import { COMPACT_FIELD, EYEBROW, FOCUS, ICON, ICON_BUTTON, SCROLL_FOCUS } from '@/components/ui/atoms'
 
 // Shape the model proposes inside a ```schedule block (see briefingAssistant.ts).
 interface SchedulePlanItem {
@@ -310,9 +310,9 @@ export function BriefingAssistantPanel({ campaignId, open, onClose, onApply }: B
               assistant grounds the briefing in them.
             </p>
           ) : (
-            <ul className="divide-y divide-line-subtle">
+            <ul className="border-t border-line-subtle">
               {docs.map(doc => (
-                <li key={doc.id} className="flex items-center gap-2 py-1 text-ui-sm text-fg">
+                <li key={doc.id} className="flex items-center gap-2 border-b border-line-subtle py-1 text-ui-sm text-fg">
                   <FileText {...ICON} aria-hidden className="flex-shrink-0 text-fg-muted" />
                   <span className="min-w-0 flex-1 truncate" title={doc.name}>{doc.name}</span>
                   <span className="whitespace-nowrap text-ui-xs text-fg-muted">
@@ -333,8 +333,7 @@ export function BriefingAssistantPanel({ campaignId, open, onClose, onApply }: B
           )}
         </div>
 
-        {/* The conversation (§8.14's log vocabulary, the study's .thread):
-            rows ruled apart on --line-subtle, newest last.
+        {/* The conversation (§8.14's log vocabulary): ruled rows, newest last.
             It scrolls inside its own box, so the box is always a focusable,
             labelled region, even before the first turn (WCAG 2.1.1; the static
             rule, 014 FR-17). */}
@@ -352,16 +351,16 @@ export function BriefingAssistantPanel({ campaignId, open, onClose, onApply }: B
             </p>
           )}
           {messages.length > 0 && (
-            <ol className="divide-y divide-line-subtle">
+            <ol className="border-t border-line-subtle">
               {messages.map((m, i) => (
-                <li key={i} className="py-3 first:pt-0">
+                <li key={i} className="border-b border-line-subtle py-3">
                   <p className={`${EYEBROW} mb-1`}>
                     {m.role === 'user' ? 'You' : 'Assistant'}
                   </p>
                   <p
                     className={
                       m.role === 'user'
-                        ? 'whitespace-pre-wrap break-words text-ui-sm font-medium leading-snug text-fg'
+                        ? "whitespace-pre-wrap break-words font-display text-ui-base italic leading-snug text-fg [font-variation-settings:'opsz'_24]"
                         : 'whitespace-pre-wrap break-words text-ui-sm leading-relaxed text-fg'
                     }
                   >
@@ -387,14 +386,13 @@ export function BriefingAssistantPanel({ campaignId, open, onClose, onApply }: B
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Schedule plan review (F4): editable rows ruled apart, on --surface-1
-            under a hairline. */}
+        {/* Schedule plan review (F4) */}
         {plan && (
           <div
             tabIndex={0}
             role="region"
             aria-label="Proposed schedule"
-            className={`max-h-72 flex-shrink-0 overflow-y-auto border-t border-line-subtle bg-surface px-5 py-4 ${SCROLL_FOCUS}`}
+            className={`max-h-72 flex-shrink-0 overflow-y-auto border-t-2 border-fg bg-surface px-5 py-4 ${SCROLL_FOCUS}`}
           >
             <div className="mb-2 flex items-center gap-2">
               <CalendarClock {...ICON} aria-hidden className="flex-shrink-0 text-fg-muted" />
@@ -402,9 +400,9 @@ export function BriefingAssistantPanel({ campaignId, open, onClose, onApply }: B
                 Proposed schedule ({plan.length}) — review, edit, then schedule
               </p>
             </div>
-            <ul className="divide-y divide-line-subtle">
+            <ul className="border-t border-line-subtle">
               {plan.map((row, i) => (
-                <li key={i} className="space-y-2 py-2.5">
+                <li key={i} className="space-y-2 border-b border-line-subtle py-2.5">
                   <div className="flex items-center gap-1">
                     <input
                       aria-label="Post topic"
@@ -482,27 +480,26 @@ export function BriefingAssistantPanel({ campaignId, open, onClose, onApply }: B
           </div>
         )}
 
-        {/* The prompt (§8.3, §8.14, the study's .ask): a pill field with the
-            round ink Send inside it (the study's .send); the wrapper shows the
-            focus outline. Send is named by its aria-label. */}
+        {/* The prompt (§8.3, §8.14): a display-italic field with the ink Send
+            button attached; the wrapper shows the focus outline. */}
         <form onSubmit={send} className="flex-shrink-0 border-t border-line-subtle px-5 py-4">
           <FieldLabel htmlFor={messageId} className="mb-1.5">Message</FieldLabel>
-          <div className="flex items-center gap-2 rounded-ui-pill border border-line bg-surface-raised py-[5px] pl-4 pr-[5px] focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-focus">
+          <div className="flex rounded-ui-sm border border-line bg-surface-raised focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-focus">
             <input
               id={messageId}
               value={input}
               onChange={e => setInput(e.target.value)}
               placeholder="Tell the assistant about this campaign…"
-              className="min-w-0 flex-1 bg-transparent text-ui-sm text-fg placeholder:text-fg-muted focus:outline-none"
+              className="min-w-0 flex-1 bg-transparent px-3.5 py-2.5 font-display text-ui-base italic text-fg [font-variation-settings:'opsz'_24] placeholder:text-fg-muted focus:outline-none"
             />
             <button
               type="submit"
               disabled={!input.trim() || pending}
               aria-label="Send"
               title="Send"
-              className={`inline-flex size-[34px] flex-shrink-0 items-center justify-center rounded-full bg-accent text-accent-fg transition-transform duration-fast ease-standard enabled:active:scale-[0.98] motion-reduce:enabled:active:scale-100 disabled:cursor-not-allowed disabled:opacity-50 ${FOCUS}`}
+              className="inline-flex flex-shrink-0 items-center gap-2 whitespace-nowrap border-l border-line bg-fg px-4 font-text text-ui-sm font-semibold text-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {pending ? <Loader2 {...ICON_SM} className="animate-spin" aria-hidden /> : <Send {...ICON_SM} aria-hidden />}
+              {pending ? <Loader2 {...ICON} className="animate-spin" aria-hidden /> : <Send {...ICON} aria-hidden />}
             </button>
           </div>
         </form>

@@ -706,6 +706,48 @@ The "Image style" section of the same step (`SizeDesignStep`, Freeform only) pic
 
 A look that is not available is disabled with its reason, never hidden. Light and dark are identical.
 
+### 8.24 The rule review panel
+
+`RuleReviewPanel` (`src/components/textUpgrade/`) sits under the text field it reviews: the brand-kit voice prompt editor (`PromptSection`) and the campaign briefing editor (`CampaignBriefingSection`). It draws a `RuleReview` from `useRuleReview` and holds no state of its own.
+
+**Anatomy.** A `section` (`role="region"`, `aria-label="Design rules"`) of stacked blocks, 12 px apart:
+
+- **Head:** an `h4` in the sub-head style (`SUB_HEAD`, §5.2) on the left, and on the right a `--text-xs` `--fg-muted` count ("2 phrases flagged", or "No vague phrases flagged"), an `aria-live="polite"` region.
+- **Flagged list:** ruled rows (`divide-y` on `--line-subtle`, 10 px padding), not cards. A row holds the quoted phrase in `font-mono` `--text-sm` 600, its rule label as a `TAG` (§8.18), a `--text-xs` `--fg-muted` "Try:" line, and a ghost small "Dismiss" `Button` at the right (its `aria-label` names the phrase).
+- **Upgrade:** a secondary small `Button` with a 15 px `Sparkles` icon, "Upgrade", showing "Upgrading…" while it runs.
+- **Notices:** each is a `Notice` (§8.18). A failed call is `tone="error" role="alert"` with a "Try again" secondary small `Button` when it can be retried. A warning is `tone="warning" role="status"`. The neutral tone (`--surface-1` fill, `--line` ring) carries the "nothing to upgrade" and "suggestions failed the checks" lines.
+- **Proposed edits:** ruled rows again. Each is a `role="group"` with a `TAG` for the kind ("Replace" or "Add after") and one for its provenance, then the sentence (a replaced quote struck through in `--fg-muted`, the new wording in `ins` 600 with no underline), the rationale (`--text-xs` `--fg-muted`), an unverified-number `Notice tone="warning"`, and the action row: an Ink small "Accept" and a ghost small "Reject", or a `TAG` "Accepted" or "Rejected" once settled.
+
+**Atoms and tokens.** `SUB_HEAD`, `TAG`, `ICON`, `Notice`, `Button`; the row rules are `--line-subtle`. The panel has no fill, ring or shadow of its own, and no bezel: it reads as part of the editor's section.
+
+| State        | Look                                                                                     |
+| ------------ | ---------------------------------------------------------------------------------------- |
+| No flags     | the head count only; no list                                                             |
+| Flagged      | the ruled list, one row per phrase                                                       |
+| Upgrading    | the Upgrade button disabled with its working label                                       |
+| Edit pending | Accept (Ink) and Reject (ghost) side by side                                             |
+| Edit stale   | Accept disabled, a `--text-xs` `--fg-muted` line says why                                |
+| Edit settled | the "Accepted" or "Rejected" `TAG` replaces the buttons                                  |
+
+**Light and dark.** The same classes serve both themes: the notice tints and `--fg-muted` text are the pairs §3.3 checks.
+
+### 8.25 The script font picker
+
+`ScriptFontPicker` (`src/components/admin/brandkits/`) is the one control for the font a brand kit uses for Sinhala text. It shows only while the kit is in edit mode, in the Fonts section ("iii."), under the `FontEditor`.
+
+**Anatomy.** One `Select` (§8.3) labelled "Sinhala font" (`FieldLabel` above it), with the first option "None (system font)" and then each family that carries the script, read from `GET /api/fonts?script=sinhala` through React Query (key `['fonts', 'script', 'sinhala']`, five minutes fresh). A stored family the list no longer holds is added as an option so it still shows as selected. The two blocks in the section are `space-y-4` apart.
+
+**Atoms and tokens.** The field is the `Select` of §8.3: 1 px `--line` edge, `--radius-sm`, `--surface-2` fill, the chevron `background-image`, the focus ring of §9. The picker adds no class of its own.
+
+| State              | Look                                                                                  |
+| ------------------ | ------------------------------------------------------------------------------------- |
+| None chosen        | "None (system font)" selected                                                         |
+| Family chosen      | the family's name selected; Save writes `scriptFonts.sinhala`                         |
+| List loading       | the options hold "None" and the stored family only; the full list fills in on arrival |
+| Read-only (not editing) | no select: the Fonts list shows the family as a ruled row with a "Sinhala" `TAG`  |
+
+**Light and dark.** Identical.
+
 ---
 
 ## 9. Accessibility floor

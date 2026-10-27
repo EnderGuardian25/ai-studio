@@ -98,14 +98,14 @@ export function FontEditor({ fonts, onChange }: FontEditorProps) {
     <div className="space-y-2">
       <div className="flex flex-wrap gap-2">
         {fonts.map((f, i) => (
-          <div key={f.name} className="flex max-w-full items-center gap-1.5 rounded-ui-pill bg-canvas py-0.5 pl-3 pr-0.5 ring-1 ring-inset ring-line-subtle">
+          <div key={f.name} className="flex max-w-full items-center gap-1.5 rounded-ui-sm border border-line-subtle bg-surface py-0.5 pl-2 pr-0.5">
             <span className="min-w-0 break-words text-ui-sm text-fg">{f.name}</span>
             {i < 2 && <span className={TAG}>{i === 0 ? 'Heading' : 'Body'}</span>}
             <button
               type="button"
               onClick={() => onChange(fonts.filter(x => x.name !== f.name))}
               aria-label={`Remove font ${f.name}`}
-              className={`inline-flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-ui-pill text-fg-muted transition-colors duration-fast ease-standard hover:bg-surface-raised hover:text-status-failed ${FOCUS}`}
+              className={`inline-flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-ui-sm text-fg-muted transition-colors duration-fast ease-standard hover:text-status-failed ${FOCUS}`}
             >×</button>
           </div>
         ))}
@@ -134,7 +134,7 @@ export function FontEditor({ fonts, onChange }: FontEditorProps) {
               id={listboxId}
               role="listbox"
               aria-label="Google Fonts matches"
-              className="surface-raised absolute z-20 mt-1 max-h-48 w-full overflow-y-auto p-1.5"
+              className="surface-raised absolute z-20 mt-1 max-h-48 w-full overflow-y-auto py-1.5"
             >
               {visible.map((f, i) => (
                 <li
@@ -147,7 +147,7 @@ export function FontEditor({ fonts, onChange }: FontEditorProps) {
                     tabIndex={-1}
                     onMouseDown={e => { e.preventDefault(); add(f.family) }}
                     onMouseEnter={() => setHighlighted(i)}
-                    className={`flex w-full items-center gap-2 rounded-ui-sm px-2.5 py-2 text-left text-ui-sm text-fg transition-colors duration-fast ease-standard ${
+                    className={`flex w-full items-center gap-2 px-3.5 py-[7px] text-left font-text text-ui-sm text-fg transition-colors duration-fast ease-standard ${
                       i === highlighted ? 'bg-canvas' : ''
                     }`}
                   >

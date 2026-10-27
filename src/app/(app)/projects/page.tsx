@@ -14,13 +14,8 @@ import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { PageHead } from '@/components/ui/PageHead'
 import { FOCUS, ICON, ICON_BUTTON, ICON_SM, TAG } from '@/components/ui/atoms'
 import { apiFetch } from '@/lib/apiFetch'
-import { ROW_TITLE } from '@/components/campaigns/classes'
+import { LIST, LIST_ROW, ROW_TITLE } from '@/components/campaigns/classes'
 import type { ProjectSummary, BrandKitSummary } from '@/lib/api-types'
-
-// A project row in the list card: ruled above on --line-subtle, except the
-// first row of each column (one column below lg, two from lg).
-const LIST_ROW =
-  'flex min-w-0 items-start gap-3 border-t border-line-subtle py-3.5 first:border-t-0 lg:[&:nth-child(2)]:border-t-0'
 
 export default function ProjectsPage() {
   const queryClient = useQueryClient()
@@ -96,9 +91,9 @@ export default function ProjectsPage() {
 
   return (
     <>
-      {/* Page head (DESIGN_SYSTEM.md §6): an eyebrow, the title, a lead. */}
+      {/* Page head (DESIGN_SYSTEM.md §6): an eyebrow, the display title, a lead. */}
       <PageHead
-        className="mb-6"
+        className="mb-8"
         eyebrow="Organize"
         title="Projects"
         lead="Organize campaigns under projects with shared brand kits and tones."
@@ -121,7 +116,7 @@ export default function ProjectsPage() {
       />
 
       {creating && (
-        <Panel className="mb-5 animate-fade-in p-5">
+        <Panel className="mb-8 animate-fade-in p-4">
           <form onSubmit={create} className="flex flex-col gap-3 sm:flex-row sm:items-end">
             <div className="min-w-0 flex-1">
               <Input
@@ -157,18 +152,17 @@ export default function ProjectsPage() {
       )}
 
       {!loading && !isError && visible.length === 0 && (
-        <Panel bezel className="py-12 text-center">
-          <FolderOpen size={28} strokeWidth={1.6} aria-hidden className="mx-auto mb-3 text-fg-muted" />
+        <div className="border-t-2 border-fg py-12 text-center">
+          <FolderOpen size={28} strokeWidth={1.4} aria-hidden className="mx-auto mb-3 text-fg-muted" />
           <p className="text-ui-sm text-fg-muted">
             {showDeleted ? 'No deleted projects.' : 'No projects yet.'}
           </p>
-        </Panel>
+        </div>
       )}
 
-      {/* Projects as ruled rows on --line-subtle (§6) in one bezel card (021
-          design.md §8), two columns on wide screens. */}
+      {/* Projects as ruled rows, not cards (§6), two columns on wide screens. */}
       {!isError && visible.length > 0 && (
-        <ul className="surface-bezel grid grid-cols-1 px-5 py-1.5 lg:grid-cols-2 lg:gap-x-10">
+        <ul className={LIST}>
           {visible.map(project => (
             <li key={project.id} className={LIST_ROW}>
               <div className="min-w-0 flex-1">
