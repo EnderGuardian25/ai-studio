@@ -90,3 +90,11 @@ The same pattern scan and local-env fixed-string check as above, run over `git l
 ## Decision
 
 No credential found. `origin` is `EnderGuardian25/ai-studio`. Push `v2` to `origin`, as approved by the user on 2026-10-27 for after the W2 gate.
+
+---
+
+# Re-scan: `0af87398..<W3 tip>` (2026-10-27, the W3 push)
+
+The range is T10, T11 and T12 (3 commits, all by the same author), plus this scan commit. The W3 gate is green (`reports/T12.md`). The same pattern scan and local-env fixed-string check over `git log -p 0af87398..HEAD` found no hits. `origin` is `EnderGuardian25/ai-studio`. Push `v2` to `origin` (pre-approved by the user for the W3 push, 2026-10-27).
+
+**CI note:** GitHub created no workflow run for the pushes of `b124aa0d` or `0af87398`, although both reached `origin` and Actions is enabled with the workflow active. The cause is not visible from the API. The user is to check the repo's Actions tab.
