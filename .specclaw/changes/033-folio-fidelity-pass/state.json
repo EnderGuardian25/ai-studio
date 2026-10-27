@@ -1,0 +1,12 @@
+{
+  "change": "033-folio-fidelity-pass",
+  "phase": "tasks",
+  "branch": "",
+  "size": "architectural",
+  "phases": {
+    "proposal": { "status": "approved", "at": "2026-10-27T11:41:46Z" },
+    "spec": { "status": "done", "at": "2026-10-27T11:44:22Z" },
+    "design": { "status": "done", "at": "2026-10-27T11:45:37Z" },
+    "tasks": { "status": "done", "at": "2026-10-27T11:46:21Z" }
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "schema_version": 1,
+  "sig": "1401911370 5731",
+  "tier": "standard",
+  "tier_source": "classifier",
+  "rationale": "Roughly 70 UI files across many screens change in look only (markup, visible text and layout of Folio screens), with behaviour frozen by the guard rule and an empty NFR-01 diff, so the panel need not be deep even though the file count is large.",
+  "domains": [],
+  "seats": [
+    { "role": "party-po", "model": "sonnet" },
+    { "role": "party-architect", "model": "opus" },
+    { "role": "party-ba", "model": "sonnet" }
+  ],
+  "dropped": []
+}
