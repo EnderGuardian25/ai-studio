@@ -57,3 +57,36 @@ An `upstream` remote (`bistec-oss/studio`, no fetched refs) reappeared in `.git/
 ## Decision
 
 No credential found. The W1 gate is green (`reports/T4.md`). Push `v2` to `origin` (pre-approved by the user, 2026-10-27).
+
+---
+
+# Re-scan: `b124aa0d..db6f471b` (2026-10-27, the W2 push)
+
+GitHub recorded the W1 push (`v2` = `b124aa0d`) in the repo's activity log but created no push event, so CI never ran on it. The user chose to push again after the W2 gate. That push covers W1 too.
+
+The range is T5 to T9: 5 commits, all by the same author. W2 (T5–T7) plus the first two W3 groups (T8, T9).
+
+## Gate on `db6f471b`
+
+| Check                    | Result                                      |
+| ------------------------ | ------------------------------------------- |
+| tsc                      | clean                                       |
+| lint                     | 0 errors / 7 warnings                       |
+| unit                     | 4579 passed                                 |
+| render                   | 154 passed                                  |
+| `test:upgrade`           | pass                                        |
+| `test:e2e:db -- --reset` | pass                                        |
+| mock E2E                 | 597 passed + 1 flaky / 0 failed / 3 skipped |
+| build                    | pass                                        |
+
+The flaky case, `surfaces` "the post on the post stage is shown as rendered", failed at 0 ms and passed on retry. Evidence: `evidence/gate-t9-summary.txt`.
+
+The earlier W2 gate on `242a4409` (T7) had one failure, `surfaces` AC-11, which asserted the Graphite 18 px header radius. T9 adapted it to the Folio shell. Evidence: `evidence/w2-gate-summary.txt`.
+
+## Range scan
+
+The same pattern scan and local-env fixed-string check as above, run over `git log -p b124aa0d..HEAD`, found no hits.
+
+## Decision
+
+No credential found. `origin` is `EnderGuardian25/ai-studio`. Push `v2` to `origin`, as approved by the user on 2026-10-27 for after the W2 gate.

@@ -106,7 +106,7 @@
   - Depends: T5
   - Notes: Mechanical: `git show 9f829456:<path>` plus the import map, for each file. `node scripts/check-folio-restore.mjs` exits 0 over the full list (AC-14). tsc and lint pass. Report any file where the restore needed more than the map (expected: none).
 
-- [~] `T7` — Guards flipped to Folio, tests adapted, docs part 1, W2 gate
+- [x] `T7` — Guards flipped to Folio, tests adapted, docs part 1, W2 gate
   - Files: `tests/unit/{designTokens,contrast,uiTokenGuard,uiPrimitives,noTeamNotice}.test.ts`, `tests/e2e/{a11y,surfaces}.test.ts` and any suite the full run shows asserting Graphite styling, `docs/ui-reference/DESIGN_SYSTEM.md`, `CLAUDE.md` (design-system lines), `reports/T7.md`
   - Estimate: large (one full E2E run)
   - Kind: test
@@ -123,28 +123,28 @@
 
 Each group task: restyle its files (design §5 "How to restyle a file"), remove them from `PENDING_RESTYLE`, add its `DESIGN_SYSTEM.md` sections (FR-19), run the E2E sections that cover its screens plus `a11y.test.ts`, and capture its screens in light and dark with `scripts/capture-ui.mjs` into `ui-captures/032/<group>` for the user.
 
-- [ ] `T8` — G1, the draft page
+- [x] `T8` — G1, the draft page
   - Files: design §5 row G1; `src/components/ui/atoms.ts` or a new `src/components/drafts/classes.ts` if shared styling needs a home; `docs/ui-reference/DESIGN_SYSTEM.md`; `tests/unit/uiTokenGuard.test.ts` (list only)
   - Estimate: large
   - Kind: impl
   - Model: sonnet
   - Depends: T7
 
-- [ ] `T9` — G2, the create flow and the shell
+- [x] `T9` — G2, the create flow and the shell
   - Files: design §5 row G2; `atoms.ts` or `src/components/brief/cardCls.ts`; `DESIGN_SYSTEM.md`; `uiTokenGuard.test.ts` (list only)
   - Estimate: large
   - Kind: impl
   - Model: sonnet
   - Depends: T8
 
-- [ ] `T10` — G3, campaigns, projects and brand kits
+- [x] `T10` — G3, campaigns, projects and brand kits
   - Files: design §5 row G3; `atoms.ts`, `src/components/campaigns/classes.ts`, `src/components/admin/brandkits/classes.ts`; `DESIGN_SYSTEM.md`; `uiTokenGuard.test.ts` (list only)
   - Estimate: large
   - Kind: impl
   - Model: sonnet
   - Depends: T9
 
-- [ ] `T11` — G4, team, settings, admin and insights
+- [x] `T11` — G4, team, settings, admin and insights
   - Files: design §5 row G4; `atoms.ts` or a new `src/components/admin/insights/classes.ts`; `DESIGN_SYSTEM.md`; `uiTokenGuard.test.ts` (list only)
   - Estimate: medium
   - Kind: impl
