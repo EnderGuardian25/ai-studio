@@ -118,7 +118,7 @@
     - `node scripts/check-ui-invariants.mjs --coverage` must exit 0.
     - Fill in the header counts. Every row is `proposed` except T3's.
 
-- [ ] `T5` — W1 gate, scan, push and the checkpoint
+- [~] `T5` — W1 gate, scan, push and the checkpoint
   - Files: `docs/e2e-test-plan.md` (latest-gate line), `CLAUDE.md` ("Current state"), `.specclaw/changes/033-folio-fidelity-pass/reports/pre-push-scan.md`
   - Estimate: medium
   - Kind: config
