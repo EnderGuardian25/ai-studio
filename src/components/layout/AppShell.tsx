@@ -13,7 +13,7 @@ import { TeamSwitcher } from '@/components/layout/TeamSwitcher'
 import { CreatePostButton } from '@/components/layout/CreatePostButton'
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser'
 import { authClient } from '@/lib/auth-client'
-import { EYEBROW, FOCUS, ICON } from '@/components/ui/atoms'
+import { EYEBROW, FOCUS } from '@/components/ui/atoms'
 
 // Folio nav is text only, no icons (DESIGN_SYSTEM.md §8.6); each link's name is its label.
 interface NavItem {
@@ -133,7 +133,7 @@ function Sidebar({ onClose }: { onClose?: () => void }) {
       {onClose && (
         <div className="flex items-center justify-end -mt-2.5 mb-2 px-3">
           <button onClick={onClose} aria-label="Close sidebar" className={`md:hidden ${SHELL_ICON_BUTTON}`}>
-            <X {...ICON} aria-hidden="true" />
+            <X size={16} strokeWidth={1.4} aria-hidden="true" />
           </button>
         </div>
       )}
@@ -192,25 +192,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           every screen inside it. */}
       <div className="min-h-screen flex flex-col bg-canvas text-fg font-text">
         {/* Top app bar: opaque --surface-1 with a --line-subtle bottom rule
-            (DESIGN_SYSTEM.md §4.2, §6). The logo sits 28 px in on desktop. The
-            wrapper div takes no box (`contents`). */}
-        <div className="contents">
-          <header className="fixed top-0 inset-x-0 z-40 h-[60px] flex items-center justify-between pl-4 pr-4 md:pl-7 md:pr-6 bg-surface border-b border-line-subtle">
-            <div className="flex items-center gap-2">
-              {/* Mobile menu button */}
-              <button
-                onClick={() => setSidebarOpen(true)}
-                className={`md:hidden ${SHELL_ICON_BUTTON}`}
-                aria-label="Open sidebar"
-              >
-                <Menu {...ICON} aria-hidden="true" />
-              </button>
-              <Logo />
-            </div>
+            (DESIGN_SYSTEM.md §4.2, §6). The logo sits 28 px in on desktop. */}
+        <header className="fixed top-0 inset-x-0 z-40 h-[60px] flex items-center justify-between pl-4 pr-4 md:pl-7 md:pr-6 bg-surface border-b border-line-subtle">
+          <div className="flex items-center gap-2">
+            {/* Mobile menu button */}
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className={`md:hidden ${SHELL_ICON_BUTTON}`}
+              aria-label="Open sidebar"
+            >
+              <Menu size={20} strokeWidth={1.4} aria-hidden="true" />
+            </button>
+            <Logo />
+          </div>
 
-            <ThemeToggle />
-          </header>
-        </div>
+          <ThemeToggle />
+        </header>
 
         {/* Body below app bar */}
         <div className="flex flex-1 pt-[60px]">

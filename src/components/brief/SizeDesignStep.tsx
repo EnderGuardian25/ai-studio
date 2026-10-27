@@ -99,7 +99,7 @@ export function SizeDesignStep({
 
       {/* Post style (027 FR-07): above the size and design choices, so the image
           style lower on this step is pre-filled from it. */}
-      <div className="pb-5">
+      <div className={SECTION}>
         <PostStylePicker value={postStyle} onChange={setPostStyle} />
       </div>
 

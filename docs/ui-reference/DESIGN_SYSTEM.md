@@ -675,7 +675,7 @@ The notices sit under the post, its caption line and the "Generated with" lines,
 
 ### 8.22 The post style picker
 
-`PostStylePicker` (`src/components/brief/`) opens step 1 of the post wizard, above the size and design choices. The picker is one `radiogroup`, with one tab stop and the arrow, Home and End keys moving the choice.
+`PostStylePicker` (`src/components/brief/PostStylePicker.tsx`) opens step 1 of the post wizard, above the size and design choices. `SizeDesignStep` places it in a `SECTION` block (`py-6`, a 1 px `--line-subtle` rule above), like the size, kit and design-mode blocks below it. The picker is one `radiogroup`, with one tab stop and the arrow, Home and End keys moving the choice. It is built from `FieldLabel`, `cardCls`, `CARD_TITLE` and `ICON`; it is the same option card as the size and design-mode cards of the same step, with no structure of its own.
 
 **Anatomy.** A `FieldLabel as="span"` ("Post style", §8.3) names the group (`aria-labelledby`). Under it a `--text-xs` `--fg-muted` line says what a style does. Then a grid, one column and two from `sm`, 12 px apart, of option cards. Each card is a `role="radio"` button drawn by `cardCls` (`brief/cardCls.ts`): the style's label (`CARD_TITLE`, `brief/classes.ts`: display face, 18 px, 500) with a 15 px `Check` in `--accent` at the right when chosen, and the style's summary (`--text-xs`, `--fg-muted`) beneath. A retired style that is already chosen stays in the list with "(retired)" in `--fg-muted`.
 
@@ -692,7 +692,7 @@ The notices sit under the post, its caption line and the "Generated with" lines,
 
 ### 8.23 The image look picker
 
-The "Image style" section of the same step (`SizeDesignStep`, Freeform only) picks how the hero image sits in the post. It is a group of `aria-pressed` toggle cards on the same `cardCls` as the post style picker, three columns from `sm`.
+The "Image style" section of the same step (`SizeDesignStep`, Freeform only) picks how the hero image sits in the post. It is a group of `aria-pressed` toggle cards on the same `cardCls` option card as the post style picker, three columns from `sm`, in a `SECTION` block of `SizeDesignStep.tsx` (`data-testid="image-style-section"`) shown only in Freeform mode.
 
 **Anatomy.** A `FieldLabel` "Image style", a `--text-xs` helper line and, when the style came from the post style, a second `--text-xs` line. Each card shows the look's label (`CARD_TITLE`), a `Check` when chosen, its summary, and, for a look that cannot be used at the chosen size or without a screenshot, one more `--text-xs` `--fg-muted` line giving the reason. The product screenshot field sits below as its own section (a `FieldLabel as="span"` with an `(optional)` or `(required)` note in normal case, a Secondary `Button` to add, a 96 × 64 px thumbnail with a Remove button once attached). Its required line is `--status-failed`.
 

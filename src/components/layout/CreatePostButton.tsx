@@ -11,8 +11,7 @@ import { FOCUS } from '@/components/ui/atoms'
 // (6.83:1 light, 7.74:1 dark), 48 px tall, 28 px from the right and bottom,
 // with the hard --shadow-overlay. Opaque: a solid fill, no alpha, no
 // backdrop-filter. It lifts 1 px on hover and presses into its shadow; under
-// reduced motion it does not move. The Plus's wrapper span takes no box
-// (`contents`), so the icon sits in the row as Folio draws it.
+// reduced motion it does not move.
 // z-30 keeps it under the header (z-40), the mobile sidebar overlay and
 // modals (z-50), and Sonner's toaster, whose offset in ToastProvider stacks
 // toasts 16 px above it.
@@ -39,9 +38,7 @@ export function CreatePostButton() {
         ${FOCUS}
       `}
     >
-      <span className="contents">
-        <Plus size={20} strokeWidth={1.8} aria-hidden="true" />
-      </span>
+      <Plus size={20} strokeWidth={1.8} aria-hidden="true" />
       <span className="hidden md:inline">Create post</span>
     </Link>
   )

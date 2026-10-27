@@ -152,7 +152,7 @@
   - Depends: T6
   - Notes: design §7. Suites: the draft-page sections of `surfaces.test.ts`, `headline-badge.test.ts`, `apply-text.test.ts`, `hero-image.test.ts`, `agui-refinement.test.ts`, the publish suites, and the axe suite.
 
-- [ ] `T8` — G2 create flow and shell
+- [x] `T8` — G2 create flow and shell
   - Files: G2's files and new components; DESIGN_SYSTEM.md §8.22, §8.23; `audit.md`; tests named by its rows
   - Estimate: large
   - Kind: impl

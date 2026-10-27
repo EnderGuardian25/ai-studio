@@ -7,7 +7,7 @@ import { apiFetch } from '@/lib/apiFetch'
 import type { Campaign, CampaignBriefing } from '@/lib/api-types'
 import { SOURCE_LABEL } from './constants'
 import type { ResolvedKit } from './types'
-import { EYEBROW, FOCUS, ICON, TAG } from '@/components/ui/atoms'
+import { EYEBROW, FOCUS, ICON } from '@/components/ui/atoms'
 import { rowCls } from './cardCls'
 import { StepHead } from './StepHead'
 import { CampaignRow } from './CampaignRow'
@@ -86,7 +86,7 @@ export function CampaignStep({
           ) : resolvedKit ? (
             <>
               <span className="font-display text-ui-base font-medium text-fg">{resolvedKit.name}</span>
-              <span className={TAG}>
+              <span className={EYEBROW}>
                 {SOURCE_LABEL[resolvedKit.source] ?? resolvedKit.source}
               </span>
               <span className="text-ui-xs text-fg-muted sm:ml-auto">Default for this post</span>
