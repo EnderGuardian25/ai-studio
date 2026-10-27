@@ -106,7 +106,7 @@
   - Depends: T5
   - Notes: Mechanical: `git show 9f829456:<path>` plus the import map, for each file. `node scripts/check-folio-restore.mjs` exits 0 over the full list (AC-14). tsc and lint pass. Report any file where the restore needed more than the map (expected: none).
 
-- [ ] `T7` — Guards flipped to Folio, tests adapted, docs part 1, W2 gate
+- [~] `T7` — Guards flipped to Folio, tests adapted, docs part 1, W2 gate
   - Files: `tests/unit/{designTokens,contrast,uiTokenGuard,uiPrimitives,noTeamNotice}.test.ts`, `tests/e2e/{a11y,surfaces}.test.ts` and any suite the full run shows asserting Graphite styling, `docs/ui-reference/DESIGN_SYSTEM.md`, `CLAUDE.md` (design-system lines), `reports/T7.md`
   - Estimate: large (one full E2E run)
   - Kind: test

@@ -15,11 +15,11 @@ import { COMPACT_FIELD, COMPACT_TEXTAREA, ICON_BUTTON } from '@/components/ui/at
 // cleanup (T13, FR-13), and Tailwind's default type and radius steps are not
 // redefined.
 //
-// 021 AC-01/AC-02 (FR-01, FR-02, FR-14): the values are Graphite's, checked
-// against the study file itself, so a hand-typed digit fails here.
+// 032 AC-15 (FR-14): the values are Folio's, checked against the study file
+// itself (021's structure), so a hand-typed digit fails here.
 
 const css = readFileSync(resolve(process.cwd(), 'src/app/globals.css'), 'utf8')
-const STUDY_PATH = 'docs/ui-reference/direction-studies/study-a-graphite.html'
+const STUDY_PATH = 'docs/ui-reference/direction-studies/study-b-folio.html'
 const study = readFileSync(resolve(process.cwd(), STUDY_PATH), 'utf8')
 
 // Custom properties of the top-level `:root { … }` or `.dark { … }` blocks
@@ -40,14 +40,14 @@ const DARK = blockVars(css, '.dark')
 const STUDY_ROOT = blockVars(study, ':root')
 const STUDY_DARK = blockVars(study, '.dark')
 
-// A value that differs from the study, allowed only for contrast (021 R10,
-// FR-01). Each entry names its contrast pair and is listed in
-// DESIGN_SYSTEM.md §3. Empty: every study value passes (design.md §9).
+// A value that differs from the study, allowed only for contrast. Each entry
+// names its contrast pair and is listed in DESIGN_SYSTEM.md §3. Empty: every
+// study value passes.
 const DEVIATIONS: Record<string, { root?: string; dark?: string; pair: string }> = {}
 
 // The study's --font-* lines are not copied: next/font supplies them.
 const isFont = (name: string) => name.startsWith('font-')
-// The control heights are 014's keys, which the study does not declare (A1).
+// The control heights are 014's keys, which the study does not declare.
 const CONTROL_KEYS = ['control-sm', 'control-md', 'control-lg']
 
 // Theme-dependent: declared in both blocks (DESIGN_SYSTEM.md §3).
@@ -76,7 +76,6 @@ const ROOT_ONLY_TOKENS = [
   'radius-sm',
   'radius-md',
   'radius-lg',
-  'radius-xl',
   'radius-pill',
   'control-sm',
   'control-md',
@@ -97,10 +96,9 @@ const ROOT_ONLY_TOKENS = [
   'space-2',
   'space-3',
   'space-4',
-  'space-5',
   'space-6',
   'space-8',
-  'space-10',
+  'space-12',
 ]
 
 const TRIPLET = /^\d{1,3} \d{1,3} \d{1,3}$/
@@ -133,8 +131,8 @@ describe('semantic tokens in globals.css (AC-07)', () => {
   })
 
   it('leaves the font variables to next/font (not literal in :root)', () => {
-    // A literal "Plus Jakarta Sans" would miss next/font's generated family
-    // name and fall through to the system sans (DESIGN_SYSTEM.md §3.1 note).
+    // A literal "Fraunces" would miss next/font's generated family name and
+    // fall through to Georgia (DESIGN_SYSTEM.md §3.1 note).
     for (const name of ['font-display', 'font-sans', 'font-mono']) {
       expect(ROOT[name]).toBeUndefined()
     }
@@ -175,12 +173,11 @@ describe('semantic tokens in globals.css (AC-07)', () => {
     expect(bodies[0]).toMatch(/(?:^|[;{\s])font-variant-numeric:\s*tabular-nums\s*;/)
   })
 
-  // 021 FR-05 (design.md §4.1): the four surface classes are opaque, set
-  // background-COLOR (never the shorthand), and have no backdrop-filter. The
-  // hairlines are box-shadow rings; the bezel's tray is its 6 px border.
+  // Folio surface classes (011 FR-08, DESIGN_SYSTEM.md §4.1): opaque, set
+  // background-COLOR (never the shorthand), and no backdrop-filter. (The
+  // Graphite bezel class and radius-xl are not part of Folio.)
   it.each([
-    ['surface', 'surface-1', 'radius-lg'],
-    ['surface-bezel', 'surface-1', 'radius-xl'],
+    ['surface', 'surface-1', 'radius-md'],
     ['surface-raised', 'surface-2', 'radius-md'],
     ['surface-overlay', 'surface-2', 'radius-lg'],
   ])('.%s is opaque --%s at --%s', (cls, fill, radius) => {
@@ -191,30 +188,32 @@ describe('semantic tokens in globals.css (AC-07)', () => {
     expect(body).not.toMatch(/backdrop-filter|background:|\/\s*0?\.\d/)
   })
 
-  it('draws the raised and overlay hairlines as rings, and the bezel tray as a 6 px border', () => {
+  // 021's ring hairlines and 6 px bezel tray are Graphite's; Folio's raised and
+  // overlay surfaces carry a 1 px --fg border.
+  it('draws the raised and overlay edges as 1 px --fg borders, not rings', () => {
     const body = (cls: string) => css.match(new RegExp(`\\n\\s*\\.${cls}\\s*\\{([^}]*)\\}`))?.[1] ?? ''
     for (const cls of ['surface-raised', 'surface-overlay']) {
-      expect(body(cls)).toMatch(/0 0 0 1px rgb\(var\(--line-subtle\)\)/)
-      expect(body(cls)).not.toMatch(/border:/)
+      expect(body(cls)).toMatch(/border:\s*1px solid rgb\(var\(--fg\)\);/)
+      expect(body(cls)).not.toMatch(/0 0 0 1px/)
     }
-    expect(body('surface-bezel')).toMatch(/border:\s*6px solid rgb\(var\(--line-subtle\)\);/)
-    expect(body('surface-bezel')).toMatch(/background-clip:\s*padding-box;/)
+    expect(body('surface')).toMatch(/border:\s*1px solid rgb\(var\(--line-subtle\)\);/)
   })
 
-  // 021 FR-05: pop (menus) and rise (toasts) replace the drop entrance, and
-  // the reduced-motion fade covers the pop.
-  it('replaces the drop entrance with pop and rise', () => {
-    expect(css).not.toMatch(/@keyframes drop\b|\.animate-drop\b/)
-    expect(css).toMatch(/@keyframes pop\s*\{[\s\S]*?translateY\(-4px\) scale\(0\.97\)/)
-    expect(css).toMatch(/@keyframes rise\s*\{[\s\S]*?translateY\(12px\) scale\(0\.98\)/)
-    expect(css).toMatch(/\.animate-pop\s*\{\s*animation: pop var\(--dur-base\) var\(--ease-standard\)/)
-    expect(css).toMatch(/\.animate-rise\s*\{\s*animation: rise var\(--dur-slow\) var\(--ease-standard\)/)
-    const reduced = css.match(/@media \(prefers-reduced-motion: reduce\) \{([\s\S]*?)\n\}/)?.[1] ?? ''
-    expect(reduced).toMatch(/\.surface-raised,\s*\.animate-pop,\s*\[data-sonner-toaster\] \[data-sonner-toast\] \{/)
+  it('has no Graphite surface class (bezel) and no radius-xl', () => {
+    expect(css).not.toMatch(/\.surface-bezel/)
+    expect(ROOT['radius-xl']).toBeUndefined()
+  })
+
+  // Folio's entrance is the 3 px drop (DESIGN_SYSTEM.md §7.2); Graphite's pop
+  // and rise are not defined.
+  it('keeps the drop entrance and defines no pop or rise', () => {
+    expect(css).toMatch(/@keyframes drop\s*\{[\s\S]*?translateY\(-3px\)/)
+    expect(css).toMatch(/\.animate-drop\s*\{\s*animation: drop var\(--dur-base\) var\(--ease-standard\)/)
+    expect(css).not.toMatch(/@keyframes (pop|rise)|\.animate-(pop|rise)/)
   })
 })
 
-describe('Graphite token values equal the study (021 AC-01, AC-02)', () => {
+describe('Folio token values equal the study (032 AC-15)', () => {
   it('parses both study blocks', () => {
     // A parse that found nothing would pass vacuously.
     expect(Object.keys(STUDY_ROOT).length).toBeGreaterThan(40)
@@ -239,15 +238,14 @@ describe('Graphite token values equal the study (021 AC-01, AC-02)', () => {
     const expectedRoot = [...Object.keys(STUDY_ROOT).filter((n) => !isFont(n)), ...CONTROL_KEYS].sort()
     expect(Object.keys(ROOT).sort()).toEqual(expectedRoot)
     expect(Object.keys(DARK).sort()).toEqual(Object.keys(STUDY_DARK).sort())
-    expect(Object.keys(ROOT)).toHaveLength(47)
-    expect(Object.keys(DARK)).toHaveLength(19)
   })
 
-  it('adds --radius-xl, --space-5 and --space-10, and drops --space-12', () => {
-    expect(ROOT['radius-xl']).toBe('26px')
-    expect(ROOT['space-5']).toBe('20px')
-    expect(ROOT['space-10']).toBe('40px')
-    expect(ROOT['space-12']).toBeUndefined()
+  it('has Folio radii and spacing, and none of the Graphite additions', () => {
+    expect(ROOT['radius-md']).toBe('4px')
+    expect(ROOT['space-12']).toBe('48px')
+    expect(ROOT['radius-xl']).toBeUndefined()
+    expect(ROOT['space-5']).toBeUndefined()
+    expect(ROOT['space-10']).toBeUndefined()
   })
 
   it('has an empty deviation map, each entry naming its contrast pair', () => {
@@ -300,7 +298,6 @@ describe('tailwind.config.ts semantic mapping (AC-07)', () => {
         'ui-sm': 'radius-sm',
         'ui-md': 'radius-md',
         'ui-lg': 'radius-lg',
-        'ui-xl': 'radius-xl',
         'ui-pill': 'radius-pill',
       },
       fontSize: {
@@ -321,18 +318,25 @@ describe('tailwind.config.ts semantic mapping (AC-07)', () => {
     }
   })
 
-  // 021 AC-02 (FR-02): exactly two families, both from next/font.
-  it('wires exactly the two next/font families, sans and mono', () => {
+  // 032 FR-14: the three Folio families, from next/font.
+  it('wires the three next/font families, display, text and mono (plus sans)', () => {
     const fonts = extend.fontFamily as Record<string, string[]>
-    expect(Object.keys(fonts)).toEqual(['sans', 'mono'])
-    expect(fonts.sans).toEqual(['var(--font-sans)', 'ui-sans-serif', 'system-ui', 'sans-serif'])
-    expect(fonts.mono).toEqual(['var(--font-mono)', 'ui-monospace', 'SFMono-Regular', 'monospace'])
+    expect(fonts.display[0]).toBe('var(--font-display)')
+    expect(fonts.text[0]).toBe('var(--font-sans)')
+    expect(fonts.mono[0]).toBe('var(--font-mono)')
+    expect(fonts.sans[0]).toBe('var(--font-sans)')
+    const layout = readFileSync(resolve(process.cwd(), 'src/app/layout.tsx'), 'utf8')
+    for (const family of ['Fraunces', 'Instrument_Sans', 'JetBrains_Mono']) {
+      expect(layout, family).toMatch(new RegExp(`\\b${family}\\(`))
+    }
+    expect(layout).not.toMatch(/Plus_Jakarta_Sans/)
   })
 
-  // 021 AC-02 (FR-02, A2, FR-07).
-  it('maps the status tint opacity and the small-caps tracking', () => {
-    expect(extend.opacity?.['12']).toBe('0.12')
-    expect(extend.letterSpacing?.label).toBe('0.14em')
+  // The Graphite keys are not in the Folio config (021 FR-02, A2, FR-07).
+  it('has no Graphite key: no ui-xl radius, no 12 opacity, no label tracking', () => {
+    expect(extend.borderRadius?.['ui-xl']).toBeUndefined()
+    expect(extend.opacity?.['12']).toBeUndefined()
+    expect(extend.letterSpacing?.label).toBeUndefined()
   })
 
   it('does not redefine Tailwind default type and radius steps', () => {
@@ -351,10 +355,10 @@ describe('tailwind.config.ts semantic mapping (AC-07)', () => {
 })
 
 // AC-06 (014 FR-07): one control height per size, from one source. The three
-// --control-* tokens on :root are the only place 32 / 38 / 44 px are written
-// (021 A1); Tailwind exposes them as spacing keys, and every control reads them.
-describe('control heights (014 AC-06, 021 A1)', () => {
-  const CONTROL = { 'control-sm': '32px', 'control-md': '38px', 'control-lg': '44px' }
+// --control-* tokens on :root are the only place 30 / 36 / 40 px are written;
+// Tailwind exposes them as spacing keys, and every control reads them.
+describe('control heights (014 AC-06)', () => {
+  const CONTROL = { 'control-sm': '30px', 'control-md': '36px', 'control-lg': '40px' }
 
   it.each(Object.entries(CONTROL))(':root declares --%s as %s', (token, value) => {
     expect(ROOT[token]).toBe(value)

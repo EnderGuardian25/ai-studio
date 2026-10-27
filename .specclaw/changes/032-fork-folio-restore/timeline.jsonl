@@ -16,3 +16,4 @@
 {"ev":"stop","span":"T5","at":"2026-10-26T22:08:57Z","ts":1793052537,"status":"ok"}
 {"ev":"start","span":"T6","kind":"task","label":"Restore the other 021-only screens","parent":"W2","model":"orchestrator","attempt":"1","at":"2026-10-26T22:09:21Z","ts":1793052561}
 {"ev":"stop","span":"T6","at":"2026-10-26T22:13:53Z","ts":1793052833,"status":"ok"}
+{"ev":"start","span":"T7","kind":"task","label":"Guards flipped, tests adapted, docs part 1","parent":"W2","model":"sonnet","attempt":"1","at":"2026-10-26T22:15:10Z","ts":1793052910}

@@ -22,10 +22,13 @@ import { join, relative, resolve } from 'node:path'
 // the deny-list's pattern 5, which bans every positive arbitrary tracking,
 // ui/ included (021 design.md §6).
 //
-// 021 FR-13: a deny-list of Folio leftovers (021 design.md §6), switched on
-// pattern by pattern in the task that removed each one's last hit; every
-// pattern is on since 021 T8. There is no legitimate Folio leftover, so
-// `ui-exception:` does not apply to it either.
+// 032 FR-14: the design system is Folio again. The Folio deny-list (021
+// FR-13) is gone; its replacement is GRAPHITE_DENY below, the Tailwind keys,
+// the font and the logo that only the 021 Graphite config had. The one rule
+// kept from 021's module rule: no file imports a path ending in `/folio`, and
+// no module is named `folio` (the helpers are `atoms.ts` and each feature's
+// `classes.ts`). A file that a change after 021 touched and that is not yet
+// restyled is named in PENDING_RESTYLE (032 W3 empties it).
 
 const ROOT = process.cwd()
 const SRC = resolve(ROOT, 'src')
@@ -64,61 +67,36 @@ const PATTERNS: Array<[string, RegExp]> = [
   ],
 ]
 
-// 021 design.md §6, numbered as there. Each entry: the label, the pattern, the
-// repo-relative files it does not apply to (data, not UI), and optionally the
-// path prefixes it is limited to (every file under src/ when absent).
-const FOLIO_PATTERNS: Array<[string, RegExp, string[], string[]?]> = [
-  // 1 (T1). No file is excluded since 031 T8 deleted the brand-kit font list: the
-  // post-font catalogue is a JSON snapshot read by the server, never UI text.
-  ['Folio font family', /fraunces|instrument[ _]sans/i, []],
-  // 2 (T1)
-  ['removed font utility', new RegExp(`${START}font-(?:display|text)${END}`), []],
-  // 3 (T1)
-  ['opsz font-variation setting', /opsz|font-variation-settings/, []],
-  // 4a (T2), the import-path half. The file-name half is FOLIO_FILE_NAME.
-  ['Folio module import', /from\s+['"][^'"]*folio[^'"]*['"]/i, []],
-  // 4b (T8). The word on any line, comments included; `portfolio` passes.
-  ['Folio name', /\bfolio\b/i, []],
-  // 5 (T6). A literal positive letter-spacing: Folio's small-caps tracking and
-  // its 0.1em table head. The one small-caps tracking is the tracking-label
-  // key, used only by SMALL_CAPS; negative heading tracking passes. Since T8
-  // also the property spelled out: an arbitrary property
-  // (`[letter-spacing:0.14em]`), CSS, or a style object (`letterSpacing`).
-  ['positive tracking literal', /tracking-\[0?\.\d+em\]|letter-?spacing\s*:\s*['"]?0?\.\d+em/i, []],
-  // 6 (T6). Small caps outside the one atom (021 FR-07): the `uppercase` class,
-  // as a whole token, in the app's UI code. src/lib and src/mcp are not UI
-  // (their comments say "uppercase" of enum values). The boundaries also catch
-  // the property spelled out (`[text-transform:uppercase]`, CSS, a style
-  // object), and since T8 in any case, as CSS keywords are.
-  [
-    'uppercase outside ui/atoms.ts',
-    new RegExp(`${START}uppercase${END}`, 'i'),
-    ['src/components/ui/atoms.ts'],
-    ['src/app/', 'src/components/'],
-  ],
-  // 7 (T5). The proof plate and its crop marks, by name in any case, and the
-  // CROP class constant (case-sensitive, so "CSS-crop" and "cropped" pass).
-  ['proof plate or crop mark', /proof[- ]plate|crop[- ]mark/i, []],
-  ['CROP constant', /\bCROP\b/, []],
-  // 8 (T3; tightened in T8). A hard offset shadow: non-zero x and y offsets
-  // (either sign) and a zero blur, in CSS or an arbitrary class. The first
-  // offset must open the shadow: it may not follow another length, so a soft
-  // `0 2px 2px 0` (y, blur, spread) is not read as x, y, blur. Graphite's soft
-  // layers (`0 1px 2px …`, `0 6px 20px -10px …`) pass.
-  [
-    'hard offset shadow',
-    /(?<![A-Za-z0-9.-])(?<!\d(?:px)?[ _])-?[1-9]\d*px[ _]-?[1-9]\d*px[ _]0(?:px)?(?=$|[ _,;)\]])/,
-    [],
-  ],
-  // 9 (T8). Folio's 2 px block rule.
-  ['2 px block rule', new RegExp(`${START}border-[tb]-2${END}`), []],
-  // 10 (T2)
-  ['drop entrance', new RegExp(`${START}animate-drop${END}`), []],
+// 032 FR-14 / design §4.3. The Tailwind keys 021 added and Folio does not have,
+// the Graphite font, and the PNG logo. Derived by diffing the two configs. The
+// scope is src/app/**, src/components/** and tailwind.config.ts, including
+// atoms.ts and every classes.ts. Out of scope: post font data
+// (src/lib/fonts/catalogue.json, which this guard never reads).
+// `codeOnly` entries ignore comments, so prose such as "1/12 of the rows" does
+// not fire; the others match anywhere. There is no legitimate Graphite
+// leftover, so `ui-exception:` does not apply.
+const GRAPHITE_DENY: Array<{ label: string; re: RegExp; codeOnly?: true }> = [
+  { label: 'Graphite radius ui-xl', re: /\brounded-ui-xl\b/ },
+  { label: 'Graphite tracking-label', re: /\btracking-label\b/ },
+  // the 021 status-tint alpha, on colour utilities only (a w-1/12 fraction is fine)
+  {
+    label: 'Graphite opacity 12',
+    re: /\b(?:[\w-]+:)*(?:bg|text|border|ring|fill|stroke|from|to|via|shadow|divide|outline|decoration|placeholder|accent|caret)-[\w-]+\/12\b/,
+    codeOnly: true,
+  },
+  { label: 'Graphite font family', re: /Plus Jakarta/ },
+  { label: 'PNG logo', re: /BistecStudioLogo/ },
 ]
 
-// 021 design.md §6 pattern 4a (T2), the file-name half: no module under src/
-// is named after Folio (FR-06).
-const FOLIO_FILE_NAME = /folio/i
+// Repo-relative files that a change after 021 touched and that W3 has not
+// restyled yet (032 design §2.2). Each is exempt from GRAPHITE_DENY and from
+// the shared-name guard until its W3 task removes it. W3's last task sets
+// W3_DONE and the list must then be empty.
+const W3_DONE = false
+const PENDING_RESTYLE: readonly string[] = [
+  // 021 status tints (bg-status-*/12) in the refine verdict rows; W3 uses the Folio tint.
+  'src/components/drafts/RefinementPanel.tsx',
+]
 
 const SHARED_NAME =
   /^\s*(?:export\s+(?:default\s+)?)?(?:async\s+)?(?:const|let|function)\s+(FOCUS|SCROLL_FOCUS|SMALL_CAPS|EYEBROW|FIELD_LABEL|PAGE_TITLE|PAGE_LEAD|SECTION_HEAD|SECTION_NUMERAL|SUB_HEAD|KIT_TITLE|STEP_HEAD|STEP_NUMERAL|STEP_LEAD|GROUP_HEAD|ASIDE_HEAD|NOTICE|WARN_NOTICE|ICON|ICON_SM|ICON_BUTTON|TEXT_LINK|TAG|TABLE_HEAD_ROW|ROW|COMPACT_FIELD|COMPACT_TEXTAREA|PILL_BADGE|PageHead|PageTitle|SectionHead|SectionHeader|Notice|FieldLabel|StatusWord|GateNotice)\b/
@@ -145,8 +123,8 @@ function findViolations(file: string, text: string): string[] {
 }
 
 // FR-05. `file` is the repo-relative path with forward slashes.
-function findSharedCopies(file: string, text: string): string[] {
-  if (file.startsWith(UI_DIR)) return []
+function findSharedCopies(file: string, text: string, pending: readonly string[] = PENDING_RESTYLE): string[] {
+  if (file.startsWith(UI_DIR) || pending.includes(file)) return []
   const hits: string[] = []
   text.split(/\r?\n/).forEach((line, i) => {
     const name = line.match(SHARED_NAME)
@@ -221,177 +199,137 @@ describe('UI token guard (AC-14)', () => {
   })
 })
 
-// 021 FR-13. `file` is the repo-relative path with forward slashes.
-function findFolioLeftovers(file: string, text: string): string[] {
+// Comments removed, line structure kept (so line numbers stay right): block
+// comments, including JSX `{/* … */}`, and `//` comments that start a line or
+// follow whitespace (so `http://x` passes).
+function stripComments(text: string): string {
+  return text
+    .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' '))
+    .replace(/(^|\s)\/\/[^\n]*/gm, '$1')
+}
+
+// 032 FR-14. `file` is the repo-relative path with forward slashes. A file in
+// `pending` passes by its exact name, so a pending entry never hides a new rule.
+function findGraphite(file: string, text: string, pending: readonly string[] = PENDING_RESTYLE): string[] {
+  if (pending.includes(file)) return []
   const hits: string[] = []
-  const name = file.split('/').pop() ?? file
-  if (FOLIO_FILE_NAME.test(name)) hits.push(`${file}: ${name} (Folio module name)`)
-  text.split(/\r?\n/).forEach((line, i) => {
-    for (const [label, re, excluded, only] of FOLIO_PATTERNS) {
-      if (excluded.includes(file)) continue
-      if (only && !only.some((prefix) => file.startsWith(prefix))) continue
-      const m = line.match(re)
+  const code = stripComments(text).split(/\r?\n/)
+  text.split(/\r?\n/).forEach((raw, i) => {
+    for (const { label, re, codeOnly } of GRAPHITE_DENY) {
+      const m = (codeOnly ? code[i] : raw).match(re)
       if (m) hits.push(`${file}:${i + 1}: ${m[0]} (${label})`)
     }
   })
   return hits
 }
 
-describe('Folio deny-list (021 FR-13, AC-05)', () => {
-  const files = sourceFiles(SRC)
+// The 021 module rule, kept: no import of a path that ends in `/folio`, and no
+// module named after it (the helpers are atoms.ts and classes.ts).
+const FOLIO_IMPORT = /from\s+['"][^'"]*\/folio(?:\.tsx?)?['"]/i
+function findFolioModule(file: string, text: string): string[] {
+  const hits: string[] = []
+  const name = file.split('/').pop() ?? file
+  if (/^folio\.(ts|tsx|css)$/i.test(name)) hits.push(`${file}: ${name} (module named folio)`)
+  text.split(/\r?\n/).forEach((line, i) => {
+    const m = line.match(FOLIO_IMPORT)
+    if (m) hits.push(`${file}:${i + 1}: ${m[0]} (import of a folio module)`)
+  })
+  return hits
+}
 
-  it('finds no Folio leftover in src/, with every §6 pattern on', () => {
-    const hits = files.flatMap((f) =>
-      findFolioLeftovers(relative(ROOT, f).split('\\').join('/'), readFileSync(f, 'utf8'))
-    )
+const repoPath = (f: string) => relative(ROOT, f).split('\\').join('/')
+const inGraphiteScope = (file: string) =>
+  file === 'tailwind.config.ts' || file.startsWith('src/app/') || file.startsWith('src/components/')
+
+describe('Graphite deny-list (032 FR-14, AC-16)', () => {
+  const files = [...sourceFiles(SRC).map(repoPath), 'tailwind.config.ts'].filter(inGraphiteScope)
+  const read = (file: string) => readFileSync(resolve(ROOT, file), 'utf8')
+  // The files that fail with an empty exemption list: what PENDING_RESTYLE may
+  // name, and no other.
+  const failing = () =>
+    files.filter((f) => findGraphite(f, read(f), []).length > 0 || findSharedCopies(f, read(f), []).length > 0)
+
+  it('scans src/app, src/components and the Tailwind config, including atoms.ts and every classes.ts', () => {
+    expect(files).toContain('tailwind.config.ts')
+    expect(files).toContain('src/components/ui/atoms.ts')
+    expect(files.filter((f) => f.endsWith('/classes.ts')).length).toBeGreaterThanOrEqual(2)
+    expect(files).not.toContain('src/lib/fonts/catalogue.json')
+  })
+
+  it('finds no Graphite leftover in a file that is not pending a restyle', () => {
+    const hits = files.flatMap((f) => findGraphite(f, read(f)))
+    expect(hits, hits.join('\n')).toEqual([])
+  })
+
+  it('finds no module named folio and no import of one', () => {
+    const hits = sourceFiles(SRC).flatMap((f) => findFolioModule(repoPath(f), readFileSync(f, 'utf8')))
     expect(hits, hits.join('\n')).toEqual([])
   })
 
   it.each([
-    // 1
-    ["import { Fraunces, JetBrains_Mono } from 'next/font/google'", 'Fraunces'],
-    ['const face = Instrument_Sans({ subsets })', 'Instrument_Sans'],
-    ['// the text face is Instrument Sans', 'Instrument Sans'],
-    // 2
-    ['<h2 className="font-display text-ui-lg">', 'font-display'],
-    ["cn('font-text', SMALL_CAPS)", 'font-text'],
-    ['<p className="md:font-display">', 'font-display'],
-    ["'w-full text-left font-text',", 'font-text'],
-    // 3
-    ['<h1 className="[font-variation-settings:\'opsz\'_144]">', 'font-variation-settings'],
-    ["  axes: ['opsz'],", 'opsz'],
-    // 4a, the import path (a path where the word is not whole, so 4b stays
-    // quiet; a whole-word path fires both, see the case below the table)
-    ["import { EYEBROW } from '@/components/ui/folioAtoms'", "from '@/components/ui/folioAtoms'"],
-    ["import { ROW } from './folios'", "from './folios'"],
-    ['export * from "./FolioKit"', 'from "./FolioKit"'],
-    // 4b, the word (021 T8)
-    ['// the Folio proof sheet', 'Folio'],
-    ['{/* folio: paper and ink */}', 'folio'],
-    ["const theme = 'FOLIO'", 'FOLIO'],
-    // 5
-    ['<th className="py-2 tracking-[0.1em]">', 'tracking-[0.1em]'],
-    ["export const SMALL_CAPS = 'text-ui-2xs font-semibold tracking-[0.14em]'", 'tracking-[0.14em]'],
-    ['<p className="md:tracking-[.05em]">', 'tracking-[.05em]'],
-    // 5, the property spelled out (021 T8)
-    ['<p className="[letter-spacing:0.14em]">', 'letter-spacing:0.14em'],
-    ['  letter-spacing: 0.1em;', 'letter-spacing: 0.1em'],
-    ["<p style={{ letterSpacing: '0.14em' }}>", "letterSpacing: '0.14em"],
-    // 6
-    ['<span className="ml-2 text-ui-2xs uppercase text-fg-muted">{a.type}</span>', 'uppercase'],
-    ["cn('uppercase', open && 'block')", 'uppercase'],
-    ['<p className="md:uppercase">', 'uppercase'],
-    ['// an uppercase micro-label', 'uppercase'],
-    // 6, the property spelled out, and any case (021 T8)
-    ['<p className="[text-transform:uppercase]">', 'uppercase'],
-    ['<p className="md:[text-transform:UPPERCASE]">', 'UPPERCASE'],
-    ['  text-transform: uppercase;', 'uppercase'],
-    ["<p style={{ textTransform: 'uppercase' }}>", 'uppercase'],
-    // 7
-    ['// A proof-plate crop mark (DESIGN_SYSTEM.md §8.12)', 'proof-plate'],
-    ['{/* The Proof Plate (§8.12): paper and a hairline edge. */}', 'Proof Plate'],
-    ['<span data-role="crop mark" />', 'crop mark'],
-    ["const CROP = 'pointer-events-none absolute h-[18px] w-[18px] border-line'", 'CROP'],
-    ['<span aria-hidden className={`${CROP} left-5 top-5 border-l border-t`} />', 'CROP'],
-    // 8
-    ['active:shadow-[2px_2px_0_0_rgb(0_0_0/0.2)]', '2px_2px_0'],
-    ['  --shadow-raised: 4px 4px 0 0 rgb(33 28 24);', '4px 4px 0'],
-    ['  box-shadow: 6px 6px 0px rgb(var(--fg));', '6px 6px 0px'],
-    // 8, negative offsets, inset, and a shadow with no colour (021 T8)
-    ['  box-shadow: -2px 2px 0 0 rgb(0 0 0 / 0.2);', '-2px 2px 0'],
-    ['active:shadow-[2px_-2px_0_0_rgb(0_0_0/0.2)]', '2px_-2px_0'],
-    ['shadow-[inset_-3px_-3px_0_rgb(0_0_0)]', '-3px_-3px_0'],
-    ['  box-shadow: 4px 4px 0;', '4px 4px 0'],
-    // 9 (021 T8)
-    ['<div className="border-t-2 border-fg pt-4">', 'border-t-2'],
-    ["cn('mb-6', open && 'md:border-b-2')", 'border-b-2'],
-    // 10
-    ['<div className="surface-raised animate-drop">', 'animate-drop'],
-    ["cn('menu', open && 'motion-safe:animate-drop')", 'animate-drop'],
+    ['<div className="rounded-ui-xl p-4">', 'rounded-ui-xl'],
+    ["cn('md:rounded-ui-xl', open && 'block')", 'rounded-ui-xl'],
+    ['<h2 className="text-ui-2xs tracking-label">', 'tracking-label'],
+    ["export const SMALL_CAPS = 'text-ui-2xs tracking-label'", 'tracking-label'],
+    ['<span className="bg-status-failed/12 text-status-failed">', 'bg-status-failed/12'],
+    ['<span className="dark:bg-status-draft/12">', 'dark:bg-status-draft/12'],
+    ['// the heading face is Plus Jakarta Sans', 'Plus Jakarta'],
+    ["const face = 'Plus Jakarta Sans, sans-serif'", 'Plus Jakarta'],
+    ['<img src="/BistecStudioLogo.png" alt="" />', 'BistecStudioLogo'],
+    ["import logo from '@/../public/BistecStudioLogo.png'", 'BistecStudioLogo'],
   ])('flags %s', (line, token) => {
-    const hits = findFolioLeftovers('src/components/x.tsx', line)
+    const hits = findGraphite('src/components/x.tsx', line, [])
     expect(hits).toHaveLength(1)
     expect(hits[0]).toContain(`: ${token} (`)
   })
 
   it.each([
-    '<p className="font-sans font-mono font-semibold">',
-    '<p className="font-textual xfont-display font-display-x">',
-    "const jakarta = Plus_Jakarta_Sans({ variable: '--font-sans' })",
-    '<span className="font-mono">token</span>',
-    // 5: the label key, negative and named tracking
-    '<h2 className="tracking-[-0.01em] tracking-tight tracking-label">',
-    // 6: other tokens that contain the word
-    '<p className="normal-case">{name.toUpperCase()}</p>',
-    '<p className="uppercased-x xuppercase">',
-    // 4a and 4b: imports of the new modules, and a word that only contains it
-    "import { ROW } from '@/components/ui/atoms'",
-    "import { ROW_TITLE } from '@/components/campaigns/classes'",
-    '// a portfolio of posts',
-    // 7: other uses of the words
-    '// We CSS-crop to that region; the post is never cropped.',
-    "const CROP_RATIO = 1 // a cropped image, a crop of the logo",
-    '{/* The post stage: a bezel card holding the post. */}',
-    // 8: soft, blurred or single-offset shadows, and other px pairs
-    '  --shadow-panel: 0 1px 2px rgb(24 24 22 / 0.04), 0 6px 20px -10px rgb(24 24 22 / 0.10);',
-    '  --shadow-raised: inset 0 1px 0 rgb(255 255 255 / 0.06), 0 2px 4px rgb(0 0 0 / 0.30);',
-    "shadow-[10px_20px_0.5px_rgb(0_0_0)] h-[52px] w-[52px] pl-[7px]",
-    // 8 (021 T8): a soft shadow whose y, blur and spread read "2px 2px 0", in
-    // CSS and as a class, and Graphite's dark inset highlight (x 0, blur 0)
-    '  box-shadow: 0 2px 2px 0 rgb(0 0 0 / 0.2);',
-    'shadow-[0_2px_2px_0_rgb(0_0_0/0.2)] shadow-[0px_2px_2px_0px_rgb(0_0_0)]',
-    '  --shadow-panel: inset 0 1px 0 rgb(255 255 255 / 0.04), 0 1px 2px rgb(0 0 0 / 0.30), 0 8px 24px -12px rgb(0 0 0 / 0.50);',
-    // 9: other border widths and sides
-    '<div className="border-t border-b border-line-subtle border-2 border-x-2 border-t-20">',
-    // 5 and 6: other letter-spacing and text-transform values
-    '<p style={{ letterSpacing: \'-0.01em\', textTransform: \'none\' }} className="[text-transform:capitalize]">',
-    // 10: other animations
-    '<div className="surface-raised origin-top-left animate-pop">',
-    '<div className="animate-dropdown xanimate-drop">',
+    '<div className="rounded-ui-lg rounded-ui-md">',
+    '<h2 className="tracking-[-0.01em] tracking-tight">',
+    '<div className="w-1/2 w-1/3 opacity-60 bg-status-failed/10 bg-scrim/50">',
+    '<div className="w-1/12 col-span-5/12 basis-1/12">',
+    '<div className="col-span-1 xrounded-ui-xl tracking-labels">',
+    // the /12 pattern ignores comments: the prose of a comment is not a class
+    '// the first 1/12 of the rows, and the status tint at 10/12 of the width',
+    '/* a 5/12 split, was bg-status-failed/12 in Graphite */',
+    '{/* the 1/12 case: a /12 in a JSX comment is skipped */}',
+    "const url = 'http://example.test/a'",
   ])('passes %s', (line) => {
-    expect(findFolioLeftovers('src/components/x.tsx', line)).toEqual([])
+    expect(findGraphite('src/components/x.tsx', line, [])).toEqual([])
   })
 
-  it('does not honour ui-exception, and excludes no file from pattern 1', () => {
-    expect(findFolioLeftovers('src/components/x.tsx', '<p className="font-text" /> // ui-exception: x')).toHaveLength(1)
-    const fontList = "  'Lexend','Instrument Sans','Kanit',"
-    expect(findFolioLeftovers('src/components/admin/brandkits/FontEditor.tsx', fontList)).toHaveLength(1)
+  it('does not honour ui-exception', () => {
+    expect(findGraphite('src/components/x.tsx', '<p className="rounded-ui-xl" /> // ui-exception: x', [])).toHaveLength(1)
   })
 
-  // 021 T8: the old module path names the word whole, so 4a and 4b both fire.
-  it('flags an import of the old folio module under both 4a and 4b', () => {
-    const hits = findFolioLeftovers('src/components/x.tsx', "import { EYEBROW } from '@/components/ui/folio'")
-    expect(hits.map((h) => h.slice(h.lastIndexOf('(')))).toEqual(['(Folio module import)', '(Folio name)'])
+  it('exempts a file only by its exact repo-relative path', () => {
+    const line = '<p className="rounded-ui-xl" />'
+    expect(findGraphite('src/components/x.tsx', line, ['src/components/x.tsx'])).toEqual([])
+    expect(findGraphite('src/components/y.tsx', line, ['src/components/x.tsx'])).toHaveLength(1)
   })
 
-  it('flags a module named after Folio, whatever its case or extension (4a)', () => {
-    for (const file of ['src/components/ui/folio.ts', 'src/components/team/folio.tsx', 'src/app/Folio.css']) {
-      expect(findFolioLeftovers(file, ''), file).toEqual([`${file}: ${file.split('/').pop()} (Folio module name)`])
+  it('flags a folio import and a module named folio, and passes the new modules', () => {
+    expect(findFolioModule('src/components/x.tsx', "import { EYEBROW } from '@/components/ui/folio'")).toHaveLength(1)
+    expect(findFolioModule('src/components/x.tsx', "import { ROW } from './folio'")).toHaveLength(1)
+    expect(findFolioModule('src/components/ui/folio.ts', '')).toHaveLength(1)
+    expect(findFolioModule('src/components/team/Folio.tsx', '')).toHaveLength(1)
+    expect(findFolioModule('src/components/x.tsx', "import { ROW } from '@/components/ui/atoms'")).toEqual([])
+    expect(findFolioModule('src/components/x.tsx', "import { ROW_TITLE } from '@/components/campaigns/classes'")).toEqual([])
+    expect(findFolioModule('src/components/x.tsx', '// the Folio design system, see folio notes')).toEqual([])
+  })
+
+  // The exemption list is honest: a file that passes must be removed from it.
+  it('PENDING_RESTYLE names only files that exist, are in scope and still fail', () => {
+    const stillFailing = new Set(failing())
+    for (const file of PENDING_RESTYLE) {
+      expect(files, `${file} exists and is in scope`).toContain(file)
+      expect(stillFailing.has(file), `${file} passes now: remove it from PENDING_RESTYLE`).toBe(true)
     }
-    for (const file of ['src/components/ui/atoms.ts', 'src/components/campaigns/classes.ts']) {
-      expect(findFolioLeftovers(file, ''), file).toEqual([])
-    }
+    expect(new Set(PENDING_RESTYLE).size).toBe(PENDING_RESTYLE.length)
   })
 
-  // 021 T6: pattern 5 replaces T2's small-caps-literal scan (it bans every
-  // positive arbitrary tracking) and applies everywhere, ui/ included. Pattern
-  // 6 applies only to the app's UI code, and not to the one atom module.
-  it('applies pattern 5 inside ui/, and pattern 6 to src/app and src/components except ui/atoms.ts', () => {
-    const tracking = "export const SMALL_CAPS = 'text-ui-2xs tracking-[0.14em]'"
-    expect(findFolioLeftovers('src/components/ui/atoms.ts', tracking)).toHaveLength(1)
-    expect(findFolioLeftovers('src/components/ui/SectionHead.tsx', tracking)).toHaveLength(1)
-    const caps = "export const SMALL_CAPS = 'text-ui-2xs font-semibold uppercase tracking-label'"
-    expect(findFolioLeftovers('src/components/ui/atoms.ts', caps)).toEqual([])
-    expect(findFolioLeftovers('src/lib/channels.ts', '// normalizing to uppercase before lookup')).toEqual([])
-    expect(findFolioLeftovers('src/mcp/tools/generate.ts', '// Channel enum values are uppercase;')).toEqual([])
-    for (const file of [
-      'src/components/ui/StatusChip.tsx',
-      'src/components/admin/brandkits/KitDetail.tsx',
-      'src/app/(app)/campaigns/page.tsx',
-      'src/app/globals.css',
-    ]) {
-      expect(findFolioLeftovers(file, caps), file).toHaveLength(1)
-    }
+  it('PENDING_RESTYLE is empty once W3 is done', () => {
+    if (W3_DONE) expect(PENDING_RESTYLE).toEqual([])
   })
 })
 

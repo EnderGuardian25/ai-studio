@@ -27,13 +27,9 @@ import {
 // AC-01 (014 FR-01, FR-03): the shared primitives render the elements, levels
 // and attributes the screens rely on. Plain createElement, so this stays a
 // .test.ts file with no JSX.
-//
-// 021 AC-07 (FR-04, FR-05): they render the Graphite strings — pills,
-// sentence-case labels and chips, the 0.12 status tint, no section numeral.
 
 const count = (html: string, re: RegExp) => (html.match(re) ?? []).length
-// renderToStaticMarkup escapes the quotes inside class values (none since the
-// Fraunces opsz settings went, 021 T1; kept for any future quoted value).
+// renderToStaticMarkup escapes the quotes inside class values (the opsz settings).
 const attr = (s: string) => s.replace(/'/g, '&#x27;')
 
 describe('PageHead', () => {
@@ -86,10 +82,11 @@ describe('PageTitle', () => {
 })
 
 describe('SectionHead', () => {
-  it('renders an h2 by default, with the id on the heading, and no numeral (021 A11)', () => {
+  it('renders an h2 by default, the numeral aria-hidden, and the id on the heading', () => {
     const html = renderToStaticMarkup(
       h(SectionHead, {
         title: 'Copy',
+        numeral: '01',
         id: 'copy-head',
         className: 'mb-3',
         children: 'Saved',
@@ -97,31 +94,34 @@ describe('SectionHead', () => {
     )
     expect(html).toContain(`<h2 id="copy-head" class="${attr(SECTION_HEAD)}">Copy</h2>`)
     expect(html).not.toContain('<h3')
-    expect(html).not.toContain('>01<')
-    expect(html).not.toContain('aria-hidden')
-    expect(html).toMatch(/^<div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 mb-3">/)
+    expect(html).toMatch(/<span aria-hidden="true" class="[^"]*">01<\/span>/)
+    expect(html).toMatch(/^<div class="flex flex-wrap items-baseline gap-x-3\.5 gap-y-2 mb-3">/)
     expect(html).toContain(
       '<div class="ml-auto flex flex-wrap items-center justify-end gap-x-3.5 gap-y-1 text-ui-xs">Saved</div>',
     )
   })
 
-  it('renders an h3 in the sub-head style with level={3}, and no tail when not given', () => {
+  it('renders an h3 in the sub-head style with level={3}, and no numeral or tail when not given', () => {
     const html = renderToStaticMarkup(h(SectionHead, { title: 'Colours', level: 3 }))
     expect(html).toBe(
-      `<div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-2"><h3 class="${SUB_HEAD}">Colours</h3></div>`,
+      `<div class="flex flex-wrap items-baseline gap-x-3.5 gap-y-2"><h3 class="${SUB_HEAD}">Colours</h3></div>`,
     )
   })
 
-  it('sets the card head at 16 px / 600 (the study .card-hd h2)', () => {
-    expect(SECTION_HEAD.split(' ')).toEqual(expect.arrayContaining(['text-ui-lg', 'font-semibold']))
+  // 021 had 'sets the card head at 16 px / 600'. Folio's section head is the
+  // Fraunces display face at text-ui-xl.
+  it('sets the section head in the display face at text-ui-xl, weight 500', () => {
+    expect(SECTION_HEAD.split(' ')).toEqual(expect.arrayContaining(['font-display', 'text-ui-xl', 'font-medium']))
   })
 
-  // 021 T8: an h3 that heads its own bezel card (the brand kit's sections,
-  // under the kit's h2) keeps its level and takes the card-head style.
-  it('renders an h3 in the card-head style with level={3} and card', () => {
-    const html = renderToStaticMarkup(h(SectionHead, { title: 'Fonts', level: 3, card: true }))
-    expect(html).toBe(
-      `<div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-2"><h3 class="${SECTION_HEAD}">Fonts</h3></div>`,
+  // Kept addition (032): `card` is accepted for post-021 callers and changes
+  // nothing (Folio has no card-head style).
+  it('accepts card and renders the same h3 as without it', () => {
+    const plain = renderToStaticMarkup(h(SectionHead, { title: 'Fonts', level: 3 }))
+    const card = renderToStaticMarkup(h(SectionHead, { title: 'Fonts', level: 3, card: true }))
+    expect(card).toBe(plain)
+    expect(card).toBe(
+      `<div class="flex flex-wrap items-baseline gap-x-3.5 gap-y-2"><h3 class="${SUB_HEAD}">Fonts</h3></div>`,
     )
   })
 })
@@ -130,7 +130,7 @@ describe('Notice', () => {
   it('renders no role unless one is passed', () => {
     const html = renderToStaticMarkup(h(Notice, { tone: 'info', children: 'Heads up' }))
     expect(html).not.toContain('role=')
-    expect(html).toBe(`<div class="${NOTICE} bg-accent/12 text-accent">Heads up</div>`)
+    expect(html).toBe(`<div class="${NOTICE} bg-accent/10 text-accent">Heads up</div>`)
   })
 
   it('passes role, data-* and aria-* through', () => {
@@ -148,16 +148,16 @@ describe('Notice', () => {
     expect(html).toContain('data-testid="background-notice"')
     expect(html).toContain('data-reason="no-provider"')
     expect(html).toContain('aria-live="polite"')
-    expect(html).toContain(`class="${NOTICE} bg-status-scheduled/12 text-status-scheduled mt-4"`)
+    expect(html).toContain(`class="${NOTICE} bg-status-scheduled/10 text-status-scheduled mt-4"`)
   })
 
-  it('maps each tone to its colours at 0.12, with no ring; neutral takes a hairline ring', () => {
+  it('maps each tone to its colours; neutral drops the currentColor ring for a --line one', () => {
     const error = renderToStaticMarkup(h(Notice, { tone: 'error', role: 'alert', children: 'x' }))
-    expect(error).toContain('bg-status-failed/12 text-status-failed')
+    expect(error).toContain('bg-status-failed/10 text-status-failed')
     expect(error).toContain('role="alert"')
-    expect(NOTICE).not.toMatch(/ring|shadow|currentColor/)
     const neutral = renderToStaticMarkup(h(Notice, { tone: 'neutral', children: 'x' }))
-    expect(neutral).toBe(`<div class="${NOTICE} bg-surface text-fg ring-1 ring-inset ring-line-subtle">x</div>`)
+    expect(neutral).toContain('bg-surface text-fg shadow-[inset_0_0_0_1px_rgb(var(--line))]')
+    expect(neutral).not.toContain('currentColor')
   })
 
   it('lays out an icon and a flexible body in a row', () => {
@@ -169,31 +169,25 @@ describe('Notice', () => {
   })
 })
 
-// The sentence-case field label (021 FR-07, AC-07): 13 px / 600 in --fg.
-const FIELD_LABEL = 'block text-ui-sm font-semibold text-fg'
-
 describe('FieldLabel', () => {
-  it('renders a <label for> with htmlFor, sentence case at text-ui-sm 600, with no uppercase', () => {
+  it('renders a <label for> with htmlFor, in the eyebrow style plus block', () => {
     const html = renderToStaticMarkup(
       h(FieldLabel, { htmlFor: 'topic', className: 'mb-2.5', children: 'Topic' }),
     )
-    expect(html).toBe(`<label for="topic" class="${FIELD_LABEL} mb-2.5">Topic</label>`)
-    expect(html).not.toContain('uppercase')
+    expect(html).toBe(`<label for="topic" class="${EYEBROW} block mb-2.5">Topic</label>`)
   })
 
   it('renders a <span> with as="span", keeping the id', () => {
     const html = renderToStaticMarkup(
       h(FieldLabel, { as: 'span', id: 'size-label', children: 'Size' }),
     )
-    expect(html).toBe(`<span id="size-label" class="${FIELD_LABEL}">Size</span>`)
+    expect(html).toBe(`<span id="size-label" class="${EYEBROW} block">Size</span>`)
   })
 })
 
 describe('StatusChip', () => {
-  // A sentence-case pill with a currentColor dot (the study's .chip).
-  const BASE = attr(
-    "inline-flex items-center gap-1.5 h-6 pl-2 pr-2.5 rounded-ui-pill text-ui-xs font-semibold whitespace-nowrap flex-shrink-0 before:content-[''] before:h-1.5 before:w-1.5 before:flex-shrink-0 before:rounded-full before:bg-current",
-  )
+  const BASE =
+    'inline-flex items-center h-[22px] px-2 rounded-ui-sm flex-shrink-0 whitespace-nowrap font-text text-ui-2xs font-semibold uppercase tracking-[0.14em] shadow-[inset_0_0_0_1px_currentColor]'
 
   // createElement reads only the last overload (the status one); JSX resolves
   // both. So the tone case names its own signature, which tsc checks against
@@ -203,17 +197,15 @@ describe('StatusChip', () => {
   it('renders the children text in the tone classes', () => {
     const html = renderToStaticMarkup(h(ToneChip, { tone: 'published', children: 'Connected' }))
     expect(html).toBe(
-      `<span class="${BASE} bg-status-published/12 text-status-published">Connected</span>`,
+      `<span class="${BASE} bg-status-published/10 text-status-published">Connected</span>`,
     )
   })
 
   it('keeps the status path: its label and colours, plus the two no-wrap utilities', () => {
-    const html = renderToStaticMarkup(h(StatusChip, { status: 'queued', className: 'x' }))
+    const html = renderToStaticMarkup(h(StatusChip, { status: 'unfinished', className: 'x' }))
     expect(html).toBe(
-      `<span class="${BASE} bg-status-scheduled/12 text-status-scheduled x">Queued</span>`,
+      `<span class="${BASE} bg-status-scheduled/10 text-status-scheduled x">Unfinished</span>`,
     )
-    expect(html).toContain('rounded-ui-pill')
-    expect(html).not.toContain('uppercase')
   })
 })
 
@@ -258,7 +250,7 @@ describe('ModelPicker', () => {
   it('names the select by its FieldLabel and describes it by the hint line', () => {
     const html = render({ id: 'li-model', label: 'LinkedIn caption model' })
     expect(html).toContain(
-      `<label for="li-model" class="${FIELD_LABEL}">LinkedIn caption model</label>`,
+      `<label for="li-model" class="${EYEBROW} block">LinkedIn caption model</label>`,
     )
     expect(html).toMatch(/<select id="li-model" [^>]*aria-describedby="li-model-hint"/)
     expect(html).toContain(
@@ -270,7 +262,7 @@ describe('ModelPicker', () => {
 
   it('defaults the accessible name to "Model", and pre-selects from the stamp', () => {
     const html = render({ id: 'm', context: { stamp: 'claude-sonnet-5-5' } })
-    expect(html).toContain(`<label for="m" class="${FIELD_LABEL}">Model</label>`)
+    expect(html).toContain(`<label for="m" class="${EYEBROW} block">Model</label>`)
     expect(html).toContain('<option value="SONNET" selected="">')
     expect(html).toContain('<p>Same model as the current caption</p>')
   })
@@ -327,7 +319,7 @@ describe('ModelPicker', () => {
       /<select id="m" [^>]*aria-describedby="m-hint m-error" aria-invalid="true"/,
     )
     expect(html).toContain(
-      '<p id="m-error" class="text-ui-xs text-status-failed">Opus 5.5 isn&#x27;t allowed on this team</p>',
+      '<p id="m-error" class="font-text text-ui-xs text-status-failed">Opus 5.5 isn&#x27;t allowed on this team</p>',
     )
   })
 
@@ -355,7 +347,7 @@ describe('Select', () => {
     )
     expect(html).toMatch(/<select id="s" [^>]*aria-describedby="help s-error" aria-invalid="true"/)
     expect(html).toContain(
-      '<p id="s-error" class="text-ui-xs text-status-failed">Bad</p>',
+      '<p id="s-error" class="font-text text-ui-xs text-status-failed">Bad</p>',
     )
   })
 
@@ -370,54 +362,52 @@ describe('Select', () => {
   })
 })
 
-// 021 AC-07 (FR-04, A13): Primary is the ink pill with the raised shadow at
-// rest, Ink the same fill, flat; fields are pills, textareas radius-md.
+// 021 had a Button and fields-and-Panel block that asserted pills, the raised
+// ink shadow and the bezel. They are adapted to Folio: square-cornered Outline
+// and Text buttons, the 1 px --line field, and the one .surface card.
 describe('Button', () => {
   const classOf = (html: string) => (html.match(/class="([^"]*)"/)?.[1] ?? '').split(' ')
 
-  it('renders primary as a raised accent pill', () => {
-    expect(classOf(renderToStaticMarkup(h(Button, null, 'Go')))).toEqual(
-      expect.arrayContaining(['rounded-ui-pill', 'bg-accent', 'text-accent-fg', 'shadow-raised']),
-    )
+  it('renders primary as the accent block, with no pill', () => {
+    const cls = classOf(renderToStaticMarkup(h(Button, null, 'Go')))
+    expect(cls).toEqual(expect.arrayContaining(['rounded-ui-md', 'bg-accent', 'text-accent-fg', 'border-accent']))
+    expect(cls).not.toContain('rounded-ui-pill')
   })
 
-  it('renders ink flat, with no resting shadow', () => {
+  it('renders ink flat in the --fg fill', () => {
     const cls = classOf(renderToStaticMarkup(h(Button, { variant: 'ink' }, 'Send')))
-    expect(cls).toEqual(expect.arrayContaining(['rounded-ui-pill', 'bg-fg', 'text-canvas', 'shadow-none']))
+    expect(cls).toEqual(expect.arrayContaining(['rounded-ui-md', 'bg-fg', 'text-canvas', 'border-fg']))
     expect(cls).not.toContain('shadow-raised')
   })
 
-  it('renders secondary as a raised paper pill with a hairline ring', () => {
+  it('renders secondary as the transparent Outline button on a --line edge', () => {
     expect(classOf(renderToStaticMarkup(h(Button, { variant: 'secondary' }, 'x')))).toEqual(
-      expect.arrayContaining(['rounded-ui-pill', 'bg-surface-raised', 'shadow-panel', 'ring-1', 'ring-line-subtle']),
+      expect.arrayContaining(['rounded-ui-md', 'bg-transparent', 'text-fg', 'border', 'border-line']),
     )
   })
 
-  it('presses at 0.98, off under reduced motion, with the outline focus (no ring)', () => {
+  it('keeps the focus ring (offset on the canvas) and no press scale', () => {
     const cls = classOf(renderToStaticMarkup(h(Button, null, 'x')))
     expect(cls).toEqual(
-      expect.arrayContaining([
-        'enabled:active:scale-[0.98]',
-        'motion-reduce:enabled:active:scale-100',
-        'focus-visible:outline-focus',
-      ]),
+      expect.arrayContaining(['focus-visible:ring-2', 'focus-visible:ring-focus', 'focus-visible:ring-offset-canvas']),
     )
-    expect(cls.filter((c) => c.startsWith('focus-visible:ring'))).toEqual([])
+    expect(cls.some((c) => c.includes('active:scale'))).toBe(false)
   })
 })
 
 describe('fields and Panel', () => {
-  it('renders Input as a pill and fieldClasses (textareas) at radius-md', () => {
+  it('renders Input and fieldClasses (textareas) at radius-sm, never a pill', () => {
     const html = renderToStaticMarkup(h(Input, { id: 'i' }))
-    expect(html).toMatch(/<input id="i" class="[^"]*\brounded-ui-pill\b/)
-    expect(fieldClasses.split(' ')).toContain('rounded-ui-md')
+    expect(html).toMatch(/<input id="i" class="[^"]*\brounded-ui-sm\b/)
+    expect(html).not.toContain('rounded-ui-pill')
+    expect(fieldClasses.split(' ')).toContain('rounded-ui-sm')
     expect(fieldClasses).not.toContain('rounded-ui-pill')
   })
 
-  it('renders Panel on .surface, or with bezel on .surface-bezel', () => {
+  // Kept addition (032): `bezel` is accepted and changes nothing; Folio has
+  // one card class.
+  it('renders Panel on .surface, and accepts bezel with the same output', () => {
     expect(renderToStaticMarkup(h(Panel, { className: 'p-5' }))).toBe('<div class="surface p-5"></div>')
-    expect(renderToStaticMarkup(h(Panel, { bezel: true, className: 'p-5' }))).toBe(
-      '<div class="surface-bezel p-5"></div>',
-    )
+    expect(renderToStaticMarkup(h(Panel, { bezel: true, className: 'p-5' }))).toBe('<div class="surface p-5"></div>')
   })
 })

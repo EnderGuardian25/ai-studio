@@ -125,7 +125,7 @@ test.describe('Field labels (T9)', () => {
     await api.dispose()
   })
 
-  test('AC-05: Input and Select labels share the brief FieldLabel style (sentence case, 021 AC-09)', async ({ page }) => {
+  test('AC-05: Input and Select labels share the brief FieldLabel style (small caps, Folio)', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 })
     await pageLogin(page)
 
@@ -136,9 +136,10 @@ test.describe('Field labels (T9)', () => {
     await page.getByRole('button', { name: /continue/i }).click()
     await expect(page.getByRole('heading', { name: 'Description & caption direction' })).toBeVisible()
     const reference = await labelStyle(page.locator('label').filter({ hasText: /^Topic$/ }))
-    // 021 FR-07: field labels are sentence case at 13 px (no longer small caps).
-    expect(reference.textTransform).toBe('none')
-    expect(reference.fontSize).toBe('13px')
+    // Folio: field labels are small caps at 11 px (the Graphite sentence-case
+    // 13 px label is gone).
+    expect(reference.textTransform).toBe('uppercase')
+    expect(reference.fontSize).toBe('11px')
 
     // The campaign create form: an Input label and a Select label.
     await page.goto('/campaigns')
@@ -240,10 +241,10 @@ test.describe('Field labels (T9)', () => {
 
 // ── T10: one control height per size, from the --control-* tokens (AC-06) ────
 
-// 021 A1: Graphite's heights (--control-sm|md = 32 | 38 px).
-const CONTROL_PX = { sm: 32, md: 38 } as const
+// Folio's heights (--control-sm|md = 30 | 36 px, 014 FR-07).
+const CONTROL_PX = { sm: 30, md: 36 } as const
 // Values no literal utility produces, for the override check below.
-const OVERRIDE_PX = { sm: 46, md: 54 } as const
+const OVERRIDE_PX = { sm: 44, md: 52 } as const
 
 async function heightOf(control: Locator) {
   await expect(control).toBeVisible()
@@ -352,31 +353,22 @@ async function tokenColours(page: Page) {
   })
 }
 
-// A computed box-shadow with at least one visible layer: `none`, and Tailwind's
-// `shadow-none` (layers of rgba(0, 0, 0, 0)), have none.
-const VISIBLE_SHADOW = /rgba?\((?!0, 0, 0, 0\))/
-
-// The names of the primary buttons in main (AC-07). In Graphite --accent
-// equals --fg (021 A13), so fill alone no longer tells Primary from Ink:
-// Primary is the accent fill WITH a resting shadow, Ink the same fill, flat.
+// The names of the buttons in main whose computed fill is the accent (AC-07).
+// In Folio --accent differs from --fg, so the fill alone tells Primary from Ink.
 async function accentFilledInMain(page: Page): Promise<string[]> {
   const { accent } = await tokenColours(page)
   return page.locator('main button').evaluateAll(
-    (buttons, [colour, visible]) =>
+    (buttons, colour) =>
       buttons
-        .filter((b) => {
-          const cs = getComputedStyle(b)
-          return cs.backgroundColor === colour && new RegExp(visible).test(cs.boxShadow)
-        })
+        .filter((b) => getComputedStyle(b).backgroundColor === colour)
         .map((b) => (b.getAttribute('aria-label') ?? b.textContent ?? '').trim()),
-    [accent, VISIBLE_SHADOW.source] as const,
+    accent,
   )
 }
 
-// An Ink button: the --fg fill and no visible resting shadow (021 A13).
+// An Ink button: the --fg fill (Folio draws no resting shadow on it either).
 async function expectInk(button: Locator, fg: string) {
   await expect(button).toHaveCSS('background-color', fg)
-  expect(await button.evaluate((b) => getComputedStyle(b).boxShadow)).not.toMatch(VISIBLE_SHADOW)
 }
 
 test.describe('Brand kits (T11)', () => {

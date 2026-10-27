@@ -11,7 +11,7 @@ This repo contains planning documents for **bistec-studio**, an internal marketi
 - Nothing deploys yet. The user will deploy to their own server, with a workflow written later. CI is checks only.
 - Object storage is `pgsty/silo`, pinned by digest in the compose files and `e2e.yml`, so a fresh deploy needs no MinIO migration. MinIO keys must not be `minioadmin`.
 - Local stack: compose project `ai-studio`; Postgres on 5442, MinIO on 9100 (console 9101); databases `ai_studio` and `ai_studio_test`. A preflight refuses another clone's stack. Use `npm run db:migrate` and `npm run test:e2e:db -- --reset`, never a bare `prisma migrate deploy`. See [`docs/cold-start.md`](docs/cold-start.md).
-- Change in flight: 032 (fork restore: the Folio theme, checks-only CI, the fork's own stack). T1 and T2 are done, T3 (these docs and the identity guard) is in this commit, and the next task is T4 (the W1 gate, the pre-push scan and the push to `origin v2`). Plan: [`spec.md`](.specclaw/changes/032-fork-folio-restore/spec.md), [`tasks.md`](.specclaw/changes/032-fork-folio-restore/tasks.md). Run `/specclaw:build 032-fork-folio-restore`.
+- Change in flight: 032 (fork restore: the Folio theme, checks-only CI, the fork's own stack). T1 to T6 are done, T7 (the guards flipped to Folio, the tests adapted and these docs) is in this commit, and the next task is T8, the start of W3 (restyle the 023–031 screens). Plan: [`spec.md`](.specclaw/changes/032-fork-folio-restore/spec.md), [`tasks.md`](.specclaw/changes/032-fork-folio-restore/tasks.md). Run `/specclaw:build 032-fork-folio-restore`.
 - No new UI work until 032 W3 lands.
 
 ### Working rules
@@ -41,15 +41,13 @@ Stack: Next.js 14, TypeScript, Prisma, PostgreSQL, MinIO, better-auth (self-host
 
 ### UI / Design system
 
-**Being restored to Folio by change 032 W2;** until then the lines below describe the Graphite state the company sync brought in.
-
 Before building or modifying any page, read the design system:
 
-- **[`docs/ui-reference/DESIGN_SYSTEM.md`](docs/ui-reference/DESIGN_SYSTEM.md)** is the design system for bistec-studio: **Graphite**, picked by the user on 2026-10-18 and built by change 021. Read it before writing any component or page.
-  - **Visual reference:** the app itself, captured at 1440 px on the draft review page: [`docs/ui-reference/screen-light.png`](docs/ui-reference/screen-light.png) and [`docs/ui-reference/screen-dark.png`](docs/ui-reference/screen-dark.png) (021 T8). The Graphite study, [`docs/ui-reference/direction-studies/study-a-graphite.html`](docs/ui-reference/direction-studies/study-a-graphite.html), is the source the system was drawn from; `designTokens.test.ts` asserts the tokens equal its block.
-  - **Screenshots of every screen:** `node scripts/capture-ui.mjs --out ui-captures/<name>` against a running test server (`ui-captures/` is gitignored). A review tool, not a gate.
-  - **Logo (user decision, 2026-10-18):** the Bistec Studio image, `public/BistecStudioLogo.png`, inverted in dark (DESIGN_SYSTEM.md §8.1). This reverses Folio's typeset "Studio" wordmark.
-  - **Every screen is on Graphite (021 T1–T8).** Folio is gone with no archive copy (git history keeps it); `tests/unit/uiTokenGuard.test.ts` fails on any Folio leftover (its deny-list, DESIGN_SYSTEM.md §11), any legacy colour utility, glass class or raw palette colour, and any copy of a shared atom outside `src/components/ui/`; a line opts out of the colour guard only with `// ui-exception: <reason>`. Frozen Light, with its screenshots and the Synthetix source HTML, is archived in [`docs/ui-reference/archive/frozen-light/`](docs/ui-reference/archive/frozen-light/) for reference only.
+- **[`docs/ui-reference/DESIGN_SYSTEM.md`](docs/ui-reference/DESIGN_SYSTEM.md)** is the design system for bistec-studio: **Folio**, picked by the user on 2026-10-07 and restored by change 032. Read it before writing any component or page.
+  - **Token source:** [`docs/ui-reference/direction-studies/study-b-folio.html`](docs/ui-reference/direction-studies/study-b-folio.html). `designTokens.test.ts` asserts that `globals.css` equals its token block.
+  - **Logo (user decision, 2026-10-07, re-confirmed 2026-10-27):** the typeset "Studio" wordmark (Fraunces italic). `public/BistecStudioLogo.png` is not used.
+  - **Screenshots:** [`screen-light.png`](docs/ui-reference/screen-light.png) and [`screen-dark.png`](docs/ui-reference/screen-dark.png) still show Graphite; 032 T12 recaptures them. `node scripts/capture-ui.mjs --out ui-captures/<name>` against a running test server captures every screen (`ui-captures/` is gitignored; a review tool, not a gate).
+  - **The guards:** `tests/unit/uiTokenGuard.test.ts` fails on the Graphite deny-list (`rounded-ui-xl`, `tracking-label`, a `/12` opacity, `Plus Jakarta`, `BistecStudioLogo`; DESIGN_SYSTEM.md §11), any legacy colour utility, glass class or raw palette colour, any copy of a shared atom outside `src/components/ui/`, and any `folio` module or import. A line opts out of the colour guard only with `// ui-exception: <reason>`. Files that a change after 021 touched and that are not yet restyled sit in its `PENDING_RESTYLE` list until 032 W3 empties it. Frozen Light is archived in [`docs/ui-reference/archive/frozen-light/`](docs/ui-reference/archive/frozen-light/) for reference only.
 
 ### Architecture & technical design
 

@@ -322,43 +322,48 @@ test.describe('Shell, login and choose-team (T6)', () => {
     expect(stops).toEqual(['Light', 'Dark', 'Switch team'])
   })
 
-  // 021 AC-10 (FR-08, A6): the PNG logo, inverted to white on the dark theme.
+  // 032 (was 021 AC-10): the logo is the typeset "Studio" wordmark in the
+  // display face, text in --fg that follows the theme, and the PNG is not used.
   for (const theme of THEMES) {
-    test(`AC-10: the logo is the Bistec Studio PNG on login and in the banner (${theme})`, async ({ page }) => {
+    test(`AC-10: the logo is the typeset Studio wordmark on login and in the banner (${theme})`, async ({ page }) => {
       await storeTheme(page, theme)
       await page.setViewportSize({ width: 1440, height: 900 })
-      const filter = theme === 'dark' ? 'invert(1)' : 'none'
       await page.goto('/login')
       await expectTheme(page, theme)
-      const loginLogo = page.getByRole('img', { name: 'Bistec Studio', exact: true })
-      await expect(loginLogo).toBeVisible()
-      await expect(loginLogo).toHaveCSS('background-image', /BistecStudioLogo\.png/)
-      await expect(loginLogo).toHaveCSS('filter', filter)
+      const wordmark = async (logo: Locator) => {
+        await expect(logo).toHaveText('Studio')
+        const style = await logo.evaluate((el) => {
+          const cs = getComputedStyle(el)
+          return { family: cs.fontFamily, style: cs.fontStyle, image: cs.backgroundImage, filter: cs.filter }
+        })
+        expect(style.family).toMatch(/Fraunces/i)
+        expect(style.style).toBe('italic')
+        expect(style.image).toBe('none')
+        expect(style.filter).toBe('none')
+      }
+      await wordmark(page.getByRole('img', { name: 'Studio', exact: true }))
       await pageLogin(page)
-      const logo = page.getByRole('banner').getByRole('img', { name: 'Bistec Studio', exact: true })
-      await expect(logo).toBeVisible()
-      await expect(logo).toHaveCSS('background-image', /BistecStudioLogo\.png/)
-      await expect(logo).toHaveCSS('filter', filter)
-      // The asset itself is served (a 404 would leave the box empty).
-      const res = await page.request.get('/BistecStudioLogo.png')
-      expect(res.status()).toBe(200)
-      expect(res.headers()['content-type']).toMatch(/image\/png/)
+      await wordmark(page.getByRole('banner').getByRole('img', { name: 'Studio', exact: true }))
+      // The PNG logo is not referenced by the page.
+      expect(await page.evaluate(() => document.documentElement.outerHTML.includes('BistecStudioLogo'))).toBe(false)
     })
   }
 
-  // 021 AC-04 (FR-03, NFR-05): next/font serves Plus Jakarta Sans under a
-  // generated family name that keeps the font's name (e.g. __Plus_Jakarta_Sans_…).
-  // The suite's afterEach keeps the AC-19 no-CDN check on these loads.
-  test('AC-04: the body font is Plus Jakarta Sans on login and in the shell', async ({ page }) => {
+  // 032 (was 021 AC-04): next/font serves Instrument Sans for the body and
+  // Fraunces for headings, each under a generated family name that keeps the
+  // font's name (e.g. __Fraunces_…). The suite's afterEach keeps the AC-19
+  // no-CDN check on these loads.
+  test('AC-04: the body font is Instrument Sans and a page title is Fraunces', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 })
     await page.goto('/login')
     const bodyFont = () => page.evaluate(() => getComputedStyle(document.body).fontFamily)
-    expect(await bodyFont()).toMatch(/Plus.Jakarta.Sans/)
+    expect(await bodyFont()).toMatch(/Instrument.Sans/)
     await pageLogin(page)
-    expect(await bodyFont()).toMatch(/Plus.Jakarta.Sans/)
-    // A heading inherits it: no other family is left to override it.
+    expect(await bodyFont()).toMatch(/Instrument.Sans/)
+    // A page title is set in the display face (font-display).
     const h1 = page.getByRole('heading', { level: 1 }).first()
-    await expect(h1).toHaveCSS('font-family', /Plus.Jakarta.Sans/)
+    await expect(h1).toHaveCSS('font-family', /Fraunces/)
+    expect(await bodyFont()).not.toMatch(/Plus.Jakarta/)
   })
 
   test('the theme toggle switches the theme and its pressed state follows', async ({ page }) => {
@@ -1455,9 +1460,9 @@ test.describe('AC-18 reduced motion', () => {
     expect(durationMs(toastAnim.duration)).toBe(150)
   })
 
-  // 021 AC-18 (NFR-03): the Button press is a 0.98 scale, switched off under
-  // reduced motion. The same press with motion allowed first proves that the
-  // press lands (so the reduced-motion read is not vacuous). The pointer
+  // 032 (was 021 AC-18): Folio's Button has no press scale. A pressed primary
+  // Button computes no scale transform, with motion allowed or reduced. The
+  // press itself is proved (:active), so the read is not vacuous. The pointer
   // leaves before it lifts, so no click submits the form.
   test('a pressed primary Button computes no scale transform (021)', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 })
@@ -1488,7 +1493,7 @@ test.describe('AC-18 reduced motion', () => {
 
     await page.emulateMedia({ reducedMotion: 'no-preference' })
     await press()
-    await expect.poll(scale).toBeCloseTo(0.98, 3)
+    expect(await scale()).toBe(1)
     await release()
 
     await page.emulateMedia({ reducedMotion: 'reduce' })
