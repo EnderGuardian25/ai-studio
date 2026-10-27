@@ -140,8 +140,8 @@ export function ReviewStep({
         Check your post before generating it.
       </StepHead>
 
-      {/* Ruled rows on --line-subtle (DESIGN_SYSTEM.md §8.15) */}
-      <dl className="border-t border-line-subtle">
+      {/* Ruled rows, opened by the 2 px --fg rule (DESIGN_SYSTEM.md §8.15) */}
+      <dl className="border-t-2 border-fg">
         {rows.map(row => (
           <ReviewRow key={row.label} {...row} />
         ))}

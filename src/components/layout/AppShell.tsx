@@ -29,8 +29,9 @@ import { useCurrentUser } from '@/lib/hooks/useCurrentUser'
 import { authClient } from '@/lib/auth-client'
 import { EYEBROW, FOCUS, ICON } from '@/components/ui/atoms'
 
-// The nav draws an icon before each label (021 A9, the study's .nav). The
-// icons are decorative (aria-hidden): each link's name is its label.
+// Folio nav is text only, no icons (DESIGN_SYSTEM.md §8.6). The items still
+// carry an icon, but it is drawn `hidden`: the restyle adds and removes no
+// element, and each link's name is its label.
 interface NavItem {
   label: string
   href: string
@@ -74,24 +75,24 @@ const NAV_SECTIONS: NavSection[] = [
 // Pinned to the sidebar's bottom area, above Sign out.
 const SETTINGS_ITEM: NavItem = { label: 'Settings', href: '/settings', icon: UserCog }
 
-// A nav item (021 design.md §5, the study's .nav a): an icon and the label at
-// 13 px / 500 in --fg-muted, the canvas on hover. Shared by the links and the
-// Sign out button.
+// Folio nav item (DESIGN_SYSTEM.md §8.6): --fg-muted text, --fg on hover.
+// Shared by the links and the Sign out button.
 const NAV_ITEM =
-  'flex items-center gap-[11px] px-2.5 py-2 rounded-ui-sm text-left text-ui-sm font-medium ' +
+  'relative block py-[5px] pl-3 text-left font-text text-ui-base rounded-ui-sm ' +
   'transition-colors duration-fast ease-standard ' +
   FOCUS
 
-// The current page (the study's .nav a[aria-current]): --surface-2 with the
-// panel shadow and a --line-subtle hairline ring.
-const NAV_CURRENT = 'bg-surface-raised text-fg shadow-panel ring-1 ring-inset ring-line-subtle'
-const NAV_IDLE = 'text-fg-muted hover:bg-canvas hover:text-fg'
+// The current page: --fg, 600, and a 2 px --accent bar at the left edge,
+// inset 8 px top and bottom.
+const NAV_CURRENT =
+  "text-fg font-semibold before:absolute before:left-0 before:top-2 before:bottom-2 before:w-0.5 before:bg-accent before:content-['']"
+const NAV_IDLE = 'text-fg-muted hover:text-fg'
 
-// The header's menu button and the mobile sidebar's close button: a round
+// The header's menu button and the mobile sidebar's close button: a
 // --control-md target, so not the --control-sm ui ICON_BUTTON.
 const SHELL_ICON_BUTTON =
-  'inline-flex items-center justify-center h-control-md w-control-md rounded-ui-pill text-fg-muted ' +
-  'hover:bg-canvas hover:text-fg transition-colors duration-fast ease-standard ' +
+  'inline-flex items-center justify-center h-control-md w-control-md rounded-ui-md text-fg-muted hover:text-fg ' +
+  'transition-colors duration-fast ease-standard ' +
   FOCUS
 
 function NavLink({ item, onClick }: { item: NavItem; onClick?: () => void }) {
@@ -105,7 +106,7 @@ function NavLink({ item, onClick }: { item: NavItem; onClick?: () => void }) {
       aria-current={isActive ? 'page' : undefined}
       className={`${NAV_ITEM} ${isActive ? NAV_CURRENT : NAV_IDLE}`}
     >
-      <item.icon {...ICON} aria-hidden="true" />
+      <item.icon {...ICON} aria-hidden="true" className="hidden" />
       {item.label}
     </Link>
   )
@@ -138,14 +139,17 @@ function Sidebar({ onClose }: { onClose?: () => void }) {
     }
   }
 
-  // The sidebar island (021 design.md §5, the study's .side): opaque
-  // --surface-1 at radius-lg with the panel shadow (011 FR-08: no alpha, no
-  // backdrop-filter). It fills its slot: the desktop band or the mobile
-  // dialog places and sizes it.
+  // Opaque --canvas (FR-08), because the sidebar is fixed over scrolling
+  // content (DESIGN_SYSTEM.md §4.2): a --line-subtle right rule on desktop;
+  // the mobile panel floats, so it takes the --fg border and overlay shadow.
   return (
-    <aside className="flex flex-col gap-[18px] h-full w-full p-3 overflow-y-auto bg-surface text-fg rounded-ui-lg shadow-panel">
+    <aside
+      className={`flex flex-col h-full w-[220px] pt-[22px] pb-[18px] overflow-y-auto bg-canvas font-text text-fg border-r ${
+        onClose ? 'border-fg shadow-overlay' : 'border-line-subtle'
+      }`}
+    >
       {onClose && (
-        <div className="flex items-center justify-end -mb-2.5">
+        <div className="flex items-center justify-end -mt-2.5 mb-2 px-3">
           <button onClick={onClose} aria-label="Close sidebar" className={`md:hidden ${SHELL_ICON_BUTTON}`}>
             <X {...ICON} aria-hidden="true" />
           </button>
@@ -154,10 +158,10 @@ function Sidebar({ onClose }: { onClose?: () => void }) {
 
       <TeamSwitcher />
 
-      <nav className="flex flex-col gap-[18px]">
+      <nav className="flex flex-col">
         {sections.map(section => (
-          <div key={section.label} className="flex flex-col gap-0.5">
-            <div className={`px-2.5 pb-1 ${EYEBROW}`}>
+          <div key={section.label} className="flex flex-col px-5 mb-[18px]">
+            <div className={`mb-1 ${EYEBROW}`}>
               {section.label}
             </div>
             {section.items.map(item => (
@@ -167,16 +171,15 @@ function Sidebar({ onClose }: { onClose?: () => void }) {
         ))}
       </nav>
 
-      {/* Settings + Sign out, pinned to the bottom of the island above a
-          --line-subtle rule (the study's .side-foot). */}
-      <div className="mt-auto flex flex-col gap-0.5 pt-2.5 border-t border-line-subtle">
+      {/* Settings + Sign out — pinned to the bottom of the panel */}
+      <div className="mt-auto flex flex-col px-5 pt-3.5 border-t border-line-subtle">
         <NavLink item={SETTINGS_ITEM} onClick={onClose} />
         <button
           onClick={handleSignOut}
           disabled={signingOut}
-          className={`${NAV_ITEM} ${NAV_IDLE} disabled:opacity-50 disabled:cursor-not-allowed`}
+          className={`${NAV_ITEM} text-fg-muted hover:text-fg disabled:opacity-50 disabled:cursor-not-allowed`}
         >
-          <LogOut {...ICON} aria-hidden="true" />
+          <LogOut {...ICON} aria-hidden="true" className="hidden" />
           {signingOut ? 'Signing out…' : 'Sign out'}
         </button>
       </div>
@@ -204,19 +207,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <ConfirmProvider>
-      <div className="min-h-screen flex flex-col bg-canvas text-fg">
-        {/* The header island (021 design.md §5, the study's .hdr): opaque
-            --surface-2, 56 px tall, inset 12 px, radius-lg, the panel shadow.
-            It sits on an 80 px --canvas band, so content scrolling beneath
-            never shows in the 12 px gutter. The band is presentational; the
-            island is the banner. */}
-        <div className="fixed top-0 inset-x-0 z-40 h-20 bg-canvas">
-          <header className="absolute inset-x-3 top-3 h-14 flex items-center justify-between pl-[18px] pr-2.5 bg-surface-raised rounded-ui-lg shadow-panel">
+      {/* font-text: the shell sets Folio's text face (Instrument Sans) for
+          every screen inside it. */}
+      <div className="min-h-screen flex flex-col bg-canvas text-fg font-text">
+        {/* Top app bar: opaque --surface-1 with a --line-subtle bottom rule
+            (DESIGN_SYSTEM.md §4.2, §6). The logo sits 28 px in on desktop. The
+            wrapper div takes no box (`contents`). */}
+        <div className="contents">
+          <header className="fixed top-0 inset-x-0 z-40 h-[60px] flex items-center justify-between pl-4 pr-4 md:pl-7 md:pr-6 bg-surface border-b border-line-subtle">
             <div className="flex items-center gap-2">
               {/* Mobile menu button */}
               <button
                 onClick={() => setSidebarOpen(true)}
-                className={`md:hidden -ml-2 ${SHELL_ICON_BUTTON}`}
+                className={`md:hidden ${SHELL_ICON_BUTTON}`}
                 aria-label="Open sidebar"
               >
                 <Menu {...ICON} aria-hidden="true" />
@@ -228,34 +231,32 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </header>
         </div>
 
-        {/* Body below the header band */}
-        <div className="flex flex-1 pt-20">
-          {/* Desktop sidebar: a 244 px island on a 268 px --canvas band,
-              12 px in from the left and the bottom. */}
-          <div className="hidden md:block w-[268px] fixed left-0 top-20 bottom-0 z-30 bg-canvas px-3 pb-3">
+        {/* Body below app bar */}
+        <div className="flex flex-1 pt-[60px]">
+          {/* Desktop sidebar */}
+          <div className="hidden md:flex w-[220px] fixed left-0 top-[60px] bottom-0">
             <Sidebar />
           </div>
 
-          {/* Mobile sidebar overlay: Radix Dialog provides the focus trap,
-              Escape-to-close, and aria-modal. The same island floats 12 px in;
-              the scrim is the one translucent layer: --scrim at 0.3, no blur. */}
+          {/* Mobile sidebar overlay — Radix Dialog provides the focus trap,
+              Escape-to-close, and aria-modal. The scrim is the one translucent
+              layer (DESIGN_SYSTEM.md §4.2): --scrim at 0.3, no blur. */}
           <Dialog.Root open={sidebarOpen} onOpenChange={setSidebarOpen}>
             <Dialog.Portal>
               <Dialog.Overlay className="fixed inset-0 z-50 bg-scrim/30 md:hidden" />
-              <Dialog.Content className="fixed left-3 top-3 bottom-3 z-50 w-[244px] md:hidden focus:outline-none">
+              <Dialog.Content className="fixed left-0 top-0 bottom-0 z-50 w-[220px] md:hidden focus:outline-none">
                 <Dialog.Title className="sr-only">Navigation</Dialog.Title>
                 <Sidebar onClose={() => setSidebarOpen(false)} />
               </Dialog.Content>
             </Dialog.Portal>
           </Dialog.Root>
 
-          {/* Main content (021 design.md §5, the study's .main): content
-              starts 90 px down (the 80 px band plus 10 px), 20 px right of the
-              sidebar band and 28 px from the right edge on wide screens (16 px
-              at 375), with 140 px at the bottom, clear of the Create post
-              button. */}
-          <main className="flex-1 min-w-0 md:ml-[268px] overflow-y-auto">
-            <div className="max-w-canvas mx-auto px-4 md:pl-5 md:pr-7 pt-[10px] pb-[140px]">
+          {/* Main content */}
+          {/* Folio main padding (DESIGN_SYSTEM.md §6): 36 px top, 48 px sides
+              on wide screens (16 px at 375), and 140 px at the bottom, clear
+              of the Create post button. */}
+          <main className="flex-1 min-w-0 md:ml-[220px] overflow-y-auto">
+            <div className="max-w-canvas mx-auto px-4 md:px-8 lg:px-12 pt-9 pb-[140px]">
               {/* CLI mode only: nudge users without a (valid) personal Claude token */}
               <ClaudeTokenPrompt />
               {children}

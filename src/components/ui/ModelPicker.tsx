@@ -37,7 +37,7 @@ interface ModelPickerProps {
   className?: string
 }
 
-const HINT = 'text-ui-xs text-fg-muted'
+const HINT = 'font-text text-ui-xs text-fg-muted'
 
 // The shared model picker (008 FR-18, design §9): the effective set for the
 // surface, pre-selected to what the server would run, a hint line saying why,
@@ -90,7 +90,7 @@ export function ModelPicker({
   return (
     <div className={cn('flex flex-col gap-1.5', className)}>
       {state.kind === 'single' ? (
-        <p className="text-ui-sm text-fg">{`${label}: ${state.preselected.entry.displayName}`}</p>
+        <p className="font-text text-ui-sm text-fg">{`${label}: ${state.preselected.entry.displayName}`}</p>
       ) : (
         <Select
           id={selectId}

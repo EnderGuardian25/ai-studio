@@ -4,7 +4,6 @@ import React from 'react'
 import { ChevronLeft, ChevronRight, Sparkles, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { PageHead } from '@/components/ui/PageHead'
-import { Panel } from '@/components/ui/Panel'
 import { ICON } from '@/components/ui/atoms'
 import { STEPS } from '@/components/brief/constants'
 import { Stepper } from '@/components/brief/Stepper'
@@ -30,13 +29,13 @@ export default function NewBriefPage() {
         eyebrow="Create"
         title="New post"
         lead="Describe what you want to create and we'll generate an on-brand social post."
-        className="mb-6"
+        className="mb-10"
       />
 
       <Stepper step={step} onJump={setStep} />
 
-      {/* The current step on one bezel card (021 design.md §8) */}
-      <Panel bezel className="p-5 sm:p-6">
+      {/* The current step: no card, the steps sit on the page (Folio) */}
+      <div>
         {step === 0 && (
           <CampaignStep
             campaignId={wizard.campaignId}
@@ -135,12 +134,12 @@ export default function NewBriefPage() {
             modelErrors={wizard.modelErrors}
           />
         )}
-      </Panel>
+      </div>
 
       {/* ============================ Navigation ======================== */}
-      {/* The action bar under the card; Continue / Generate Post is the view's
-          one primary (the floating Create post button is hidden here). */}
-      <div className="flex items-center justify-between gap-3 mt-5">
+      {/* The action bar sits under a 2 px --fg rule; Continue / Generate Post is
+          the view's one primary (the floating Create post button is hidden here). */}
+      <div className="flex items-center justify-between gap-3 mt-10 pt-4 border-t-2 border-fg">
         <Button variant="ghost" onClick={() => setStep(s => s - 1)} disabled={step === 0 || submitting}>
           <ChevronLeft {...ICON} aria-hidden /> Back
         </Button>

@@ -30,8 +30,8 @@ import {
 //          Plus Jakarta Sans (AC-04).
 //   021 T2: a pressed primary Button computes no scale under reduced motion
 //          (AC-18).
-//   021 T3: the header and sidebar islands' geometry and the Create post
-//          button's nub (AC-11), and the sidebar's small-caps section label
+//   021 T3 (032: Folio values): the header and sidebar geometry and the Create post
+//          button's hover (AC-11), and the sidebar's small-caps section label
 //          (AC-09).
 //   021 T5: the draft page's page head, then the stage beside the caption
 //          card from xl and above it below xl, with no crop marks (AC-12).
@@ -89,21 +89,17 @@ async function expectOpaque(locator: Locator, what: string) {
   expect(style.backdrop, `${what} backdrop-filter`).toBe('none')
 }
 
-// The Create post button's nub: the circle that holds its Plus icon.
-function fabNub(page: Page): Locator {
-  return page.getByTestId('create-post-fab').locator(':scope > span').first()
-}
-
-// The rotation of an element's computed transform, in degrees: `none` is 0,
-// `matrix(a, b, c, d, e, f)` is atan2(b, a).
-function rotationDeg(locator: Locator): Promise<number> {
+// The Create post button's computed translation, in px: 'none' is (0, 0),
+// 'matrix(a, b, c, d, e, f)' is (e, f). Folio lifts the button 1 px up and
+// left on hover and presses it 2 px down and right (DESIGN_SYSTEM.md §7.2).
+function translation(locator: Locator): Promise<[number, number]> {
   return locator.evaluate((el) => {
     const t = getComputedStyle(el).transform
-    if (t === 'none') return 0
+    if (t === 'none') return [0, 0] as [number, number]
     const m = t.match(/^matrix\(([^)]+)\)$/)
-    if (!m) return Number.NaN
-    const [a, b] = m[1].split(',').map(Number)
-    return (Math.atan2(b, a) * 180) / Math.PI
+    if (!m) return [Number.NaN, Number.NaN] as [number, number]
+    const parts = m[1].split(',').map(Number)
+    return [parts[4], parts[5]] as [number, number]
   })
 }
 
@@ -385,21 +381,22 @@ test.describe('Shell, login and choose-team (T6)', () => {
     await expect(light).toHaveAttribute('aria-pressed', 'false')
   })
 
-  // 021 AC-11 (FR-09): the nub turns 90° on hover; the button itself does
-  // not move (no lift).
-  test('the Create post button turns its nub 90° on hover', async ({ page }) => {
+  // 032 (was 021 AC-11, the nub turning 90°): Folio's Create post button lifts
+  // 1 px up and left on hover (DESIGN_SYSTEM.md §7.2); it has no nub.
+  test('the Create post button lifts 1 px on hover', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 })
+    await page.emulateMedia({ reducedMotion: 'no-preference' })
     await pageLogin(page)
     const fab = page.getByTestId('create-post-fab')
     await fab.hover()
-    await expect.poll(() => rotationDeg(fabNub(page))).toBeCloseTo(90, 1)
-    expect(await fab.evaluate((el) => getComputedStyle(el).transform)).toBe('none')
+    await expect.poll(() => translation(fab)).toEqual([-1, -1])
   })
 
-  // 021 AC-11 (FR-09, design.md §5): at 1440 in light, the header is a 56 px
-  // island 12 px in from the top and left, at radius-lg (18 px) with a
-  // shadow; the desktop sidebar is a 244 px island 12 px in from the left.
-  test('AC-11: the header and sidebar are floating islands at 1440px', async ({ page }) => {
+  // 032 (was 021 AC-11, the floating islands): at 1440 in light, the Folio
+  // header is a flat 60 px bar across the top with a 1 px --line-subtle bottom
+  // rule and no shadow or radius; the desktop sidebar is a 220 px column from
+  // under it to the bottom edge, ruled on the right (DESIGN_SYSTEM.md §4.2, §6).
+  test('AC-11: the header is a flat bar and the sidebar a ruled column at 1440px', async ({ page }) => {
     await storeTheme(page, 'light')
     await page.setViewportSize({ width: 1440, height: 900 })
     await pageLogin(page)
@@ -407,21 +404,24 @@ test.describe('Shell, login and choose-team (T6)', () => {
     const header = page.getByRole('banner')
     await expect(header).toBeVisible()
     const hbox = (await header.boundingBox())!
-    expect(hbox.x).toBe(12)
-    expect(hbox.y).toBe(12)
-    expect(hbox.height).toBe(56)
-    await expect(header).toHaveCSS('border-radius', '18px')
-    expect(await header.evaluate((el) => getComputedStyle(el).boxShadow)).not.toBe('none')
+    expect(hbox.x).toBe(0)
+    expect(hbox.y).toBe(0)
+    expect(hbox.height).toBe(60)
+    expect(hbox.width).toBe(1440)
+    await expect(header).toHaveCSS('border-radius', '0px')
+    await expect(header).toHaveCSS('border-bottom-width', '1px')
+    expect(await header.evaluate((el) => getComputedStyle(el).boxShadow)).toBe('none')
 
     const sidebar = page.locator('aside').first()
     await expect(sidebar).toBeVisible()
     const sbox = (await sidebar.boundingBox())!
-    expect(sbox.x).toBe(12)
-    expect(sbox.width).toBe(244)
-    // Below the header band (80 px), 12 px off the bottom edge.
-    expect(sbox.y).toBe(80)
-    expect(sbox.y + sbox.height).toBe(900 - 12)
-    await expect(sidebar).toHaveCSS('border-radius', '18px')
+    expect(sbox.x).toBe(0)
+    expect(sbox.width).toBe(220)
+    // Below the 60 px header, down to the bottom edge.
+    expect(sbox.y).toBe(60)
+    expect(sbox.y + sbox.height).toBe(900)
+    await expect(sidebar).toHaveCSS('border-radius', '0px')
+    await expect(sidebar).toHaveCSS('border-right-width', '1px')
   })
 
   // 021 AC-09 (FR-07): the sidebar's section labels are the one small-caps
@@ -1507,17 +1507,17 @@ test.describe('AC-18 reduced motion', () => {
     await release()
   })
 
-  // 021 AC-11: under reduced motion neither the button nor its nub moves on
-  // hover. Polled: the 1 ms reduced-motion transition (011 T2 note 2).
-  test('the Create post button and its nub do not move on hover (shell)', async ({ page }) => {
+  // 032 (was 021 AC-11, the button and its nub): under reduced motion the
+  // Create post button does not move on hover. Polled: the 1 ms reduced-motion
+  // transition (011 T2 note 2).
+  test('the Create post button does not move on hover (shell)', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 })
     await pageLogin(page)
     const fab = page.getByTestId('create-post-fab')
     await fab.hover()
     await expect.poll(() => fab.evaluate((el) => getComputedStyle(el).transform)).toBe('none')
-    await expect.poll(() => fabNub(page).evaluate((el) => getComputedStyle(el).transform)).toBe('none')
     await page.waitForTimeout(200)
-    expect(await fabNub(page).evaluate((el) => getComputedStyle(el).transform)).toBe('none')
+    expect(await fab.evaluate((el) => getComputedStyle(el).transform)).toBe('none')
   })
 })
 

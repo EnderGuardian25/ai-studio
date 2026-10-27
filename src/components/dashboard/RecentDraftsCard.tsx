@@ -7,12 +7,11 @@ import { ChevronDown, ChevronUp, Trash2 } from 'lucide-react'
 import { StatusChip } from '@/components/ui/StatusChip'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { Button } from '@/components/ui/Button'
-import { Panel } from '@/components/ui/Panel'
 import { SectionHead } from '@/components/ui/SectionHead'
 import {
   FOCUS,
+  ICON,
   ICON_SM,
-  PILL_BADGE,
   SCROLL_FOCUS,
   TABLE_HEAD_ROW,
   TEXT_LINK,
@@ -24,20 +23,17 @@ import { channelLabel as sharedChannelLabel } from '@/lib/channels'
 // ─── Recent Drafts card (dashboard) ─────────────────────────────────────────
 // Collapsed it shows the first COLLAPSED_COUNT rows; Expand grows the same
 // block in place and scrolls the full server-provided list internally — no
-// overlay, no extra fetch. A bezel card holding a ruled table (021 design.md
-// §8, the study's .ct).
+// overlay, no extra fetch. Folio draws it as a ruled table, not a card box.
 
 const COLLAPSED_COUNT = 8
 
-// The visible focus (DESIGN_SYSTEM.md §9), on a rounded-ui-sm box: the links
-// and buttons in this card draw their outline with the corner.
+// Folio's visible focus (DESIGN_SYSTEM.md §9), on a rounded-ui-sm box: the
+// links and buttons in this card draw their outline with the corner.
 const FOCUS_ROUNDED = `${FOCUS} rounded-ui-sm`
-// A row's title link: --fg, underlined on hover (--accent is ink in Graphite,
-// so a colour change would not show).
-const TOPIC_LINK =
-  'font-medium text-fg decoration-line underline-offset-4 hover:underline'
-// A header cell; the sentence-case style is on the row (TABLE_HEAD_ROW).
-const HEAD_CELL = 'py-2'
+// A row's title link: --fg, --accent on hover.
+const TOPIC_LINK = 'font-medium text-fg transition-colors duration-fast ease-standard hover:text-accent'
+// The small-caps header cell (§8.15).
+const HEAD_CELL = 'py-2 font-semibold'
 
 const DRAFT_CHIP: Record<DraftStatus, 'draft' | 'exported' | 'published' | 'failed'> = {
   IN_PROGRESS: 'draft',
@@ -114,9 +110,9 @@ export function RecentDraftsCard({
   }
 
   return (
-    <Panel bezel className={`p-5 ${className ?? ''}`}>
-      {/* The card head (the study's .card-hd), with Expand in its tail */}
-      <SectionHead title="Recent Drafts" className="mb-3">
+    <div className={className}>
+      {/* Section head over a 2 px --fg rule (DESIGN_SYSTEM.md §6, §8.13) */}
+      <SectionHead title="Recent Drafts" className="pb-2.5">
         {hasMore && (
           <Button variant="ghost" size="sm" onClick={() => setExpanded(v => !v)}>
             {expanded ? (
@@ -133,7 +129,7 @@ export function RecentDraftsCard({
       </SectionHead>
 
       {drafts.length === 0 && unfinished.length === 0 ? (
-        <p className="py-8 text-center text-ui-sm text-fg-muted">
+        <p className="border-t-2 border-fg py-8 text-center text-ui-sm text-fg-muted">
           No drafts yet.{' '}
           <Link href="/brief" className={`${TEXT_LINK} ${FOCUS_ROUNDED}`}>
             Create your first post
@@ -148,9 +144,9 @@ export function RecentDraftsCard({
           tabIndex={0}
           role="region"
           aria-label="Recent drafts"
-          className={`rounded-ui-sm ${SCROLL_FOCUS} ${expanded ? 'max-h-96 overflow-y-auto overflow-x-auto' : 'overflow-x-auto'}`}
+          className={`border-t-2 border-fg ${SCROLL_FOCUS} ${expanded ? 'max-h-96 overflow-y-auto overflow-x-auto' : 'overflow-x-auto'}`}
         >
-          {/* A data table (§8.15, the study's .ct): ruled rows, a sentence-case header row */}
+          {/* Folio data table (§8.15): ruled rows, a small-caps header row */}
           <table className="w-full min-w-[600px] text-ui-sm">
             <thead>
               <tr className={TABLE_HEAD_ROW}>
@@ -164,7 +160,7 @@ export function RecentDraftsCard({
             </thead>
             <tbody>
               {unfinishedRows.map(u => (
-                <tr key={`unfinished-${u.id}`} className="group border-b border-line-subtle last:border-b-0">
+                <tr key={`unfinished-${u.id}`} className="group border-b border-line-subtle">
                   <td className="py-2.5 pr-3">
                     <Link href={`/brief?resume=${u.id}`} className={`${TOPIC_LINK} ${FOCUS_ROUNDED}`}>
                       {u.topic || 'Untitled post'}
@@ -174,7 +170,7 @@ export function RecentDraftsCard({
                   <td className="py-2.5 pr-3 text-fg-muted">—</td>
                   <td className="py-2.5 pr-3 text-fg-muted">—</td>
                   <td className="py-2.5 pr-3">
-                    <span className={PILL_BADGE}>Unfinished</span>
+                    <StatusChip status="unfinished" />
                   </td>
                   <td className="whitespace-nowrap py-2.5 text-ui-xs text-fg-muted">
                     <span className="inline-flex items-center gap-3">
@@ -187,16 +183,16 @@ export function RecentDraftsCard({
                         aria-label="Discard unfinished post"
                         disabled={discarding === u.id}
                         onClick={() => void discardUnfinished(u)}
-                        className={`inline-flex h-6 w-6 items-center justify-center rounded-ui-pill text-fg-muted transition-colors duration-fast ease-standard hover:bg-surface-raised hover:text-status-failed disabled:opacity-50 ${FOCUS}`}
+                        className={`inline-flex h-6 w-6 items-center justify-center text-fg-muted transition-colors duration-fast ease-standard hover:text-status-failed disabled:opacity-50 ${FOCUS_ROUNDED}`}
                       >
-                        <Trash2 {...ICON_SM} aria-hidden />
+                        <Trash2 {...ICON} aria-hidden />
                       </button>
                     </span>
                   </td>
                 </tr>
               ))}
               {rows.map(d => (
-                <tr key={d.id} className="group border-b border-line-subtle last:border-b-0">
+                <tr key={d.id} className="group border-b border-line-subtle">
                   <td className="py-2.5 pr-3">
                     <Link href={`/drafts/${d.id}`} className={`${TOPIC_LINK} ${FOCUS_ROUNDED}`}>
                       {d.brief?.topic ?? 'Untitled'}
@@ -217,6 +213,6 @@ export function RecentDraftsCard({
           </table>
         </div>
       )}
-    </Panel>
+    </div>
   )
 }

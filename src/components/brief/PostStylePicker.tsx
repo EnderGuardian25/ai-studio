@@ -6,6 +6,7 @@ import { activeStyles, getStyle, type PostStyle } from '@/lib/postStyles'
 import { FieldLabel } from '@/components/ui/FieldLabel'
 import { ICON } from '@/components/ui/atoms'
 import { cardCls } from './cardCls'
+import { CARD_TITLE } from './classes'
 
 // 027 FR-07: the post style, on step 1 above the size and design choices. A
 // radio-card group (one tab stop, arrow keys move the choice) on the same cards
@@ -81,7 +82,7 @@ export function PostStylePicker({ value, onChange }: PostStylePickerProps) {
               className={cardCls(checked, 'p-4')}
             >
               <div className="flex items-start gap-2">
-                <span className="text-ui-base font-semibold leading-tight text-fg">
+                <span className={CARD_TITLE}>
                   {opt.label}
                   {opt.status === 'retired' && <span className="font-normal text-fg-muted"> (retired)</span>}
                 </span>

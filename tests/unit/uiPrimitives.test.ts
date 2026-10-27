@@ -254,7 +254,7 @@ describe('ModelPicker', () => {
     )
     expect(html).toMatch(/<select id="li-model" [^>]*aria-describedby="li-model-hint"/)
     expect(html).toContain(
-      '<div id="li-model-hint" class="text-ui-xs text-fg-muted"><p>Default</p></div>',
+      '<div id="li-model-hint" class="font-text text-ui-xs text-fg-muted"><p>Default</p></div>',
     )
     expect(count(html, /<option /g)).toBe(3)
     expect(html).toContain('<option value="HAIKU" selected="">Haiku 4.5 · $ (fast)</option>')
@@ -281,7 +281,7 @@ describe('ModelPicker', () => {
   it('shows one model as plain text, with no select', () => {
     const html = render({ id: 'm' }, view({ allowed: ['HAIKU'] }))
     expect(html).not.toContain('<select')
-    expect(html).toContain('<p class="text-ui-sm text-fg">Model: Haiku 4.5</p>')
+    expect(html).toContain('<p class="font-text text-ui-sm text-fg">Model: Haiku 4.5</p>')
   })
 
   it('renders nothing for CAPTION when the caption provider is not Claude, or before the view loads', () => {

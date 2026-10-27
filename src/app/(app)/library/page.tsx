@@ -42,24 +42,23 @@ const PAGE_SIZE = 20
 
 // ── Skeleton loader ───────────────────────────────────────────────────────────
 
-// The shape of a library tile (PostCard): a card holding a thumbnail, a
-// title, a meta line and the action row (DESIGN_SYSTEM.md §8.12).
+// The shape of a library tile (PostCard): a thumbnail, a title, a meta line
+// and the action row. No card box (DESIGN_SYSTEM.md §8.12).
 function SkeletonCard() {
   return (
-    <div className="surface flex flex-col p-2.5 animate-pulse">
-      <div className="aspect-square w-full bg-canvas" />
-      <div className="px-1.5 pt-3 pb-1 flex flex-col gap-2">
+    <div className="flex flex-col animate-pulse">
+      <div className="aspect-square w-full bg-surface outline outline-1 outline-offset-[3px] outline-line-subtle" />
+      <div className="pt-4 flex flex-col gap-2">
         <div className="h-4 rounded-ui-sm bg-line-subtle w-3/4" />
         <div className="h-3 rounded-ui-sm bg-line-subtle w-1/2" />
-        <div className="h-8 rounded-ui-pill bg-line-subtle w-1/2 mt-1" />
+        <div className="h-[30px] rounded-ui-md bg-line-subtle w-1/2 mt-1" />
       </div>
     </div>
   )
 }
 
-// Tiles: a grid of cards, on the study's 20 px gap. Each card hugs its own
-// post (sizes differ by ratio), so a short tile is never stretched empty.
-const GRID = 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 items-start gap-5'
+// Tiles: a contact sheet with room between frames for the 3 px outline offset.
+const GRID = 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-10'
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
@@ -176,7 +175,7 @@ export default function LibraryPage() {
         eyebrow="Posts"
         title="Library"
         lead="All exported drafts and published posts."
-        className="mb-6"
+        className="mb-8"
         actionsClassName="min-w-0"
         actions={
           // The label sits above the icon's relative box, so the icon stays
@@ -187,7 +186,7 @@ export default function LibraryPage() {
               <Search
                 {...ICON}
                 aria-hidden
-                className="absolute left-4 top-1/2 -translate-y-1/2 text-fg-muted pointer-events-none"
+                className="absolute left-3.5 top-1/2 -translate-y-1/2 text-fg-muted pointer-events-none"
               />
               <input
                 id={searchId}
@@ -202,8 +201,8 @@ export default function LibraryPage() {
         }
       />
 
-      {/* Status tabs, on the segmented track (§8.4) */}
-      <div className="mb-6">
+      {/* Status tabs, over the 2 px --fg rule that opens the sheet */}
+      <div className="pb-4 mb-8 border-b-2 border-fg">
         <SegmentedToggle
           options={STATUS_TABS.map(({ label, value }) => ({ value, label }))}
           value={activeStatus}

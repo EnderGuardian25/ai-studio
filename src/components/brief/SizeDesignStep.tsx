@@ -14,6 +14,7 @@ import type { Campaign, TemplateSummary } from '@/lib/api-types'
 import { ASPECT_OPTIONS, SOURCE_LABEL } from './constants'
 import type { DesignMode, ResolvedKit } from './types'
 import { cardCls } from './cardCls'
+import { CARD_TITLE } from './classes'
 import { FieldLabel } from '@/components/ui/FieldLabel'
 import { ICON } from '@/components/ui/atoms'
 import { StepHead } from './StepHead'
@@ -53,10 +54,9 @@ interface SizeDesignStepProps {
   removeScreenshot: () => void
 }
 
-// One field group per section, ruled apart on --line-subtle (DESIGN_SYSTEM.md §6).
-const SECTION = 'py-5 border-t border-line-subtle last:pb-0'
-// An empty state inside the step's card: a recessed canvas well with a hairline.
-const EMPTY = 'rounded-ui-md bg-canvas px-4 py-3 ring-1 ring-inset ring-line-subtle text-ui-sm text-fg-muted'
+// One field group per section, ruled apart (DESIGN_SYSTEM.md §6).
+const SECTION = 'py-6 border-t border-line-subtle'
+const EMPTY = 'surface px-4 py-3 text-ui-sm text-fg-muted'
 
 export function SizeDesignStep({
   aspectRatio,
@@ -117,9 +117,9 @@ export function SizeDesignStep({
                 aria-pressed={selected}
                 className={cardCls(selected, 'flex items-center gap-3 p-4')}
               >
-                <Icon size={20} strokeWidth={1.6} aria-hidden className={selected ? 'text-fg' : 'text-fg-muted'} />
+                <Icon size={20} strokeWidth={1.4} aria-hidden className={selected ? 'text-fg' : 'text-fg-muted'} />
                 <span className="min-w-0">
-                  <span className="block text-ui-base font-semibold leading-tight text-fg">
+                  <span className={`block ${CARD_TITLE}`}>
                     {ASPECT_LABELS[value]}
                   </span>
                   <span className="block text-ui-xs text-fg-muted">{sub} px</span>
@@ -162,7 +162,7 @@ export function SizeDesignStep({
             aria-pressed={designMode === 'TEMPLATE'}
             className={cardCls(designMode === 'TEMPLATE', 'p-4')}
           >
-            <div className="text-ui-base font-semibold leading-tight text-fg mb-1.5">
+            <div className={`${CARD_TITLE} mb-1.5`}>
               Template
             </div>
             <div className="text-ui-xs text-fg-muted">
@@ -178,7 +178,7 @@ export function SizeDesignStep({
             aria-pressed={designMode === 'GENERATE'}
             className={cardCls(designMode === 'GENERATE', 'p-4')}
           >
-            <div className="text-ui-base font-semibold leading-tight text-fg mb-1.5">
+            <div className={`${CARD_TITLE} mb-1.5`}>
               Freeform
             </div>
             <div className="text-ui-xs text-fg-muted">
@@ -216,7 +216,7 @@ export function SizeDesignStep({
                   className={cardCls(selected, 'p-4 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:shadow-none')}
                 >
                   <div className="flex items-start gap-2">
-                    <span className="text-ui-base font-semibold leading-tight text-fg">{opt.label}</span>
+                    <span className={CARD_TITLE}>{opt.label}</span>
                     {selected && <Check {...ICON} aria-hidden className="ml-auto text-accent flex-shrink-0" />}
                   </div>
                   <div className="mt-1.5 text-ui-xs text-fg-muted">{opt.summary}</div>
@@ -238,7 +238,7 @@ export function SizeDesignStep({
         <div className={SECTION} data-testid="screenshot-section">
           <FieldLabel as="span" id="screenshot-label" className="mb-1">
             Product screenshot{' '}
-            <span className="font-normal text-fg-muted">{needsScreenshot ? '(required)' : '(optional)'}</span>
+            <span className="normal-case tracking-normal font-normal">{needsScreenshot ? '(required)' : '(optional)'}</span>
           </FieldLabel>
           <p id="screenshot-help" className="text-ui-xs text-fg-muted mb-3">
             Needed for the Product screen image style, which shows it on a laptop. PNG, JPEG or WebP, up to 10 MB, at
@@ -265,7 +265,7 @@ export function SizeDesignStep({
                   className="h-full w-full object-contain"
                 />
               </span>
-              <span className="min-w-0 flex-1 font-mono text-ui-xs text-fg-muted">
+              <span className="min-w-0 flex-1 text-ui-xs text-fg-muted">
                 {compositeSource.width}×{compositeSource.height} px
               </span>
               <Button
@@ -346,7 +346,7 @@ export function SizeDesignStep({
       {designMode === 'GENERATE' && (
         <div className={SECTION}>
           <FieldLabel className="mb-2.5">
-            Style reference <span className="font-normal text-fg-muted">(optional)</span>
+            Style reference <span className="normal-case tracking-normal font-normal">(optional)</span>
           </FieldLabel>
           <p className="text-ui-xs text-fg-muted mb-3">
             Used for visual inspiration only — it won&apos;t copy the layout exactly.
@@ -358,7 +358,7 @@ export function SizeDesignStep({
               aria-pressed={referenceTemplateId === ''}
               className={cardCls(referenceTemplateId === '', 'flex items-center gap-3 p-3')}
             >
-              <span className="w-8 h-8 rounded-ui-sm bg-canvas ring-1 ring-inset ring-line-subtle flex items-center justify-center flex-shrink-0">
+              <span className="w-8 h-8 rounded-ui-sm border border-line-subtle bg-surface flex items-center justify-center flex-shrink-0">
                 <Sparkles {...ICON} aria-hidden className="text-fg-muted" />
               </span>
               <span className="text-ui-sm font-semibold text-fg">No reference</span>

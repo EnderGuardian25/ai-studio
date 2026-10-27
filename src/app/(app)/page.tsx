@@ -11,9 +11,8 @@ import { resolveTeamForServerComponent } from '@/lib/authz/serverTeam'
 import { draftVisibilityWhere, postVisibilityWhere } from '@/lib/authz/visibility'
 import type { TeamAuthedUser } from '@/lib/api/handler'
 import { PageHead } from '@/components/ui/PageHead'
-import { Panel } from '@/components/ui/Panel'
 import { SectionHead } from '@/components/ui/SectionHead'
-import { FOCUS, ICON } from '@/components/ui/atoms'
+import { EYEBROW, FOCUS, ICON } from '@/components/ui/atoms'
 import { RecentDraftsCard } from '@/components/dashboard/RecentDraftsCard'
 import { NoTeamNotice } from '@/components/dashboard/NoTeamNotice'
 import { channelLabel as sharedChannelLabel } from '@/lib/channels'
@@ -122,22 +121,20 @@ async function getDashboardData(user: TeamAuthedUser) {
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
-// A KPI (021 design.md §8): a sentence-case muted label over a bold
-// tabular numeral. The four sit in one bezel card, split by hairlines from lg.
+// A KPI: a small-caps label over a display numeral, on a ruled row (no box).
 function KpiCard({ label, value }: { label: string; value: number }) {
   return (
-    <div className="min-w-0 lg:border-l lg:border-line-subtle lg:pl-5 lg:first:border-l-0 lg:first:pl-0">
-      <div className="text-ui-xs font-medium text-fg-muted">{label}</div>
-      <div className="mt-1.5 text-ui-2xl font-bold leading-none tracking-tight tabular-nums">
+    <div className="min-w-0 border-b border-line-subtle py-4">
+      <div className={EYEBROW}>{label}</div>
+      <div className="mt-2 font-display text-ui-2xl font-normal leading-none tabular-nums [font-variation-settings:'opsz'_144]">
         {value}
       </div>
     </div>
   )
 }
 
-// A quick action: a link drawn as the secondary pill (the study's .btn-sec,
-// 021 design.md §4.3). The floating Create post button is the view's one
-// primary, so these stay secondary.
+// A quick action: a link drawn as Folio's Outline button (§8.2). The floating
+// Create post button is the view's one primary, so these stay outline.
 function QuickAction({
   href,
   label,
@@ -150,7 +147,7 @@ function QuickAction({
   return (
     <Link
       href={href}
-      className={`inline-flex h-control-md items-center gap-2 whitespace-nowrap rounded-ui-pill bg-surface-raised px-4 text-ui-sm font-semibold text-fg shadow-panel ring-1 ring-inset ring-line-subtle transition-[transform,box-shadow] duration-fast ease-standard hover:shadow-raised active:scale-[0.98] motion-reduce:active:scale-100 ${FOCUS}`}
+      className={`inline-flex h-control-md items-center gap-2 whitespace-nowrap rounded-ui-md border border-line px-3.5 text-ui-sm font-semibold text-fg transition-[border-color] duration-fast ease-standard hover:border-fg ${FOCUS}`}
     >
       {icon}
       {label}
@@ -185,19 +182,19 @@ export default async function DashboardPage() {
         eyebrow="Overview"
         title="Dashboard"
         lead="At-a-glance status across drafts, posts, and campaigns."
-        className="mb-6"
+        className="mb-8"
       />
 
-      {/* KPI summary: one bezel card (021 design.md §8) */}
-      <Panel bezel className="grid grid-cols-2 gap-5 p-5 lg:grid-cols-4">
+      {/* KPI summary: a 2 px --fg rule opens the block; ruled cells, no boxes */}
+      <div className="grid grid-cols-2 gap-x-6 border-t-2 border-fg lg:grid-cols-4">
         <KpiCard label="Drafts Ready" value={data.draftsReady} />
         <KpiCard label="Posts Published" value={data.postsPublished} />
         <KpiCard label="Active Campaigns" value={data.activeCampaigns} />
         <KpiCard label="AI providers" value={data.aiProviders} />
-      </Panel>
+      </div>
 
       {/* Quick actions */}
-      <div className="mt-5 flex flex-wrap gap-2">
+      <div className="mt-6 flex flex-wrap gap-2">
         <QuickAction href="/brief" label="New post" icon={<FilePlus2 {...ICON} aria-hidden />} />
         <QuickAction href="/library" label="View library" icon={<BookOpen {...ICON} aria-hidden />} />
         <QuickAction
@@ -207,7 +204,7 @@ export default async function DashboardPage() {
         />
       </div>
 
-      <div className="mt-8 grid grid-cols-1 items-start gap-5 lg:grid-cols-3">
+      <div className="mt-12 grid grid-cols-1 gap-x-12 gap-y-12 lg:grid-cols-3">
         {/* Recent drafts — collapsed 8 / expandable to the full fetched list */}
         <RecentDraftsCard
           className="min-w-0 lg:col-span-2"
@@ -231,25 +228,25 @@ export default async function DashboardPage() {
           }))}
         />
 
-        {/* Activity feed: a bezel card of ruled rows */}
-        <Panel bezel className="min-w-0 p-5">
-          <SectionHead title="Activity" className="mb-3" />
+        {/* Activity feed */}
+        <div className="min-w-0">
+          <SectionHead title="Activity" className="pb-2.5" />
 
           {data.events.length === 0 ? (
-            <p className="py-8 text-center text-ui-sm text-fg-muted">
+            <p className="border-t-2 border-fg py-8 text-center text-ui-sm text-fg-muted">
               No recent activity.
             </p>
           ) : (
-            <ul className="divide-y divide-line-subtle">
+            <ul className="border-t-2 border-fg">
               {data.events.map(e => (
-                <li key={e.id} className="min-w-0 py-2.5">
+                <li key={e.id} className="min-w-0 border-b border-line-subtle py-2.5">
                   <p className="truncate text-ui-sm text-fg">{e.text}</p>
                   <p className="text-ui-xs text-fg-muted">{relativeTime(e.at)}</p>
                 </li>
               ))}
             </ul>
           )}
-        </Panel>
+        </div>
       </div>
     </>
   )

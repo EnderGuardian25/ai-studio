@@ -673,6 +673,39 @@ Four notices sit under the post in the Preview section, in this order: the backg
 
 **States.** `stale` and `unconfirmed` both show the badge (the text differs). The Apply confirm uses the confirm dialog (§8.10) with the old and new headline in curly quotes. A failed apply names the reason in a toast, and a render-time failure arrives as the page's failure line. Light and dark are identical.
 
+### 8.22 The post style picker
+
+`PostStylePicker` (`src/components/brief/`) opens step 1 of the post wizard, above the size and design choices. The picker is one `radiogroup`, with one tab stop and the arrow, Home and End keys moving the choice.
+
+**Anatomy.** A `FieldLabel as="span"` ("Post style", §8.3) names the group (`aria-labelledby`). Under it a `--text-xs` `--fg-muted` line says what a style does. Then a grid, one column and two from `sm`, 12 px apart, of option cards. Each card is a `role="radio"` button drawn by `cardCls` (`brief/cardCls.ts`): the style's label (`CARD_TITLE`, `brief/classes.ts`: display face, 18 px, 500) with a 15 px `Check` in `--accent` at the right when chosen, and the style's summary (`--text-xs`, `--fg-muted`) beneath. A retired style that is already chosen stays in the list with "(retired)" in `--fg-muted`.
+
+**Atoms and tokens.** The card is a ruled control, not a panel: a 1 px `--line` edge on the page ground, `--radius-md`, text in `--fg`. No shadow, no blur.
+
+| State        | Look                                                                                                         |
+| ------------ | ------------------------------------------------------------------------------------------------------------ |
+| Idle         | transparent fill, 1 px `--line` edge                                                                         |
+| Hover        | the edge turns `--fg`                                                                                        |
+| Selected     | `--surface-2` fill and a 2 px ink frame (the `--fg` border plus an inset 1 px `--fg` ring), the check showing |
+| Focus        | the §9 outline (`FOCUS`), 2 px `--focus` at 2 px offset, on the card that holds the tab stop                  |
+
+**Light and dark.** The same classes serve both themes: `--line`, `--fg` and `--surface-2` switch with the `.dark` class and keep the 3:1 edge of §3.3.
+
+### 8.23 The image look picker
+
+The "Image style" section of the same step (`SizeDesignStep`, Freeform only) picks how the hero image sits in the post. It is a group of `aria-pressed` toggle cards on the same `cardCls` as the post style picker, three columns from `sm`.
+
+**Anatomy.** A `FieldLabel` "Image style", a `--text-xs` helper line and, when the style came from the post style, a second `--text-xs` line. Each card shows the look's label (`CARD_TITLE`), a `Check` when chosen, its summary, and, for a look that cannot be used at the chosen size or without a screenshot, one more `--text-xs` `--fg-muted` line giving the reason. The product screenshot field sits below as its own section (a `FieldLabel as="span"` with an `(optional)` or `(required)` note in normal case, a Secondary `Button` to add, a 96 × 64 px thumbnail with a Remove button once attached). Its required line is `--status-failed`.
+
+**Atoms and tokens.** As §8.22. Sections are ruled apart by `SECTION` (`py-6`, a 1 px `--line-subtle` rule above); an empty state is the `.surface` panel at `--text-sm` `--fg-muted`.
+
+| State                 | Look                                                                            |
+| --------------------- | ------------------------------------------------------------------------------- |
+| Idle, hover, selected | as the post style card (§8.22)                                                  |
+| Disabled (unsupported) | `disabled:opacity-60`, `cursor-not-allowed`, no hover change; the reason line shows |
+| Focus                 | the §9 outline                                                                  |
+
+A look that is not available is disabled with its reason, never hidden. Light and dark are identical.
+
 ---
 
 ## 9. Accessibility floor

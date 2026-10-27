@@ -96,7 +96,7 @@ export function ContentStep({ topic, setTopic, prompt, setPrompt, goal, tone, se
                 tabIndex={0}
                 role="region"
                 aria-label="Before"
-                className={`rounded-ui-md bg-canvas px-4 py-3 ring-1 ring-inset ring-line-subtle text-ui-sm text-fg-muted whitespace-pre-wrap leading-relaxed max-h-40 overflow-y-auto ${SCROLL_FOCUS}`}
+                className={`surface px-4 py-3 text-ui-sm text-fg-muted whitespace-pre-wrap leading-relaxed max-h-40 overflow-y-auto ${SCROLL_FOCUS}`}
               >
                 {enhanceResult.original}
               </div>
@@ -108,7 +108,7 @@ export function ContentStep({ topic, setTopic, prompt, setPrompt, goal, tone, se
               tabIndex={0}
               role="region"
               aria-label="AI suggestion"
-              className={`rounded-ui-md bg-surface-raised px-4 py-3 shadow-panel ring-[1.5px] ring-inset ring-fg text-ui-sm text-fg whitespace-pre-wrap leading-relaxed max-h-64 overflow-y-auto ${SCROLL_FOCUS}`}
+              className={`rounded-ui-sm border border-fg bg-surface-raised px-4 py-3 text-ui-sm text-fg whitespace-pre-wrap leading-relaxed max-h-64 overflow-y-auto ${SCROLL_FOCUS}`}
             >
               {enhanceResult.draft}
             </div>
@@ -141,7 +141,7 @@ export function ContentStep({ topic, setTopic, prompt, setPrompt, goal, tone, se
             >
               <Sparkles {...ICON} aria-hidden /> {enhancing ? 'Enhancing…' : 'Enhance with AI'}
             </Button>
-            <div className="text-right font-mono text-ui-2xs text-fg-muted pt-2">
+            <div className="text-right text-ui-xs text-fg-muted pt-1.5">
               {prompt.length} chars{prompt.trim().length > 0 && prompt.trim().length <= 10 ? ' — add a little more detail' : ''}
             </div>
           </div>
