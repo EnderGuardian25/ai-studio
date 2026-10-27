@@ -11,7 +11,6 @@ import { Input } from '@/components/ui/Input'
 import { Modal } from '@/components/ui/Modal'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { PageHead } from '@/components/ui/PageHead'
-import { Panel } from '@/components/ui/Panel'
 import { StatusChip } from '@/components/ui/StatusChip'
 import { ICON, ICON_SM, SCROLL_FOCUS, TABLE_HEAD_ROW, TAG } from '@/components/ui/atoms'
 import { GateNotice } from '@/components/ui/GateNotice'
@@ -103,7 +102,7 @@ export default function AdminUsersPage() {
         eyebrow="Admin"
         title="Users"
         lead="Create and deactivate accounts. Team roles are set under Teams. Share initial passwords out-of-band."
-        className="mb-6"
+        className="mb-8"
         actions={
           <Button onClick={() => setAddOpen(true)}>
             <Plus {...ICON} /> Add user
@@ -111,82 +110,78 @@ export default function AdminUsersPage() {
         }
       />
 
-      {/* A ruled data table (§8.15, the study's .ct) on a bezel card (021
-          design.md §8): sentence-case muted headers and --line-subtle rows. It
-          scrolls inside its own container at narrow widths, so the container
-          is a focusable, labelled region with an inset focus outline.
-          `relative` makes it the containing block of the sr-only Actions
-          header, which otherwise widened the page at 375 px (the pre-T5 383 px
-          bug). */}
-      <Panel bezel className="min-w-0 p-5">
-        <div
-          tabIndex={0}
-          role="region"
-          aria-label="Users"
-          className={`relative overflow-x-auto ${SCROLL_FOCUS}`}
-        >
-          <table className="w-full min-w-[720px] text-ui-sm">
-            <thead>
-              <tr className={TABLE_HEAD_ROW}>
-                <th scope="col" className="py-2 pr-3 font-semibold">Name</th>
-                <th scope="col" className="py-2 pr-3 font-semibold">Username</th>
-                <th scope="col" className="py-2 pr-3 font-semibold">Status</th>
-                <th scope="col" className="py-2 pr-3 font-semibold">Created</th>
-                <th scope="col" className="py-2 font-semibold sr-only">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {users.map(u => {
-                const locked = u.role === 'SUPER_ADMIN' || u.id === me?.userId
-                return (
-                  <tr key={u.id} className="border-b border-line-subtle align-middle last:border-b-0">
-                    <td className="py-2.5 pr-3 font-medium text-fg">
-                      {u.name}
-                      {u.id === me?.userId && (
-                        <span className="ml-1.5 text-ui-xs font-normal text-fg-muted">(you)</span>
-                      )}
-                      {u.role === 'SUPER_ADMIN' && (
-                        <span className={`ml-1.5 whitespace-nowrap ${TAG}`}>Super admin</span>
-                      )}
-                    </td>
-                    <td className="break-all py-2.5 pr-3 text-fg">{loginLabel(u)}</td>
-                    <td className="py-2.5 pr-3">
-                      <StatusPill disabled={u.disabled} />
-                    </td>
-                    <td className="whitespace-nowrap py-2.5 pr-3 text-ui-xs text-fg-muted">
-                      {new Date(u.createdAt).toLocaleDateString()}
-                    </td>
-                    <td className="whitespace-nowrap py-1.5">
-                      {!locked && (
-                        <div className="flex justify-end gap-1">
-                          <Button variant="ghost" size="sm" onClick={() => setResetTarget(u)}>
-                            <KeyRound {...ICON_SM} /> Reset password
-                          </Button>
-                          <Button
-                            variant={u.disabled ? 'secondary' : 'danger'}
-                            size="sm"
-                            onClick={() => toggleDisabled(u)}
-                          >
-                            {u.disabled ? (
-                              <>
-                                <UserCheck {...ICON_SM} /> Reactivate
-                              </>
-                            ) : (
-                              <>
-                                <UserX {...ICON_SM} /> Deactivate
-                              </>
-                            )}
-                          </Button>
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-      </Panel>
+      {/* A Folio data table (§8.15). It scrolls inside its own container at
+          narrow widths, so the container is a focusable, labelled region with
+          an inset focus outline. `relative` makes it the containing block of
+          the sr-only Actions header, which otherwise widened the page at
+          375 px (the pre-T5 383 px bug). */}
+      <div
+        tabIndex={0}
+        role="region"
+        aria-label="Users"
+        className={`relative overflow-x-auto border-t-2 border-fg ${SCROLL_FOCUS}`}
+      >
+        <table className="w-full min-w-[720px] text-ui-sm">
+          <thead>
+            <tr className={TABLE_HEAD_ROW}>
+              <th scope="col" className="py-2 pr-3 font-semibold">Name</th>
+              <th scope="col" className="py-2 pr-3 font-semibold">Username</th>
+              <th scope="col" className="py-2 pr-3 font-semibold">Status</th>
+              <th scope="col" className="py-2 pr-3 font-semibold">Created</th>
+              <th scope="col" className="py-2 font-semibold sr-only">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {users.map(u => {
+              const locked = u.role === 'SUPER_ADMIN' || u.id === me?.userId
+              return (
+                <tr key={u.id} className="border-b border-line-subtle align-middle">
+                  <td className="py-2.5 pr-3 font-medium text-fg">
+                    {u.name}
+                    {u.id === me?.userId && (
+                      <span className="ml-1.5 text-ui-xs font-normal text-fg-muted">(you)</span>
+                    )}
+                    {u.role === 'SUPER_ADMIN' && (
+                      <span className={`ml-1.5 whitespace-nowrap ${TAG}`}>Super admin</span>
+                    )}
+                  </td>
+                  <td className="break-all py-2.5 pr-3 text-fg">{loginLabel(u)}</td>
+                  <td className="py-2.5 pr-3">
+                    <StatusPill disabled={u.disabled} />
+                  </td>
+                  <td className="whitespace-nowrap py-2.5 pr-3 text-ui-xs text-fg-muted">
+                    {new Date(u.createdAt).toLocaleDateString()}
+                  </td>
+                  <td className="whitespace-nowrap py-1.5">
+                    {!locked && (
+                      <div className="flex justify-end gap-1">
+                        <Button variant="ghost" size="sm" onClick={() => setResetTarget(u)}>
+                          <KeyRound {...ICON_SM} /> Reset password
+                        </Button>
+                        <Button
+                          variant={u.disabled ? 'secondary' : 'danger'}
+                          size="sm"
+                          onClick={() => toggleDisabled(u)}
+                        >
+                          {u.disabled ? (
+                            <>
+                              <UserCheck {...ICON_SM} /> Reactivate
+                            </>
+                          ) : (
+                            <>
+                              <UserX {...ICON_SM} /> Deactivate
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
 
       <AddUserModal open={addOpen} onClose={() => setAddOpen(false)} onSaved={invalidate} />
       <ResetPasswordModal target={resetTarget} onClose={() => setResetTarget(null)} />

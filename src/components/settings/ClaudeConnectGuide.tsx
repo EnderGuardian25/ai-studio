@@ -79,11 +79,11 @@ function CommandLine({ command }: { command: string }) {
     }
   }
 
-  // A code line (§5.1: mono is for code only) in a recessed canvas well with a
-  // hairline ring. The command wraps rather than scrolling, so nothing here
-  // needs a keyboard scroll region and nothing widens the page at 375 px.
+  // A code line (§5.1: mono is for code only) on paper, with a hairline edge.
+  // The command wraps rather than scrolling, so nothing here needs a keyboard
+  // scroll region and nothing widens the page at 375 px.
   return (
-    <span className="mt-1.5 flex items-center gap-2 rounded-ui-md bg-canvas py-1 pl-3 pr-1 ring-1 ring-inset ring-line-subtle">
+    <span className="mt-1.5 flex items-center gap-2 rounded-ui-sm border border-line-subtle bg-surface-raised py-1 pl-3 pr-1">
       <code className="min-w-0 flex-1 font-mono text-ui-xs text-fg [overflow-wrap:anywhere]">
         {command}
       </code>
@@ -91,7 +91,7 @@ function CommandLine({ command }: { command: string }) {
         type="button"
         onClick={copy}
         aria-label="Copy command"
-        className={`${ICON_BUTTON} hover:bg-surface-raised hover:text-fg ${FOCUS}`}
+        className={`${ICON_BUTTON} hover:text-fg ${FOCUS}`}
       >
         {copied ? <Check {...ICON} /> : <Copy {...ICON} />}
       </button>
@@ -114,10 +114,7 @@ export function ClaudeConnectGuide({ variant }: { variant: 'personal' | 'team' }
       <div
         role="tablist"
         aria-label="Operating system"
-        // SegmentedToggle's track (§8.4, the study's .theme-btn): a canvas pill
-        // with a hairline ring. Drawn here rather than through SegmentedToggle
-        // because each tab carries its own id and aria-controls.
-        className="inline-flex items-center gap-0.5 self-start rounded-ui-pill bg-canvas p-[3px] ring-1 ring-inset ring-line-subtle"
+        className="inline-flex self-start overflow-hidden rounded-ui-md border border-line"
       >
         {OS_ORDER.map((key) => {
           const selected = key === os
@@ -130,10 +127,11 @@ export function ClaudeConnectGuide({ variant }: { variant: 'personal' | 'team' }
               aria-selected={selected}
               aria-controls={`claude-guide-panel-${variant}`}
               onClick={() => setOs(key)}
-              // Segments in --fg-muted; the selected one raised on the track.
-              // Nothing clips the track, so the focus outline sits outside.
-              className={`rounded-ui-pill px-3 py-1.5 text-ui-xs font-semibold transition-[background-color,color,box-shadow] duration-fast ease-standard ${FOCUS} ${
-                selected ? 'bg-surface-raised text-fg shadow-panel' : 'text-fg-muted hover:text-fg'
+              // §8.4: segments in --fg-muted, the selected one in ink. The
+              // focus ring is inset: the outline's overflow-hidden clips an
+              // outer one.
+              className={`px-2.5 py-1.5 font-text text-ui-xs font-semibold transition-colors duration-fast ease-standard focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus ${
+                selected ? 'bg-fg text-canvas' : 'text-fg-muted hover:text-fg'
               }`}
             >
               {OS_LABELS[key]}

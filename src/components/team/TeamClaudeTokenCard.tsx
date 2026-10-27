@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
 import { SectionHead } from '@/components/ui/SectionHead'
 import { StatusChip } from '@/components/ui/StatusChip'
-import { ICON, SUB_HEAD } from '@/components/ui/atoms'
+import { BLOCK, ICON, SUB_HEAD } from '@/components/ui/atoms'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { apiFetch } from '@/lib/apiFetch'
 import type { TeamClaudeTokenInfo } from '@/lib/api-types'
@@ -27,7 +27,7 @@ function statusPill(info: TeamClaudeTokenInfo) {
   return <StatusChip tone="published">Connected</StatusChip>
 }
 
-export function TeamClaudeTokenCard() {
+export function TeamClaudeTokenCard({ numeral }: { numeral?: string }) {
   const confirm = useConfirm()
   const queryClient = useQueryClient()
   const [token, setToken] = useState('')
@@ -75,13 +75,12 @@ export function TeamClaudeTokenCard() {
   const info = data ?? ({ connected: false } as TeamClaudeTokenInfo)
 
   return (
-    // A bezel card (021 design.md §8), its head the study's .card-hd.
-    <section className="surface-bezel min-w-0 p-5">
-      <SectionHead title="Team Claude account" className="mb-3">
+    <section>
+      <SectionHead numeral={numeral} title="Team Claude account" className="mb-3">
         {!isLoading && statusPill(info)}
       </SectionHead>
 
-      <div className="flex flex-col gap-5">
+      <div className={`${BLOCK} flex flex-col gap-5`}>
         <p className="text-ui-sm text-fg-muted">
           Shared fallback used by members who haven&apos;t connected their own Claude account. It is also the only credential scheduled posts, MCP and ACP runs can use.
         </p>

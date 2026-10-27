@@ -19,7 +19,7 @@ interface DataTableProps<T> {
   minWidth?: number
 }
 
-// A ruled data table (§8.15): sentence-case muted heads, --line-subtle rows,
+// A ruled data table (§8.15): small-caps muted heads, --line-subtle rows,
 // numbers right-aligned in tabular figures. It scrolls inside its own labelled,
 // focusable region, so a wide table never widens the page at 390 px.
 export function DataTable<T>({
@@ -55,7 +55,7 @@ export function DataTable<T>({
             <tr
               key={rowKey(r)}
               data-testid={rowTestId?.(r)}
-              className="border-b border-line-subtle last:border-b-0"
+              className="border-b border-line-subtle"
             >
               {columns.map((c) => (
                 <td

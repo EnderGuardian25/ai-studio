@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/Button'
 import { SectionHead } from '@/components/ui/SectionHead'
 import { Notice } from '@/components/ui/Notice'
 import { StatusChip } from '@/components/ui/StatusChip'
-import { ICON } from '@/components/ui/atoms'
+import { BLOCK, ICON } from '@/components/ui/atoms'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { apiFetch } from '@/lib/apiFetch'
 import type { OpenAiKeyInfo } from '@/lib/api-types'
@@ -79,13 +79,12 @@ export function OpenAiKeyCard({ numeral }: { numeral?: string }) {
   const info = data ?? ({ connected: false } as OpenAiKeyInfo)
 
   return (
-    // A bezel card (021 design.md §8), its head the study's .card-hd.
-    <section className="surface-bezel min-w-0 p-5">
+    <section>
       <SectionHead numeral={numeral} title="Image generation key" className="mb-3">
         {!isLoading && statusPill(info)}
       </SectionHead>
 
-      <div className="flex flex-col gap-5">
+      <div className={`${BLOCK} flex flex-col gap-5`}>
         <p className="text-ui-sm text-fg-muted">
           Your own OpenAI or Gemini key. When connected, it makes every image you generate, before the
           team&apos;s provider.

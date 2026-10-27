@@ -1,6 +1,6 @@
 import React from 'react'
-import { Panel } from '@/components/ui/Panel'
 import { SectionHead } from '@/components/ui/SectionHead'
+import { SUB_HEAD } from '@/components/ui/atoms'
 
 interface InsightSectionProps {
   id: string
@@ -11,16 +11,16 @@ interface InsightSectionProps {
   children: React.ReactNode
 }
 
-// One page section on a bezel card, labelled by its heading.
+// One page section (§6): opened by the 2 px ink rule, labelled by its heading.
 export function InsightSection({ id, title, question, tail, children }: InsightSectionProps) {
   return (
-    <Panel bezel className="min-w-0 p-5" role="region" aria-labelledby={`${id}-h`} data-testid={`section-${id}`}>
+    <div className="min-w-0 border-t-2 border-fg pt-4" role="region" aria-labelledby={`${id}-h`} data-testid={`section-${id}`}>
       <SectionHead id={`${id}-h`} title={title} className="mb-1">
         {tail}
       </SectionHead>
       <p className="mb-4 text-ui-sm text-fg-muted">{question}</p>
       <div className="flex flex-col gap-5">{children}</div>
-    </Panel>
+    </div>
   )
 }
 
@@ -28,7 +28,7 @@ export function InsightSection({ id, title, question, tail, children }: InsightS
 export function Block({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="min-w-0">
-      <h3 className="mb-2 text-ui-base font-semibold leading-snug text-fg">{title}</h3>
+      <h3 className={`mb-2 ${SUB_HEAD}`}>{title}</h3>
       {children}
     </div>
   )

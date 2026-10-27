@@ -52,7 +52,7 @@ export default function AdminInsightsPage() {
         eyebrow="Admin"
         title="Insights"
         lead="What happens to drafts across every team: refine, failures, image styles and model choices."
-        className="mb-6"
+        className="mb-8"
         actions={<SegmentedToggle label="Date range" options={RANGE_OPTIONS} value={range} onChange={setRange} />}
       />
 
@@ -62,7 +62,7 @@ export default function AdminInsightsPage() {
       )}
 
       {data && (
-        <div className="flex flex-col gap-6" data-testid="insights-body">
+        <div className="flex flex-col gap-12" data-testid="insights-body">
           <RefineSection data={data.refine} />
           <FailuresSection data={data.failures} />
           <StylesSection data={data.styles} />

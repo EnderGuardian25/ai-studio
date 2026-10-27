@@ -643,7 +643,7 @@ The page heads, section heads, notices and field labels are shared components in
 | Draft page, design        | Under the action bar, Path B only and once the draft is ready, `sm:max-w-xs`                                                                           |
 | Assistant drawers         | The first strip under the drawer's title bar, with a 1 px `--line-subtle` rule below; nothing renders, not even the strip, until the models view loads |
 
-**`/team` → Models** (section "v.") is the admin side: a named group of checkboxes, "Allowed models", labelled `<name> · <tier> · <speed>` with a "New" `StatusChip` outside the label for a model added since the team saved; six `Select`s in a "Defaults" group, each starting with "System default (<name>)"; the switch "Opus requires a personal token" with its helper text (disabled in API mode, "Only applies in CLI mode."); and an ink Save (§8.2). A 400 shows inline as `Notice tone="error" role="alert"`.
+**`/team` → Models** (section "vi.") is the admin side: a named group of checkboxes, "Allowed models", labelled `<name> · <tier> · <speed>` with a "New" `StatusChip` outside the label for a model added since the team saved; six `Select`s in a "Defaults" group, each starting with "System default (<name>)"; the switch "Opus requires a personal token" with its helper text (disabled in API mode, "Only applies in CLI mode."); and an ink Save (§8.2). A 400 shows inline as `Notice tone="error" role="alert"`.
 
 ### 8.20 The draft-page notices: image style, image key, fonts and facts check
 
@@ -747,6 +747,46 @@ A look that is not available is disabled with its reason, never hidden. Light an
 | Read-only (not editing) | no select: the Fonts list shows the family as a ruled row with a "Sinhala" `TAG`  |
 
 **Light and dark.** Identical.
+
+### 8.26 The caption route card
+
+`CaptionRouteCard` (`src/components/team/`) is the first section of `/team` (numeral "i."): the one place a team admin names the credential its captions run on. It renders `GET /api/team/caption-route` and holds no rule of its own.
+
+**Anatomy.** A section named by its heading (`aria-labelledby`): a `SectionHead` ("Caption route", numeral "i.") over a body opened by the 2 px ink block rule (`BLOCK`, §6). In the body, a `--text-sm` `--fg-muted` helper paragraph; then, 16 px below, a row of a `SegmentedToggle` (§8.4, "Caption route": "Claude CLI (OAuth)" or "Anthropic API key") and, once a route is chosen, a small secondary `Button` "Use the default"; then one state line.
+
+**Atoms and tokens.** `SectionHead`, `BLOCK`, `SegmentedToggle`, `Button`, `Notice`, `QueryError`. The card has no fill, ring or shadow of its own: like every `/team` section it is a numbered head over a ruled body, 48 px (`gap-12`) from the next.
+
+| State          | Look                                                                                                          |
+| -------------- | ------------------------------------------------------------------------------------------------------------- |
+| Loading        | "Loading…" in `--text-sm` `--fg-muted`                                                                         |
+| Ready          | one `--text-sm` `--fg` line: "Captions run on <route>."                                                        |
+| No route chosen | the same line says the server default applies; no "Use the default" button                                     |
+| Not ready      | `Notice tone="warning" role="status"` with the server's message and "New captions fail until this is fixed."   |
+| Save failed    | `Notice tone="error" role="alert"` with the server's message                                                   |
+| Load failed    | `QueryError` with Retry                                                                                        |
+
+**Light and dark.** The same classes serve both themes (`--fg`, `--line`, and the notice tints §3.3 checks).
+
+### 8.27 The insights page: section, data table and rate bar
+
+`/admin/insights` (super admin only) is one page of ruled sections, each answering one question. Its parts are in `src/components/admin/insights/`.
+
+**The section** (`InsightSection`) is a `role="region"` named by its heading: the 2 px ink rule above (`border-t-2 border-fg`), 16 px of padding, a `SectionHead` (no numeral: the page does not number its sections) with an optional tail (a `StatusChip`), a one-line `--text-sm` `--fg-muted` question, then the content 20 px apart. Sections sit 48 px apart. A sub-block (`Block`) is an `h3` in the sub-head style (`SUB_HEAD`, §5.2) over its table. A figure (`Stat`) is a `--text-xs` `--fg-muted` label over a `--text-lg` 600 value in tabular figures, in a grid of two columns (four from `sm`).
+
+**The data table** (`DataTable`) is §8.15: a scroll region (`tabIndex={0}`, `role="region"`, an `aria-label`, `SCROLL_FOCUS`), `relative` so it never widens the page, holding a table with a minimum width. The head row is `TABLE_HEAD_ROW` (small caps, `--fg-muted`, 0.1em); every row, the last included, is ruled below in `--line-subtle`; numeric columns are right-aligned. An empty table is one `--text-sm` `--fg-muted` line.
+
+**The rate bar** (`RateBar`) draws a rate as a 64 × 6 px `--radius-sm` track in `--line-subtle` with an `--accent` fill, then the number in `--text-sm` tabular figures. The number is always visible text; the bar is decorative (`aria-hidden`), so a rate is never carried by colour alone.
+
+| State            | Look                                                                                      |
+| ---------------- | ----------------------------------------------------------------------------------------- |
+| Loading          | "Loading insights…" (`role="status"`, `--text-sm` `--fg-muted`)                            |
+| Empty table      | the table's empty line; the section and its head stay                                     |
+| Rate unknown     | an empty track and the placeholder number                                                 |
+| Events lost      | `Notice tone="warning" role="status"` above the lost-events table                         |
+| Retention health | a `StatusChip` in the section tail: `published`, `failed` or `draft`                       |
+| Not a super admin | `GateNotice` ("Requires super admin"), nothing else                                       |
+
+**Light and dark.** Identical: the track, rules and text are tokens that switch with `.dark`.
 
 ---
 
