@@ -1,0 +1,10 @@
+{
+  "tier": "deep",
+  "domains": ["security"],
+  "rationale": "Closes anonymous self-registration at the auth route, which is a trust boundary (who may create accounts), and moves the image upload from withAuth to withTeamAuth so a signed-in user with no team can no longer write to the public-read bucket.",
+  "signals": {
+    "blast_radius": "Two existing route handlers (src/app/api/auth/[...all]/route.ts and src/app/api/briefs/images/route.ts), plus E2E tests and one doc line; no new subsystem",
+    "unresolved": "Open question 2 (deny-list of sign-up versus allow-list of auth paths) changes how the edge gate is written, and open question 3 changes the upload's auth wrapper; both are small but touch the gate itself",
+    "irreversibility": "A git revert restores the open sign-up, so the change is cheap to undo, but an account created while the gate is missing stays in the database and the public bucket objects stay public"
+  }
+}

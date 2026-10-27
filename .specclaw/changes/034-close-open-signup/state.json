@@ -1,0 +1,9 @@
+{
+  "change": "034-close-open-signup",
+  "phase": "proposal",
+  "branch": "",
+  "size": "bounded",
+  "phases": {
+    "proposal": { "status": "approved", "at": "2026-10-27T17:09:31Z" }
+  }
+}

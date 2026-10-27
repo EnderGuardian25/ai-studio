@@ -1,7 +1,7 @@
 # 🦞 SpecClaw Dashboard
 
 **Project:** bistec-studio
-**Last Updated:** 2026-10-27 16:04 UTC
+**Last Updated:** 2026-10-27 17:10 UTC
 
 _1 unnumbered change · run `/specclaw:renumber` to order them_
 
@@ -43,6 +43,7 @@ _1 unnumbered change · run `/specclaw:renumber` to order them_
 ## Pending Proposals
 
 - 📋 **010-whatsapp-channel-posting** — proposal ready, awaiting planning
+- 📋 **034-close-open-signup** ▫ — proposal ready, awaiting planning
 
 ## Recently Completed
 

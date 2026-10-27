@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "sig": "310013822 5176",
+  "tier": "deep",
+  "tier_source": "classifier",
+  "rationale": "Closes anonymous self-registration at the auth route, which is a trust boundary (who may create accounts), and moves the image upload from withAuth to withTeamAuth so a signed-in user with no team can no longer write to the public-read bucket.",
+  "domains": ["security"],
+  "seats": [
+    { "role": "party-po", "model": "sonnet" },
+    { "role": "party-architect", "model": "opus" },
+    { "role": "party-ba", "model": "sonnet" },
+    { "role": "party-security", "model": "opus" },
+    { "role": "party-visionary", "model": "opus" }
+  ],
+  "dropped": []
+}
