@@ -1,3 +1,5 @@
+import { spawnSync } from 'node:child_process'
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { checkStack } from '../../scripts/lib/stackPreflight.mjs'
 
@@ -69,5 +71,31 @@ describe('checkStack', () => {
   it('reads a URL with no port as the default Postgres port', () => {
     const r = check({ DATABASE_URL: 'postgresql://u:p@localhost/ai_studio' })
     expect(r.join('\n')).toMatch(/local port 5432/)
+  })
+})
+
+describe('the preflight CLI as the npm scripts call it', () => {
+  // Node reads `--env-file <path>` as its own option even after the script path
+  // and exits 9 when the file is missing. CI has no .env.test, so the CLI's flag
+  // must be one that Node does not own.
+  const scripts: Record<string, string> = JSON.parse(readFileSync('package.json', 'utf8')).scripts
+
+  it.each(['test:e2e:db', 'test:upgrade'])('%s passes its preflight with the env file missing', (name) => {
+    const preflight = scripts[name].split('&&')[0].trim().split(/\s+/)
+    expect(preflight.slice(0, 2)).toEqual(['node', 'scripts/stack-preflight.mjs'])
+    const args = preflight.slice(1).map((a) => (a.startsWith('.env') ? '.env.missing-for-this-test' : a))
+    const r = spawnSync(process.execPath, args, {
+      // The stack values CI's workflow env sets (.github/workflows/e2e.yml).
+      env: {
+        PATH: process.env.PATH ?? '',
+        SystemRoot: process.env.SystemRoot ?? '',
+        NODE_ENV: 'test',
+        DATABASE_URL: 'postgresql://u:p@localhost:5442/ai_studio_test',
+        MINIO_ENDPOINT: 'http://localhost:9100',
+      },
+      encoding: 'utf8',
+    })
+    expect(r.status, r.stderr).toBe(0)
+    expect(r.stdout).toContain('stack-preflight: ok (.env.missing-for-this-test)')
   })
 })
