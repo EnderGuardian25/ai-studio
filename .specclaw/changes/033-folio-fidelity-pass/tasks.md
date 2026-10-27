@@ -132,7 +132,7 @@
 
 ### Wave 2: The pass
 
-- [ ] `T6` — Folio primitives in the shared modules
+- [x] `T6` — Folio primitives in the shared modules
   - Files: `src/components/ui/atoms.ts`, `src/components/ui/{PageHead,Notice,FieldLabel,StatusChip}.tsx`, `docs/ui-reference/DESIGN_SYSTEM.md` (§8.18), `.specclaw/changes/033-folio-fidelity-pass/audit.md` (rows closed by T6)
   - Estimate: medium
   - Kind: refactor
