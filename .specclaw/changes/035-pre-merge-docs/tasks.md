@@ -29,7 +29,7 @@ T1 writes the docs. T2 records state (roadmap, history, the CLAUDE.md pick-up) a
 
 ### Wave 3 — the PR
 
-- [ ] `T3` — Open the v2 → main PR
+- [x] `T3` — Open the v2 → main PR
   - Files: none (GitHub only)
   - Estimate: small
   - Kind: config
