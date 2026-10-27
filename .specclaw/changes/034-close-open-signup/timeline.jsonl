@@ -6,3 +6,5 @@
 {"ev":"start","span":"T1","kind":"task","label":"allow-list + team gate + tests","parent":"W1","model":"sonnet","attempt":"1","at":"2026-10-27T17:19:19Z","ts":1793121558}
 {"ev":"stop","span":"T1","at":"2026-10-27T17:26:52Z","ts":1793122012,"status":"ok"}
 {"ev":"stop","span":"W1","at":"2026-10-27T17:31:50Z","ts":1793122310,"status":"ok"}
+{"ev":"start","span":"verify-1793122663","kind":"phase","label":"verify","at":"2026-10-27T17:37:43Z","ts":1793122663}
+{"ev":"stop","span":"verify-1793122663","at":"2026-10-27T18:07:43Z","ts":1793124463,"status":"ok"}

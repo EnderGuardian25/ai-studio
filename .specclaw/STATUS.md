@@ -1,7 +1,7 @@
 # 🦞 SpecClaw Dashboard
 
 **Project:** bistec-studio
-**Last Updated:** 2026-10-27 17:32 UTC
+**Last Updated:** 2026-10-27 18:07 UTC
 
 _1 unnumbered change · run `/specclaw:renumber` to order them_
 
@@ -39,7 +39,7 @@ _1 unnumbered change · run `/specclaw:renumber` to order them_
 - 🔍 **031-v2-final-polish** ▣ — verify PASS | 19/19 tasks (100%) | 0 failed | 8h36m
 - 🔍 **032-fork-folio-restore** ▣ — verify PASS | 12/12 tasks (100%) | 0 failed | 13h39m
 - 🔍 **033-folio-fidelity-pass** ▣ — verify PASS | 11/11 tasks (100%) | 0 failed | 4h22m
-- 🔨 **034-close-open-signup** ▫ — build done | 2/2 tasks (100%) | 0 failed | 33m
+- 🔍 **034-close-open-signup** ▫ — verify PASS | 2/2 tasks (100%) | 0 failed | 39m
 
 ## Pending Proposals
 
