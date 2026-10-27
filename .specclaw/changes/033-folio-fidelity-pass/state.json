@@ -1,6 +1,6 @@
 {
   "change": "033-folio-fidelity-pass",
-  "phase": "build",
+  "phase": "verify",
   "branch": "v2",
   "size": "architectural",
   "phases": {
@@ -8,6 +8,7 @@
     "spec": { "status": "done", "at": "2026-10-27T11:44:22Z" },
     "design": { "status": "done", "at": "2026-10-27T11:45:37Z" },
     "tasks": { "status": "done", "at": "2026-10-27T11:46:21Z" },
-    "build": { "status": "in-progress", "at": "2026-10-27T11:53:44Z" }
+    "build": { "status": "in-progress", "at": "2026-10-27T11:53:44Z" },
+    "verify": { "status": "passed", "at": "2026-10-27T16:03:22Z", "verdict": "PASS" }
   }
 }

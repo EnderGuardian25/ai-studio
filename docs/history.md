@@ -2,7 +2,7 @@
 
 > **To pick up work, read `CLAUDE.md` "Current state", not this file.**
 
-## 2026-10-27 (late): 033 Folio fidelity pass built
+## 2026-10-27 (late): 033 Folio fidelity pass built and verified
 
 - **W1 (T1 to T5):**
   - **T1:** a behaviour-invariant check, `scripts/check-ui-invariants.mjs`. It compares guarded JSX attributes with `c45ed3dc`, and only `audit.md` permits can excuse a difference.
@@ -20,6 +20,7 @@
   - Four of the 12 new components were restyled: the facts-check notice, the stale-headline badge, the rule review panel and the insights section. The other 8 were already Folio and only their DESIGN_SYSTEM.md sections changed.
   - DESIGN_SYSTEM.md §8.20–§8.27 were rewritten with their code.
   - **T11** ran the final gate (597 + 1 flaky / 3 / 0), recaptured the reference screenshots and wrote the index of changed screens (`reports/T11.md`).
+- **Verified PASS, 17 of 17**, after the user approved the final captures. CI was green on `bbf99c51` (run 40533199662, E2E 598/3/0/0).
 - **Lessons:**
   - Capturing right after an edit under `next dev` can catch a stale stylesheet (L30).
   - The invariant check nets keys across files, so a used permit can still show as "unused". Per-file counts are the cross-check.

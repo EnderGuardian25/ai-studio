@@ -1,0 +1,7 @@
+exit=0
+duration_s=12
+log=.specclaw/changes/033-folio-fidelity-pass/logs/test-npm-run-test-unit-271441.log
+head=bbf99c515c31d6fc23a8cf9befc83c96529d03a5
+dirty=true
+cmd=npm run test:unit
+interrupted=false
