@@ -149,7 +149,7 @@ Each family task:
 
 ## 8. Gate and process
 
-- **The gate script** is the 032 scratchpad `gate.sh` with two new steps: `node scripts/check-ui-invariants.mjs` and `--coverage` after the restore check. `CAPTURE=1` captures into `ui-captures/033/`.
+- **The gate script** is [`tools/gate.sh`](tools/gate.sh) (032's gate plus `check-ui-invariants.mjs` and `--coverage` after the restore check; both are skipped until T1 adds the script). Run it in the background as `bash .specclaw/changes/033-folio-fidelity-pass/tools/gate.sh <logdir>` and read `<logdir>/summary.txt`; the E2E result is its `MOCK_EXIT=` line. `CAPTURE=1` also runs [`tools/ref-shots.mjs`](tools/ref-shots.mjs) (the reference screenshots) and `capture-ui.mjs` into `${CAPTURE_OUT:-ui-captures/033}`.
 - **Two full E2E runs:** T5 and T11. A family task runs its own suites (§7) only.
 - **Before each push,** the orchestrator checks `git remote get-url origin` and scans the range (patterns, plus the fixed-string env check). After each push it checks `gh run list --branch v2`.
 - **Models:**

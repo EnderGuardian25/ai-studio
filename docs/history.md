@@ -1,6 +1,21 @@
 > **History. Not instructions.** The company-era entries (2026-10-18 to 2026-10-27) describe `bistec-oss/studio`.
 
-## ✅ Outstanding work — START HERE (updated 2026-10-27)
+> **To pick up work, read `CLAUDE.md` "Current state", not this file.**
+
+## 2026-10-27 (end): 032 verified, CI back, 033 planned
+
+- **032 VERIFIED PASS, 23/23** ([`verify-report.md`](../.specclaw/changes/032-fork-folio-restore/verify-report.md)). The first pass was PARTIAL, because GitHub had created no CI run since 2026-10-14: the repo's workflows had been disabled. The user re-enabled them.
+- **The first CI run then failed on a 032 defect.** The preflight's `--env-file` flag is also a Node option, so Node read it even after the script path and exited 9 when the file was missing. CI has no `.env.test`. The flag is now `--stack-env` (`86439c0e`, recorded in 032's `errors.md`). CI went green at `468a2018` (run 40487229474: unit, build, E2E 598/3/0/0).
+- **Fork `main`:** with the user's go-ahead, `e7b057bd` deleted the company deploy workflow (`docker-publish.yml`, a Coolify redeploy on a push to `main`). `main`'s CI is green, and no branch has a deploy workflow.
+- **The company repo is push-blocked in this clone's git config** (`pushInsteadOf` for every `bistec-oss` URL form, a dead `upstream` push URL, and `remote.pushDefault=origin`). GitHub Desktop may re-add `upstream`; it cannot push there.
+- **033 Folio fidelity pass: proposed, panel, planned.** The panel was standard (po, architect, ba), with the verdict CHANGES_REQUESTED, answered by the user's rulings:
+  - a checkpoint after the audit;
+  - "deliberate" means named in a 018–031 proposal or spec;
+  - the aim is one coherent product.
+
+  The plan is 13 FR, 6 NFR, 17 AC and 11 tasks (`80aec635`). The gate and screenshot scripts live in its `tools/` folder.
+
+## 2026-10-27: Outstanding work at the start of 032 (superseded)
 
 - **🍴 2026-10-27 — THIS REPO IS THE FORK `EnderGuardian25/ai-studio` AGAIN. PICK UP HERE: change 032 (fork restore) is PLANNED (2026-10-27): 21 FR, 5 NFR, 23 AC, 12 tasks in 3 waves ([`spec.md`](../.specclaw/changes/032-fork-folio-restore/spec.md), [`design.md`](../.specclaw/changes/032-fork-folio-restore/design.md), [`tasks.md`](../.specclaw/changes/032-fork-folio-restore/tasks.md)). Next: `/specclaw:build 032-fork-folio-restore`, starting at T1. The folder move is done (fork at `D:\ai-studio`, company clone at `D:\Bistec\studio` pinned to `designer`), and the leftover `upstream` remote was removed.** This entry is authoritative. **Every entry below it, and the top sections of `docs/handoff.md`, describe the company repo `bistec-oss/studio` between 2026-10-18 and 2026-10-27, not this repo.** W1 of 032 rewrites them.
   - **First, verify the repo:** `git remote get-url origin` must print `https://github.com/EnderGuardian25/ai-studio.git`. If it prints `bistec-oss/studio`, you are in the company clone: stop, and do not apply anything from this entry.

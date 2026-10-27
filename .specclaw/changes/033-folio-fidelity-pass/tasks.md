@@ -37,7 +37,9 @@
   3. Start `npm run test:e2e:serve` in the background.
   4. Run `npm run test:e2e:mock`.
 
-  Other tasks run only their own suites (design §7).
+  [`tools/gate.sh`](tools/gate.sh) does all of this plus the other checks; run it in the background (design §8). Other tasks run only their own suites (design §7), against a server started with `npm run test:e2e:serve` after `npm run test:e2e:db -- --reset`.
+
+- **Captures for a single task:** start the mock server as above, then `node scripts/capture-ui.mjs --out ui-captures/033-t<n>`, and view the PNGs.
 
 - **No real model or image calls.** Captures run against the mock server (`:3001`).
 - **Read `docs/ui-reference/DESIGN_SYSTEM.md` before any UI task,** including §12 "Words".
