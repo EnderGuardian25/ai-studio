@@ -37,3 +37,20 @@ authors: Damian De Cruz
 pattern hits (distinct): 0
 env values checked: 15; hits: none
 ```
+
+---
+
+# Re-scan: W2 (2026-10-27, before the T11 push)
+
+**Range:** `cd829be3..<T11 tip>`, which holds T5's approval, T6 to T10 with their row-closing commits, and T11. All commits are by one author.
+
+**Method:** the same pattern scan and local-env fixed-string check as above.
+
+| Range                             | Commits | Pattern hits | Env values checked | Env hits |
+| --------------------------------- | ------- | ------------ | ------------------ | -------- |
+| `cd829be3..8bcb0420` (before T11) | 10      | 0            | 15                 | none     |
+| the T11 diff (`git diff HEAD`)    | 1       | 0            | —                  | —        |
+
+**Note on the W1 push.** The W1 re-scan after the T5 commit found one hit, `COOLIFY_API_TOKEN`. It is the name inside the pattern written in this file, not a value. The W1 push command did not stop for review of that hit before pushing. It was reviewed right after: a name only, the same verdict as 032. From W2 on, the push runs only after the scan output is read.
+
+**Decision:** no credential was found. `origin` is `EnderGuardian25/ai-studio`.

@@ -2,6 +2,28 @@
 
 > **To pick up work, read `CLAUDE.md` "Current state", not this file.**
 
+## 2026-10-27 (late): 033 Folio fidelity pass built
+
+- **W1 (T1 to T5):**
+  - **T1:** a behaviour-invariant check, `scripts/check-ui-invariants.mjs`. It compares guarded JSX attributes with `c45ed3dc`, and only `audit.md` permits can excuse a difference.
+  - **T2:** capture coverage for the 018–031 states.
+  - **T3:** the three known items. The nav is text only, the two drawers' Send shows its word, and the crop marks are back.
+  - **T4:** the audit, 72 rows over 47 files.
+  - **T5:** the gate (598/3/0/0) and the push (`cd829be3`; CI run 40513095569 green).
+- **The checkpoint (user, 2026-10-27).** The user approved every look row, with no cut:
+  - A-002: keep the full-width draft head;
+  - A-003: `xl` with Folio's gaps;
+  - A-025: keep "New post".
+- **W2 (T6 to T11).**
+  - **T6** added no primitive, because no row needed one.
+  - **T7 to T10** closed every look row by family, one commit each, with each row closed at its commit: the draft page, the create flow and shell, the campaigns and kits, and team and insights.
+  - Four of the 12 new components were restyled: the facts-check notice, the stale-headline badge, the rule review panel and the insights section. The other 8 were already Folio and only their DESIGN_SYSTEM.md sections changed.
+  - DESIGN_SYSTEM.md §8.20–§8.27 were rewritten with their code.
+  - **T11** ran the final gate (597 + 1 flaky / 3 / 0), recaptured the reference screenshots and wrote the index of changed screens (`reports/T11.md`).
+- **Lessons:**
+  - Capturing right after an edit under `next dev` can catch a stale stylesheet (L30).
+  - The invariant check nets keys across files, so a used permit can still show as "unused". Per-file counts are the cross-check.
+
 ## 2026-10-27 (end): 032 verified, CI back, 033 planned
 
 - **032 VERIFIED PASS, 23/23** ([`verify-report.md`](../.specclaw/changes/032-fork-folio-restore/verify-report.md)). The first pass was PARTIAL, because GitHub had created no CI run since 2026-10-14: the repo's workflows had been disabled. The user re-enabled them.

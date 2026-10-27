@@ -176,7 +176,7 @@
   - Depends: T9
   - Notes: design §7. Suites: the team, caption-route, settings, admin-users and `analytics.test.ts` (insights) suites, and the axe suite.
 
-- [ ] `T11` — Final gate, screenshots, docs and push
+- [x] `T11` — Final gate, screenshots, docs and push
   - Files: `docs/ui-reference/screen-light.png`, `docs/ui-reference/screen-dark.png`, `CLAUDE.md`, `docs/e2e-test-plan.md`, `docs/history.md`, `reports/pre-push-scan.md`, `audit.md`
   - Estimate: medium
   - Kind: config
