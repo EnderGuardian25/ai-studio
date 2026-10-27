@@ -17,9 +17,10 @@ This repo contains planning documents for **bistec-studio**, an internal marketi
     - The fresh deploy passed: the real compose file on an empty scratch stack, all 46 migrations, no schema drift, smoke OK.
     - Security found one MEDIUM, open self-registration (F1, already on `main`). Change 034 fixed it.
     - The leftovers and config checks were clean.
-    - Lower findings are left for later: F2 for the future deploy workflow (`MINIO_PUBLIC_ENDPOINT` plus a route to MinIO, first-admin bootstrap from a checkout, app port binding), and F3 hardening (no exploit).
+    - Lower findings are left for later: F2 for the future deploy workflow (`MINIO_PUBLIC_ENDPOINT` plus a route to MinIO, first-admin bootstrap from a checkout, app port binding; documented in [`docs/deploy.md`](docs/deploy.md) by 035), and F3 hardening (no exploit).
     - The report is outside the repo, as agreed.
-    - **Pick up here: the `v2` → `main` PR, only when the user asks for it.**
+  - **Change 035 (pre-merge docs) refreshed the README, added [`docs/deploy.md`](docs/deploy.md) and fixed the MCP/ACP guide's ports. The user asked for the docs to be updated before the PR.**
+  - **Pick up here: the `v2` → `main` PR is open.** Merging it is the user's call; never merge without the user's go-ahead. Address review comments on `v2`.
   - **Change 034 (close open self-registration) is VERIFIED PASS (2026-10-27, 6 of 6; CI green on `93e9c7f4`, run 40552350239: E2E 601/3/0/0).** The auth route is an allow-list of better-auth paths, and `/api/briefs/images` requires a team. Report: [`verify-report.md`](.specclaw/changes/034-close-open-signup/verify-report.md).
   - The review's scope, kept for the record: `origin/main..origin/v2` was 458 commits, 361 `src/` files and about +49k/−5k lines (004 to 033, including 018–031 from the one-time sync). Every change was reviewed and verified on its own, so the user agreed on 2026-10-27 to a **targeted** review, not a line-by-line one. These are the four checks:
     1. **Fresh deploy from zero.** Run every migration in order on an empty scratch database (not `ai_studio` or `ai_studio_test`), build, and smoke-test. `main` is the deploy target, and the system starts with no data import.

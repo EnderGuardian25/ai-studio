@@ -2,6 +2,33 @@
 
 > **To pick up work, read `CLAUDE.md` "Current state", not this file.**
 
+## 2026-10-27 (night): the pre-PR review, 034 and 035
+
+- **The pre-PR review of `v2` against `main`** ran the four agreed checks, read-only. The full report stays outside the repo (user decision).
+  - **Fresh deploy from zero: pass.** This ran the real `docker-compose.yml` as its own scratch project, with a prod-shaped `.env`.
+    - The image built, and all 46 migrations applied on an empty database. App and scheduler serialized on the advisory lock.
+    - `prisma migrate diff` found no drift.
+    - `/api/health` returned 200 and the four buckets were created.
+    - `seed-admin.mjs`, run from the host, created the super admin, who signed in and created a team.
+  - **Security: one MEDIUM, already on `main`.** Two reviewers covered auth and roles, every API route, keys and crypto, MCP/ACP, uploads, SSRF and the test seams.
+    - The MEDIUM was open self-registration. An anonymous `POST /api/auth/sign-up/email` returned a session, and that account could write images to the public-read bucket through `/api/briefs/images`.
+    - There were no HIGH findings.
+  - **Company leftovers: clean.** Coolify and Hearts appear only in comments and seed data. No company hostname or company-only env var is in `src/`.
+  - **Config and env: clean.** Every variable `env.ts` reads is in `.env.example`, and the only workflow runs checks only.
+  - **Left for later:**
+    - The deploy items: `MINIO_PUBLIC_ENDPOINT` plus a browser route to MinIO, the first admin seeded from a checkout, and the app port. 035 documents them in `docs/deploy.md`.
+    - Hardening with no exploit: no session revocation on a password reset, no `MOCK_*` refusal in production, no MIME allow-list on the brand-kit uploads, and no `secure` flag on the active-team cookie.
+- **034 close open self-registration (VERIFIED PASS, 6/6; CI green on `93e9c7f4`, run 40552350239, E2E 601/3/0/0).**
+  - `src/app/api/auth/[...all]/route.ts` passes only five better-auth method and path pairs and answers 404 to the rest.
+  - `/api/briefs/images` requires a team.
+  - It adds TC-AUTH-09 to TC-AUTH-11.
+  - **Lesson:** better-auth 1.6.20's `disableSignUp` also refuses the server-side `auth.api.signUpEmail` that admin user creation uses, so the HTTP route is gated instead. Next.js answers 308 to a trailing-slash path before any route handler runs.
+- **035 pre-merge docs.**
+  - The README is current: Next 16 and React 19, `npm run db:migrate`, the full scripts table.
+  - The new `docs/deploy.md` covers a self-hosted compose deploy.
+  - The MCP/ACP guide uses the fork's ports.
+  - Then the `v2` → `main` PR.
+
 ## 2026-10-27 (late): 033 Folio fidelity pass built and verified
 
 - **W1 (T1 to T5):**

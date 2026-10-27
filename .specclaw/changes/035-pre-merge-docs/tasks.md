@@ -20,7 +20,7 @@ T1 writes the docs. T2 records state (roadmap, history, the CLAUDE.md pick-up) a
 
 ### Wave 2 — state and push
 
-- [ ] `T2` — Roadmap, history and the CLAUDE.md pick-up; push
+- [x] `T2` — Roadmap, history and the CLAUDE.md pick-up; push
   - Files: `.specclaw/ROADMAP.md`, `docs/history.md`, `CLAUDE.md`
   - Estimate: small
   - Kind: docs
