@@ -12,7 +12,7 @@ T1 closes the hole and proves it: the allow-list at the auth route, the team gat
 
 ### Wave 1 — the fix and its tests
 
-- [ ] `T1` — Allow-list the auth route, team-gate the brief image upload, and add TC-AUTH-09 to TC-AUTH-11
+- [x] `T1` — Allow-list the auth route, team-gate the brief image upload, and add TC-AUTH-09 to TC-AUTH-11
   - Files: `src/app/api/auth/[...all]/route.ts`, `src/app/api/briefs/images/route.ts`, `tests/e2e/auth.test.ts`
   - Estimate: small
   - Kind: impl

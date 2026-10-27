@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { withAuth } from '@/lib/api/handler'
+import { withTeamAuth } from '@/lib/api/handler'
 import { uploadObject, publicUrl, BUCKET_IMAGES, validateUpload, RASTER_IMAGE_TYPES } from '@/lib/storage/minio'
 
 // Accepts a multipart image upload from the brief wizard (Images step) and
 // returns a MinIO URL. Runs before the Brief exists, so it is not scoped to a
 // briefId — files land under a briefs/ prefix and are referenced from
-// Brief.briefImages once the brief is created. Available to any signed-in user.
-export const POST = withAuth(async (req: NextRequest, _ctx, user) => {
+// Brief.briefImages once the brief is created. Requires a live team membership (change 034).
+export const POST = withTeamAuth(async (req: NextRequest, _ctx, user) => {
   const formData = await req.formData()
   const file = formData.get('file') as File | null
   if (!file) return NextResponse.json({ error: 'file is required' }, { status: 400 })

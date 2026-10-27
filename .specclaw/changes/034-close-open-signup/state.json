@@ -1,11 +1,12 @@
 {
   "change": "034-close-open-signup",
-  "phase": "tasks",
-  "branch": "",
+  "phase": "build",
+  "branch": "v2",
   "size": "bounded",
   "phases": {
     "proposal": { "status": "approved", "at": "2026-10-27T17:09:31Z" },
     "spec": { "status": "done", "at": "2026-10-27T17:16:52Z" },
-    "tasks": { "status": "done", "at": "2026-10-27T17:17:14Z" }
+    "tasks": { "status": "done", "at": "2026-10-27T17:17:14Z" },
+    "build": { "status": "in-progress", "at": "2026-10-27T17:18:58Z" }
   }
 }

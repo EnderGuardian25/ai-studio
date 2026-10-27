@@ -38,7 +38,7 @@ better-auth's `emailAndPassword.disableSignUp` is **not** used. In better-auth 1
 - **AC-02 (FR-01, FR-02).** For each allowed path the request still reaches better-auth: sign-in by username and by email answer 200 with a session cookie (TC-AUTH-01 and §M stay green), and `GET /api/auth/get-session` with that cookie answers 200 with the session.
 - **AC-03 (FR-01, FR-02).** These requests each answer 404:
   - `GET /api/auth/sign-up/email`
-  - `POST /api/auth/sign-in/username/` (a trailing slash)
+  - `POST /api/auth/sign-in/username/` (a trailing slash; amended at build, T1: Next.js answers 308 to the slash-less path before the route handler runs, so the test accepts 308 or 404 with redirects off. The redirect target is checked by the allow-list itself, so nothing off the list is reached.)
   - `POST /api/auth/SIGN-UP/email`
   - one unused better-auth path, `POST /api/auth/update-user`
 - **AC-04 (FR-03).** A user created by a super admin through `POST /api/admin/users`, signed in, and in no team gets 403 from `POST /api/briefs/images` with a valid PNG. A team member gets 200 with a `url`, as before.
