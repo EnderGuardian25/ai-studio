@@ -153,7 +153,7 @@ function EmptyState({
   return (
     <div ref={root} className="flex flex-col items-center gap-2 py-8 text-center">
       <MousePointerClick size={18} strokeWidth={1.4} className="text-fg-muted" aria-hidden />
-      <p className="text-ui-lg font-medium text-fg">Select an element</p>
+      <p className="font-display text-ui-lg font-medium text-fg">Select an element</p>
       <p className={MUTED}>
         Click any part of the design to change its text, color or size. Each change saves as a new
         revision. With the keyboard, start from the whole design and move with Parent, Child,
@@ -246,7 +246,7 @@ function SelectionFields({
             tabIndex={-1}
             data-focus-id="heading"
             aria-live="polite"
-            className="flex min-w-0 items-center gap-2 text-ui-lg font-medium text-fg focus:outline-none"
+            className="flex min-w-0 items-center gap-2 font-display text-ui-lg font-medium text-fg focus:outline-none"
           >
             Selected
             <span
@@ -376,7 +376,7 @@ function ColorField({
           style={hex ? { backgroundColor: hex } : NONE_SWATCH}
         >
           {!hex && (
-            <span aria-hidden className="text-ui-2xs font-semibold text-fg">
+            <span aria-hidden className="font-text text-ui-2xs font-semibold text-fg">
               none
             </span>
           )}

@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/Button'
 import { Notice } from '@/components/ui/Notice'
 import { ModelPicker } from '@/components/ui/ModelPicker'
 import { SectionHead } from '@/components/ui/SectionHead'
-import { FOCUS, ICON, ICON_SM, SCROLL_FOCUS, TAG } from '@/components/ui/atoms'
+import { FOCUS, ICON, ICON_SM, SCROLL_FOCUS, SMALL_CAPS } from '@/components/ui/atoms'
 import { NotAppliedCard } from '@/components/drafts/NotAppliedCard'
 import { ApiError, apiFetch } from '@/lib/apiFetch'
 import type { DraftAction, DraftNotApplied } from '@/lib/api-types'
@@ -240,18 +240,17 @@ export function RefinementPanel({
   const busy = running || pendingAction !== null || awaitingResolution || adopting
 
   return (
-    <section className="surface-bezel p-5">
-      <SectionHead title="Refine design" id={headingId} className="mb-3">
+    <section className="pt-[22px] pb-1.5">
+      <SectionHead numeral="ii." title="Refine design" id={headingId} className="mb-3">
         {messages.length > 0 && (
-          <span className="font-mono text-ui-2xs text-fg-muted">
+          <span className="text-fg-muted">
             {messages.length} {messages.length === 1 ? 'request' : 'requests'}
           </span>
         )}
       </SectionHead>
 
-      {/* The refine log (§8.14, the study's .thread): ruled rows, newest last,
-          each with a status disc, the instruction, a status line and a mono
-          time. It scrolls inside its own box once it is long, so the box is
+      {/* The refine log (§8.14): ruled rows, newest last, each with a status
+          marker, the instruction, a status line and the time. It scrolls inside its own box once it is long, so the box is
           always a focusable, labelled region, even with no requests yet (WCAG
           2.1.1; the static rule, 014 FR-17). */}
       <div
@@ -259,25 +258,25 @@ export function RefinementPanel({
         tabIndex={0}
         role="region"
         aria-label="Refine requests"
-        className={`mb-3.5 max-h-72 overflow-y-auto rounded-ui-md ${SCROLL_FOCUS}`}
+        className={`mb-4 max-h-72 overflow-y-auto ${SCROLL_FOCUS}`}
       >
         {messages.length === 0 ? (
           <p className="text-ui-sm text-fg-muted">
             Describe a change in natural language and the design agent will apply it.
           </p>
         ) : (
-          <ol className="divide-y divide-line-subtle">
+          <ol>
             {messages.map((m) => (
-              <li key={m.id} className="grid grid-cols-[22px_minmax(0,1fr)_auto] items-start gap-2.5 px-2 py-2.5">
+              <li key={m.id} className="grid grid-cols-[22px_minmax(0,1fr)_auto] items-start gap-3 border-b border-line-subtle py-2.5">
                 <StatusDisc status={m.status} />
                 <div className="min-w-0">
-                  <p className="break-words text-ui-sm font-medium text-fg">{m.instruction}</p>
-                  <p className="mt-0.5 text-ui-2xs text-fg-muted">
+                  <p className="break-words text-ui-base leading-snug text-fg">{m.instruction}</p>
+                  <p className="mt-0.5 text-ui-xs text-fg-muted">
                     {m.status === 'pending' && <span>Applying…</span>}
-                    {m.status === 'applied' && <span>Applied</span>}
-                    {m.status === 'conflict' && <span className="font-semibold text-status-scheduled">Brand conflict</span>}
+                    {m.status === 'applied' && <span className={`text-status-published ${SMALL_CAPS}`}>Applied</span>}
+                    {m.status === 'conflict' && <span className={`text-status-scheduled ${SMALL_CAPS}`}>Brand conflict</span>}
                     {m.status === 'not-applied' && (
-                      <span className="font-semibold text-status-scheduled" title={m.detail}>
+                      <span className={`text-status-scheduled ${SMALL_CAPS}`} title={m.detail}>
                         Not applied
                       </span>
                     )}
@@ -288,7 +287,7 @@ export function RefinementPanel({
                     )}
                   </p>
                 </div>
-                <time dateTime={m.sentAt.toISOString()} className="pt-0.5 font-mono text-ui-2xs text-fg-muted">
+                <time dateTime={m.sentAt.toISOString()} className="pt-0.5 text-ui-xs text-fg-muted">
                   {m.sentAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </time>
               </li>
@@ -328,26 +327,26 @@ export function RefinementPanel({
         </Notice>
       )}
 
-      {/* Suggestions (§8.14, the study's .sugg): TAG pills. */}
-      <div className="mb-3 flex flex-wrap items-center gap-1.5">
-        <span className="mr-1 text-ui-xs text-fg-muted">Try:</span>
+      {/* Suggestions (§8.14): text buttons with a dotted underline. */}
+      <div className="mb-3.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-ui-sm">
+        <span className="text-fg-muted">Try:</span>
         {SUGGESTIONS.map((s) => (
           <button
             key={s}
             type="button"
             onClick={() => setInput(s)}
             disabled={busy}
-            className={`${TAG} h-7 px-3 transition-shadow duration-fast ease-standard enabled:hover:ring-line disabled:cursor-not-allowed disabled:opacity-50 ${FOCUS}`}
+            className={`border-b border-dotted border-line text-fg transition-colors duration-fast ease-standard enabled:hover:border-fg disabled:cursor-not-allowed disabled:opacity-50 ${FOCUS}`}
           >
             {s}
           </button>
         ))}
       </div>
 
-      {/* The prompt (§8.3, §8.14, the study's .ask): a pill field with the
-          round ink Send inside it; the wrapper shows the focus outline. */}
+      {/* The prompt (§8.3, §8.14): a display-italic field with the ink Send
+          button attached; the wrapper shows the focus outline. */}
       <form
-        className="flex items-center gap-2 rounded-ui-pill border border-line bg-surface-raised py-[5px] pl-4 pr-[5px] focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-focus"
+        className="flex rounded-ui-sm border border-line bg-surface-raised focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-focus"
         onSubmit={(e) => {
           e.preventDefault()
           if (!busy) send(input)
@@ -359,14 +358,14 @@ export function RefinementPanel({
           onChange={(e) => setInput(e.target.value)}
           disabled={busy}
           placeholder="e.g. Make the logo larger…"
-          className="min-w-0 flex-1 bg-transparent text-ui-sm text-fg placeholder:text-fg-muted focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+          className="min-w-0 flex-1 bg-transparent px-3.5 py-2.5 font-display text-ui-base italic text-fg [font-variation-settings:'opsz'_24] placeholder:text-fg-muted focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
         />
         <button
           type="submit"
           aria-label="Send"
           title="Send"
           disabled={busy || !input.trim()}
-          className={`inline-flex size-[34px] flex-shrink-0 items-center justify-center rounded-full bg-accent text-accent-fg transition-transform duration-fast ease-standard enabled:active:scale-[0.98] motion-reduce:enabled:active:scale-100 disabled:cursor-not-allowed disabled:opacity-50 ${FOCUS}`}
+          className="inline-flex flex-shrink-0 items-center gap-2 whitespace-nowrap border-l border-line bg-fg px-4 font-text text-ui-sm font-semibold text-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus disabled:cursor-not-allowed disabled:opacity-50"
         >
           {running || pendingAction === 'REFINE' ? (
             <Loader2 {...ICON_SM} className="animate-spin" aria-hidden />
@@ -394,20 +393,20 @@ export function RefinementPanel({
   )
 }
 
-// A refine row's status disc (the study's .st): 22 px, the status colour on
-// its 0.12 tint (021 A2), with a check or an alert; a spinner while it runs.
+// A refine row's status marker: 22 px, the status colour on its 10 % tint
+// (the pair §3.3 checks), with a check or an alert; a spinner while it runs.
 function StatusDisc({ status }: { status: RefineMessage['status'] }) {
   const tone =
     status === 'pending'
       ? 'bg-canvas text-fg-muted'
       : status === 'applied'
-        ? 'bg-status-published/12 text-status-published'
+        ? 'bg-status-published/10 text-status-published'
         : status === 'error'
-          ? 'bg-status-failed/12 text-status-failed'
-          : 'bg-status-scheduled/12 text-status-scheduled'
+          ? 'bg-status-failed/10 text-status-failed'
+          : 'bg-status-scheduled/10 text-status-scheduled'
   const Icon = status === 'pending' ? Loader2 : status === 'applied' ? Check : AlertTriangle
   return (
-    <span aria-hidden className={`mt-px inline-flex size-[22px] items-center justify-center rounded-full ${tone}`}>
+    <span aria-hidden className={`mt-px inline-flex size-[22px] items-center justify-center rounded-ui-sm ${tone}`}>
       <Icon {...ICON_SM} className={status === 'pending' ? 'animate-spin' : undefined} />
     </span>
   )

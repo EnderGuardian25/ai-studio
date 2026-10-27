@@ -130,7 +130,7 @@ export function PublishDialog({ draftId, headlineState, onClose, onSuccess }: Pu
             const reasonId = `${channelsId}-${ch}-reason`
             return (
               <div key={ch} className="flex flex-col gap-1">
-                <label className="flex items-center gap-2 cursor-pointer text-ui-sm font-medium text-fg">
+                <label className="flex items-center gap-2 cursor-pointer text-ui-base text-fg">
                   <input
                     type="checkbox"
                     checked={checkedChannels.includes(ch)}

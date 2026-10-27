@@ -33,7 +33,7 @@ import { FactsCheckNotice } from '@/components/drafts/FactsCheckNotice'
 import { HeadlineImageNotice } from '@/components/drafts/HeadlineImageNotice'
 import { ModelPicker } from '@/components/ui/ModelPicker'
 import { PageTitle } from '@/components/ui/PageHead'
-import { EYEBROW, FOCUS, ICON, ICON_SM, PILL_BADGE } from '@/components/ui/atoms'
+import { EYEBROW, FOCUS, ICON, ICON_SM, PILL_BADGE, SUB_HEAD } from '@/components/ui/atoms'
 import { ApiError, apiFetch } from '@/lib/apiFetch'
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser'
 import { useUndoableAction } from '@/lib/hooks/useUndoableAction'
@@ -79,15 +79,14 @@ const STATUS_TO_CHIP: Record<DraftDetail['status'], 'draft' | 'exported' | 'publ
 const REVISION_RETRY_DELAYS_MS = [2000, 4000, 8000]
 
 // The expand badge sits on the post image, which can be any colour, so it
-// uses the study's fixed .expand values, paper on ink, that read in both
-// themes: 32 × 32, inset 10 px, shown while the post is hovered or focused.
+// uses fixed ink-on-paper values that read in both themes (§8.12): 30 × 30,
+// inset 10 px, shown while the post is hovered or keyboard-focused.
 const EXPAND_BADGE =
-  'absolute right-2.5 top-2.5 inline-flex h-control-sm w-control-sm items-center justify-center rounded-[10px] bg-[#fbfaf8] text-[#181816] shadow-[0_4px_12px_-4px_rgb(0_0_0/0.3)] opacity-0 transition-opacity duration-fast ease-standard group-hover:opacity-100 group-focus-visible:opacity-100' // ui-exception: drawn on the post image, fixed paper-on-ink per DESIGN_SYSTEM.md §8.12
+  'absolute right-2.5 top-2.5 inline-flex h-[30px] w-[30px] items-center justify-center rounded-ui-sm border border-[#211c18] bg-[#fffefb] text-[#211c18] opacity-0 transition-opacity duration-fast ease-standard group-hover:opacity-100 group-focus-visible:opacity-100' // ui-exception: drawn on the post image, fixed ink-on-paper per DESIGN_SYSTEM.md §8.12
 
-// A version cell (the study's .v): thumbnail over the number and label. The
-// current one adds the nav "current" look with a 1.5 px ink ring.
-const VERSION_CELL =
-  'flex w-full min-w-0 flex-col items-center gap-2 rounded-ui-md px-1 pb-1.5 pt-2 text-center transition-colors duration-fast ease-standard'
+// A version cell (§8.13): the thumbnail over the number and label, left
+// aligned. The current one is ringed by its thumbnail's ink outline.
+const VERSION_CELL = 'block w-full min-w-0 text-left'
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
@@ -379,12 +378,11 @@ export default function DraftDetailPage() {
         <div className="min-w-0">
           <Link
             href="/library"
-            className={`mb-2 inline-flex items-center gap-1.5 text-ui-xs font-medium text-fg-muted transition-colors duration-fast ease-standard hover:text-fg ${FOCUS}`}
+            className={`mb-2 inline-flex items-center gap-1.5 text-ui-sm text-fg-muted underline decoration-line underline-offset-4 transition-colors duration-fast ease-standard hover:text-fg ${FOCUS}`}
           >
-            <ArrowLeft {...ICON_SM} aria-hidden /> Library
+            <ArrowLeft {...ICON} aria-hidden /> Library
           </Link>
-          {/* The page eyebrow stays (021 A7), as the Graphite micro-label; the
-              kit is in the meta row below. */}
+          {/* The page eyebrow stays (021 A7); the kit is in the meta row below. */}
           <p className={EYEBROW}>Draft</p>
           <PageTitle className="mt-2 break-words lg:truncate">
             <span title={draft.brief.topic}>{draft.brief.topic}</span>
@@ -476,11 +474,11 @@ export default function DraftDetailPage() {
           Refine design, Captions. */}
       <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[0.92fr_1.08fr]">
         <div className="flex min-w-0 flex-col gap-3.5">
-          {/* ── The stage (§8.12): a bezel card holding the post ──────────── */}
-          <section aria-label="Preview" className="surface-bezel min-w-0 p-5 sm:p-7">
+          {/* ── The stage (§8.12): the proof plate holding the post ─────────── */}
+          <section aria-label="Preview" className="relative min-w-0 border border-line-subtle bg-surface-raised p-5 sm:p-10">
             <div className="mb-[18px] flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
               <span className={EYEBROW}>Preview</span>
-              <span className="font-mono text-ui-2xs text-fg-muted">
+              <span className="text-ui-xs text-fg-muted">
                 {width} × {height}
                 {currentRevision && ` · v${currentRevision.revisionNumber} of ${revisions.length}`}
               </span>
@@ -489,7 +487,7 @@ export default function DraftDetailPage() {
             {/* The post, at its own aspect ratio, never cropped, rounded or
               restyled (021 A3): its immediate wrapper is square too. */}
             <div
-              className={`relative mx-auto ${aspectClassFor(draft.brief.aspectRatio)} w-full max-w-[392px] bg-canvas`}
+              className={`relative mx-auto ${aspectClassFor(draft.brief.aspectRatio)} w-full max-w-[392px] bg-surface`}
             >
               {draft.exportUrl ? (
                 <button
@@ -505,12 +503,12 @@ export default function DraftDetailPage() {
                     className="block h-full w-full object-contain"
                   />
                   <span aria-hidden className={EXPAND_BADGE}>
-                    <Maximize2 {...ICON_SM} />
+                    <Maximize2 {...ICON} />
                   </span>
                 </button>
               ) : isGenerating ? (
                 <div
-                  className="absolute inset-0 flex animate-pulse flex-col items-center justify-center gap-3 bg-canvas"
+                  className="absolute inset-0 flex animate-pulse flex-col items-center justify-center gap-3 bg-surface"
                   aria-label="Generating design"
                   role="status"
                 >
@@ -610,14 +608,14 @@ export default function DraftDetailPage() {
               />
             )}
 
-            {/* The versions (§8.13, the study's .v): a thumbnail at the post's
-              ratio, the number, the instruction. The current one is ringed in
-              ink with a "Current" pill. No previous/next arrows (021 A5). */}
-            <h2 className="sr-only">Revision History</h2>
+            {/* The versions (§8.13): a thumbnail at the post's ratio, the number,
+              the instruction. The current one is ringed in ink with a "Current"
+              badge. No previous/next arrows (021 A5). */}
+            <h2 className={`${SUB_HEAD} mb-2.5 mt-7 border-b border-fg pb-2`}>Revision History</h2>
             {revisions.length === 0 ? (
-              <p className="mt-5 text-ui-sm text-fg-muted">No revisions yet.</p>
+              <p className="text-ui-sm text-fg-muted">No revisions yet.</p>
             ) : (
-              <ul aria-label="Versions" className="mt-5 grid grid-cols-4 gap-2">
+              <ul aria-label="Versions" className="grid grid-cols-4 gap-3 sm:gap-5">
                 {versions.map((r) => {
                   const isCurrent = r.revisionNumber === draft.currentRevisionNumber
                   // 008 FR-20: the model that made this version. The cell is too
@@ -628,7 +626,13 @@ export default function DraftDetailPage() {
                     <>
                       {/* A version's own render, shown as rendered (§8.12): square. */}
                       <span
-                        className={`relative block w-11 flex-shrink-0 ${aspectClassFor(draft.brief.aspectRatio)} bg-canvas`}
+                        className={[
+                          `relative block w-full max-w-[72px] ${aspectClassFor(draft.brief.aspectRatio)} bg-surface`,
+                          'outline outline-offset-[3px] transition-[outline-color] duration-fast ease-standard',
+                          isCurrent
+                            ? 'outline-2 outline-fg'
+                            : 'outline-1 outline-line-subtle group-hover:outline-line',
+                        ].join(' ')}
                       >
                         {r.exportUrl && (
                           // eslint-disable-next-line @next/next/no-img-element
@@ -640,14 +644,14 @@ export default function DraftDetailPage() {
                         )}
                       </span>
                       <span className="block w-full min-w-0">
-                        <span className="flex flex-wrap items-center justify-center gap-x-1 gap-y-0.5 font-mono text-ui-xs font-semibold text-fg">
+                        <span className="mt-2.5 flex flex-wrap items-baseline gap-x-1.5 font-display text-ui-base font-medium text-fg">
                           v{r.revisionNumber}
-                          {isCurrent && <span className={`${PILL_BADGE} font-sans`}>Current</span>}
+                          {isCurrent && <span className={`${PILL_BADGE} font-text`}>Current</span>}
                           {restoringRev === r.revisionNumber && (
-                            <Loader2 {...ICON_SM} className="animate-spin text-fg-muted" />
+                            <Loader2 {...ICON} className="animate-spin self-center text-fg-muted" />
                           )}
                         </span>
-                        <span className="mt-0.5 line-clamp-2 break-words text-ui-2xs leading-snug text-fg-muted">
+                        <span className="line-clamp-2 break-words text-ui-xs leading-snug text-fg-muted">
                           {r.instruction}
                         </span>
                         <span className="mt-0.5 block text-ui-2xs leading-snug text-fg-muted">
@@ -680,7 +684,7 @@ export default function DraftDetailPage() {
                         <div
                           aria-current="true"
                           title={r.instruction ?? undefined}
-                          className={`${VERSION_CELL} bg-surface-raised shadow-panel ring-[1.5px] ring-inset ring-fg`}
+                          className={VERSION_CELL}
                         >
                           {frame}
                         </div>
@@ -691,7 +695,7 @@ export default function DraftDetailPage() {
                           disabled={restoringRev !== null || actionPending}
                           aria-label={`Switch to v${r.revisionNumber}`}
                           title={`Switch to v${r.revisionNumber}${r.instruction ? ` — ${r.instruction}` : ''}`}
-                          className={`${VERSION_CELL} enabled:hover:bg-surface-raised disabled:cursor-not-allowed disabled:opacity-50 ${FOCUS}`}
+                          className={`group ${VERSION_CELL} disabled:cursor-not-allowed disabled:opacity-50 ${FOCUS}`}
                         >
                           {frame}
                         </button>

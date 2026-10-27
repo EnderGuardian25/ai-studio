@@ -93,10 +93,7 @@ const GRAPHITE_DENY: Array<{ label: string; re: RegExp; codeOnly?: true }> = [
 // the shared-name guard until its W3 task removes it. W3's last task sets
 // W3_DONE and the list must then be empty.
 const W3_DONE = false
-const PENDING_RESTYLE: readonly string[] = [
-  // 021 status tints (bg-status-*/12) in the refine verdict rows; W3 uses the Folio tint.
-  'src/components/drafts/RefinementPanel.tsx',
-]
+const PENDING_RESTYLE: readonly string[] = []
 
 const SHARED_NAME =
   /^\s*(?:export\s+(?:default\s+)?)?(?:async\s+)?(?:const|let|function)\s+(FOCUS|SCROLL_FOCUS|SMALL_CAPS|EYEBROW|FIELD_LABEL|PAGE_TITLE|PAGE_LEAD|SECTION_HEAD|SECTION_NUMERAL|SUB_HEAD|KIT_TITLE|STEP_HEAD|STEP_NUMERAL|STEP_LEAD|GROUP_HEAD|ASIDE_HEAD|NOTICE|WARN_NOTICE|ICON|ICON_SM|ICON_BUTTON|TEXT_LINK|TAG|TABLE_HEAD_ROW|ROW|COMPACT_FIELD|COMPACT_TEXTAREA|PILL_BADGE|PageHead|PageTitle|SectionHead|SectionHeader|Notice|FieldLabel|StatusWord|GateNotice)\b/

@@ -69,7 +69,7 @@ export function HeadlineImageNotice({
           <Button variant="secondary" size="sm" onClick={onApply} disabled={disabled} aria-label="Apply the new headline to the image">
             Apply to image
             {beta && (
-              <span data-testid="apply-beta-chip" className="ml-1.5 rounded-ui-pill border border-line px-1.5 text-ui-2xs font-semibold text-fg-muted">
+              <span data-testid="apply-beta-chip" className="ml-1.5 rounded-ui-sm border border-line px-1.5 text-ui-2xs font-semibold text-fg-muted">
                 Beta
               </span>
             )}

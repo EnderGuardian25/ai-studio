@@ -46,10 +46,9 @@ type RegenerateBody = ({ channel?: Channel } | { headline: true }) & { model?: M
 // "Regenerate all"'s targets, as the route reads {} (captions/requests.ts).
 const ALL_CAPTIONS = CAPTION_CHANNELS.map((s) => s.channel)
 
-// The caption card (012 FR-18; 021 FR-11, the study's Caption card): a bezel
-// card whose head is "Captions" with "Regenerate all" in its tail, then the
-// headline and one panel per registry channel, in registry order, as ruled
-// blocks. Each panel owns its Regenerate and its Undo (FR-19). A background
+// The caption desk (012 FR-18): "i. Captions" with "Regenerate all" in its
+// tail, then the headline and one panel per registry channel, in registry
+// order. Each panel owns its Regenerate and its Undo (FR-19). A background
 // failure is shown by the page's pendingActionError line; a channel's own
 // failure by its panel.
 export function CaptionPanels({ draft, onSaved, onActionStarted }: CaptionPanelsProps) {
@@ -121,8 +120,8 @@ export function CaptionPanels({ draft, onSaved, onActionStarted }: CaptionPanels
   }
 
   return (
-    <section className="surface-bezel p-5">
-      <SectionHead title="Captions" className="mb-3">
+    <section className="pt-[22px] pb-1.5">
+      <SectionHead numeral="i." title="Captions" className="mb-3">
         {regenerating && (
           <span className="flex items-center gap-1.5 text-fg-muted">
             <Loader2 {...ICON} className="animate-spin" aria-hidden /> Regenerating…
@@ -153,8 +152,7 @@ export function CaptionPanels({ draft, onSaved, onActionStarted }: CaptionPanels
           <Loader2 {...ICON} className="animate-spin" aria-hidden /> Writing the captions…
         </p>
       )}
-      {/* The panels as ruled blocks on line-subtle (§8.14). */}
-      <div className="divide-y divide-line-subtle [&>*:first-child]:pt-1 [&>*:last-child]:pb-0 [&>*]:py-5">
+      <div className="space-y-6">
         <HeadlinePanel
           draftId={draft.id}
           headline={draft.headline}

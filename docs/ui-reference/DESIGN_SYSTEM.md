@@ -645,6 +645,34 @@ The page heads, section heads, notices and field labels are shared components in
 
 **`/team` → Models** (section "v.") is the admin side: a named group of checkboxes, "Allowed models", labelled `<name> · <tier> · <speed>` with a "New" `StatusChip` outside the label for a model added since the team saved; six `Select`s in a "Defaults" group, each starting with "System default (<name>)"; the switch "Opus requires a personal token" with its helper text (disabled in API mode, "Only applies in CLI mode."); and an ink Save (§8.2). A 400 shows inline as `Notice tone="error" role="alert"`.
 
+### 8.20 The draft-page notices: image style, image key, fonts and facts check
+
+Four notices sit under the post in the Preview section, in this order: the background notice (008, §8.19's neighbour), the image-key notice, the font notice and the image-style notice, then the facts check and the stale-headline badge (§8.21). Each is a `Notice` (§8.18) with `tone="warning"` and `role="status"`: a heads-up about a working post, never a blocker (Publish stays enabled).
+
+**Anatomy.** A `Notice` with a 15 px `ICON` (a lucide `LayoutTemplate` for the image style, `ShieldAlert` for the facts check, `Type` for the headline, `ImageOff` for the background) at `mt-0.5`, then a body. The body is a `font-semibold` title line (the image-style notice's reads "Image style", the facts check's "Facts check") and a `mt-1 text-ui-xs text-fg` line carrying the message. The image-key and font notices have the message line only. The caller adds `mt-4`.
+
+**Atoms and tokens.** `Notice` carries the fill and the ring: `--status-scheduled` text on its 10 % fill, ringed in `currentColor` (§3.2, the pair §3.3 checks), radius `--radius-sm`. Message text is `--fg` on that fill. A value quoted in a notice is `font-mono break-all`. No notice has a bezel, a pill or a shadow.
+
+**The image-style notice** (`CompositionNotice`) shows the fixed per-reason line for the look that was not applied. Its `data-reason` names the reason; a `composite-*` reason is a product screenshot that could not be placed, and the post fell back to the classic look.
+
+**States.** One notice per cause, stacked, none shown for a clear state. Light and dark use the same classes: the status colour, its 10 % fill and `--fg` text are checked in both themes (§3.3), so no notice sets a theme class.
+
+### 8.21 The facts-check notice and the stale-headline badge
+
+**The facts-check notice** (`FactsCheckNotice`) is the §8.20 anatomy with the title "Facts check". When the check is `flagged` it lists each value as `<code class="font-mono break-all">` with its source in parentheses, then the fixed advice sentence; when the check could not run it shows one message line. It renders nothing for a clear check or one that was never run.
+
+**The stale-headline badge** (`HeadlineImageNotice`) is a §8.20 notice with the title "Headline" and the `Type` icon. Under the title are the headline line, an optional reason line and an optional scheduled-post line, each `mt-1 text-ui-xs text-fg`. Then an action row, `mt-3 flex flex-wrap gap-2`, of secondary small `Button`s (§8.2), each with its own `aria-label`:
+
+| Action               | When it shows                                                              |
+| -------------------- | -------------------------------------------------------------------------- |
+| Edit inline          | Always; disabled when the draft cannot be edited inline or an action runs. |
+| Regenerate design    | Freeform posts with a design.                                              |
+| Apply to image       | Only while the headline is `stale` (no model call; a confirm dialog first). |
+
+"Apply to image" can carry a "Beta" chip, `ml-1.5 rounded-ui-sm border border-line px-1.5 text-ui-2xs font-semibold text-fg-muted`, only while the re-measure sits below its bar; today the chip is off. The badge and the three buttons are disabled while any draft action runs. Nothing renders for a `fresh` or `unknown` headline.
+
+**States.** `stale` and `unconfirmed` both show the badge (the text differs). The Apply confirm uses the confirm dialog (§8.10) with the old and new headline in curly quotes. A failed apply names the reason in a toast, and a render-time failure arrives as the page's failure line. Light and dark are identical.
+
 ---
 
 ## 9. Accessibility floor
