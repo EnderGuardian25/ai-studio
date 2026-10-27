@@ -80,7 +80,7 @@
     - Run the CLI at HEAD (expected: exit 0, no diff). `--coverage` is expected to fail until T4 and is not in the T1 commit's gate.
     - No change to `package.json` scripts.
 
-- [ ] `T2` — Capture coverage for every state this change touches
+- [x] `T2` — Capture coverage for every state this change touches
   - Files: `scripts/capture-ui.mjs`
   - Estimate: medium
   - Kind: test
