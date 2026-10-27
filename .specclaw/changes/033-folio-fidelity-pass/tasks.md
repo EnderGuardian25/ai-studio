@@ -67,7 +67,7 @@
 
 ### Wave 1: Evidence and the known gaps
 
-- [ ] `T1` — The behaviour-invariant check
+- [x] `T1` — The behaviour-invariant check
   - Files: `scripts/lib/uiInvariants.mjs` (new), `scripts/check-ui-invariants.mjs` (new), `tests/unit/uiInvariants.test.ts` (new), `.specclaw/changes/033-folio-fidelity-pass/audit.md` (new: the header and empty family tables only)
   - Estimate: medium
   - Kind: test
