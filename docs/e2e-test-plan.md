@@ -240,6 +240,9 @@ Legend: **P** precondition · **S** steps · **E** expected. "Guards" = remediat
 - **TC-AUTH-05 — Admin-only mutations gated.** P: editor session. S: PATCH/DELETE `/api/campaigns/[id]`, `/api/projects/[id]`; POST `/api/posts`; any `/api/admin/*`. E: 403. **Guards H4.**
 - **TC-AUTH-06 — `requireRole` case-insensitive.** S: as admin (`ADMIN` in DB) hit an admin route. E: 200 (not 403). **Guards the role-casing bonus fix.**
 - **TC-AUTH-07 — middleware exact-prefix.** S: request a path that merely _prefixes_ a protected one (e.g. `/admincustom`). E: not wrongly treated as protected/exempt. **Guards M9.**
+- **TC-AUTH-09 — Public sign-up is refused (change 034).** P: no cookie. S: POST `/api/auth/sign-up/email` with a valid body. E: 404; as super admin, `GET /api/admin/users` does not list the username, and sign-in with those credentials fails.
+- **TC-AUTH-10 — The auth route is an allow-list (change 034).** S: sign in by username, then GET `/api/auth/get-session` with the cookie; probe `GET /api/auth/sign-up/email`, `POST /api/auth/SIGN-UP/email`, `POST /api/auth/update-user` and `POST /api/auth/sign-in/username/`. E: sign-in 200 with a cookie, get-session 200; the probes 404 (the trailing slash may answer Next's 308 to the canonical path, with redirects off).
+- **TC-AUTH-11 — Brief image upload needs a team (change 034).** P: a user created by a super admin through `POST /api/admin/users`, in no team. S: POST `/api/briefs/images` with a PNG. E: 403; the seeded editor (in a team) gets 200 with a `url`.
 
 ### B. Brand kits (admin)
 
@@ -1226,6 +1229,7 @@ CI gate: **`.github/workflows/e2e.yml`** runs the whole suite (§A–§AA, inclu
 | Change 031 post fonts (AC-17, AC-18, AC-22 → AC-24)                    | §AJ TC-PF-01…08 (see §AJ)                                                              |
 | Change 031 briefing design-rule upgrade (AC-27, AC-28)                 | §AK TC-BU-01…05 (see §AK)                                                              |
 | Change 031 assistants: schedule styles, brand-kit fonts (AC-30, AC-32) | §AL TC-AS-01…06 (see §AL)                                                              |
+| Change 034 open self-registration (pre-PR review F1; AC-01 → AC-04)    | TC-AUTH-09, TC-AUTH-10, TC-AUTH-11 (§A)                                                |
 
 > Items with no behavioral surface (M2 init race, M3 stdin, M7 polling, M8 crypto guards, M13 dead code) are best covered by unit tests; M7 polling can optionally be a UI test (draft auto-refresh while `IN_PROGRESS`).
 

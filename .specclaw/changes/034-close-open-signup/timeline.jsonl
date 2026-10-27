@@ -4,3 +4,4 @@
 {"ev":"stop","span":"plan","at":"2026-10-27T17:17:56Z","ts":1793121476,"status":"ok"}
 {"ev":"start","span":"W1","kind":"wave","label":"wave 1","at":"2026-10-27T17:19:18Z","ts":1793121558}
 {"ev":"start","span":"T1","kind":"task","label":"allow-list + team gate + tests","parent":"W1","model":"sonnet","attempt":"1","at":"2026-10-27T17:19:19Z","ts":1793121558}
+{"ev":"stop","span":"T1","at":"2026-10-27T17:26:52Z","ts":1793122012,"status":"ok"}

@@ -30,7 +30,7 @@ T1 closes the hole and proves it: the allow-list at the auth route, the team gat
 
 ### Wave 2 — record the decision
 
-- [ ] `T2` — Test plan and CLAUDE.md
+- [x] `T2` — Test plan and CLAUDE.md
   - Files: `docs/e2e-test-plan.md`, `CLAUDE.md`
   - Estimate: small
   - Kind: docs
