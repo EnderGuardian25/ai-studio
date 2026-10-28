@@ -8,7 +8,7 @@
 
 ### Wave 1
 
-- [ ] `T1` — Set the root metadata title to `ai-studio`
+- [x] `T1` — Set the root metadata title to `ai-studio`
   - Files: `src/app/layout.tsx`
   - Estimate: small
   - Kind: impl
