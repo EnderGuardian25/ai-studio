@@ -1,7 +1,7 @@
 # 🦞 SpecClaw Dashboard
 
 **Project:** bistec-studio
-**Last Updated:** 2026-10-28 15:05 UTC
+**Last Updated:** 2026-10-28 15:45 UTC
 
 _1 unnumbered change · run `/specclaw:renumber` to order them_
 
@@ -41,11 +41,11 @@ _1 unnumbered change · run `/specclaw:renumber` to order them_
 - 🔍 **033-folio-fidelity-pass** ▣ — verify PASS | 11/11 tasks (100%) | 0 failed | PR #1 merged | 4h22m
 - 🔍 **034-close-open-signup** ▫ — verify PASS | 2/2 tasks (100%) | 0 failed | PR #1 merged | 1h9m
 - 🔍 **035-pre-merge-docs** ▫ — verify PASS | 3/3 tasks (100%) | 0 failed | 5m
+- 🔍 **036-browser-title-ai-studio** ▫ — verify pass | 1/1 tasks (100%) | 0 failed | 51s
 
 ## Pending Proposals
 
 - 📋 **010-whatsapp-channel-posting** — proposal ready, awaiting planning
-- 📋 **036-browser-title-ai-studio** — proposal ready, awaiting planning
 
 ## Recently Completed
 
@@ -53,6 +53,6 @@ _None._
 
 ## Stats
 
-- **Total changes:** 34
-- **Active:** 34
+- **Total changes:** 35
+- **Active:** 35
 - **Completed:** 0
