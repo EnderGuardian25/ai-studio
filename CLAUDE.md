@@ -20,7 +20,7 @@ This repo contains planning documents for **bistec-studio**, an internal marketi
     - Lower findings are left for later: F2 for the future deploy workflow (`MINIO_PUBLIC_ENDPOINT` plus a route to MinIO, first-admin bootstrap from a checkout, app port binding; documented in [`docs/deploy.md`](docs/deploy.md) by 035), and F3 hardening (no exploit).
     - The report is outside the repo, as agreed.
   - **Change 035 (pre-merge docs) refreshed the README, added [`docs/deploy.md`](docs/deploy.md) and fixed the MCP/ACP guide's ports. The user asked for the docs to be updated before the PR.**
-  - **Pick up here: the `v2` → `main` PR is open, [#1](https://github.com/EnderGuardian25/ai-studio/pull/1) (opened 2026-10-28 on `c9bdf564`, CI run 40559451217 green).** Merging it is the user's call; never merge without the user's go-ahead. Address review comments on `v2`.
+  - The `v2` → `main` PR [#1](https://github.com/EnderGuardian25/ai-studio/pull/1) was merged by the user on 2026-10-28 (merge commit `4cd1f94f` on `main`).
   - **Change 034 (close open self-registration) is VERIFIED PASS (2026-10-27, 6 of 6; CI green on `93e9c7f4`, run 40552350239: E2E 601/3/0/0).** The auth route is an allow-list of better-auth paths, and `/api/briefs/images` requires a team. Report: [`verify-report.md`](.specclaw/changes/034-close-open-signup/verify-report.md).
   - The review's scope, kept for the record: `origin/main..origin/v2` was 458 commits, 361 `src/` files and about +49k/−5k lines (004 to 033, including 018–031 from the one-time sync). Every change was reviewed and verified on its own, so the user agreed on 2026-10-27 to a **targeted** review, not a line-by-line one. These are the four checks:
     1. **Fresh deploy from zero.** Run every migration in order on an empty scratch database (not `ai_studio` or `ai_studio_test`), build, and smoke-test. `main` is the deploy target, and the system starts with no data import.
@@ -29,6 +29,45 @@ This repo contains planning documents for **bistec-studio**, an internal marketi
     4. **Config and env.** Diff `.env.example`, `docker-compose*`, `next.config.*` and `.github/workflows` against `main`, so that the deploy has every variable it needs.
   - **No proposal is needed for the review** (user, 2026-10-27): it only reads code and reports. Keep the findings outside the repo (the scratchpad, or a published page); committing them under `docs/` would be a docs change. **A fix that a finding needs goes through `/specclaw:propose` first.** Open the PR only when the user says so; the fork takes no per-change PRs, and `main` is never touched without the user's go-ahead.
   - `scripts/check-ui-invariants.mjs` belongs to 033's gate and is not in CI (its baseline is `c45ed3dc`). A later UI change retires it or rebases it.
+- **`main` holds PR #1 (merged by the user on 2026-10-28, `4cd1f94f`).** `v2` was fast-forwarded to it and work continues on `v2`. `main` is not touched again without the user's go-ahead.
+- **Change 036 (browser tab title "ai-studio") is VERIFIED PASS (2026-10-28, 3 of 3; CI green on `c74a6fa3`, run 40714132579: E2E 601/3/0/0).** Only the root metadata title in `src/app/layout.tsx` changed. The ACP and MCP server names and the model prompt text still say "bistec-studio" on purpose. Report: [`verify-report.md`](.specclaw/changes/036-browser-title-ai-studio/verify-report.md).
+- **Pick up here: the 037–039 program (user, 2026-10-28).** The product becomes generate a post image, download it, copy a caption. There are three architectural changes, built in this order:
+  - **037 remove scheduling and publishing.** Approved. Its party panel ran (deep, 5 seats, 2 rounds): CHANGES_REQUESTED, 28 findings upheld (2 BLOCK), all in [`party-report.md`](.specclaw/changes/037-remove-scheduling-publishing/party-report.md). The user's decisions after it are in the proposal's "Decisions after the party review":
+    - one change, with the table drop and enum rebuild now, behind a fail-closed migration;
+    - Download replaces Export, and "current" means rendered from the latest revision;
+    - a "Posts this month" KPI;
+    - the removal is accepted as one-way. The tag `pre-037-publishing` (`ea8e7f2e`, pushed) is the last commit with publishing.
+  - **038 campaigns become projects.** The user approved the proposal. Its panel is resolved (deep, 5 seats: po and ba on sonnet, architect, security and visionary on opus) but **has not run**.
+  - **039 general caption plus curated Instagram, LinkedIn and Facebook captions.** The user approved the proposal. Its panel is resolved (deep, 5 seats) but has not run.
+  - **The next task is to run the 038 panel.** The user chose panels on all three changes and approved the bill (10 spawns per change: 6 opus, 4 sonnet), so no further spend question is needed for 038 or 039.
+    - The procedure is `/specclaw:propose` step 4: round 1 blind and in parallel, then round 2 with all round-1 files, then `tally`, `report` and `spawn-budget record`.
+    - Write each seat's final message verbatim to `party/findings-r1/<role>.md` (then `findings-r2/`).
+    - Append the upheld findings to the proposal's Open Questions, and ask the user to decide the blocking ones.
+    - Then record `specclaw-set-phase .specclaw 038-campaigns-to-projects proposal approved --size architectural`.
+    - Then do the same for 039, then `/specclaw:plan` 037, build, verify; then 038, then 039.
+  - **The user's decisions for the program (2026-10-28; most are in the three proposals):**
+    - **Posts and projects:**
+      - Every member of a team sees every post. Only the author and team admins edit, refine, regenerate, change the kit of or delete a post.
+      - A post belongs to zero or one project, set in the wizard or later. Team admins create projects and edit their settings; any member assigns a post.
+      - A project's default kit, briefing, documents and default post style and tone take over from campaigns.
+    - **Data:** the old tables are dropped, not kept.
+    - **Captions:**
+      - Every post gets the on-image headline plus one general caption.
+      - Instagram, LinkedIn and Facebook captions are generated on demand: one per channel, editable, written from the brief plus the general caption.
+      - Facebook: 40 to 120 words, a call to action with the link, 0 to 3 hashtags.
+      - The wizard's channel picker goes.
+    - **Download and library:**
+      - PNG Download plus a Copy button per caption.
+      - The library filters by project, kit and post style.
+    - **MCP and ACP:** `generate_post` stays and `publish_post` goes.
+    - **Worker:** a slim worker container runs only analytics retention.
+    - **Insights:** trimmed, plus caption, download and copy metrics.
+- **Local machine only (not the repo):**
+  - On 2026-10-28 the user reset the local `ai_studio` database for their Aloy's Travels work. `adminBTG` and the Bistec team are deleted, and MinIO was emptied.
+  - The only account is the super admin `DDC`. The teams are `Aloys` (kits Aloy's Highlights and Aloy's Tours, with 4 Tours templates) and `ddc` (empty).
+  - Do not run `npm run db:seed` there without asking: it recreates adminBTG and a Bistec team.
+  - The local dev server runs on port 3001 (`BETTER_AUTH_URL` and `NEXT_PUBLIC_APP_URL` set to 3001 for that run), because another project holds 3000.
+  - No Claude token or image key is connected yet.
 - **CI runs again since 2026-10-27.** Workflows had been disabled on GitHub from 2026-10-14 until the user re-enabled them. The fork's `main` no longer has the company deploy workflow (`e7b057bd`), so no workflow on any branch deploys.
 - GitHub Desktop on this machine re-adds an `upstream` remote (the company repo) for the fork. Pushing to the company repo is blocked in this clone's local git config: `url.<no-push>.pushInsteadOf` covers every `bistec-oss` URL form, `remote.upstream.pushurl` is a dead URL, and `remote.pushDefault` is `origin`. Never remove these settings.
 
@@ -107,6 +146,8 @@ Before writing any backend code, API routes, Prisma models, or provider logic, r
 | 6    | [wave-6-admin-e2e.md](.specclaw/changes/001-marketing-post-studio-v1/wave-6-admin-e2e.md)                 | Admin settings, AGUI refinement, E2E tests             |
 
 ## Architecture decisions to remember
+
+> The 037–039 program (see "Current state") will remove scheduling, publishing and campaigns, and rework captions. Until each change is built, the entries below describe the code as it is.
 
 - All AI calls are **server-side only** — the browser never calls an AI API or Puppeteer directly
 - **Roles are hierarchical:** `SUPER_ADMIN > ADMIN > EDITOR`; every check goes through `hasRole()` (`src/lib/roles.ts`) — never compare role strings directly. Super-admins pass every admin gate. User management (`/admin/users`) is super-admin-only; "delete" = deactivate (`User.disabled`, sessions revoked, sign-in blocked).
