@@ -1,0 +1,9 @@
+{
+  "change": "037-remove-scheduling-publishing",
+  "phase": "proposal",
+  "branch": "",
+  "size": "architectural",
+  "phases": {
+    "proposal": { "status": "approved", "at": "2026-10-28T17:39:42Z" }
+  }
+}
