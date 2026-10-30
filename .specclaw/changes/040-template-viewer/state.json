@@ -1,0 +1,9 @@
+{
+  "change": "040-template-viewer",
+  "phase": "proposal",
+  "branch": "",
+  "size": "bounded",
+  "phases": {
+    "proposal": { "status": "approved", "at": "2026-10-30T12:35:58Z" }
+  }
+}
