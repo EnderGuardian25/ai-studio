@@ -62,3 +62,39 @@ This is change 2 of 3. It depends on 037, which removes the campaign queue.
 
 - **Decided (user, 2026-10-28):** with every member seeing every post, only the author and team admins may edit, refine, regenerate, change the kit of or delete a post. Other members can view, download, copy captions and assign it to a project.
 - The plan must confirm the right owner for `projectId` (`Brief` or `Draft`) from how regenerate and revisions use them.
+
+### Party review (2026-10-30): CHANGES_REQUESTED, 33 upheld (6 BLOCK, 18 WARN, 9 NOTE), 2 withdrawn — see party-report.md
+
+- (party-architect, BLOCK) The author-or-admin edit rule has no home; name one predicate (e.g. `canEditPost`) and split the ~24 `visibility.ts` callers into read, assign and edit.
+- (party-security, BLOCK) Widening the read predicate widens writes unless a separate `canModify` gate and a guard test exist; add same-team non-author 403 E2E cases.
+- (party-security, BLOCK) A caller-supplied project id (wizard, assign, move, MCP/ACP) must be checked against the caller's team, 404 on mismatch, with cross-team tests.
+- (party-security, BLOCK) A member who may not edit a post can change its kit, style, briefing and facts-check sources by moving it; snapshot the inputs on the draft, or limit moves of an assigned post to author and admins.
+- (party-security, BLOCK) The table drop needs a fail-closed guard (refuse when campaign rows exist), a named recovery path, and a rule for orphaned `CampaignDocument` objects in storage.
+- (party-po, BLOCK) A cheaper variant is not weighed; justify the full move against extending the existing Project with only the link and visibility rule (party-architect and party-visionary rebut a plain rename: it would leave two project entities).
+- (party-architect) Decide which table owns `projectId` (`Brief` or `Draft`) in the proposal, with the brief-to-draft cardinality; only one table carries it.
+- (party-architect) Say whether project inputs are snapshotted at generation (which stamp) or read live, and what a move does to the facts check and the next regenerate.
+- (party-architect) Name the single kit resolver and its guard; say whether "team default kit" is an existing field.
+- (party-architect) Specify the `generate_post` project argument (id or name), the error for an unknown or foreign project, how a stale `campaign` field is handled, and the new manifest version.
+- (party-architect) List the analytics events and Insights sections that change, whether the event's project is the one at generation, and whether assign and move emit events.
+- (party-architect, NOTE) List which `src/lib/campaign/*` modules move and which are deleted, and which project surfaces exist today.
+- (party-architect, NOTE) A plain rename of Campaign builds a second project entity; any cheaper variant should extend the existing Project.
+- (party-architect, NOTE) A 038a/038b split needs an interim kit, style and briefing chain covering both `campaignId` and `projectId`.
+- (party-security) Deleting a project silently strips its posts' inputs and destroys briefing history; add a confirmation naming the post count, a soft delete or retention window, and a named failure for a mid-run deletion.
+- (party-security) `generate_post` must answer 400 with a named error for the retired campaign field or an unresolved project id, never treat either as "no project".
+- (party-security) "Moving only relabels" is safe only with a snapshot; otherwise a non-author's move changes the author's next regenerate.
+- (party-security) The principle "changes only its grouping is any member" puts the input-switching move in the open tier unless inputs are snapshotted.
+- (party-security, NOTE) Posts made private under the old rule become team-visible; log the count in the migration and say so in the deploy notes.
+- (party-ba) The proposal has no falsifiable acceptance criteria; list per-behaviour checks (kit and style precedence, briefing in the prompt, non-author 403, unassign on delete).
+- (party-ba) Say whether the existing Project table gains briefing, documents, style and tone, or a new table replaces it, and which Project fields stay.
+- (party-ba, NOTE) Say what an unassigned post uses for briefing and facts-check sources, and that a move does not re-run generation.
+- (party-po) The briefing assistant, chat, Improve and upgrade routes are ported with no stated value; consider a plain versioned briefing editor first.
+- (party-po) Three assignment surfaces (wizard, post page, library) and an extra permission tier are unpriced; ship wizard and post-page assign first.
+- (party-po, NOTE) Name a cut line, e.g. 038a (visibility, `projectId`, picker, project page) and 038b (briefing, documents, defaults, drop, analytics).
+- (party-po, NOTE) State the CI delta and caps on projects per team and documents per project.
+- (party-visionary) Keep the mutable assignment and the generation provenance separate: stamp `{ projectId, briefingVersion }` on the draft at generation.
+- (party-visionary) Say a post's project is single-valued for good, or keep many-valued grouping separate from the single configuration source now.
+- (party-visionary) One function should return a post's project context, with a call-site guard test, so 039's new caption calls cannot miss the briefing.
+- (party-visionary) State the principle behind the edit/view split and back `canEditPost` with a coverage test for every draft action.
+- (party-visionary) Rebuttal: an in-place rename of Campaign leaves two "project" entities; reuse the briefing and document machinery under the existing Project instead.
+- (party-visionary, NOTE) Key the briefing store and routes on an owner, and give the briefing a fallback tier (or say why none).
+- (party-visionary, NOTE) Keep `visibility.ts` as the only read predicate, with a boundary test against inline team filters.
