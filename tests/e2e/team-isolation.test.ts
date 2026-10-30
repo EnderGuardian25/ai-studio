@@ -157,6 +157,17 @@ test.describe('Cross-tenant isolation (D7)', () => {
     expect((clientxTemplates as { id: string }[]).map((t) => t.id)).not.toContain(heartsTemplateId)
   })
 
+  test('GET /api/templates/<id> is 404 across the team boundary, 200 for the owner (040 AC-05)', async () => {
+    const bistecTemplates = await (await bistecAdmin.get('/api/templates')).json()
+    const heartsTemplateId = (bistecTemplates as { id: string; name: string }[]).find((t) =>
+      t.name.includes('Hearts Talk'),
+    )?.id
+    expect(heartsTemplateId).toBeTruthy()
+
+    expect((await bistecAdmin.get(`/api/templates/${heartsTemplateId}`)).status()).toBe(200)
+    expect((await clientxAdmin.get(`/api/templates/${heartsTemplateId}`)).status()).toBe(404)
+  })
+
   // ── By-id routes across the boundary → 404 (GET/PATCH/DELETE) ──────────────
   test('draft by-id (GET/PATCH/DELETE) 404s across the team boundary', async () => {
     expect((await clientxAdmin.get(`/api/drafts/${bistecUncategorizedDraftId}`)).status()).toBe(404)

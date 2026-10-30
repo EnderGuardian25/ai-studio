@@ -13,3 +13,7 @@
 {"ev":"start","span":"T3","kind":"task","label":"Wizard preview","parent":"W2","model":"sonnet","attempt":"1","at":"2026-10-30T12:52:28Z","ts":1793364748}
 {"ev":"stop","span":"T3","at":"2026-10-30T12:54:52Z","ts":1793364892,"status":"ok"}
 {"ev":"stop","span":"W2","at":"2026-10-30T12:54:53Z","ts":1793364893,"status":"ok"}
+{"ev":"start","span":"W3","kind":"wave","label":"wave 3","at":"2026-10-30T12:56:08Z","ts":1793364968}
+{"ev":"start","span":"T4","kind":"task","label":"E2E","parent":"W3","model":"sonnet","attempt":"1","at":"2026-10-30T12:56:09Z","ts":1793364968}
+{"ev":"stop","span":"T4","at":"2026-10-30T13:00:25Z","ts":1793365225,"status":"ok"}
+{"ev":"stop","span":"W3","at":"2026-10-30T13:00:26Z","ts":1793365226,"status":"ok"}

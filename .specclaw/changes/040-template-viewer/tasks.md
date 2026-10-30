@@ -34,7 +34,7 @@ A shared sandboxed preview atom, a viewer on the kit page, a team-scoped read ro
 
 ### Wave 3 — E2E
 
-- [ ] `T4` — E2E: kit viewer, wizard preview, cross-team 404, a11y
+- [x] `T4` — E2E: kit viewer, wizard preview, cross-team 404, a11y
   - Files: `tests/e2e/template-viewer.test.ts`, `tests/e2e/team-isolation.test.ts`, `tests/e2e/a11y.test.ts`
   - Estimate: medium
   - Kind: test

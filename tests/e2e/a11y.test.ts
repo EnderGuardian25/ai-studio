@@ -1204,6 +1204,18 @@ test.describe('axe scan (T18)', () => {
     await expectNoAxeViolations(page, '/admin/brandkits (kit in edit mode)', { settle: true })
   })
 
+  // 040 AC-06: the kit page with the template viewer dialog open.
+  test('AC-19 (040): /admin/brandkits with the template viewer open', async ({ page }) => {
+    const { kit, stamp } = await mintBrandKitFixture(api)
+    mintedKits.push(kit.id)
+    await pageLogin(page)
+    await openKit(page, kit.name)
+    await page.getByRole('button', { name: `View template T11 template ${stamp}`, exact: true }).click()
+    await expect(page.getByRole('dialog')).toBeVisible()
+    await expect(page.locator('iframe[title^="Preview of"]')).toBeVisible()
+    await expectNoAxeViolations(page, '/admin/brandkits (template viewer open)', { settle: true })
+  })
+
   test('AC-19: /team with the register form open', async ({ page }) => {
     await pageLogin(page)
     await page.goto('/team')
