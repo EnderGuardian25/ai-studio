@@ -21,7 +21,7 @@ import { validateHeadline } from '@/lib/captions/headline'
 import { loadDraftCaptions, saveCaptionEdit, saveHeadlineEdit, settlePendingCaptions } from '@/lib/captions/store'
 import { copyProviderIsClaude } from '@/providers/registry'
 import { track } from '@/lib/analytics/track'
-import { headlineImageFor, headlineState, type ScheduledPosts } from '@/lib/renderedText/state'
+import { headlineImageFor } from '@/lib/renderedText/state'
 import { parseRenderedText } from '@/lib/renderedText/stamp'
 import { trackHeadlineEdited } from '@/lib/renderedText/track'
 
@@ -126,16 +126,6 @@ async function loadDraft(id: string) {
     where: { id },
     include: {
       brief: true,
-      posts: {
-        orderBy: { createdAt: 'desc' },
-        select: {
-          id: true,
-          channel: true,
-          status: true,
-          scheduledAt: true,
-          publishedAt: true,
-        },
-      },
       // revisionCount counts the chain only — rejected refine renders are not
       // versions (change 004 FR-13).
       _count: { select: { revisions: { where: COMMITTED_REVISION } } },
@@ -160,15 +150,11 @@ async function loadDraft(id: string) {
   } | null
 
   // 030 FR-12: the state comes from columns already read (no parse, no render).
-  // The scheduled-posts read runs only for a state that shows it, so the 4 s
-  // poll stays flat for `fresh` and `unknown`, which is nearly every poll.
   const renderedText = parseRenderedText(draft.renderedText)
   const imageSource = parseImageSource(draft.imageSource)
-  const state = headlineState(renderedText, draft.headline)
-  const wantsScheduled = state === 'stale' || state === 'unconfirmed'
 
   // Independent reads, run together (018 FR-04: this GET is the 4 s poll).
-  const [kit, notApplied, captionProviderIsClaude, scheduledAgg] = await Promise.all([
+  const [kit, notApplied, captionProviderIsClaude] = await Promise.all([
     resolveBrandKit(draft.teamId, draft.brief.campaignId ?? undefined, draft.brief.brandKitId ?? undefined),
     // FR-14/AC-18: a twice-failed refine is a distinct outcome, not the
     // existing error channel — re-derived from the retained rejected row on
@@ -179,18 +165,7 @@ async function loadDraft(id: string) {
     // (the brief's key, else the team default), not GET /api/models' team
     // default. It selects the provider name only.
     copyProviderIsClaude(draft.brief.teamId, draft.brief.copyProviderKey ?? undefined),
-    wantsScheduled
-      ? prisma.post.aggregate({
-          where: { draftId: draft.id, status: 'SCHEDULED' },
-          _count: true,
-          _min: { scheduledAt: true },
-        })
-      : null,
   ])
-  const scheduled: ScheduledPosts | null =
-    scheduledAgg && scheduledAgg._count > 0 && scheduledAgg._min.scheduledAt
-      ? { count: scheduledAgg._count, nextAt: scheduledAgg._min.scheduledAt.toISOString() }
-      : null
 
   const composition = draftCompositionStamp(draft)
 
@@ -236,7 +211,7 @@ async function loadDraft(id: string) {
     factsCheck: parseFactsCheck(draft.factsCheck),
     postStyle: styleSummary(draft.postStyle),
     // 030 FR-12: what the image shows of the headline, from the stamp.
-    headlineImage: headlineImageFor(renderedText, draft.headline, scheduled),
+    headlineImage: headlineImageFor(renderedText, draft.headline),
     createdAt: draft.createdAt,
     revisionCount: draft._count.revisions,
     currentRevisionNumber: draft.currentRevisionNumber,
@@ -250,7 +225,6 @@ async function loadDraft(id: string) {
       aspectRatio: draft.brief.aspectRatio,
       designMode: draft.brief.designMode,
     },
-    posts: draft.posts,
     },
   }
 }
@@ -293,15 +267,6 @@ export const PATCH = withTeamAuth<Params>(async (req, { params }, user) => {
     !canAccessContent(user, { teamId: existing.teamId, ownerId: existing.brief.userId, campaignId: existing.brief.campaignId })
   ) {
     return NextResponse.json({ error: 'Draft not found' }, { status: 404 })
-  }
-
-  // The published captions live only on the draft — editing them after publish
-  // would silently desynchronize the record from what was actually posted.
-  if (existing.status === 'PUBLISHED') {
-    return NextResponse.json(
-      { error: 'This draft has been published — its captions can no longer be edited' },
-      { status: 409 }
-    )
   }
 
   const beingGenerated = () => NextResponse.json({ error: 'This caption is being generated' }, { status: 409 })
@@ -357,8 +322,7 @@ export const PATCH = withTeamAuth<Params>(async (req, { params }, user) => {
   return NextResponse.json(result?.data)
 })
 
-// Admin-only hard delete: removes the draft with its publish history (Post rows —
-// a SCHEDULED post is thereby cancelled), revisions, and the parent Brief when no
+// Admin-only hard delete: removes the draft with its revisions, and the parent Brief when no
 // other draft references it. No cascades exist on these relations, so children
 // are deleted first, all in one transaction — except the caption rows
 // (DraftCaption), which cascade with the draft (012 D11).
@@ -372,7 +336,6 @@ export const DELETE = withTeamAdmin<Params>(async (_req, { params }, user) => {
   }
 
   const { briefDeleted, screenshotKey } = await prisma.$transaction(async (tx) => {
-    await tx.post.deleteMany({ where: { draftId: draft.id } })
     // Deliberately UNFILTERED: a hard delete removes every revision row,
     // rejected refine renders included (the FK would otherwise block the draft
     // delete). Draft.notAppliedRevisionId is ON DELETE SET NULL, so removing the

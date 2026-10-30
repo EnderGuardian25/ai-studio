@@ -51,11 +51,6 @@ export function HeadlineImageNotice({
       <p className="font-semibold">Headline</p>
       <p className="mt-1 text-ui-xs text-fg">{text.headline}</p>
       {text.reasonLine && <p className="mt-1 text-ui-xs text-fg">{text.reasonLine}</p>}
-      {text.scheduledLine && (
-        <p data-testid="headline-scheduled-line" className="mt-1 text-ui-xs text-fg">
-          {text.scheduledLine}
-        </p>
-      )}
       <div className="mt-3 flex flex-wrap gap-2">
         <Button variant="secondary" size="sm" onClick={onEditInline} disabled={disabled || !canEditInline} aria-label="Edit inline to fix the headline">
           Edit inline

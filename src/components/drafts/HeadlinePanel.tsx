@@ -26,7 +26,7 @@ export interface HeadlinePanelProps {
   /** The headline is being written: a generation, or a headline-only action
    *  (captionActionTargets). */
   busy: boolean
-  /** The draft can take a caption action (EXPORTED or PUBLISHED). */
+  /** The draft can take a caption action (EXPORTED). */
   ready: boolean
   /** Any action is firing or running on the draft (single-flight, A2). */
   locked: boolean

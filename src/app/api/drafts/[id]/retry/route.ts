@@ -10,7 +10,7 @@ type Params = { id: string }
 // Re-run generation for a FAILED draft in place (the preview page's inline
 // "Retry"). Resets the draft to IN_PROGRESS and fires generation in the
 // background again; the page's poll resumes and skeletons re-appear. Only a
-// FAILED draft can be retried — a live (EXPORTED/PUBLISHED) draft is left alone,
+// FAILED draft can be retried — a live (EXPORTED) draft is left alone,
 // and an already-IN_PROGRESS one is presumed still running.
 export const POST = withTeamAuth<Params>(async (_req, { params }, user) => {
   const draft = await prisma.draft.findUnique({

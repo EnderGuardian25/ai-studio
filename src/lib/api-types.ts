@@ -323,8 +323,6 @@ export interface HeadlineImage {
   renderedHeadline: string | null
   // Why the check could not confirm, when the state is 'unconfirmed'.
   reason: UnverifiedReason | null
-  // SCHEDULED posts of this draft, when the state is 'stale' or 'unconfirmed'.
-  scheduledPosts: { count: number; nextAt: string } | null
 }
 
 export interface DraftDetail {
@@ -349,7 +347,7 @@ export interface DraftDetail {
   imageUrl: string | null
   htmlContent: string | null
   exportUrl: string | null
-  status: 'IN_PROGRESS' | 'EXPORTED' | 'PUBLISHED' | 'FAILED'
+  status: 'IN_PROGRESS' | 'EXPORTED' | 'FAILED'
   failureReason: string | null
   pendingAction: DraftAction | null
   pendingActionError: string | null
@@ -385,13 +383,6 @@ export interface DraftDetail {
     aspectRatio: AspectRatio
     designMode: DesignMode
   }
-  posts: Array<{
-    id: string
-    channel: string
-    status: string
-    scheduledAt: string | null
-    publishedAt: string | null
-  }>
 }
 
 // ── Library (drafts + posts) ────────────────────────────────────────────

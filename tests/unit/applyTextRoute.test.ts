@@ -215,7 +215,7 @@ describe('acceptApplyRender fails closed (FR-40)', () => {
 })
 
 describe('Apply to image button (FR-44)', () => {
-  const stale = { state: 'stale', renderedHeadline: OLD, reason: null, scheduledPosts: null } as never
+  const stale = { state: 'stale', renderedHeadline: OLD, reason: null } as never
   const props = {
     canEditInline: true,
     canRegenerate: false,
@@ -240,7 +240,7 @@ describe('Apply to image button (FR-44)', () => {
   it('has no Apply button without canApply, or for an unconfirmed image', () => {
     const noApply = renderToStaticMarkup(h(HeadlineImageNotice, { ...props, image: stale, onApply: () => {} }))
     expect(noApply).not.toContain('Apply the new headline')
-    const unconfirmed = { state: 'unconfirmed', renderedHeadline: null, reason: 'not-visible', scheduledPosts: null } as never
+    const unconfirmed = { state: 'unconfirmed', renderedHeadline: null, reason: 'not-visible' } as never
     const html = renderToStaticMarkup(
       h(HeadlineImageNotice, { ...props, image: unconfirmed, canApply: true, onApply: () => {} }),
     )

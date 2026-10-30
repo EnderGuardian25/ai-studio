@@ -13,7 +13,6 @@ const h = vi.hoisted(() => ({
   teamFindUnique: vi.fn(),
   copyProviderIsClaude: vi.fn(),
   resolveBrandKit: vi.fn(),
-  postAggregate: vi.fn(),
   saveHeadlineEdit: vi.fn(),
   trackHeadlineEdited: vi.fn(),
   renderBoom: vi.fn(() => {
@@ -26,7 +25,6 @@ vi.mock('@/lib/prisma', () => ({
     draft: { findUnique: h.draftFindUnique, updateMany: h.draftUpdateMany },
     availableProvider: { findMany: h.providerFindMany },
     team: { findUnique: h.teamFindUnique },
-    post: { aggregate: h.postAggregate },
   },
 }))
 // 030 AC-10: the renderer and the mock check throw if reached, to show the read
@@ -98,7 +96,6 @@ function exportedDraft(copyProviderKey: string | null) {
     imageUrl: null,
     backgroundSkipReason: null,
     backgroundSkipDetail: null,
-    posts: [],
     _count: { revisions: 1 },
     brief: {
       id: 'b1',
@@ -132,7 +129,6 @@ beforeEach(() => {
   h.copyProviderIsClaude.mockImplementation(realCopyProviderIsClaude)
   h.resolveBrandKit.mockReset()
   h.resolveBrandKit.mockResolvedValue(null)
-  h.postAggregate.mockReset().mockResolvedValue({ _count: 0, _min: { scheduledAt: null } })
   h.saveHeadlineEdit.mockReset().mockResolvedValue(true)
   h.trackHeadlineEdited.mockReset().mockResolvedValue(undefined)
   h.renderBoom.mockClear()
@@ -309,7 +305,6 @@ describe('GET /api/drafts/[id] — headlineImage (030 FR-12, AC-10)', () => {
     renderedText,
     headline,
   })
-  const NEXT = new Date('2026-11-03T09:30:00.000Z')
 
   async function image(draft: unknown) {
     h.draftFindUnique.mockResolvedValue(draft)
@@ -318,66 +313,38 @@ describe('GET /api/drafts/[id] — headlineImage (030 FR-12, AC-10)', () => {
     return body.headlineImage as Record<string, unknown>
   }
 
-  it('fresh: only the state, and the scheduled read never runs', async () => {
+  it('fresh: only the state', async () => {
     expect(await image(withStamp(verified('h')))).toEqual({
       state: 'fresh',
       renderedHeadline: null,
       reason: null,
-      scheduledPosts: null,
     })
-    expect(h.postAggregate).not.toHaveBeenCalled()
   })
 
   it.each([
     ['a null stamp (a draft from before 030)', null, 'H'],
     ['a stamp with no headline key', {}, 'H'],
     ['a null headline', verified('H'), null],
-  ])('unknown for %s: only the state, and the scheduled read never runs', async (_n, stamp, headline) => {
+  ])('unknown for %s: only the state', async (_n, stamp, headline) => {
     const img = await image(withStamp(stamp, headline))
-    expect(img).toEqual({ state: 'unknown', renderedHeadline: null, reason: null, scheduledPosts: null })
-    expect(h.postAggregate).not.toHaveBeenCalled()
+    expect(img).toEqual({ state: 'unknown', renderedHeadline: null, reason: null })
   })
 
   it('an unreadable stored value reads as unknown, never a throw', async () => {
     expect((await image(withStamp({ headline: 'nope' }))).state).toBe('unknown')
   })
 
-  it('stale: renderedHeadline is the stamped text, no reason, and the scheduled read runs', async () => {
-    h.postAggregate.mockResolvedValue({ _count: 2, _min: { scheduledAt: NEXT } })
+  it('stale: renderedHeadline is the stamped text, and no reason', async () => {
     const img = await image(withStamp(verified('Old line'), 'New line'))
-    expect(img).toEqual({
-      state: 'stale',
-      renderedHeadline: 'Old line',
-      reason: null,
-      scheduledPosts: { count: 2, nextAt: NEXT.toISOString() },
-    })
-    expect(h.postAggregate).toHaveBeenCalledTimes(1)
-    expect(h.postAggregate).toHaveBeenCalledWith({
-      where: { draftId: 'd1', status: 'SCHEDULED' },
-      _count: true,
-      _min: { scheduledAt: true },
-    })
+    expect(img).toEqual({ state: 'stale', renderedHeadline: 'Old line', reason: null })
   })
 
-  it('stale with no SCHEDULED post: scheduledPosts is null', async () => {
-    expect((await image(withStamp(verified('Old line'), 'New line'))).scheduledPosts).toBeNull()
-    expect(h.postAggregate).toHaveBeenCalledTimes(1)
-  })
-
-  it('unconfirmed: the reason, no renderedHeadline, and the scheduled read runs', async () => {
-    h.postAggregate.mockResolvedValue({ _count: 1, _min: { scheduledAt: NEXT } })
+  it('unconfirmed: the reason, and no renderedHeadline', async () => {
     const img = await image(withStamp(unverified('H', 'not-visible')))
-    expect(img).toEqual({
-      state: 'unconfirmed',
-      renderedHeadline: null,
-      reason: 'not-visible',
-      scheduledPosts: { count: 1, nextAt: NEXT.toISOString() },
-    })
-    expect(h.postAggregate).toHaveBeenCalledTimes(1)
+    expect(img).toEqual({ state: 'unconfirmed', renderedHeadline: null, reason: 'not-visible' })
   })
 
   it('answers with the renderer and the mock check set to throw: nothing is rendered or parsed', async () => {
-    h.postAggregate.mockResolvedValue({ _count: 1, _min: { scheduledAt: NEXT } })
     await image(withStamp(verified('Old line'), 'New line'))
     expect(h.renderBoom).not.toHaveBeenCalled()
   })

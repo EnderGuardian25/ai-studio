@@ -114,11 +114,9 @@ describe('AC-18: the import edges', () => {
   })
 })
 
-describe('AC-01: the seven columns are optional with no default', () => {
+describe('AC-01: the five columns are optional with no default', () => {
   const COLUMNS: Array<[string, string]> = [
     ['Brief', 'postStyle'],
-    ['ScheduledGeneration', 'postStyle'],
-    ['ScheduledGeneration', 'heldReason'],
     ['Campaign', 'defaultPostStyle'],
     ['Draft', 'postStyle'],
     ['Draft', 'factsCheck'],
@@ -141,8 +139,6 @@ describe('AC-01: the seven columns are optional with no default', () => {
         .find((x) => x.name === model)!
         .fields.find((x) => x.name === field)!.type
     expect(type('Brief', 'postStyle')).toBe('String')
-    expect(type('ScheduledGeneration', 'postStyle')).toBe('String')
-    expect(type('ScheduledGeneration', 'heldReason')).toBe('String')
     expect(type('Campaign', 'defaultPostStyle')).toBe('String')
     expect(type('Draft', 'postStyle')).toBe('Json')
     expect(type('Draft', 'factsCheck')).toBe('Json')
@@ -156,10 +152,6 @@ describe('AC-01: the seven columns are optional with no default', () => {
       Prisma.BriefUncheckedCreateInput,
       'postStyle'
     > satisfies Prisma.BriefUncheckedCreateInput
-    const entry = null as unknown as Omit<
-      Prisma.ScheduledGenerationUncheckedCreateInput,
-      'postStyle' | 'heldReason'
-    > satisfies Prisma.ScheduledGenerationUncheckedCreateInput
     const campaign = null as unknown as Omit<
       Prisma.CampaignUncheckedCreateInput,
       'defaultPostStyle'
@@ -172,7 +164,7 @@ describe('AC-01: the seven columns are optional with no default', () => {
       Prisma.DraftRevisionUncheckedCreateInput,
       'postStyle'
     > satisfies Prisma.DraftRevisionUncheckedCreateInput
-    expect([brief, entry, campaign, draft, revision]).toHaveLength(5)
+    expect([brief, campaign, draft, revision]).toHaveLength(4)
   })
 })
 

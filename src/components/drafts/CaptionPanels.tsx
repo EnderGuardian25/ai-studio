@@ -70,7 +70,7 @@ export function CaptionPanels({ draft, onSaved, onActionStarted }: CaptionPanels
     setAllModelError(undefined)
   }, [])
 
-  const ready = draft.status === 'EXPORTED' || draft.status === 'PUBLISHED'
+  const ready = draft.status === 'EXPORTED'
   const writing = draft.status === 'IN_PROGRESS' && draft.captions.some((c) => c.status === 'PENDING')
   const regenerating = firing || draft.pendingAction === 'REGENERATE_COPY'
   // Single-flight is draft-level (A2): any in-flight action blocks every

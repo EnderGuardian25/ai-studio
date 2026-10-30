@@ -9,7 +9,7 @@ import { pageLogin } from '../helpers/ui'
 //   POST /api/drafts/[id]/regenerate-design | regenerate-copy | refine
 //     → all validation SYNCHRONOUS (404/403, 400 NOT_PATH_B, 400 'instruction
 //       is required', 422 NO_BRAND_KIT/COPY_ERROR, regenerate-copy 409 unless
-//       status EXPORTED/PUBLISHED — legacy shapes unchanged)
+//       status EXPORTED — legacy shapes unchanged)
 //     → atomic claim of Draft.pendingAction; a second action while one is in
 //       flight → 409 {error:'Another action is already running on this draft'}
 //     → 202 {ok:true}; the model work runs in-process in the background.

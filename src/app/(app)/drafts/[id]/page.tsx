@@ -69,7 +69,6 @@ const STATUS_TO_CHIP: Record<DraftDetail['status'], 'draft' | 'exported' | 'fail
   {
     IN_PROGRESS: 'draft',
     EXPORTED: 'exported',
-    PUBLISHED: 'exported', // the value goes with the schema change (T5)
     FAILED: 'failed',
   }
 
@@ -342,7 +341,7 @@ export default function DraftDetailPage() {
     draft?.pendingAction === 'REFINE' ||
     draft?.pendingAction === 'APPLY_TEXT'
   const isFailed = draft?.status === 'FAILED'
-  const ready = draft?.status === 'EXPORTED' || draft?.status === 'PUBLISHED'
+  const ready = draft?.status === 'EXPORTED'
 
   if (loading) {
     return (

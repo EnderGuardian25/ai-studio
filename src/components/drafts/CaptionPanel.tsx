@@ -65,7 +65,7 @@ export type RegenerateResult = { ok: true } | { ok: false; modelError: string | 
 export interface CaptionPanelProps {
   draftId: string
   caption: DraftCaptionDetail
-  /** The draft can take a caption action (EXPORTED or PUBLISHED). */
+  /** The draft can take a caption action (EXPORTED). */
   ready: boolean
   /** Any action is firing or running on the draft (single-flight, A2). */
   locked: boolean

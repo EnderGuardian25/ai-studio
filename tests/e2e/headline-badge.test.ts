@@ -27,7 +27,6 @@ type Img = {
   state: string
   renderedHeadline: string | null
   reason: string | null
-  scheduledPosts: { count: number; nextAt: string } | null
 }
 type Draft = Record<string, unknown> & { id: string; headline: string; headlineImage: Img }
 

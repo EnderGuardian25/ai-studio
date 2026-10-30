@@ -83,7 +83,7 @@ Add Download first, then remove scheduled generation, then the publishing UI, th
 
 ### Wave 5: drop the schema
 
-- [ ] `T5` — Fail-closed migration, down script, clear script, upgrade-path scenario and the `PUBLISHED` removal
+- [x] `T5` — Fail-closed migration, down script, clear script, upgrade-path scenario and the `PUBLISHED` removal
   - Files: prisma/schema.prisma, prisma/migrations/20261031120000_remove_scheduling_publishing/migration.sql, prisma/rollback/037-remove-scheduling-publishing.down.sql, scripts/clear-publishing-data.mjs, scripts/lib/clearPublishing.mjs, scripts/test-upgrade-path.mjs, scripts/seed-teams.mjs, src/app/api/drafts/[id]/route.ts, tx.post, src/app/api/drafts/[id]/apply-text/route.ts, src/app/api/drafts/[id]/regenerate-copy/route.ts, src/app/api/drafts/[id]/retry/route.ts, src/lib/drafts/inlineEdit.ts, src/components/drafts/CaptionPanel.tsx, src/components/drafts/CaptionPanels.tsx, src/components/drafts/HeadlinePanel.tsx, src/components/dashboard/RecentDraftsCard.tsx, src/app/(app)/drafts/[id]/page.tsx, src/lib/api-types.ts, tests/unit/clearPublishing.test.ts, tests/unit/inlineEdit.test.ts, tests/unit/draftDetailGet.test.ts, tests/unit/applyTextRoute.test.ts, tests/e2e/*
   - Estimate: large
   - Depends: T4

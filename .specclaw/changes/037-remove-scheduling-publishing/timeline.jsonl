@@ -16,3 +16,9 @@
 {"ev":"stop","span":"W3","at":"2026-10-30T16:24:20Z","ts":1793377460,"status":"ok"}
 {"ev":"start","span":"W4","kind":"wave","label":"wave 4","at":"2026-10-30T16:24:25Z","ts":1793377465}
 {"ev":"start","span":"T4","kind":"task","label":"Remove publish backend","parent":"W4","model":"sonnet","attempt":"1","at":"2026-10-30T16:24:26Z","ts":1793377466}
+{"ev":"stop","span":"T4","at":"2026-10-30T16:40:34Z","ts":1793378434,"status":"ok"}
+{"ev":"stop","span":"W4","at":"2026-10-30T16:40:34Z","ts":1793378434,"status":"ok"}
+{"ev":"stop","span":"T4","at":"2026-10-30T16:40:48Z","ts":1793378448,"status":"ok"}
+{"ev":"stop","span":"W4","at":"2026-10-30T16:40:48Z","ts":1793378448,"status":"ok"}
+{"ev":"start","span":"W5","kind":"wave","label":"wave 5","at":"2026-10-30T16:40:55Z","ts":1793378455}
+{"ev":"start","span":"T5","kind":"task","label":"Fail-closed migration, clear script, PUBLISHED removal","parent":"W5","model":"sonnet","attempt":"1","at":"2026-10-30T16:40:56Z","ts":1793378455}

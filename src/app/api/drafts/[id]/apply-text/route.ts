@@ -56,7 +56,7 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
   ) {
     return NextResponse.json({ error: 'Draft not found' }, { status: 404 })
   }
-  if ((draft.status !== 'EXPORTED' && draft.status !== 'PUBLISHED') || !draft.htmlContent) {
+  if (draft.status !== 'EXPORTED' || !draft.htmlContent) {
     return NextResponse.json(
       { code: 'DRAFT_NOT_READY', message: 'Apply to image needs a finished design.' },
       { status: 409 },

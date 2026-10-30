@@ -58,7 +58,7 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
 
   // Regeneration needs existing content to replace — a draft still generating
   // (or one whose generation failed) has none.
-  if (draft.status !== 'EXPORTED' && draft.status !== 'PUBLISHED') {
+  if (draft.status !== 'EXPORTED') {
     return NextResponse.json({ error: 'Draft is not ready for caption regeneration' }, { status: 409 })
   }
 

@@ -44,6 +44,9 @@ const CARRYOVER = '20261012130000_legacy_caption_carryover'
 const DROP_LEGACY = '20261013120000_drop_legacy_captions'
 const DROP_TEAM = '20261013130000_drop_empty_default_team'
 const GUARD_PREFIX = '022 legacy_caption_carryover'
+const GUARD_037_PREFIX = '037 remove_scheduling_publishing refused:'
+const PRE_037 = '20261030120000_apply_text_action' // the migration before 037
+const REMOVE_PUBLISHING = '20261031120000_remove_scheduling_publishing' // 037
 const PERSONAL_KEY_MIGRATION = '20261028120000_personal_image_key_provider' // 031 C
 
 // Scenario 3's sabotage: one exact replacement in the carry-over's INSERT, so
@@ -111,7 +114,7 @@ const ALL_MIGRATIONS = readdirSync(MIGRATIONS_DIR, { withFileTypes: true })
   .map((d) => d.name)
   .sort()
 
-for (const name of [MAIN_HEAD, PRE_CARRYOVER, CARRYOVER, DROP_LEGACY, DROP_TEAM, PERSONAL_KEY_MIGRATION]) {
+for (const name of [MAIN_HEAD, PRE_CARRYOVER, CARRYOVER, DROP_LEGACY, DROP_TEAM, PERSONAL_KEY_MIGRATION, PRE_037, REMOVE_PUBLISHING]) {
   if (!ALL_MIGRATIONS.includes(name)) {
     console.error(`FAIL setup: migration ${name} not found in prisma/migrations`)
     process.exit(1)
@@ -160,6 +163,16 @@ function deployFromTemp(migrations, patch) {
     rmSync(tmp, { recursive: true, force: true })
     tempDirs.delete(tmp)
   }
+}
+
+// The operator script, run against the scratch database only (DATABASE_URL is explicit).
+function runClearScript(args) {
+  const res = spawnSync(process.execPath, [join(ROOT, 'scripts', 'clear-publishing-data.mjs'), ...args], {
+    cwd: ROOT,
+    encoding: 'utf8',
+    env: { ...process.env, DATABASE_URL: SCRATCH_URL },
+  })
+  return { status: res.status, output: `${res.stdout ?? ''}${res.stderr ?? ''}` }
 }
 
 const deployFull = () => runPrisma(['migrate', 'deploy', '--schema', SCHEMA])
@@ -339,7 +352,8 @@ async function scenario1() {
   const keptBefore = json(await captionsOf([CAPTIONED, POST012]))
   const postBefore = json(await db.$queryRaw`SELECT * FROM "Post" WHERE "id" = ${SCHEDULED_POST}`)
 
-  mustDeploy('full deploy to head', deployFull())
+  // 037: today's checks run on the schema before 037 (Post and PUBLISHED still exist).
+  mustDeploy('to the migration before 037', deployFromTemp(upTo(PRE_037)))
 
   // Converted legacy drafts: 3 READY rows each, expected text, null model.
   const rows = await captionsOf(LEGACY.map((d) => d.id))
@@ -374,6 +388,40 @@ async function scenario1() {
   const team = await db.$queryRaw`SELECT 1 FROM "Team" WHERE "id" = ${TEAM}`
   check(team.length === 1, `${TEAM} was deleted although it has rows`)
 
+  // 037 AC-02: head refuses while publishing rows exist, and leaves them alone.
+  const refused = deployFull()
+  check(refused.status !== 0, 'deploying head with a Post row and a PUBLISHED draft exited 0')
+  check(refused.output.includes(GUARD_037_PREFIX), `the failed deploy has no "${GUARD_037_PREFIX}" message:
+${refused.output}`)
+  check(/1 Post, 0 ChannelToken, 0 ScheduledGeneration, 1 PUBLISHED drafts/.test(refused.output), 'the 037 message does not name the counts')
+  check(await tableExists('Post'), 'Post table is gone after the refused deploy')
+  check(json(await db.$queryRaw`SELECT * FROM "Post" WHERE "id" = ${SCHEDULED_POST}`) === postBefore, 'the Post row changed in the refused deploy')
+  const [{ pub }] = await db.$queryRawUnsafe(`SELECT count(*)::int AS pub FROM "Draft" WHERE status::text = 'PUBLISHED'`)
+  check(pub === 1, `${pub} PUBLISHED drafts after the refused deploy, expected 1`)
+
+  // Recovery: mark the failed migration rolled back, clear the data, deploy head.
+  const resolved = runPrisma(['migrate', 'resolve', '--rolled-back', REMOVE_PUBLISHING, '--schema', SCHEMA])
+  check(resolved.status === 0, `migrate resolve --rolled-back exited ${resolved.status}:
+${resolved.output}`)
+  const dry = runClearScript([])
+  check(dry.status === 3, `clear-publishing-data dry run exited ${dry.status}, expected 3:
+${dry.output}`)
+  const cleared = runClearScript(['--yes'])
+  check(cleared.status === 0, `clear-publishing-data --yes exited ${cleared.status}:
+${cleared.output}`)
+  mustDeploy('full deploy to head', deployFull())
+
+  // 037 AC-01: the tables and types are gone; DraftStatus has three values.
+  for (const t of ['Post', 'ChannelToken', 'ScheduledGeneration']) check(!(await tableExists(t)), `${t} still exists at head`)
+  const types = await db.$queryRawUnsafe(`SELECT typname FROM pg_type WHERE typname IN ('PostStatus', 'PostGenerationAction', 'GenerationStatus')`)
+  check(types.length === 0, `types still exist at head: ${json(types)}`)
+  const labels = (await db.$queryRawUnsafe(`SELECT e.enumlabel AS l FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid WHERE t.typname = 'DraftStatus' ORDER BY e.enumsortorder`)).map((r) => r.l)
+  check(json(labels) === json(['IN_PROGRESS', 'EXPORTED', 'FAILED']), `DraftStatus is ${json(labels)}`)
+  const [{ st }] = await db.$queryRawUnsafe(`SELECT status::text AS st FROM "Draft" WHERE id = 'upg_headers'`)
+  check(st === 'EXPORTED', `the PUBLISHED draft is ${st} after the clear script, expected EXPORTED`)
+  const [{ def }] = await db.$queryRawUnsafe(`SELECT column_default AS def FROM information_schema.columns WHERE table_name = 'Draft' AND column_name = 'status' AND table_schema = current_schema()`)
+  check(String(def).includes('IN_PROGRESS'), `Draft.status default is ${def}`)
+
   // The head Prisma client reads every draft with its captions.
   try {
     const drafts = await db.draft.findMany({ include: { captions: true } })
@@ -389,7 +437,7 @@ async function scenario1() {
 
   return {
     failures,
-    detail: `${LEGACY.length} legacy drafts converted (${rows.length} rows), ${archive.length} archived, 2 kept drafts unchanged, post untouched, copyText dropped, 016 applied, ${TEAM} kept, head client read OK, migrate diff exit ${diff.status}`,
+    detail: `${LEGACY.length} legacy drafts converted (${rows.length} rows), ${archive.length} archived, 2 kept drafts unchanged, post untouched at 037's predecessor, 037 refused with the counts and recovered through the clear script (tables gone, DraftStatus rebuilt), copyText dropped, 016 applied, ${TEAM} kept, head client read OK, migrate diff exit ${diff.status}`,
   }
 }
 
