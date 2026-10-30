@@ -20,6 +20,7 @@ import { ICON } from '@/components/ui/atoms'
 import { StepHead } from './StepHead'
 import { PostStylePicker } from './PostStylePicker'
 import { TemplateCard } from './TemplateCard'
+import { SelectedTemplatePreview } from './SelectedTemplatePreview'
 
 // ─── Step 1 — Size & Design ──────────────────────────────────────────────────
 
@@ -339,6 +340,10 @@ export function SizeDesignStep({
               ))}
             </div>
           )}
+          <SelectedTemplatePreview
+            template={visibleTemplates.find(t => t.id === templateId)}
+            data-testid="template-preview"
+          />
         </div>
       )}
 
@@ -372,6 +377,10 @@ export function SizeDesignStep({
               />
             ))}
           </div>
+          <SelectedTemplatePreview
+            template={visibleTemplates.find(t => t.id === referenceTemplateId)}
+            data-testid="reference-preview"
+          />
         </div>
       )}
     </div>

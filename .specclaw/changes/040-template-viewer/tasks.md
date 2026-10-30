@@ -25,7 +25,7 @@ A shared sandboxed preview atom, a viewer on the kit page, a team-scoped read ro
 
 ### Wave 2 — wizard
 
-- [ ] `T3` — Wizard preview of the selected template
+- [x] `T3` — Wizard preview of the selected template
   - Files: `src/components/brief/SizeDesignStep.tsx`, `src/components/brief/useBriefWizard.ts` (only if needed)
   - Estimate: small
   - Kind: impl

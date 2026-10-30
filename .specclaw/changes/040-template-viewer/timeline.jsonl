@@ -9,3 +9,7 @@
 {"ev":"start","span":"T2","kind":"task","label":"GET /api/templates/[id]","parent":"W1","model":"sonnet","attempt":"1","at":"2026-10-30T12:50:23Z","ts":1793364623}
 {"ev":"stop","span":"T2","at":"2026-10-30T12:52:19Z","ts":1793364739,"status":"ok"}
 {"ev":"stop","span":"W1","at":"2026-10-30T12:52:19Z","ts":1793364739,"status":"ok"}
+{"ev":"start","span":"W2","kind":"wave","label":"wave 2","at":"2026-10-30T12:52:28Z","ts":1793364748}
+{"ev":"start","span":"T3","kind":"task","label":"Wizard preview","parent":"W2","model":"sonnet","attempt":"1","at":"2026-10-30T12:52:28Z","ts":1793364748}
+{"ev":"stop","span":"T3","at":"2026-10-30T12:54:52Z","ts":1793364892,"status":"ok"}
+{"ev":"stop","span":"W2","at":"2026-10-30T12:54:53Z","ts":1793364893,"status":"ok"}
