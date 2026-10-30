@@ -7,6 +7,10 @@
     "proposal": { "status": "approved", "at": "2026-10-30T12:35:58Z" },
     "spec": { "status": "done", "at": "2026-10-30T12:37:47Z" },
     "tasks": { "status": "done", "at": "2026-10-30T12:37:48Z" },
-    "build": { "status": "in-progress", "at": "2026-10-30T12:45:09Z" }
+    "build": {
+      "status": "done",
+      "at": "2026-10-30T13:01:58Z",
+      "tasks": { "done": 4, "total": 4, "failed": 0 }
+    }
   }
 }

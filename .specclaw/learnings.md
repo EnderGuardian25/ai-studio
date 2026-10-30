@@ -549,3 +549,37 @@ check-report reads only the last '## Verification' block and needs Command:/Exit
 Put the multi-command summary under another heading and end with one Command/Exit/Output footer from a real run
 
 ---
+
+## [L33] design_gap — T3 added src/components/brief/SelectedTemplatePreview.tsx...
+
+**When:** 2026-10-30 13:01 UTC
+**Category:** design_gap
+**Priority:** low
+**Status:** pending
+
+### Detail
+
+T3 added src/components/brief/SelectedTemplatePreview.tsx, not named in the spec's Approach file map (the map allowed SizeDesignStep and optionally useBriefWizard)
+
+### Action
+
+Name a possible new sibling component in a bounded file map when a UI task adds a fetching child
+
+---
+
+## [L34] best_practice — specclaw-build commit writes no Co-Authored-By trailer; t...
+
+**When:** 2026-10-30 13:02 UTC
+**Category:** best_practice
+**Priority:** medium
+**Status:** pending
+
+### Detail
+
+specclaw-build commit writes no Co-Authored-By trailer; this repo's commits carry one
+
+### Action
+
+Commit task work with git commit and the trailer, not specclaw-build commit
+
+---
