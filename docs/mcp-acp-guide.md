@@ -37,7 +37,7 @@ There is **no admin/non-admin tier** — a single valid key grants that key's te
 
 The key is read **once from the `MCP_API_KEY` env var** (`server.ts:13`) but **re-resolved against the DB on every tool call** (`server.ts:122`), so a mid-session revoke takes effect at once.
 
-### Tools (8)
+### Tools (7)
 
 | Tool                    | Purpose                                                                                                                                            |
 | ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -48,7 +48,6 @@ The key is read **once from the `MCP_API_KEY` env var** (`server.ts:13`) but **r
 | `get_brand_kit`         | Full kit details + templates + active prompt                                                                                                       |
 | `generate_post`         | Brief → finished post (captions + headline + design → render → export). Returns `draftId`, `exportUrl`, `htmlContent`, `headline`, `captions` (§4) |
 | `get_draft`             | Fetch a draft by id: `headline`, `captions`, `imageUrl`, `exportUrl`, `status` (§4)                                                                |
-| `publish_post`          | Publish a draft to Instagram / LinkedIn, with that channel's own caption (§4)                                                                      |
 
 ### Client configuration
 
@@ -95,7 +94,7 @@ Plain HTTP against the deployed app. The key goes in the **`x-bistec-api-key`** 
 
 ### Capabilities (2)
 
-ACP exposes only `generate_post` and `publish_post` (the brand-kit management tools are MCP-only).
+ACP exposes only `generate_post` (the brand-kit management tools are MCP-only). `publish_post` was removed by change 037; the MCP server and the ACP manifest are both version `2.0.0`.
 
 ```bash
 # Discover
@@ -113,12 +112,6 @@ curl -X POST https://studio.bistecglobal.com/api/acp/run \
       "designMode": "GENERATE", "channels": ["LINKEDIN"]
     }
   }'
-
-# Publish
-curl -X POST https://studio.bistecglobal.com/api/acp/run \
-  -H "x-bistec-api-key: bstk_…" \
-  -H "content-type: application/json" \
-  -d '{"capability":"publish_post","input":{"draftId":"…","channel":"LINKEDIN"}}'
 ```
 
 `goal` is a legacy field. It picks a post style (`hiring` or `announcement`) only when no `postStyle` is given, and is ignored otherwise.
@@ -129,7 +122,7 @@ Response codes: `400` invalid input, `401` bad/missing key, `422` tool-level fai
 
 ## 4. Captions and the headline (change 012)
 
-Since 012 every draft has an on-image **headline** and **one caption per channel** (`DraftCaption`: Instagram and LinkedIn; the WhatsApp caption was dropped by change 026), each with a `status` of `PENDING`, `READY` or `FAILED`. Each channel is published its **own** caption; nothing sends one combined string any more. The field and route names below are unchanged from before 012 except where noted.
+Since 012 every draft has an on-image **headline** and **one caption per channel** (`DraftCaption`: Instagram and LinkedIn; the WhatsApp caption was dropped by change 026), each with a `status` of `PENDING`, `READY` or `FAILED`. Nothing in the app publishes them: the user downloads the image and copies a caption. The field and route names below are unchanged from before 012 except where noted.
 
 ### Output fields
 
@@ -142,21 +135,7 @@ Since 012 every draft has an on-image **headline** and **one caption per channel
 - **`captions`** is `[{ channel, text, status }]`: always two entries, in registry order (`INSTAGRAM`, `LINKEDIN`). Read through the caption loader, which fills a missing channel with an empty `READY` entry. Old WhatsApp rows from before 026 are hidden by the loader, not deleted.
 - **`headline`** is the text drawn on the image (at most 100 characters). It is null only while it has not been written yet (a generation still running, or one that failed before the headline was stored); a design made for such a draft falls back to the brief topic.
 - **There is no `copyText` field.** The pre-012 alias (the Instagram caption's text) was removed by change 016. Read the channel's entry in `captions`.
-- **The ACP manifest** (`src/acp/agent.ts`, version `1.1.0` since change 018) advertises `generate_post`'s full output: `draftId`, `exportUrl`, `htmlContent`, `headline` (`string | null`) and `captions` (an array of `{ channel, text, status }`, all three required; `channel` is one of the registry channels `INSTAGRAM`, `LINKEDIN`, and `status` one of `PENDING`, `READY`, `FAILED`). A unit test (`tests/unit/mcpGetDraft.test.ts`) fails if the advertised keys and the handler's keys ever differ. The MCP `generate_post` tool description lists the same fields. The **input** channel enums stay `['INSTAGRAM', 'LINKEDIN']` (publishable channels only).
-
-### `publish_post` (MCP and ACP)
-
-- **A non-publishable channel is rejected up front,** before any lookup or Post row. Today that is `WHATSAPP` (no publisher; change 010 was dropped on 2026-10-23): MCP throws `channel must be INSTAGRAM or LINKEDIN`, and ACP answers `400` with the same message from its input validator.
-- **A refused caption leaves a FAILED Post row** (FR-17, user decision 2026-10-11), keeping "every attempt leaves a row". The status, export and duplicate checks run first, as before. Then `createAndPublishPost` writes a PENDING row, and `publishToChannel` resolves that channel's caption **before** it signs the export. A failed, pending, empty or over-limit caption is refused terminally: the row becomes `FAILED` with `errorReason` = the resolver's reason, the export is never signed and the platform is never called. The caller gets `Publish failed (<reason>) — recorded as post <id> with status FAILED` (ACP: `422`), the same format as a platform failure.
-- **The resolver's reasons** (`src/lib/captions/resolve.ts`), first match wins:
-  1. "WhatsApp publishing isn't available." (026 wording; also for any channel with no publisher);
-  2. "This draft has no <Label> caption.";
-  3. "The <Label> caption is being generated. Publish again when it finishes.";
-  4. "The <Label> caption failed to generate (<failureReason>). Regenerate or edit it, then publish again.";
-  5. "The <Label> caption is empty. Write or regenerate it, then publish again.";
-  6. "The <Label> caption is <n> characters; <Label> allows <limit>." (Instagram 2,200; LinkedIn 3,000).
-- **One channel's refusal doesn't block another:** a failed LinkedIn caption still lets Instagram publish its own text.
-- (The session route `POST /api/posts` differs on purpose: it checks the caption up front and answers `422 { code: 'CAPTION_UNPUBLISHABLE' }` with **no** row.)
+- **The ACP manifest** (`src/acp/agent.ts`, version `2.0.0` since change 037) advertises `generate_post`'s full output: `draftId`, `exportUrl`, `htmlContent`, `headline` (`string | null`) and `captions` (an array of `{ channel, text, status }`, all three required; `channel` is one of the registry channels `INSTAGRAM`, `LINKEDIN`, and `status` one of `PENDING`, `READY`, `FAILED`). A unit test (`tests/unit/mcpGetDraft.test.ts`) fails if the advertised keys and the handler's keys ever differ. The MCP `generate_post` tool description lists the same fields. The **input** channel enums stay `['INSTAGRAM', 'LINKEDIN']`.
 
 ### `POST /api/generate/copy`
 
@@ -168,12 +147,11 @@ A session-authenticated route (not MCP/ACP) that writes a headline and three cap
 
 Since 008 every model call resolves through one catalogue (`src/lib/models/catalogue.ts`: Haiku 4.5, Sonnet 5.5, Opus 5.5) and one resolver (`resolveModel`). A team admin sets the allowed models, a default per surface and the "Opus requires a personal token" switch at `/team` → Models.
 
-- **MCP and ACP have no `model` input.** Neither `generate_post` nor `publish_post` takes one, and the ACP manifest advertises none. An extra `model` key in an ACP `input` is ignored (TC-MODEL-09 sends `model: 'HAIKU'` and the draft still runs the team default).
-- **`generate_post` uses the team default.** MCP, ACP and the scheduler run with no user (`userId: null`), so each surface (captions; template fill or freeform design) resolves from the team's default at run time, then the system default (captions and template fill → Haiku, freeform design → Sonnet). In CLI mode they always run on the **team** Claude token. There is no per-key or per-entry model pin.
+- **MCP and ACP have no `model` input.** `generate_post` takes none, and the ACP manifest advertises none. An extra `model` key in an ACP `input` is ignored (TC-MODEL-09 sends `model: 'HAIKU'` and the draft still runs the team default).
+- **`generate_post` uses the team default.** MCP and ACP run with no user (`userId: null`), so each surface (captions; template fill or freeform design) resolves from the team's default at run time, then the system default (captions and template fill → Haiku, freeform design → Sonnet). In CLI mode they always run on the **team** Claude token. There is no per-key or per-entry model pin.
 - **With the switch on, in CLI mode,** these callers can never run Opus, because they always use the team token. A team default of Opus falls through to the next tier, is recorded on the draft's stamp as a substitution, and is logged at `warn`: `[models] DESIGN_FREEFORM: "OPUS" not available (needs a personal token) → SONNET (system)`.
 - **Stamps.** The generated draft records the full ID of the model that wrote each caption, the headline and the design (`DraftCaption.model`, `Draft.headlineModel`, `Draft.designModel`, `DraftRevision.model`). The session API's draft GET returns them; the MCP `get_draft` and `generate_post` outputs (§4) are unchanged and don't.
-- **A team with no runnable model** (reachable only through a hand-edited policy row; `/team` refuses to save one) fails closed before any model call, with the resolver's `NO_ALLOWED_MODEL` message: an MCP error, an ACP `422`, or a scheduled entry's `errorReason`. The sync path creates no draft.
-- **A scheduled run that hits a Claude usage limit** gets its `errorReason` prefixed with "Claude usage limit reached on the team's credential — ". Retries and backoff are unchanged.
+- **A team with no runnable model** (reachable only through a hand-edited policy row; `/team` refuses to save one) fails closed before any model call, with the resolver's `NO_ALLOWED_MODEL` message: an MCP error, or an ACP `422`. The sync path creates no draft.
 - **`POST /api/generate/copy`** (a session route, not MCP/ACP) has no `model` field either: it resolves the caption surface from the team default, then the system default.
 - **The session routes that do take a pick** are `POST /api/briefs` (`captionModel`, `designModel`), `regenerate-copy`, `regenerate-design`, `refine` and the two assistant chats (`model`). Only a key (`HAIKU`, `SONNET`, `OPUS`) is accepted, and a refused pick is `400 { error, code: 'MODEL_NOT_ALLOWED' }` before anything is claimed.
 
@@ -183,8 +161,7 @@ Since 008 every model call resolves through one catalogue (`src/lib/models/catal
 
 - **Team-locked.** Every tool call threads `teamId` **from the resolved key**, never from the request. Caller args are spread _first_ so a `teamId` in the payload can't override the key's real team (`server.ts:146`, `run/route.ts:38`). A team-A key cannot read or write team-B data.
 - **Acts as a system user.** MCP/ACP-created rows are owned by a dedicated `MCP Agent` user (EDITOR, `src/mcp/systemUser.ts`), auto-granted an idempotent membership in the calling team so its rows are visible under the team's D6 visibility rules. Editor-level, not super-admin.
-- **Publishing needs the team's channel tokens.** The key authorizes the action; the actual LinkedIn/Instagram push uses the team's `ChannelToken` configured at `/team`.
-- **Treat a `bstk_` key like a publish-capable service account** — one key grants the whole team tool surface, including public social publishing.
+- **Treat a `bstk_` key like a service account:** one key grants the whole team tool surface, including generating posts and managing brand kits (MCP).
 
 ---
 
@@ -205,8 +182,8 @@ Production runs in **CLI mode** (`claude -p`), and `generate_post` can drive the
 
 - `src/mcp/auth.ts` — key generation (`generateApiKey`) + resolution (`resolveApiKey`)
 - `src/mcp/server.ts` — MCP stdio server + tool dispatch
-- `src/mcp/tools/*` — tool implementations (brandkit, generate, publish)
-- `src/lib/captions/*`, `src/lib/channels.ts` — the caption store and loader, the publish resolver, the per-channel registry (012)
+- `src/mcp/tools/*` — tool implementations (brandkit, generate)
+- `src/lib/captions/*`, `src/lib/channels.ts` — the caption store and loader, the per-channel registry (012)
 - `src/mcp/systemUser.ts` — system user + team membership
 - `src/app/api/acp/{manifest,run}/route.ts` — ACP HTTP surface
 - `src/app/api/team/api-keys/*` — key management (mint / list / revoke)

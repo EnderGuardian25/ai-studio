@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { loginAs, waitForDraft, type ApiClient } from '../helpers/api'
+import { loginAs, waitForDraft, waitForAction, type ApiClient } from '../helpers/api'
 import { ADMIN_EMAIL, ADMIN_PASSWORD, pageLogin } from '../helpers/ui'
 import { prisma, dbAvailable } from '../helpers/db'
 
@@ -124,4 +124,56 @@ test.describe('§AI Download', () => {
     })
     await expect(page.getByRole('button', { name: 'Download', exact: true })).toBeEnabled()
   })
+
+  // AC-17: generate (Path A and Path B), refine, Download, copy a caption.
+  async function generatePathA(topic: string): Promise<Draft> {
+    const kit = await (await api.post('/api/admin/brandkits', { name: `DL Kit ${Date.now()}`, colors: ['#0284c7'] })).json()
+    const template = await (await api.post(`/api/admin/brandkits/${kit.id}/templates`, {
+      name: 'DL Template',
+      htmlTemplate: '<html><body style="width:1080px;height:1080px;background:#0284c7">{{topic}}</body></html>',
+    })).json()
+    const camp = await (await api.post('/api/campaigns', { name: `DL Camp ${Date.now()}`, brandKitId: kit.id })).json()
+    const brief = await (await api.post('/api/briefs', {
+      topic, goal: 'g', tone: 'professional', channels: ['INSTAGRAM'],
+      designMode: 'TEMPLATE', copyProviderKey: 'cli', campaignId: camp.id,
+    })).json()
+    const res = await api.post('/api/generate/assemble-a', { briefId: brief.id, templateId: template.id })
+    expect(res.status()).toBe(202)
+    const draft = (await waitForDraft(api, (await res.json()).draftId)) as Draft
+    expect(draft.status).toBe('EXPORTED')
+    return draft
+  }
+
+  for (const [tc, path, make] of [
+    ['TC-DL-06', 'Path A', generatePathA],
+    ['TC-DL-07', 'Path B', generate],
+  ] as const) {
+    test(`${tc}: ${path} post is refined, downloaded and its Instagram caption copied`, async ({ page, context }) => {
+      if (!MOCKED()) { test.skip(); return }
+      const draft = await make(`Download Flow ${Date.now()}`)
+
+      const refine = await api.post(`/api/drafts/${draft.id}/refine`, { instruction: 'Add a subtle gradient' })
+      expect(refine.status()).toBe(202)
+      const settled = await waitForAction(api, draft.id)
+      expect(settled.pendingActionError ?? null).toBeNull()
+
+      await context.grantPermissions(['clipboard-read', 'clipboard-write'], {
+        origin: new URL(process.env.TEST_BASE_URL ?? 'http://localhost:3001').origin,
+      })
+      await pageLogin(page)
+      await page.goto(`/drafts/${draft.id}`)
+      const button = page.getByTestId('download-button')
+      await expect(button).toBeEnabled({ timeout: 20_000 })
+      const downloadPromise = page.waitForEvent('download')
+      await button.click()
+      expect((await downloadPromise).suggestedFilename()).toMatch(/\.png$/)
+
+      const caption = page.getByRole('textbox', { name: 'Instagram', exact: true })
+      await expect(caption).not.toHaveValue('', { timeout: 20_000 })
+      await page.getByRole('button', { name: 'Copy Instagram caption' }).click()
+      await expect(page.getByText('Caption copied')).toBeVisible()
+      const copied = await page.evaluate(() => navigator.clipboard.readText())
+      expect(copied).toBe(await caption.inputValue())
+    })
+  }
 })

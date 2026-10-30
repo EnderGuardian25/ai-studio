@@ -5,6 +5,16 @@
 
 Last full run on `main` (2026-07-13, post brief-draft-recovery §P): **132 passed, 0 failed, 7 skipped** (`npm run test:e2e:mock`; the machine lacked `BISTEC_API_KEYS` in `.env.test`, so 3 §J ACP-auth cases skipped on top of the 4 intentional skips below — CI sets the keys as job env and runs them). The 2026-07-13 feature batch added `async-generation.test.ts` (F1 async + retry), a version back/forward-jump case (F2), F4 auto-scheduling cases in `campaign-scheduling.test.ts`, `brandkit-assistant.test.ts` (F5), and `image-to-template.test.ts` (F6); generation-dependent suites now poll via the `waitForDraft` helper (generation is async). A GitHub Actions gate (`.github/workflows/e2e.yml`) runs the whole suite — including the §K security-fix regressions — on every PR and push to `main`, and is **green as of 2026-07-13** (it had been red for weeks on a bad CI `TOKEN_ENCRYPTION_KEY` — it MUST be a valid 64-char hex string, else `crypto.ts` throws and the credential-encrypting routes 500). Runs on GitHub-hosted `ubuntu-latest` with the actions on the Node 24 runtime.
 
+> **Update (2026-10-31, change 037 remove scheduling and publishing):** the catalog below is history where it names publishing, scheduling or the queue; the suites and cases here are gone from `tests/e2e/`. No `MOCK_SOCIAL` flag, `POST /api/test/scheduler-tick` or `POST /api/test/generation-tick` seam exists any more. Every remaining test seam is a 404 in a production build.
+>
+> - **Removed suites:** `publish.test.ts` (§G, TC-PUB-*), `campaign-scheduling.test.ts`, `export.test.ts` (§F, replaced by `download.test.ts`), `scheduler-heartbeat.test.ts` (§Z, replaced by `retention-health.test.ts`).
+> - **Removed cases:** TC-PS-07 to 09, 17 to 24 and 38 (`post-styles.test.ts`); TC-AS-01 to 03 (`assistants-031.test.ts`, §AL); TC-LOOK-11 and 15 to 20 (`image-looks.test.ts`); TC-OBS-08 and 09 (`analytics.test.ts`; TC-OBS-10 and 16 were reworded for the retention loop); TC-HL-07 (`headline-badge.test.ts`, the scheduled-posts line); TC-CAP-04 to 06 and 08 (`captions.test.ts`); TC-REG-H7c, H9 (the `Post` index), H12a/b/c (the scheduler) and TC-UI-03 (the Publish button).
+> - **New `download.test.ts` (TC-DL-01 to 05, `GET /api/drafts/[id]/download`):** 01, a current draft returns its stored PNG with no render; 02, a draft with no stored PNG renders once and the next download does not; 03, an unknown draft is 404; 04, the draft page has Download and no Export or Publish, and Download saves a `.png`; 05, a stale headline shows the download line (`downloadLineFor`) next to the button. 06 and 07 (037 AC-17), Path A and Path B: generate, refine, Download a `.png`, and copy the Instagram caption to the clipboard.
+> - **New `retention-health.test.ts` (§Z, replaces TC-HB-\*):** a fresh `retention` row reads "Retention running", an old one "Retention stalled", none "Retention never ran" (the Insights Health line); the seam `POST /api/test/worker-heartbeat` accepts only `loop: 'retention'` (anything else is 400 and writes nothing) and stays admin-gated.
+> - **New `removed-routes.test.ts` (TC-RM-\*, 037 AC-04):** every removed route (`/api/posts/**`, `/api/team/channels/**`, the queue routes, `/api/scheduler/status`, `/api/generate/export`, the two tick seams) answers 404 or 405, never a 2xx.
+> - **New library case TC-LIB-06 (`library.test.ts`, AC-10):** the library page has "Brand kit" and "Post style" selects, no status filter, and no Publish or History control. TC-LIB-02 now covers the `brandKitId` and `postStyle` filters.
+> - **The ACP manifest and the MCP server are `2.0.0`;** `publish_post` is gone (TC-ACP cases for it were removed).
+
 > **Update (2026-10-13, change 017 publish API fixes):** a publish the platform refuses is no longer a 2xx. `POST /api/posts` (immediate) and `POST /api/posts/[id]/publish` (retry) answer **502** `{error, code:'PUBLISH_FAILED', postId, status:'FAILED'}`; the FAILED row is still written. **TC-PUB-03** now expects the 502 (and a failing retry's 502), and new **TC-PUB-10** drives the publish dialog: the failed channel shows "✕ failed" with its reason and the dialog stays open.
 
 > **Update (2026-10-24, change 027 post styles and the facts check):** new suite **`post-styles.test.ts` (§AE, TC-PS-01 to TC-PS-40)**, driven by the mock fact sentinels `__MOCK_FACT_PRICE__`, `__MOCK_FACT_PCT__`, `__MOCK_FACT_DATE__`, `__MOCK_FACT_NUM__`, `__MOCK_FACT_HEADLINE__` and `__MOCK_FACT_ERROR__` and the existing `POST /api/test/generation-tick` (see §AE); §AD gains TC-OBS-31. Gate: 517/3/0/0 (unit 3737/3737, render 47/47, CI green at `c199270` (run 40111923100)).
@@ -49,8 +59,8 @@ All §6 cases are now written. New/changed files:
   - `scripts/seed-editor.mjs` — the non-admin RBAC account (`editor@bisteccare.lk`, fixed test password — see `FIXED_TEST_PASSWORD` in `scripts/seed-admin.mjs`), wired into `setup-test-db.mjs`.
   - `tests/helpers/db.ts` — direct test-DB access for cases that can't be set up over HTTP. **It reads `DATABASE_URL` from `.env.test` FIRST**, because importing `@prisma/client` runs Prisma's bundled dotenv and loads the dev `.env` into `process.env` — so "process.env first" would wrongly hit the dev DB.
   - **`loginAs` now creates an isolated `APIRequestContext`** (its own cookie jar). The previous version reused the shared `request` fixture, so the admin cookie leaked into editor calls and RBAC tests got 200 instead of 403.
-  - Two production-safe `testHooks.ts` seams — `buildMockCopy()` routes the brief topic into the mock caption, and `shouldMockPublishFail()` lets a `__FAIL_ALWAYS__`/`__FAIL_ONCE__` sentinel in the brief topic drive deterministic publish failures (TC-PUB-03/04, TC-REG-H12b) within a single serve.
-  - **`POST /api/test/scheduler-tick`** — a test-only seam that runs one `runScheduledJobs()` pass so §K H12 can drive the scheduler over HTTP (Playwright's loader can't resolve the transitive `@/` aliases in the app module graph). **Dormant in prod: hard-404 when `NODE_ENV==='production'` AND 404 unless `MOCK_SOCIAL` is set, plus admin-gated.**
+  - A production-safe `testHooks.ts` seam, `buildMockCopy()`, routes the brief topic into the mock caption. (The publish-failure seam `shouldMockPublishFail()` was removed by 037.)
+  - ~~`POST /api/test/scheduler-tick`~~ — removed by 037 along with `MOCK_SOCIAL`. Every remaining test seam is a 404 in a production build.
   - **`POST /api/test/worker-heartbeat`** — a test-only seam (change 023, §Z) that upserts one loop's `WorkerHeartbeat` row at offsets from now (`{ loop, startedAgoMs, endedAgoMs }`) or deletes every row (`{ clear: true }`). The tick seams call the job runners directly and never go through the worker's `loop()`, so they write no heartbeat, and no worker runs in E2E. **Dormant in prod: hard-404 when `NODE_ENV==='production'` AND 404 unless `MOCK_AI` is set, plus admin-gated.**
   - `playwright.config.ts`: the global `Content-Type: application/json` was **removed** (it overrode the multipart boundary and 500'd every upload route); `retries: 1` added (cold `next dev` route compiles flake under load).
   - ~~`.env.test` additions: `BISTEC_API_KEYS`/`BISTEC_ADMIN_API_KEYS`~~ **Superseded 2026-07-21 (team tenancy):** the env-key lists are deleted; the §J ACP-auth cases now mint real hashed `ApiKey` rows via `POST /api/team/api-keys` at test time — no env vars, no CI job env needed.
@@ -70,7 +80,7 @@ All §6 cases are now written. New/changed files:
 **Resolved infra dependencies (now run in the standard mock suite):**
 
 - **DB-dependent cases** (TC-PUB-07/08, TC-EXP-01/03, TC-GEN-B2, TC-REG-H9/H10b/c) self-resolve the test DB via `tests/helpers/db.ts` (reads `.env.test`), so they run under `test:e2e:mock` — no reg-mode needed.
-- **Scheduler** (TC-REG-H12a/b/c) drive the scheduler over the `/api/test/scheduler-tick` HTTP seam, so they run in the standard mock suite (no app-module import, no reg-mode).
+- **Scheduler** (TC-REG-H12a/b/c): removed by 037 with the scheduler-tick seam.
 - **ACP authenticated** (TC-ACP-02/03/04/05) mint a real `ApiKey` via `POST /api/team/api-keys` (team-admin session) and present the plaintext — always run, no env/job-env dependency (superseded 2026-07-21). TC-ACP-05 is folded into the generate_post output-signing assertion (the MCP stdio surface isn't HTTP-reachable).
   **Owner:** _unassigned_
   **Scope:** End-to-end coverage of the full app surface (API + UI) plus a dedicated regression suite for the 28 code-review remediation fixes (see [`code-review-findings.md`](code-review-findings.md)).
@@ -150,7 +160,6 @@ TOKEN_ENCRYPTION_KEY=<copy from .env>
 PUPPETEER_EXECUTABLE_PATH=C:\Program Files\Google\Chrome\Application\chrome.exe
 MOCK_AI=true
 MOCK_PUPPETEER=true
-MOCK_SOCIAL=true
 # (BISTEC_API_KEYS / BISTEC_ADMIN_API_KEYS deleted 2026-07-21 — §J mints real ApiKey rows via the API)
 ```
 
@@ -169,15 +178,14 @@ Add a global setup that truncates app tables (keep `User`/`Account`/`Session` fo
 
 The deterministic path uses small, test-only seams, all centralized in **`src/lib/testHooks.ts`** and each gated behind its env flag so production is untouched. **Implemented (2026-06-23):**
 
-| Flag             | Seam point (file)                                                                                                                                                                                                                                                                                                                                                                                                                                      | Behavior when set                                                                                                                                                        |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `MOCK_AI`        | `resolveCopyProvider` (`src/providers/registry.ts`) → stub copy provider; `runDesignAgent` (`src/lib/agent/designAgent.ts`) → emits `buildMockHtml()` (echoes the brand kit's first hex colour from the prompt) then renders via the mocked Puppeteer path to get a **real EXPORTS key**; returns `buildMockConflict()` JSON when the refine instruction contains `conflict_test`. Also short-circuits the admin brand-voice `prompts/generate` route. | No Anthropic/OpenAI calls.                                                                                                                                               |
-| `MOCK_PUPPETEER` | `renderHtmlToPng` (`src/lib/renderer/puppeteer.ts`)                                                                                                                                                                                                                                                                                                                                                                                                    | Skip Chromium; return `MOCK_PNG_BUFFER`. The MinIO upload still happens, so export keys remain real and signable (exercises H10).                                        |
-| `MOCK_SOCIAL`    | `publish()` in `src/lib/social/instagram.ts` + `linkedin.ts`                                                                                                                                                                                                                                                                                                                                                                                           | Return `{ platformId: 'mock-<channel>-<ts>' }` with no HTTP call. `MOCK_SOCIAL_FAIL=true` makes them throw `PublishError` — for the FAILED/retry/backoff cases (§G, §K). |
+| Flag             | Seam point (file)                                                                                                                                                                                                                                                                                                                                                                                                                                      | Behavior when set                                                                                                                 |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
+| `MOCK_AI`        | `resolveCopyProvider` (`src/providers/registry.ts`) → stub copy provider; `runDesignAgent` (`src/lib/agent/designAgent.ts`) → emits `buildMockHtml()` (echoes the brand kit's first hex colour from the prompt) then renders via the mocked Puppeteer path to get a **real EXPORTS key**; returns `buildMockConflict()` JSON when the refine instruction contains `conflict_test`. Also short-circuits the admin brand-voice `prompts/generate` route. | No Anthropic/OpenAI calls.                                                                                                        |
+| `MOCK_PUPPETEER` | `renderHtmlToPng` (`src/lib/renderer/puppeteer.ts`)                                                                                                                                                                                                                                                                                                                                                                                                    | Skip Chromium; return `MOCK_PNG_BUFFER`. The MinIO upload still happens, so export keys remain real and signable (exercises H10). |
 
 > The brief's `copyProviderKey` must still reference a real enabled COPY provider (brief creation validates it) — the seed registers the keyless `cli` provider, and the specs pass `copyProviderKey: 'cli'`. `MOCK_AI` only stubs the _generation call_, not the validation.
 
-> **Alternative (no mock flags):** run with `DESIGN_PROVIDER=cli` + real Puppeteer (`PUPPETEER_EXECUTABLE_PATH` + Claude CLI auth) + `MOCK_SOCIAL`. Slower, non-deterministic copy, but exercises the real render path.
+> **Alternative (no mock flags):** run with `DESIGN_PROVIDER=cli` + real Puppeteer (`PUPPETEER_EXECUTABLE_PATH` + Claude CLI auth) . Slower, non-deterministic copy, but exercises the real render path.
 
 > Note: the unused `tests/fixtures/mockHtml.ts` is superseded by `src/lib/testHooks.ts` (the seams need the constants server-side, where the app can't import from `tests/`).
 
@@ -297,9 +305,9 @@ Legend: **P** precondition · **S** steps · **E** expected. "Guards" = remediat
 - **TC-EXP-02 — Export short-circuit.** P: draft already has `exportUrl`. S: POST export. E: returns the (signed) existing one; no re-render.
 - **TC-EXP-03 — Export needs HTML.** P: draft with no `htmlContent`. E: 422.
 
-### G. Publish & schedule
+### G. Publish & schedule (REMOVED by change 037; kept as history)
 
-> Requires `MOCK_SOCIAL`.
+> The suite and the `MOCK_SOCIAL` flag are gone.
 
 - **TC-PUB-01 — Immediate publish.** P: EXPORTED draft. S: POST `/api/posts {draftId,channel:'INSTAGRAM'}`. E: 201 `{postId,status:'PUBLISHED'}`; `platformId` set. **(Corrects publish.test.ts — singular `channel`, object response.)**
 - **TC-PUB-02 — Schedule for later.** S: POST with future `scheduledAt`. E: 201 `{status:'SCHEDULED'}`; **no transient PENDING row persists** (query DB → status is SCHEDULED, never PENDING). **Guards H7.**
@@ -604,7 +612,7 @@ Each case uses a unique topic and `waitForDraft` / `waitForAction`, with one kit
 
 - **`GET` / `DELETE /api/test/model-calls`** (008 FR-16): the recorder's ring buffer.
   - It holds 200 records on `globalThis`, shared across `next dev` route modules, newest last.
-  - It is gated like `/api/test/scheduler-tick`: 404 in production, 404 unless `MOCK_AI`, and admin-only.
+  - It is gated like the other test seams: 404 in production, 404 unless `MOCK_AI`, and admin-only.
   - Each record is `{ surface, key, arg, mode, source, substitutedFrom, label, route }`. `route` (024 FR-07) is `CLI`, `API_KEY`, `SERVER_KEY` or `OTHER` on a caption (`label` `copy`) record, from the selector's decision, and `null` on every other record. Read a caption's route by filtering on `label === 'copy'`. Every `MOCK_AI` branch on a model surface records the `ResolvedModel` it was handed before returning its mock. The upgrade route (007) records under the label `kit-upgrade` (surface `ASSISTANT_BRANDKIT`); read it by filtering on that label.
   - Each case `DELETE`s before the action it asserts on.
 - **Stamps are seeded through the test DB** (`prisma.draft.update` / `draftCaption.update`), as §W does.
@@ -786,7 +794,7 @@ Each case mints an EXPORTED draft (`mintExportedDraft`) and acts on it in the br
 
 > **Update (2026-10-20, change 020):** `create-post-button.test.ts` (011 FR-01 to FR-03) now asserts the floating Create post button is absent on `/drafts/[id]` at 1440 and 375, and runs a check that the refine Send button is not covered at 1440. Its AC-01 case is narrowed to `/`, `/library` and `/campaigns`. **Update (2026-10-23, change 026):** Refine design moved to the left column, so AC-02b now checks the control that sits in the bottom-right band, the LinkedIn caption's Regenerate button. TC-ASYNC-02 expects two captions.
 
-### Z. Scheduler heartbeat (`scheduler-heartbeat.test.ts`, change 023 T2 — AC-05, AC-06, AC-08)
+### Z. Scheduler heartbeat (REMOVED by change 037; now `retention-health.test.ts`, see the 037 update at the top; kept as history)
 
 Serial (`test.describe.configure({ mode: 'serial' })`), because the `WorkerHeartbeat` table is global. Every case clears the rows in `beforeEach` and the suite clears them in `afterAll`, so the default state for every other suite stays "no rows". No worker runs in E2E, so the cases seed the rows through the `POST /api/test/worker-heartbeat` seam and open a campaign page. Needs `MOCK_AI` and test-DB access; TC-HB-05 also needs `dbAvailable`.
 
@@ -934,7 +942,7 @@ The pure parts (the dataset, detector, measurable check, validator, review reduc
 
 ### AD. Product observability (`analytics.test.ts`, change 006 T2 to T5 — AC-04 to AC-14, AC-16)
 
-Serial (`test.describe.configure({ mode: 'serial' })`). Needs `MOCK_AI`, `MOCK_PUPPETEER` and `MOCK_SOCIAL` and test-DB access; it skips without them. Each case clears the store first (`DELETE /api/test/analytics-events`), drives a real flow under the mocks and reads the events back through the seam.
+Serial (`test.describe.configure({ mode: 'serial' })`). Needs `MOCK_AI` and `MOCK_PUPPETEER` and test-DB access; it skips without them. Each case clears the store first (`DELETE /api/test/analytics-events`), drives a real flow under the mocks and reads the events back through the seam.
 
 **The seam** (`/api/test/analytics-events`, FR-07): 404 in production, 404 unless `MOCK_AI`, admin only, like `model-calls`. `GET` returns recent events (optional `name` and `draftId` filters); `DELETE` clears them; `POST` takes one of three bodies: `{ seed: [...] }` inserts rows with an explicit `at` (retention and range cases), `{ failNext: n }` makes the next `n` event inserts reject (failure isolation, AC-08), and `{ sweep: true }` runs the retention sweep once. The cases reuse these existing sentinels and seams: `__FAIL_GEN_ALWAYS__` (a generation that always fails), `__VERIFY_PASS__` and `__VERIFY_FAIL_ALWAYS__` (the mock verifier), `conflict_test` (a brand-kit conflict on refine), `__FAIL_ALWAYS__` in the topic (a publish that always fails) and `POST /api/test/generation-tick`.
 
@@ -999,7 +1007,7 @@ The mock suite proves the mechanism with mock replies; it records no real model 
 
 ### AE. Post styles and the facts check (`post-styles.test.ts`, change 027 T4 to T7 — AC-05 to AC-07, AC-10 to AC-16, AC-22)
 
-Serial. Needs `MOCK_AI`, `MOCK_PUPPETEER` and `MOCK_SOCIAL` and test-DB access; it skips without them. The suite runs under the mocks only: no model call, and the check itself is code. The server cases are TC-PS-01 to TC-PS-29, the UI cases TC-PS-30 to TC-PS-39, and the insights section TC-PS-40. The section also adds **TC-OBS-31** to §AD (the three new event fields).
+Serial. Needs `MOCK_AI` and `MOCK_PUPPETEER` and test-DB access; it skips without them. The suite runs under the mocks only: no model call, and the check itself is code. The server cases are TC-PS-01 to TC-PS-29, the UI cases TC-PS-30 to TC-PS-39, and the insights section TC-PS-40. The section also adds **TC-OBS-31** to §AD (the three new event fields).
 
 **The seams** (`src/lib/testHooks.ts`, consulted only under `MOCK_AI`, dormant in prod). A sentinel in the brief **topic** makes the mock caption and headline carry one invented value, and carries no digit itself:
 
