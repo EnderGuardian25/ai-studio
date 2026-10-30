@@ -240,6 +240,14 @@ export interface TemplateSummary {
   previewColor: string
 }
 
+// GET /api/templates/[id]
+export interface TemplateDetail {
+  id: string
+  name: string
+  aspectRatio: AspectRatio
+  htmlTemplate: string
+}
+
 // ── AI providers (public, non-admin) ────────────────────────────────────
 
 // GET /api/providers/available?slot=COPY|IMAGE

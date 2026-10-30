@@ -17,7 +17,7 @@ A shared sandboxed preview atom, a viewer on the kit page, a team-scoped read ro
   - Estimate: small
   - Kind: impl
   - Notes: FR-01, FR-02, AC-02. `sandbox=""` exactly. Sizes only through `dimensionsFor`. Use the shared `Modal` (pick a `size` that fits a 1080×1350 preview scaled down). Keep the existing delete button and its `aria-label`. Read `docs/ui-reference/DESIGN_SYSTEM.md` before styling.
-- [ ] `T2` — `GET /api/templates/[id]`
+- [x] `T2` — `GET /api/templates/[id]`
   - Files: `src/app/api/templates/[id]/route.ts`, `src/lib/api-types.ts`, `tests/unit/templateRoute.test.ts`
   - Estimate: small
   - Kind: impl
