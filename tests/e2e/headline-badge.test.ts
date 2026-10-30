@@ -74,7 +74,7 @@ const topicOf = (label: string) => `HL ${label} ${Date.now()}`
 async function openDraft(page: Page, id: string) {
   await pageLogin(page)
   await page.goto(`/drafts/${id}`)
-  await expect(page.getByRole('button', { name: /^publish$/i })).toBeVisible({ timeout: 20_000 })
+  await expect(page.getByTestId('download-button')).toBeVisible({ timeout: 20_000 })
 }
 
 async function clearEvents() {
@@ -160,7 +160,7 @@ test.describe('§AH stale-headline badge', () => {
     await waitForAction(api, draft.id)
     expect((await getDraft(draft.id)).headlineImage.state).toBe('fresh')
     await page.reload()
-    await expect(page.getByRole('button', { name: /^publish$/i })).toBeVisible({ timeout: 20_000 })
+    await expect(page.getByTestId('download-button')).toBeVisible({ timeout: 20_000 })
     await expect(page.getByTestId('headline-image-notice')).toHaveCount(0)
   })
 
@@ -216,7 +216,7 @@ test.describe('§AH stale-headline badge', () => {
     expect((await api.post(`/api/drafts/${draft.id}/revisions/2/restore`, {})).status()).toBe(200)
     expect((await getDraft(draft.id)).headlineImage.state).toBe('unknown')
     await page.reload()
-    await expect(page.getByRole('button', { name: /^publish$/i })).toBeVisible({ timeout: 20_000 })
+    await expect(page.getByTestId('download-button')).toBeVisible({ timeout: 20_000 })
     await expect(page.getByTestId('headline-image-notice')).toHaveCount(0)
   })
 
@@ -237,31 +237,25 @@ test.describe('§AH stale-headline badge', () => {
     )
   })
 
-  test('TC-HL-08: the publish dialog on the draft page shows the line when stale, none when fresh, and Confirm stays usable', async ({ page }) => {
+  test('TC-HL-08: the draft page download line shows when stale, none when fresh, and Download stays usable', async ({ page }) => {
     if (!MOCKED()) { test.skip(); return }
     const fresh = await generate(topicOf('dlg-fresh'))
     const stale = await generate(topicOf('dlg-stale'))
     await setHeadline(stale.id, NEW_HEADLINE)
 
     await openDraft(page, stale.id)
-    await page.getByRole('button', { name: /^publish$/i }).click()
-    const dialog = page.getByRole('dialog', { name: 'Publish post' })
-    await expect(dialog.getByTestId('publish-headline-line')).toHaveText('The image shows an older headline.')
-    await dialog.getByRole('checkbox').first().check()
-    await expect(dialog.getByRole('button', { name: /^publish$/i })).toBeEnabled()
-    await dialog.getByRole('button', { name: 'Cancel' }).click()
+    await expect(page.getByTestId('download-line')).toHaveText('The image shows an older headline.')
+    await expect(page.getByTestId('download-button')).toBeEnabled()
+    // 037: there is no Publish button to carry the line any more.
+    await expect(page.getByRole('button', { name: /^publish$/i })).toHaveCount(0)
 
     await page.goto(`/drafts/${fresh.id}`)
-    await expect(page.getByRole('button', { name: /^publish$/i })).toBeVisible({ timeout: 20_000 })
-    await page.getByRole('button', { name: /^publish$/i }).click()
-    const dialog2 = page.getByRole('dialog', { name: 'Publish post' })
-    await expect(dialog2).toBeVisible()
-    await expect(dialog2.getByTestId('publish-headline-line')).toHaveCount(0)
-    await dialog2.getByRole('checkbox').first().check()
-    await expect(dialog2.getByRole('button', { name: /^publish$/i })).toBeEnabled()
+    await expect(page.getByTestId('download-button')).toBeVisible({ timeout: 20_000 })
+    await expect(page.getByTestId('download-line')).toHaveCount(0)
+    await expect(page.getByTestId('download-button')).toBeEnabled()
   })
 
-  test('TC-HL-09: the publish dialog on the library page shows the line for a stale draft, and the library shows no badge', async ({ page }) => {
+  test('TC-HL-09: the library reports the stale state, shows no badge and has no Publish button', async ({ page }) => {
     if (!MOCKED()) { test.skip(); return }
     const topic = topicOf('lib')
     const draft = await generate(topic)
@@ -277,13 +271,9 @@ test.describe('§AH stale-headline badge', () => {
     await pageLogin(page)
     await page.goto('/library')
     await page.getByPlaceholder('Search by topic…').fill(topic)
-    await expect(page.getByRole('button', { name: 'Publish', exact: true })).toHaveCount(1, { timeout: 20_000 })
+    await expect(page.getByRole('link', { name: 'Open' })).toHaveCount(1, { timeout: 20_000 })
     await expect(page.getByTestId('headline-image-notice')).toHaveCount(0)
-    await page.getByRole('button', { name: 'Publish', exact: true }).click()
-    const dialog = page.getByRole('dialog', { name: 'Publish post' })
-    await expect(dialog.getByTestId('publish-headline-line')).toHaveText('The image shows an older headline.')
-    await dialog.getByRole('checkbox').first().check()
-    await expect(dialog.getByRole('button', { name: /^publish$/i })).toBeEnabled()
+    await expect(page.getByRole('button', { name: 'Publish', exact: true })).toHaveCount(0)
   })
 
   test('TC-HL-10: draft.headline_edited once per change, none for an unchanged save; publish.settled carries headlineState', async () => {

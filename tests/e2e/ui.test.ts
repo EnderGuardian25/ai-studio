@@ -57,7 +57,10 @@ test.describe('UI flows', () => {
     await pageLogin(page)
     await expect(page).toHaveURL(/\/$/)
     await expect(page.getByText('Drafts Ready')).toBeVisible()
-    await expect(page.getByText('Posts Published')).toBeVisible()
+    await expect(page.getByText('Posts this month')).toBeVisible()
+    // 037 AC-11: the publishing KPIs are gone.
+    await expect(page.getByText('Posts Published')).toHaveCount(0)
+    await expect(page.getByText('Active Campaigns')).toHaveCount(0)
   })
 
   // TC-UI-02 — Brief wizard renders its 5 steps and the primary action.
@@ -75,26 +78,30 @@ test.describe('UI flows', () => {
     // API-level generation tests (path-a/path-b).
   })
 
-  // TC-UI-03 — Publish opens the publish dialog; picking a channel + Confirm fires
-  // POST /api/posts (not a nav). Guards H5 and the shared PublishDialog wiring.
-  test('clicking Publish fires a POST /api/posts request', async ({ page }) => {
+  // TC-UI-03 — 037 AC-09/AC-11: Download is the one primary action and there is no
+  // Publish button; the dashboard's "Posts this month" counts the new draft.
+  test('the draft page has no Publish button and the dashboard counts the post', async ({ page }) => {
     if (!MOCKED()) { test.skip(); return }
-    const draftId = await apiDraft(api, `UI-Publish-${Date.now()}`)
     await pageLogin(page)
+    const readKpi = async () =>
+      Number(
+        (
+          await page
+            .locator('div.border-b', { has: page.getByText('Posts this month', { exact: true }) })
+            .locator('div.font-display')
+            .innerText()
+        ).trim(),
+      )
+    const before = await readKpi()
+
+    const draftId = await apiDraft(api, `UI-Download-${Date.now()}`)
     await page.goto(`/drafts/${draftId}`)
+    await expect(page.getByTestId('download-button')).toBeVisible({ timeout: 20_000 }) // client-rendered after fetch
+    await expect(page.getByRole('button', { name: /^publish$/i })).toHaveCount(0)
 
-    const publishBtn = page.getByRole('button', { name: /^publish$/i })
-    await expect(publishBtn).toBeVisible({ timeout: 20_000 }) // client-rendered after fetch
-    await publishBtn.click()
-
-    // The dialog appears — select a channel and confirm.
-    await page.getByText('Publish post').waitFor({ timeout: 5_000 })
-    await page.getByRole('checkbox').first().check()
-    const [req] = await Promise.all([
-      page.waitForRequest(r => r.url().includes('/api/posts') && r.method() === 'POST'),
-      page.getByRole('button', { name: /^publish$/i }).click(),
-    ])
-    expect(req).toBeTruthy()
+    await page.goto('/')
+    await expect(page.getByText('Posts this month', { exact: true })).toBeVisible()
+    expect(await readKpi()).toBeGreaterThanOrEqual(before + 1)
   })
 
   // TC-UI-04 — The draft preview image loads in the browser (signed URL works). Guards H10.

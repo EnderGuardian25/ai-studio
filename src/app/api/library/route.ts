@@ -3,7 +3,8 @@ import { prisma } from "@/lib/prisma"
 import { withTeamAuth } from "@/lib/api/handler"
 import { draftVisibilityWhere } from "@/lib/authz/visibility"
 import { resolveExportUrl } from "@/lib/storage/minio"
-import { Prisma, PostStatus } from "@prisma/client"
+import { Prisma } from "@prisma/client"
+import { isStyleKey } from "@/lib/postStyles"
 import { headlineState } from "@/lib/renderedText/state"
 import { parseRenderedText } from "@/lib/renderedText/stamp"
 
@@ -11,8 +12,14 @@ export const GET = withTeamAuth(async (req: NextRequest, _ctx, user) => {
   const { searchParams } = new URL(req.url)
   const page = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10))
   const pageSize = Math.min(50, Math.max(1, parseInt(searchParams.get("pageSize") ?? "20", 10)))
-  const statusFilter = searchParams.get("status") ?? "ALL"
   const search = searchParams.get("search")?.trim() ?? ""
+  const brandKitId = searchParams.get("brandKitId")?.trim() || null
+  const postStyle = searchParams.get("postStyle")?.trim() || null
+
+  // An unknown style is a client error, never "no filter" (037 FR-06).
+  if (postStyle && !isStyleKey(postStyle)) {
+    return NextResponse.json({ error: "Unknown post style" }, { status: 400 })
+  }
 
   // Build the where clause with the real Prisma type (M3, final review) — the
   // old hand-rolled WhereClause type didn't match Prisma's actual
@@ -20,32 +27,8 @@ export const GET = withTeamAuth(async (req: NextRequest, _ctx, user) => {
   // silenced with `as never`. That cast meant a future change to
   // draftVisibilityWhere's shape wouldn't be type-checked at this call
   // site — exactly where a silent visibility regression (D6) would hurt.
-  const where: Prisma.DraftWhereInput = {}
-
-  // Status filter
-  if (statusFilter === "READY") {
-    // READY = EXPORTED draft with no posts yet
-    where.status = "EXPORTED"
-    where.posts = { none: {} }
-  } else if (
-    statusFilter === "PUBLISHED" ||
-    statusFilter === "SCHEDULED" ||
-    statusFilter === "FAILED"
-  ) {
-    where.OR = [
-      {
-        posts: {
-          some: { status: statusFilter as PostStatus },
-        },
-      },
-    ]
-  } else {
-    // ALL: EXPORTED drafts OR drafts with any post
-    where.OR = [
-      { status: "EXPORTED" },
-      { posts: { some: {} } },
-    ]
-  }
+  // The library lists finished posts only (037 D10): EXPORTED drafts.
+  const where: Prisma.DraftWhereInput = { status: "EXPORTED" }
 
   // AND-ed conditions accumulate here (search + the mandatory D6 visibility
   // clause below) so the two can never accidentally overwrite each other.
@@ -59,14 +42,27 @@ export const GET = withTeamAuth(async (req: NextRequest, _ctx, user) => {
 
   // D6 visibility: own drafts, or anything shared via a campaign-linked brief
   // (team-wide admins/super-admins see the whole team).
+  if (postStyle) {
+    andConditions.push({ brief: { postStyle } })
+  }
+
+  // Kit filter: the brief's own kit, else (no explicit kit) the campaign's.
+  if (brandKitId) {
+    andConditions.push({
+      OR: [
+        { brief: { brandKitId } },
+        { brief: { brandKitId: null, campaign: { brandKitId } } },
+      ],
+    })
+  }
+
   andConditions.push(draftVisibilityWhere(user))
 
   where.AND = andConditions
 
   const [drafts, total] = await Promise.all([
     // select (not include): tiles never need htmlContent (megabytes/row after
-    // inline-asset restoration) or pendingConflict. Campaign/kit labels come
-    // from the brief's campaign — the only way drafts are linked to campaigns.
+    // inline-asset restoration) or pendingConflict.
     prisma.draft.findMany({
       where,
       select: {
@@ -80,26 +76,10 @@ export const GET = withTeamAuth(async (req: NextRequest, _ctx, user) => {
         brief: {
           select: {
             topic: true,
-            channels: true,
             aspectRatio: true,
-            campaign: {
-              select: {
-                name: true,
-                brandKit: { select: { name: true } },
-              },
-            },
-          },
-        },
-        posts: {
-          orderBy: { createdAt: "desc" },
-          select: {
-            id: true,
-            channel: true,
-            status: true,
-            scheduledAt: true,
-            publishedAt: true,
-            platformId: true,
-            errorReason: true,
+            postStyle: true,
+            brandKit: { select: { name: true } },
+            campaign: { select: { brandKit: { select: { name: true } } } },
           },
         },
       },
@@ -113,8 +93,15 @@ export const GET = withTeamAuth(async (req: NextRequest, _ctx, user) => {
   // exportUrl is stored as an EXPORTS object key — sign each for the browser
   // (thumbnails). Signing is local (no network round-trip), so mapping is cheap.
   const signedDrafts = await Promise.all(
-    drafts.map(async ({ headline, renderedText, ...d }) => ({
+    drafts.map(async ({ headline, renderedText, brief, ...d }) => ({
       ...d,
+      brief: {
+        topic: brief.topic,
+        aspectRatio: brief.aspectRatio,
+        postStyle: brief.postStyle,
+        // The explicit kit wins; a brief with none falls to its campaign's.
+        brandKitName: brief.brandKit?.name ?? brief.campaign?.brandKit?.name ?? null,
+      },
       exportUrl: await resolveExportUrl(d.exportUrl),
       headlineState: headlineState(parseRenderedText(renderedText), headline),
     }))

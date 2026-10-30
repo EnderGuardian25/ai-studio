@@ -417,11 +417,11 @@ export interface DraftRecord {
   headlineState: HeadlineState
   brief: {
     topic: string
-    channels: string[]
     aspectRatio: AspectRatio
-    campaign: { name: string; brandKit: { name: string } | null } | null
+    // Stored key (null = none); the card shows its label.
+    postStyle: string | null
+    brandKitName: string | null
   }
-  posts: PostRecord[]
 }
 
 export interface LibraryResponse {

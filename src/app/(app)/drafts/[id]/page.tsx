@@ -20,7 +20,6 @@ import { ImageLightbox } from '@/components/ui/ImageLightbox'
 import { Button } from '@/components/ui/Button'
 import { Panel } from '@/components/ui/Panel'
 import { StatusChip } from '@/components/ui/StatusChip'
-import { PublishDialog } from '@/components/library/PublishDialog'
 import { CaptionPanels } from '@/components/drafts/CaptionPanels'
 import { RefinementPanel } from '@/components/drafts/RefinementPanel'
 import { InlineEditModal } from '@/components/drafts/InlineEditModal'
@@ -35,7 +34,6 @@ import { ModelPicker } from '@/components/ui/ModelPicker'
 import { PageTitle } from '@/components/ui/PageHead'
 import { EYEBROW, FOCUS, ICON, PILL_BADGE, SUB_HEAD } from '@/components/ui/atoms'
 import { ApiError, apiFetch } from '@/lib/apiFetch'
-import { useCurrentUser } from '@/lib/hooks/useCurrentUser'
 import { useUndoableAction } from '@/lib/hooks/useUndoableAction'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { applyFailureNotice, APPLY_FAILURES, type ApplyFailure } from '@/lib/applyText'
@@ -67,11 +65,11 @@ interface Revision {
   modelSubstitutedFrom: string | null
 }
 
-const STATUS_TO_CHIP: Record<DraftDetail['status'], 'draft' | 'exported' | 'published' | 'failed'> =
+const STATUS_TO_CHIP: Record<DraftDetail['status'], 'draft' | 'exported' | 'failed'> =
   {
     IN_PROGRESS: 'draft',
     EXPORTED: 'exported',
-    PUBLISHED: 'published',
+    PUBLISHED: 'exported', // the value goes with the schema change (T5)
     FAILED: 'failed',
   }
 
@@ -105,8 +103,6 @@ export default function DraftDetailPage() {
   const [downloading, setDownloading] = useState(false)
   const [retrying, setRetrying] = useState(false)
   const [restoringRev, setRestoringRev] = useState<number | null>(null)
-  const { isTeamAdmin } = useCurrentUser()
-  const [showPublish, setShowPublish] = useState(false)
   const [showPreview, setShowPreview] = useState(false)
   const [showInlineEdit, setShowInlineEdit] = useState(false)
   const [regenDesign, setRegenDesign] = useState(false)
@@ -448,15 +444,6 @@ export default function DraftDetailPage() {
               {downloading ? <Loader2 {...ICON} className="animate-spin" /> : <Download {...ICON} />}
               Download
             </Button>
-            {isTeamAdmin && (
-              <Button
-                variant="secondary"
-                disabled={!draft.exportUrl || actionPending}
-                onClick={() => setShowPublish(true)}
-              >
-                Publish
-              </Button>
-            )}
           </div>
         </div>
         {/* The download line (037 FR-05): one muted sentence, never blocking. */}
@@ -806,24 +793,6 @@ export default function DraftDetailPage() {
           src={draft.exportUrl}
           topic={draft.brief.topic}
           aspectRatio={draft.brief.aspectRatio}
-        />
-      )}
-
-      {/* Publish dialog — channel + optional schedule (shared with Library). */}
-      {showPublish && (
-        <PublishDialog
-          draftId={draftId}
-          headlineState={draft.headlineImage?.state}
-          onClose={() => {
-            // A partial failure closes here, not via onSuccess, and the
-            // channels that did publish can change the draft's status.
-            setShowPublish(false)
-            fetchDraft()
-          }}
-          onSuccess={() => {
-            setShowPublish(false)
-            fetchDraft()
-          }}
         />
       )}
 

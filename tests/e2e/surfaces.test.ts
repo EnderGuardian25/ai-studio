@@ -199,17 +199,6 @@ for (const theme of THEMES) {
       await expectOpaque(await fireToast(page), 'toast')
     })
 
-    test(`publish modal (${theme})`, async ({ page }) => {
-      test.skip(!MOCKED(), 'needs MOCK_AI + MOCK_PUPPETEER to mint a draft')
-      const draft = await exportedDraft(api)
-      await page.setViewportSize({ width: 1440, height: 900 })
-      await pageLogin(page)
-      await page.goto(`/drafts/${draft.id}`)
-      await page.getByRole('button', { name: /^publish$/i }).click({ timeout: 20_000 })
-      await expectOpaque(page.getByRole('dialog', { name: 'Publish post' }), 'publish modal')
-      await page.keyboard.press('Escape')
-    })
-
     test(`confirm dialog, cancelled (${theme})`, async ({ page }) => {
       test.skip(!MOCKED(), 'needs MOCK_AI + MOCK_PUPPETEER to mint a draft')
       const draft = await exportedDraft(api)
@@ -442,7 +431,7 @@ test.describe('Shell, login and choose-team (T6)', () => {
 // Filter the library down to one tile by topic (the search is debounced).
 async function filterLibraryTo(page: Page, topic: string) {
   await page.getByPlaceholder('Search by topic…').fill(topic)
-  await expect(page.getByRole('button', { name: 'History', exact: true })).toHaveCount(1, { timeout: 20_000 })
+  await expect(page.getByRole('link', { name: 'Open', exact: true })).toHaveCount(1, { timeout: 20_000 })
   await expect(page.locator(`img[alt="${topic}"]`)).toBeVisible()
 }
 
@@ -467,10 +456,14 @@ test.describe('Dashboard and library (T7)', () => {
     await pageLogin(page)
     await page.goto('/library')
     await expect(page.getByRole('heading', { name: 'Library', level: 1 })).toBeVisible()
-    expect(await tabThreeFromMain(page)).toEqual(['Search by topic…', 'All', 'Ready'])
+    // The two selects have no aria-label or placeholder, so a stop reads as its option text.
+    const stops = await tabThreeFromMain(page)
+    expect(stops[0]).toBe('Search by topic…')
+    expect(stops[1]).toMatch(/^All kits/)
+    expect(stops[2]).toMatch(/^All styles/)
   })
 
-  test('AC-12: dashboard (Recent Drafts expanded), library, publish dialog and history drawer at 375px', async ({ page }) => {
+  test('AC-12: dashboard (Recent Drafts expanded) and library at 375px', async ({ page }) => {
     test.skip(!MOCKED(), 'needs MOCK_AI + MOCK_PUPPETEER to mint a draft')
     const draft = await exportedDraft(api)
     await page.setViewportSize({ width: 375, height: 812 })
@@ -500,23 +493,10 @@ test.describe('Dashboard and library (T7)', () => {
     await expect(page.getByRole('link', { name: draft.topic })).toBeVisible()
     await expect(page.getByRole('button', { name: `View ${draft.topic} full screen` })).toBeAttached()
     await expect(page.getByRole('button', { name: `Delete ${draft.topic}` })).toBeVisible()
-
-    await page.getByRole('button', { name: 'Publish', exact: true }).click()
-    const publish = page.getByRole('dialog', { name: 'Publish post' })
-    await expect(publish).toBeVisible()
-    await expect(publish.getByRole('checkbox')).not.toHaveCount(0)
-    await expect(publish.getByRole('button', { name: 'Publish' })).toBeVisible()
-    await expectNoHorizontalScroll(page, 'publish dialog at 375px')
-    await publish.getByRole('button', { name: 'Cancel' }).click()
-    await expect(publish).toBeHidden()
-
-    await page.getByRole('button', { name: 'History', exact: true }).click()
-    const history = page.getByRole('dialog', { name: 'Publish History' })
-    await expect(history).toBeVisible()
-    await expect(history.getByText('No publish history yet.')).toBeVisible()
-    await expectNoHorizontalScroll(page, 'history drawer at 375px')
-    await history.getByRole('button', { name: 'Close' }).click()
-    await expect(history).toBeHidden()
+    // 037: no Publish or History control on a tile; Open is there.
+    await expect(page.getByRole('button', { name: 'Publish', exact: true })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'History', exact: true })).toHaveCount(0)
+    await expect(page.getByRole('link', { name: 'Open', exact: true })).toBeVisible()
   })
 
   test('library thumbnails are shown as rendered: no filter, transform, rounding or hover scale', async ({ page }) => {
@@ -721,7 +701,7 @@ test.describe('Draft review (T9)', () => {
     for (const name of ['Regenerate design', 'Edit inline', 'Download', 'Regenerate all']) {
       await expect(page.getByRole('button', { name, exact: true })).toBeVisible()
     }
-    await expect(page.getByRole('button', { name: /^publish$/i })).toBeVisible()
+    await expect(page.getByRole('button', { name: /^publish$/i })).toHaveCount(0)
     await expect(page.getByPlaceholder('Write the Instagram caption…')).toBeVisible()
     for (const name of ['Make the background darker', 'Move the headline to top', 'Increase font size']) {
       await expect(page.getByRole('button', { name, exact: true })).toBeVisible()
@@ -1234,24 +1214,19 @@ test.describe('Team, settings and admin (T12)', () => {
     await expectNoHorizontalScroll(page, 'settings at 375px')
   })
 
-  test('AC-12 + FR-12: /team at 375px keeps providers, channels, the team token and API keys, with the register form and key modals open', async ({ page }) => {
+  test('AC-12 + FR-12: /team at 375px keeps providers, the team token and API keys, with the register form and key modals open', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 })
     await pageLogin(page)
     await page.goto('/team')
 
     await expect(page.getByRole('heading', { name: 'Team settings', level: 1 })).toBeVisible()
-    for (const name of ['AI providers', 'Social channels', 'Team Claude account', 'API keys', 'Models']) {
+    for (const name of ['AI providers', 'Team Claude account', 'API keys', 'Models']) {
       await expect(page.getByRole('heading', { name, exact: true, level: 2 })).toBeVisible()
     }
     await expect(page.getByRole('heading', { name: 'Image generation', level: 3 })).toBeVisible()
-    // Social channels: both rows, each with its token reveal and Save. Scoped
-    // to the section since 008 added the Models section's own Save to /team.
-    const channels = page
-      .locator('section')
-      .filter({ has: page.getByRole('heading', { name: 'Social channels', exact: true, level: 2 }) })
-      .last()
-    await expect(channels.getByRole('button', { name: 'Show access token' })).toHaveCount(2)
-    await expect(channels.getByRole('button', { name: 'Save', exact: true })).toHaveCount(2)
+    // 037: the Social channels section is gone.
+    await expect(page.getByRole('heading', { name: 'Social channels' })).toHaveCount(0)
+    // The Models section's own Save.
     await expect(
       page.getByRole('region', { name: 'Models', exact: true }).getByRole('button', { name: 'Save', exact: true }),
     ).toBeVisible()

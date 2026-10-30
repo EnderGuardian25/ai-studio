@@ -57,6 +57,7 @@ test.describe('Team settings — team-admin-only credentials', () => {
     expect((await admin.del('/api/team/claude-token')).status()).toBe(200)
   })
 
+  // 037 T3: the page no longer calls these routes; they are deleted in T4, with this test.
   test('team admin can connect/revoke Social Channels; editor is 403 throughout', async () => {
     expect((await editor.get('/api/team/channels')).status()).toBe(403)
     expect(

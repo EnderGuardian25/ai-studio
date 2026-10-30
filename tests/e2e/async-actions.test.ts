@@ -408,7 +408,7 @@ test.describe('§Q — async draft actions', () => {
     await expect(page.getByRole('status', { name: 'Generating the Instagram caption' })).toHaveCount(0)
 
     // 3. Still in the library (it lists EXPORTED drafts — a flipped status hid it).
-    const library = await (await api.get('/api/library?status=READY&pageSize=50')).json()
+    const library = await (await api.get('/api/library?pageSize=50')).json()
     expect(library.drafts.some((d: { id: string }) => d.id === draft.id)).toBe(true)
 
     // 4. Regenerate is accepted (this was the 409 'not ready') and refills the

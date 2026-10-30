@@ -8,3 +8,7 @@
 {"ev":"stop","span":"W1","at":"2026-10-30T16:01:08Z","ts":1793376068,"status":"ok"}
 {"ev":"start","span":"W2","kind":"wave","label":"wave 2","at":"2026-10-30T16:01:14Z","ts":1793376074}
 {"ev":"start","span":"T2","kind":"task","label":"Remove queue, generation loop, briefing plan","parent":"W2","model":"sonnet","attempt":"1","at":"2026-10-30T16:01:14Z","ts":1793376074}
+{"ev":"stop","span":"T2","at":"2026-10-30T16:14:57Z","ts":1793376897,"status":"ok"}
+{"ev":"stop","span":"W2","at":"2026-10-30T16:14:57Z","ts":1793376897,"status":"ok"}
+{"ev":"start","span":"W3","kind":"wave","label":"wave 3","at":"2026-10-30T16:15:02Z","ts":1793376902}
+{"ev":"start","span":"T3","kind":"task","label":"Remove publish UI; library filters; dashboard KPIs","parent":"W3","model":"sonnet","attempt":"1","at":"2026-10-30T16:15:03Z","ts":1793376902}

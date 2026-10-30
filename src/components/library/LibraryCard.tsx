@@ -3,41 +3,31 @@
 import React, { useState } from 'react'
 import Link from 'next/link'
 import { ImageIcon, Trash2, Maximize2 } from 'lucide-react'
-import { Button } from '@/components/ui/Button'
-import { StatusChip } from '@/components/ui/StatusChip'
 import { ImageLightbox } from '@/components/ui/ImageLightbox'
 import type { AspectRatio } from '@prisma/client'
+import { FOCUS } from '@/components/ui/atoms'
 import { aspectClassFor } from '@/lib/aspectRatio'
-import { channelLabel } from '@/lib/channels'
+import { postStyleLabel } from '@/components/campaigns/postStyleOptions'
+import { formatDateTime } from '@/lib/format'
 
-interface PostSummary {
-  id: string
-  channel: string
-  status: string
-  scheduledAt: string | null
-  publishedAt: string | null
-}
-
-interface PostCardDraft {
+interface LibraryCardDraft {
   id: string
   exportUrl: string | null
-  status: string
   createdAt: string
-  brief: { topic: string; channels: string[]; aspectRatio?: AspectRatio }
-  posts: PostSummary[]
-  brandKitName: string | null
+  brief: {
+    topic: string
+    aspectRatio?: AspectRatio
+    postStyle: string | null
+    brandKitName: string | null
+  }
 }
 
-interface PostCardProps {
-  draft: PostCardDraft
+interface LibraryCardProps {
+  draft: LibraryCardDraft
   isTeamAdmin: boolean
-  onPublish: (draftId: string, exportUrl: string) => void
-  onViewHistory: (draftId: string, posts: PostSummary[]) => void
   // Admin-only hard delete (button hidden when omitted).
   onDelete?: (draftId: string) => void
 }
-
-type ChipStatus = 'draft' | 'exported' | 'scheduled' | 'published' | 'failed'
 
 // The expand button sits on the post image, which can be any colour, so it
 // uses fixed ink-on-paper values that read in both themes (DESIGN_SYSTEM.md
@@ -45,21 +35,9 @@ type ChipStatus = 'draft' | 'exported' | 'scheduled' | 'published' | 'failed'
 const EXPAND_BUTTON =
   'absolute top-2.5 right-2.5 inline-flex h-control-sm w-control-sm items-center justify-center rounded-ui-sm border border-[#211c18] bg-[#fffefb] text-[#211c18] opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity duration-fast ease-standard focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus' // ui-exception: drawn on the post image, fixed ink-on-paper per DESIGN_SYSTEM.md §8.12
 
-function deriveStatus(draft: PostCardDraft): ChipStatus {
-  if (draft.posts.length === 0) {
-    return draft.status === 'EXPORTED' ? 'exported' : 'draft'
-  }
-  // Most recent post is first (ordered desc)
-  const latest = draft.posts[0]
-  const s = latest.status.toLowerCase()
-  if (s === 'published') return 'published'
-  if (s === 'scheduled' || s === 'pending') return 'scheduled'
-  if (s === 'failed') return 'failed'
-  return 'draft'
-}
-
-export function PostCard({ draft, isTeamAdmin, onPublish, onViewHistory, onDelete }: PostCardProps) {
-  const chipStatus = deriveStatus(draft)
+export function LibraryCard({ draft, isTeamAdmin, onDelete }: LibraryCardProps) {
+  const styleLabel = postStyleLabel(draft.brief.postStyle)
+  const metaLine = [draft.brief.brandKitName, styleLabel].filter(Boolean).join(' · ')
   const [showPreview, setShowPreview] = useState(false)
 
   return (
@@ -111,47 +89,20 @@ export function PostCard({ draft, isTeamAdmin, onPublish, onViewHistory, onDelet
           {draft.brief.topic}
         </p>
 
-        <div className="flex items-center justify-between gap-3">
-          <p
-            className="min-w-0 truncate text-ui-xs text-fg-muted"
-            title={[
-              draft.brief.channels.map((ch) => channelLabel(ch)).join(', '),
-              draft.brandKitName,
-            ]
-              .filter(Boolean)
-              .join(' · ')}
-          >
-            {draft.brief.channels.map((ch) => channelLabel(ch)).join(', ')}
-            {draft.brandKitName && (
-              <>
-                <span aria-hidden="true"> · </span>
-                {draft.brandKitName}
-              </>
-            )}
-          </p>
-          <StatusChip status={chipStatus} className="flex-shrink-0" />
-        </div>
+        <p className="min-w-0 truncate text-ui-xs text-fg-muted" title={metaLine}>
+          {metaLine || 'No kit'}
+        </p>
+        <p className="text-ui-xs text-fg-muted">{formatDateTime(draft.createdAt)}</p>
 
         {/* Actions. The floating Create post button is the view's one
-            primary (§8.2), so Publish is Outline here and History is Text. */}
+            primary (§8.2), so Open is Outline here. */}
         <div className="flex items-center gap-2 pt-2">
-          {isTeamAdmin && (
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => onPublish(draft.id, draft.exportUrl ?? '')}
-              disabled={!draft.exportUrl}
-            >
-              Publish
-            </Button>
-          )}
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => onViewHistory(draft.id, draft.posts)}
+          <Link
+            href={`/drafts/${draft.id}`}
+            className={`inline-flex h-control-sm items-center rounded-ui-md border border-line px-3 text-ui-sm font-semibold text-fg transition-[border-color] duration-fast ease-standard hover:border-fg ${FOCUS}`}
           >
-            History
-          </Button>
+            Open
+          </Link>
           {isTeamAdmin && onDelete && (
             <button
               type="button"

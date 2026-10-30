@@ -35,10 +35,12 @@ const TOPIC_LINK = 'font-medium text-fg transition-colors duration-fast ease-sta
 // The small-caps header cell (§8.15).
 const HEAD_CELL = 'py-2 font-semibold'
 
-const DRAFT_CHIP: Record<DraftStatus, 'draft' | 'exported' | 'published' | 'failed'> = {
+// No published state: a finished post is Ready (037). The PUBLISHED enum value
+// goes with the schema change (T5); until then it reads as Ready too.
+const DRAFT_CHIP: Record<DraftStatus, 'draft' | 'exported' | 'failed'> = {
   IN_PROGRESS: 'draft',
   EXPORTED: 'exported',
-  PUBLISHED: 'published',
+  PUBLISHED: 'exported',
   FAILED: 'failed',
 }
 

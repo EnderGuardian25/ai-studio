@@ -49,7 +49,7 @@ Add Download first, then remove scheduled generation, then the publishing UI, th
 
 ### Wave 3: remove the publishing UI
 
-- [ ] `T3` — Remove the publish UI; library filters and `LibraryCard`; dashboard KPIs; team wording
+- [x] `T3` — Remove the publish UI; library filters and `LibraryCard`; dashboard KPIs; team wording
   - Files: src/components/library/PublishDialog.tsx, src/components/library/PublishHistoryDrawer.tsx, src/components/library/PostCard.tsx, src/components/library/LibraryCard.tsx, src/app/(app)/library/page.tsx, src/app/api/library/route.ts, src/app/(app)/page.tsx, src/components/dashboard/RecentDraftsCard.tsx, src/app/(app)/drafts/[id]/page.tsx, src/app/(app)/team/page.tsx, src/components/team/CaptionRouteCard.tsx, src/components/team/ModelsCard.tsx, src/components/team/TeamClaudeTokenCard.tsx, src/lib/dates.ts, scripts/capture-ui.mjs, tests/unit/libraryRoute.test.ts, tests/unit/monthStart.test.ts, tests/unit/libraryHeadlineState.test.ts, tests/e2e/library.test.ts, tests/e2e/ui.test.ts, tests/e2e/team-settings.test.ts, tests/e2e/a11y.test.ts, tests/e2e/headline-badge.test.ts, tests/helpers/ui.ts
   - Estimate: large
   - Depends: T2

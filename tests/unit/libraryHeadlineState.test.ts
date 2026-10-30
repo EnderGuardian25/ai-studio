@@ -33,8 +33,7 @@ const row = (id: string, headline: string | null, renderedText: unknown) => ({
   createdAt: new Date('2026-10-26T00:00:00Z'),
   headline,
   renderedText,
-  brief: { topic: 'T', channels: [], aspectRatio: 'SQUARE', campaign: null },
-  posts: [],
+  brief: { topic: 'T', aspectRatio: 'SQUARE', postStyle: null, brandKit: null, campaign: null },
 })
 
 async function list() {

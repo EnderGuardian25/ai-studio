@@ -185,21 +185,6 @@ test.describe('Field labels (T9)', () => {
     await expect(templates.locator('label').filter({ hasText: /^Size$/ })).toHaveCount(0)
     await expect(templates.locator('span').filter({ hasText: /^Size$/ })).toBeVisible()
   })
-
-  test('§8.3: the publish dialog Channels caption names its group', async ({ page }) => {
-    test.skip(!MOCKED(), 'needs MOCK_AI + MOCK_PUPPETEER to mint an exported draft')
-    const draft = await mintExportedDraft(api, `a11y-groups-${Date.now()}`)
-    await page.setViewportSize({ width: 1440, height: 900 })
-    await pageLogin(page)
-
-    // The publish dialog, from the draft page.
-    await page.goto(`/drafts/${draft.id}`)
-    await page.getByRole('button', { name: /^publish$/i }).click()
-    const publish = page.getByRole('dialog', { name: 'Publish post' })
-    const publishChannels = publish.getByRole('group', { name: 'Channels', exact: true })
-    await expect(publishChannels).toBeVisible()
-    await expect(publishChannels.getByRole('checkbox')).toHaveCount(2)
-  })
 })
 
 // ── T10: one control height per size, from the --control-* tokens (AC-06) ────
@@ -686,11 +671,6 @@ async function expectEyeCentred(field: Locator, eye: Locator) {
   expect(Math.abs(f!.y + f!.height / 2 - (e!.y + e!.height / 2))).toBeLessThan(1)
 }
 
-// A channel's ruled row, found by its visible channel name.
-function channelRow(page: Page, name: string): Locator {
-  return page.getByRole('listitem').filter({ has: page.getByText(name, { exact: true }) })
-}
-
 test.describe('Labels: team (T16)', () => {
   test('AC-11 rows 7, 8 and 9: the register form key, provider name and display label are labelled', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 })
@@ -715,32 +695,13 @@ test.describe('Labels: team (T16)', () => {
     await expectLabelled(page, 'Display label', { tag: 'INPUT', placeholder: 'Display label (e.g. Llama 3 (Groq))' })
   })
 
-  test('AC-11 rows 10 and 11: each channel row labels its access token and its ID field', async ({ page }) => {
+  test('037 FR-07: team settings has no Social channels section', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 })
     await pageLogin(page)
     await page.goto('/team')
-    await expect(page.getByRole('heading', { name: 'Social channels' })).toBeVisible()
-
-    for (const [name, idLabel] of [
-      ['Instagram', 'Business Account ID'],
-      ['LinkedIn', 'Organization ID'],
-    ] as const) {
-      const row = channelRow(page, name)
-      await expect(row, `one ${name} row`).toHaveCount(1)
-      // Row 10, scoped to the channel row: both rows say "Access token".
-      await expectLabelled(row, 'Access token', { tag: 'INPUT', placeholder: 'Access token' })
-      await expectEyeCentred(
-        row.getByLabel('Access token', { exact: true }),
-        row.getByRole('button', { name: 'Show access token' }),
-      )
-      // Row 11.
-      await expectLabelled(row, idLabel, { tag: 'INPUT', placeholder: idLabel })
-    }
-
-    // The two "Access token" labels point at two different fields.
-    const ids = await page.getByLabel('Access token', { exact: true }).evaluateAll((els) => els.map((el) => el.id))
-    expect(ids).toHaveLength(2)
-    expect(new Set(ids).size).toBe(2)
+    await expect(page.getByRole('heading', { name: 'AI providers' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Social channels' })).toHaveCount(0)
+    await expect(page.getByLabel('Access token', { exact: true })).toHaveCount(0)
   })
 
   test('AC-18: a provider row shows "On" or "Off" beside its toggle, aria-hidden, and the toggle keeps its name', async ({ page, request }) => {
@@ -867,7 +828,7 @@ test.describe('ARIA states (T17)', () => {
     return fixture
   }
 
-  test('AC-12: every tablist is named — library, /team, an open kit and a campaign', async ({ page }) => {
+  test('AC-12: every tablist is named — /team, an open kit and a campaign', async ({ page }) => {
     const kit = await mintKit()
     const { camp } = await mintCampaign()
     await page.setViewportSize({ width: 1440, height: 900 })
@@ -875,7 +836,8 @@ test.describe('ARIA states (T17)', () => {
 
     await page.goto('/library')
     await expect(page.getByRole('heading', { name: 'Library', level: 1 })).toBeVisible()
-    await expectTablistsNamed(page, ['Filter by status'])
+    // 037: the library's status tabs are gone (two selects replace them); any tablist left must be named.
+    await expectTablistsNamed(page, [])
 
     // /team with the register form open. Both modes render the slot toggle
     // since 024 FR-09.

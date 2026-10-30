@@ -8,25 +8,18 @@ import {
 import { prisma } from '@/lib/prisma'
 import { listBriefDrafts } from '@/lib/brief/briefDrafts'
 import { resolveTeamForServerComponent } from '@/lib/authz/serverTeam'
-import { draftVisibilityWhere, postVisibilityWhere } from '@/lib/authz/visibility'
+import { draftVisibilityWhere } from '@/lib/authz/visibility'
 import type { TeamAuthedUser } from '@/lib/api/handler'
 import { PageHead } from '@/components/ui/PageHead'
 import { SectionHead } from '@/components/ui/SectionHead'
 import { EYEBROW, FOCUS, ICON } from '@/components/ui/atoms'
 import { RecentDraftsCard } from '@/components/dashboard/RecentDraftsCard'
 import { NoTeamNotice } from '@/components/dashboard/NoTeamNotice'
-import { channelLabel as sharedChannelLabel } from '@/lib/channels'
 import { relativeTime } from '@/lib/format'
+import { monthStartUtc } from '@/lib/dates'
 
 // Dashboard renders live data; never cache it.
 export const dynamic = 'force-dynamic'
-
-// ── Helpers ─────────────────────────────────────────────────────────────────
-
-function channelLabel(channels: string[]): string {
-  if (!channels?.length) return '—'
-  return channels.map(sharedChannelLabel).join(', ')
-}
 
 // ── Data ────────────────────────────────────────────────────────────────────
 
@@ -34,19 +27,20 @@ async function getDashboardData(user: TeamAuthedUser) {
   const teamId = user.teamId
   const [
     draftsReady,
-    postsPublished,
-    activeCampaigns,
+    postsThisMonth,
     aiProviders,
     recentDrafts,
-    recentPublished,
     recentProviders,
   ] = await Promise.all([
     // KPI counts use the same D6 visibility as the library/posts listings —
     // a bare { teamId } count shows an editor team-wide numbers their own
     // list pages then contradict ("13 drafts ready", library shows 2).
     prisma.draft.count({ where: { ...draftVisibilityWhere(user), status: 'EXPORTED' } }),
-    prisma.post.count({ where: { ...postVisibilityWhere(user), status: 'PUBLISHED' } }),
-    prisma.campaign.count({ where: { isDeleted: false, teamId } }),
+    // Team-wide on purpose (037 D11): the whole team's output this month, by
+    // teamId and not through draft visibility, so every member sees one number.
+    prisma.draft.count({
+      where: { teamId, status: 'EXPORTED', createdAt: { gte: monthStartUtc(new Date()) } },
+    }),
     prisma.availableProvider.count({ where: { isEnabled: true, teamId } }),
     // D6 visibility (fixes the prior leak: this used to show every team's
     // drafts to every signed-in user, no scoping at all).
@@ -67,12 +61,6 @@ async function getDashboardData(user: TeamAuthedUser) {
         },
       },
     }),
-    prisma.post.findMany({
-      where: { ...postVisibilityWhere(user), status: 'PUBLISHED' },
-      take: 5,
-      orderBy: { publishedAt: 'desc' },
-      include: { draft: { include: { brief: { select: { topic: true } } } } },
-    }),
     // AvailableProvider is team-wide (no personal ownership concept).
     prisma.availableProvider.findMany({ where: { teamId }, take: 5, orderBy: { createdAt: 'desc' } }),
   ])
@@ -84,19 +72,13 @@ async function getDashboardData(user: TeamAuthedUser) {
   const unfinishedBriefs = await listBriefDrafts(user.userId, user.teamId)
 
   // Build a merged, chronological activity feed from the available signals.
-  type Event = { id: string; at: Date; text: string; kind: 'draft' | 'post' | 'provider' }
+  type Event = { id: string; at: Date; text: string; kind: 'draft' | 'provider' }
   const events: Event[] = [
     ...recentDrafts.map(d => ({
       id: `draft-${d.id}`,
       at: d.createdAt,
       text: `Draft generated — “${d.brief?.topic ?? 'Untitled'}”`,
       kind: 'draft' as const,
-    })),
-    ...recentPublished.map(p => ({
-      id: `post-${p.id}`,
-      at: p.publishedAt ?? p.createdAt,
-      text: `Published to ${channelLabel([p.channel])} — “${p.draft?.brief?.topic ?? 'Untitled'}”`,
-      kind: 'post' as const,
     })),
     ...recentProviders.map(p => ({
       id: `prov-${p.id}`,
@@ -110,8 +92,7 @@ async function getDashboardData(user: TeamAuthedUser) {
 
   return {
     draftsReady,
-    postsPublished,
-    activeCampaigns,
+    postsThisMonth,
     aiProviders,
     recentDrafts,
     unfinishedBriefs,
@@ -181,15 +162,14 @@ export default async function DashboardPage() {
       <PageHead
         eyebrow="Overview"
         title="Dashboard"
-        lead="At-a-glance status across drafts, posts, and campaigns."
+        lead="At-a-glance status across drafts and posts."
         className="mb-8"
       />
 
       {/* KPI summary: a 2 px --fg rule opens the block; ruled cells, no boxes */}
-      <div className="grid grid-cols-2 gap-x-6 border-t-2 border-fg lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-x-6 border-t-2 border-fg lg:grid-cols-3">
         <KpiCard label="Drafts Ready" value={data.draftsReady} />
-        <KpiCard label="Posts Published" value={data.postsPublished} />
-        <KpiCard label="Active Campaigns" value={data.activeCampaigns} />
+        <KpiCard label="Posts this month" value={data.postsThisMonth} />
         <KpiCard label="AI providers" value={data.aiProviders} />
       </div>
 

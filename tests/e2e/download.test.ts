@@ -93,7 +93,7 @@ test.describe('§AI Download', () => {
     expect((await api.get('/api/drafts/does-not-exist/download')).status()).toBe(404)
   })
 
-  test('TC-DL-04: the draft page has Download and no Export; Download saves a .png', async ({ page }) => {
+  test('TC-DL-04: the draft page has Download and no Export or Publish; Download saves a .png', async ({ page }) => {
     if (!MOCKED()) { test.skip(); return }
     const draft = await generate(`Download Page ${Date.now()}`)
     await pageLogin(page)
@@ -103,6 +103,8 @@ test.describe('§AI Download', () => {
     await expect(button).toBeEnabled()
     await expect(page.getByRole('button', { name: 'Export', exact: true })).toHaveCount(0)
     await expect(page.getByRole('button', { name: 'Re-export', exact: true })).toHaveCount(0)
+    // AC-09: Download is the one primary action; there is no Publish button.
+    await expect(page.getByRole('button', { name: /^publish$/i })).toHaveCount(0)
 
     // The download listener is created before the click.
     const downloadPromise = page.waitForEvent('download')
