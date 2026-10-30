@@ -12,8 +12,8 @@ A shared sandboxed preview atom, a viewer on the kit page, a team-scoped read ro
 
 ### Wave 1 — atom and route
 
-- [ ] `T1` — `TemplatePreview` atom and the kit page viewer
-  - Files: `src/components/ui/TemplatePreview.tsx`, `src/components/ui/index.ts`, `src/components/admin/brandkits/KitDetail.tsx`, `tests/unit/templatePreview.test.tsx`
+- [x] `T1` — `TemplatePreview` atom and the kit page viewer
+  - Files: `src/components/ui/TemplatePreview.tsx`, `src/components/ui/index.ts`, `src/components/admin/brandkits/KitDetail.tsx`, `tests/unit/templatePreview.test.ts`
   - Estimate: small
   - Kind: impl
   - Notes: FR-01, FR-02, AC-02. `sandbox=""` exactly. Sizes only through `dimensionsFor`. Use the shared `Modal` (pick a `size` that fits a 1080×1350 preview scaled down). Keep the existing delete button and its `aria-label`. Read `docs/ui-reference/DESIGN_SYSTEM.md` before styling.

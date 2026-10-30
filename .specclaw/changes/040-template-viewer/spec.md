@@ -38,10 +38,10 @@
 
 One shared atom draws the HTML in a fully sandboxed, scaled iframe; both screens use it. The kit page reuses data it already has; the wizard fetches one template at a time from a new team-scoped read route beside the list route.
 
-| File                                                                                                                                                                         | Change                                        |
-| ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
-| `src/components/ui/TemplatePreview.tsx` (+ `index.ts` export)                                                                                                                | New atom (FR-01)                              |
-| `src/components/admin/brandkits/KitDetail.tsx`                                                                                                                               | Name becomes a button; viewer `Modal` (FR-02) |
-| `src/app/api/templates/[id]/route.ts`, `src/lib/api-types.ts`                                                                                                                | New route and its response type (FR-03)       |
-| `src/components/brief/SizeDesignStep.tsx` (and `useBriefWizard.ts` only if the fetch belongs there)                                                                          | Selected-template preview (FR-04)             |
-| `tests/unit/templatePreview.test.tsx`, `tests/unit/templateRoute.test.ts`, `tests/e2e/template-viewer.test.ts`, `tests/e2e/team-isolation.test.ts`, `tests/e2e/a11y.test.ts` | AC-01 to AC-06                                |
+| File                                                                                                                                                                        | Change                                        |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
+| `src/components/ui/TemplatePreview.tsx` (+ `index.ts` export)                                                                                                               | New atom (FR-01)                              |
+| `src/components/admin/brandkits/KitDetail.tsx`                                                                                                                              | Name becomes a button; viewer `Modal` (FR-02) |
+| `src/app/api/templates/[id]/route.ts`, `src/lib/api-types.ts`                                                                                                               | New route and its response type (FR-03)       |
+| `src/components/brief/SizeDesignStep.tsx` (and `useBriefWizard.ts` only if the fetch belongs there)                                                                         | Selected-template preview (FR-04)             |
+| `tests/unit/templatePreview.test.ts`, `tests/unit/templateRoute.test.ts`, `tests/e2e/template-viewer.test.ts`, `tests/e2e/team-isolation.test.ts`, `tests/e2e/a11y.test.ts` | AC-01 to AC-06                                |

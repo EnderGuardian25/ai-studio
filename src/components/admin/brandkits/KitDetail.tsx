@@ -9,6 +9,8 @@ import { Notice } from '@/components/ui/Notice'
 import { FieldLabel } from '@/components/ui/FieldLabel'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { SectionHead } from '@/components/ui/SectionHead'
+import { Modal } from '@/components/ui/Modal'
+import { TemplatePreview } from '@/components/ui/TemplatePreview'
 import { COMPACT_FIELD, EYEBROW, FOCUS, ICON, ICON_BUTTON, SECTION_HEAD, TAG } from '@/components/ui/atoms'
 import { apiFetch } from '@/lib/apiFetch'
 import type { AspectRatio } from '@prisma/client'
@@ -56,6 +58,8 @@ export function KitDetail({ kit, onRefresh }: KitDetailProps) {
   const [templateRatio, setTemplateRatio] = useState<AspectRatio>('SQUARE')
   const [addingTemplate, setAddingTemplate] = useState(false)
   const [assistantOpen, setAssistantOpen] = useState(false)
+  const [viewTemplateId, setViewTemplateId] = useState<string | null>(null)
+  const viewedTemplate = kit.templates.find(t => t.id === viewTemplateId)
   const [templateFromImageBusy, setTemplateFromImageBusy] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
   const artifactRef = useRef<HTMLInputElement>(null)
@@ -492,7 +496,15 @@ export function KitDetail({ kit, onRefresh }: KitDetailProps) {
               {kit.templates.map(t => (
                 <li key={t.id} className="flex items-center justify-between gap-3 border-b border-line-subtle py-1.5">
                   <span className="flex min-w-0 items-center gap-2">
-                    <span className="truncate text-ui-sm text-fg" title={t.name}>{t.name}</span>
+                    <button
+                      type="button"
+                      onClick={() => setViewTemplateId(t.id)}
+                      title={t.name}
+                      aria-label={`View template ${t.name}`}
+                      className={`truncate text-left text-ui-sm text-fg underline-offset-2 hover:underline ${FOCUS}`}
+                    >
+                      {t.name}
+                    </button>
                     <span className={`${TAG} flex-shrink-0`}>{ASPECT_LABELS[t.aspectRatio]}</span>
                   </span>
                   <button
@@ -508,6 +520,19 @@ export function KitDetail({ kit, onRefresh }: KitDetailProps) {
               ))}
             </ul>
           )}
+          <Modal open={!!viewedTemplate} onClose={() => setViewTemplateId(null)} title={viewedTemplate?.name ?? 'Template'} size="md">
+            {viewedTemplate && (
+              <div className="flex flex-col gap-3">
+                <span className={`${TAG} self-start`}>{ASPECT_LABELS[viewedTemplate.aspectRatio]}</span>
+                <TemplatePreview
+                  html={viewedTemplate.htmlTemplate}
+                  aspectRatio={viewedTemplate.aspectRatio}
+                  title={`Preview of ${viewedTemplate.name}`}
+                  className="mx-auto max-w-xs"
+                />
+              </div>
+            )}
+          </Modal>
         </section>
 
         {/* Brand Voice Prompt */}
