@@ -4,8 +4,8 @@ This repo contains planning documents for **bistec-studio**, an internal marketi
 
 ## Current state
 
-- This repo is the fork `EnderGuardian25/ai-studio`. `origin` is the only remote it pushes to (a fetch-only `upstream` may reappear; see below).
-- Before any push, run `git remote get-url origin` and confirm it prints `https://github.com/EnderGuardian25/ai-studio.git`. If it names another repo, stop.
+- This repo is the fork `DDC-endpoint/ai-studio` (the GitHub account was renamed from `EnderGuardian25` on 2026-10-30; GitHub redirects the old URLs). `origin` is the only remote it pushes to (a fetch-only `upstream` may reappear; see below).
+- Before any push, run `git remote get-url origin` and confirm it prints `https://github.com/DDC-endpoint/ai-studio.git`. If it names another repo, stop.
 - On 2026-10-27 the fork took company changes 018–031 once. That sync was one-time; there are no company merges.
 - The system starts fresh: no data import from any earlier deployment.
 - Nothing deploys yet. The user will deploy to their own server, with a workflow written later. CI is checks only.
@@ -20,7 +20,7 @@ This repo contains planning documents for **bistec-studio**, an internal marketi
     - Lower findings are left for later: F2 for the future deploy workflow (`MINIO_PUBLIC_ENDPOINT` plus a route to MinIO, first-admin bootstrap from a checkout, app port binding; documented in [`docs/deploy.md`](docs/deploy.md) by 035), and F3 hardening (no exploit).
     - The report is outside the repo, as agreed.
   - **Change 035 (pre-merge docs) refreshed the README, added [`docs/deploy.md`](docs/deploy.md) and fixed the MCP/ACP guide's ports. The user asked for the docs to be updated before the PR.**
-  - The `v2` → `main` PR [#1](https://github.com/EnderGuardian25/ai-studio/pull/1) was merged by the user on 2026-10-28 (merge commit `4cd1f94f` on `main`).
+  - The `v2` → `main` PR [#1](https://github.com/DDC-endpoint/ai-studio/pull/1) was merged by the user on 2026-10-28 (merge commit `4cd1f94f` on `main`).
   - **Change 034 (close open self-registration) is VERIFIED PASS (2026-10-27, 6 of 6; CI green on `93e9c7f4`, run 40552350239: E2E 601/3/0/0).** The auth route is an allow-list of better-auth paths, and `/api/briefs/images` requires a team. Report: [`verify-report.md`](.specclaw/changes/034-close-open-signup/verify-report.md).
   - The review's scope, kept for the record: `origin/main..origin/v2` was 458 commits, 361 `src/` files and about +49k/−5k lines (004 to 033, including 018–031 from the one-time sync). Every change was reviewed and verified on its own, so the user agreed on 2026-10-27 to a **targeted** review, not a line-by-line one. These are the four checks:
     1. **Fresh deploy from zero.** Run every migration in order on an empty scratch database (not `ai_studio` or `ai_studio_test`), build, and smoke-test. `main` is the deploy target, and the system starts with no data import.

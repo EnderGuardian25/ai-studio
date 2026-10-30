@@ -60,7 +60,7 @@ Compose publishes the app as `3000:3000` on every interface. Put a TLS-terminati
 ## 5. Build and start
 
 ```bash
-git clone https://github.com/EnderGuardian25/ai-studio.git
+git clone https://github.com/DDC-endpoint/ai-studio.git
 cd ai-studio
 git checkout main
 # write .env (section 2), then:
