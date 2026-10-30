@@ -221,12 +221,12 @@ test.describe('§K — H11 Puppeteer', () => {
     const draftIds = await Promise.all(
       Array.from({ length: 8 }, (_, i) => createExportedDraft(api, `H11b-${i}-${Date.now()}`)),
     )
-    const results = await Promise.all(
-      draftIds.map(id => api.post('/api/generate/export', { draftId: id })),
-    )
+    // Clear each export so the download has to render.
+    await prisma!.draft.updateMany({ where: { id: { in: draftIds } }, data: { exportUrl: null } })
+    const results = await Promise.all(draftIds.map(id => api.get(`/api/drafts/${id}/download`)))
     for (const r of results) {
       expect(r.status()).toBe(200)
-      expect((await r.json()).exportUrl).toMatch(/^https?:\/\//)
+      expect(r.headers()['content-type']).toBe('image/png')
     }
   })
 

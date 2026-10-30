@@ -29,6 +29,7 @@ import { Notice } from '@/components/ui/Notice'
 import { CompositionNotice } from '@/components/drafts/CompositionNotice'
 import { GeneratedWith, PostStyleLine } from '@/components/drafts/GeneratedWith'
 import { FactsCheckNotice } from '@/components/drafts/FactsCheckNotice'
+import { downloadLineFor } from '@/lib/renderedText/noticeText'
 import { HeadlineImageNotice } from '@/components/drafts/HeadlineImageNotice'
 import { ModelPicker } from '@/components/ui/ModelPicker'
 import { PageTitle } from '@/components/ui/PageHead'
@@ -101,7 +102,7 @@ export default function DraftDetailPage() {
   const [revisions, setRevisions] = useState<Revision[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [exporting, setExporting] = useState(false)
+  const [downloading, setDownloading] = useState(false)
   const [retrying, setRetrying] = useState(false)
   const [restoringRev, setRestoringRev] = useState<number | null>(null)
   const { isTeamAdmin } = useCurrentUser()
@@ -207,19 +208,30 @@ export default function DraftDetailPage() {
     fetchRevisions()
   }
 
-  async function handleExport() {
-    setExporting(true)
+  async function handleDownload() {
+    setDownloading(true)
     try {
-      await apiFetch('/api/generate/export', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ draftId }),
-      })
+      const res = await fetch(`/api/drafts/${draftId}/download`)
+      if (!res.ok) {
+        const body = (await res.json().catch(() => null)) as { error?: string } | null
+        throw new Error(body?.error ?? 'Download failed')
+      }
+      const filename =
+        /filename="([^"]+)"/.exec(res.headers.get('Content-Disposition') ?? '')?.[1] ?? `post-${draftId}.png`
+      const url = URL.createObjectURL(await res.blob())
+      const a = document.createElement('a')
+      a.href = url
+      a.download = filename
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+      // A download may have rendered and stored a fresh PNG.
       await fetchDraft()
     } catch (e: unknown) {
       toast.error(e instanceof Error ? e.message : 'Something went wrong')
     } finally {
-      setExporting(false)
+      setDownloading(false)
     }
   }
 
@@ -358,6 +370,12 @@ export default function DraftDetailPage() {
   }
 
   const { width, height } = dimensionsFor(draft.brief.aspectRatio)
+  const flaggedCount = draft.factsCheck?.status === 'flagged' ? draft.factsCheck.flagged.length : 0
+  const downloadLine =
+    (draft.headlineImage ? downloadLineFor(draft.headlineImage.state) : null) ??
+    (flaggedCount > 0
+      ? `The facts check flagged values in this post. ${flaggedCount} flagged.`
+      : null)
   const ratioShort = ASPECT_LABELS[draft.brief.aspectRatio ?? 'SQUARE'].split(' ')[0]
   const currentRevision = revisions.find((r) => r.revisionNumber === draft.currentRevisionNumber)
   // The versions read left to right, oldest first, like the study (§8.13);
@@ -389,7 +407,7 @@ export default function DraftDetailPage() {
         </div>
 
         {/* The action bar (§8.17, within FR-12): every control stays a visible
-            button with its own name, Publish the one primary. The design action
+            button with its own name, Download the one primary. The design action
             on the left; the rest on the right. No More menu and no Refine
             button (021 A5). It wraps, never scrolls. */}
         <div className="mt-6 flex flex-wrap items-center gap-2 border-b border-t-2 border-b-line-subtle border-t-fg py-3.5">
@@ -416,22 +434,23 @@ export default function DraftDetailPage() {
                 variant="secondary"
                 onClick={() => setShowInlineEdit(true)}
                 disabled={actionPending || !draft.htmlContent}
-                title="Manually edit text and images, then re-export"
+                title="Manually edit text and images, then download"
               >
                 <Pencil {...ICON} /> Edit inline
               </Button>
             )}
             <Button
-              variant="secondary"
-              onClick={handleExport}
-              disabled={exporting || !draft.htmlContent || actionPending}
+              variant="primary"
+              onClick={handleDownload}
+              disabled={downloading || draft.status !== 'EXPORTED' || !draft.htmlContent || actionPending}
+              data-testid="download-button"
             >
-              {exporting ? <Loader2 {...ICON} className="animate-spin" /> : <Download {...ICON} />}
-              {draft.exportUrl ? 'Re-export' : 'Export'}
+              {downloading ? <Loader2 {...ICON} className="animate-spin" /> : <Download {...ICON} />}
+              Download
             </Button>
             {isTeamAdmin && (
               <Button
-                variant="primary"
+                variant="secondary"
                 disabled={!draft.exportUrl || actionPending}
                 onClick={() => setShowPublish(true)}
               >
@@ -440,6 +459,12 @@ export default function DraftDetailPage() {
             )}
           </div>
         </div>
+        {/* The download line (037 FR-05): one muted sentence, never blocking. */}
+        {downloadLine && (
+          <p className="mt-2 text-ui-xs text-fg-muted" data-testid="download-line">
+            {downloadLine}
+          </p>
+        )}
         {/* The design regenerate's model (008 FR-20), pre-selected from the
             current design's stamp (FR-09). Path B only, like the button. */}
         {isPathB && ready && (

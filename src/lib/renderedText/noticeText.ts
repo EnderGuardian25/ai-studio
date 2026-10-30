@@ -1,4 +1,4 @@
-// The sentences of the headline badge and the publish dialog (030 FR-13, FR-14),
+// The sentences of the headline badge and the download line (030 FR-13, 037 FR-05),
 // in one place so the page, the dialog and the tests share them. Pure and
 // client-safe; structured lines, not JSX.
 import type { HeadlineImage } from './state'
@@ -46,8 +46,8 @@ export function headlineNoticeText(image: HeadlineImage): HeadlineNotice | null 
   return { headline, reasonLine, scheduledLine }
 }
 
-// The one non-blocking line in the publish dialog; null for `fresh` and `unknown`.
-export function publishLineFor(state: HeadlineState): string | null {
+// The one non-blocking line under the Download button; null for `fresh` and `unknown`.
+export function downloadLineFor(state: HeadlineState): string | null {
   if (state === 'stale') return 'The image shows an older headline.'
   if (state === 'unconfirmed') return "We couldn't confirm the image shows the current headline."
   return null

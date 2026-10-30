@@ -14,7 +14,7 @@ Add Download first, then remove scheduled generation, then the publishing UI, th
 
 ### Wave 1: Download
 
-- [ ] `T1` — Download replaces Export
+- [x] `T1` — Download replaces Export
   - Files: src/lib/drafts/download.ts, src/app/api/drafts/[id]/download/route.ts, src/app/api/generate/export/route.ts, src/app/(app)/drafts/[id]/page.tsx, src/lib/renderedText/noticeText.ts, src/components/library/PublishDialog.tsx, src/lib/analytics/catalogue.ts, src/lib/api-types.ts, tests/unit/download.test.ts, tests/unit/fontInjectionSites.test.ts, tests/unit/compositeRerender.test.ts, tests/unit/renderedText.test.ts, tests/unit/analyticsCatalogue.test.ts, tests/e2e/export.test.ts, tests/e2e/download.test.ts, tests/e2e/regression.test.ts
   - Estimate: medium
   - Kind: impl

@@ -16,7 +16,7 @@ import {
   mockHeadlineCheck,
   normaliseHeadline,
   parseRenderedText,
-  publishLineFor,
+  downloadLineFor,
   renderedTextColumn,
   renderedTextSchema,
   stampFromCheck,
@@ -386,13 +386,13 @@ describe('notice text (FR-13, FR-14)', () => {
       expect(
         headlineNoticeText({ state, renderedHeadline: null, reason: null, scheduledPosts: null }),
       ).toBeNull()
-      expect(publishLineFor(state)).toBeNull()
+      expect(downloadLineFor(state)).toBeNull()
     }
   })
 
-  it('the publish lines', () => {
-    expect(publishLineFor('stale')).toBe('The image shows an older headline.')
-    expect(publishLineFor('unconfirmed')).toBe(
+  it('the download lines', () => {
+    expect(downloadLineFor('stale')).toBe('The image shows an older headline.')
+    expect(downloadLineFor('unconfirmed')).toBe(
       "We couldn't confirm the image shows the current headline.",
     )
   })

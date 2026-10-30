@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/Button'
 import { apiFetch } from '@/lib/apiFetch'
 import { CHANNEL_VALUES, channelLabel } from '@/lib/channels'
 import type { Channel } from '@prisma/client'
-import { publishLineFor } from '@/lib/renderedText/noticeText'
+import { downloadLineFor } from '@/lib/renderedText/noticeText'
 import type { HeadlineState } from '@/lib/renderedText/vocab'
 
 // Shared publish dialog: pick one or more channels and an optional schedule, then
@@ -35,7 +35,7 @@ export interface PublishDialogProps {
 type ChannelOutcome = { ok: true } | { ok: false; message: string }
 
 export function PublishDialog({ draftId, headlineState, onClose, onSuccess }: PublishDialogProps) {
-  const headlineLine = headlineState ? publishLineFor(headlineState) : null
+  const headlineLine = headlineState ? downloadLineFor(headlineState) : null
   const [checkedChannels, setCheckedChannels] = useState<Channel[]>([])
   const [scheduledAt, setScheduledAt] = useState('')
   const [submitting, setSubmitting] = useState(false)

@@ -26,6 +26,7 @@ import { POST_STYLE_KEYS } from '@/lib/postStyles'
 import { redactText } from '@/lib/text/redact'
 import { HEADLINE_CHECKS, HEADLINE_STATES } from '@/lib/renderedText/vocab'
 import { APPLY_FAILURES, APPLY_FIELDS, APPLY_METHODS } from '@/lib/applyText/vocab'
+import { DOWNLOAD_FAILURES } from '@/lib/drafts/downloadVocab'
 
 export const INSTRUCTION_MAX = 2000
 export const FAILURE_REASON_MAX = 500
@@ -176,6 +177,19 @@ export const CATALOGUE = {
       field: z.enum(APPLY_FIELDS),
       method: z.enum(APPLY_METHODS),
       failure: z.enum(APPLY_FAILURES).optional(),
+    }),
+  },
+  // 037 D7: a Download that reached a verdict. No text.
+  'draft.downloaded': {
+    schemaVersion: 1,
+    source: ['web'],
+    outcomes: ['ok', 'failed'],
+    schema: z.object({
+      // Whether a render ran for this download.
+      rendered: z.boolean(),
+      factsStatus: z.enum(FACTS_STATUSES).nullable(),
+      headlineState: z.enum(HEADLINE_STATES),
+      failure: z.enum(DOWNLOAD_FAILURES).optional(),
     }),
   },
   'publish.settled': {
