@@ -67,3 +67,40 @@ This is change 3 of 3. It depends on 037 (Download replaces Export, and publishi
 
 - **Decided (user, 2026-10-28):** a curated caption is written from the brief, the kit voice, the post style and the project briefing, with the general caption passed in as context so the facts and offers stay consistent.
 - Can the general caption be regenerated on its own? The proposed default is yes, using today's per-channel regenerate route, with general as one more target.
+
+### Party review (2026-10-30): CHANGES_REQUESTED, 34 upheld (3 BLOCK, 25 WARN, 6 NOTE), 0 withdrawn — see party-report.md
+
+- (party-visionary, BLOCK) Whether the general caption is a `Channel` value or a caption kind is one-way (enum rows, event payloads, the `get_draft` contract); decide it in the proposal, not the plan.
+- (party-security, BLOCK) The Facebook link has no stated source, so the model would invent one; take it from one stored, validated field (code inserts or checks it), leave it out when none exists, and never ask the model for it.
+- (party-security, BLOCK) Regenerate and delete can destroy a hand-edited caption; record the previous text so undo restores it, replace only after a successful settle, and make delete recoverable.
+- (party-architect) The caption vocabulary choice decides four contracts (uniqueness key, FAILED-row CHECK, coverage test, copy event field); choose it in the proposal.
+- (party-architect) Decide drop or ignore for `Brief.channels`, and list every surface that writes or reads it.
+- (party-architect) Name the route and claim action for curate, regenerate and delete, what history records for a caption change, and whether delete can be undone.
+- (party-architect) The facts check must recompute on every write to the caption set (delete, undo and the general-caption backfill included), or through one function every writer calls.
+- (party-architect) Say what curate does on an old draft with no general caption, and what `get_draft` returns there.
+- (party-architect) Name the field the Facebook link comes from and whether the Facebook limits are checked in code (a pure function), so tests do not only test the mock.
+- (party-architect) Name the emitter of the download event (037's route or this change) and the path that records the client-side copy event.
+- (party-architect) Write the new `get_draft` caption JSON shape, including the old-draft null case, for both MCP and ACP.
+- (party-architect, NOTE) If sliced, the vocabulary, its migration and the full `get_draft` shape land with the general caption; only Facebook and curation paths belong to slice 2.
+- (party-security) Only the author and team admins may curate, regenerate, edit or delete a caption (server-checked 403); one in-flight curate per draft and channel, plus a per-user rate limit.
+- (party-security) The facts check sources stay the brief, kit voice text and project briefing and documents, never a caption; show a flagged general caption before curate runs.
+- (party-security) `get_draft` and ACP return each caption's facts status and matched values; clients treat `flagged` and `error` as needing review.
+- (party-security) The copy event goes through the session-scoped client-event path, checked against the caller's team and the registry, rate-limited; download is emitted by the server route.
+- (party-security) The enum down script must fail closed (count rows, refuse without an explicit flag); prefer ignoring `Brief.channels`, or document a pre-drop dump.
+- (party-security, NOTE) Dropping `Brief.channels` is safe only with a documented dump; ignoring it should mark it deprecated.
+- (party-ba) Define "curated" in one sentence and state each channel's measurable rules.
+- (party-ba) Add falsifiable criteria: Facebook word and hashtag limits, the link's source and its absent case, and how consistency with the general caption is observed.
+- (party-ba) State the general caption's own rules, whether it is a channel or a kind, and the old-draft behaviour.
+- (party-ba, NOTE) State what usage would show the feature is not wanted (e.g. a curate rate).
+- (party-po) Weigh a minimal variant (curate, which replaces on re-run, plus copy) against edit, delete and a separate regenerate.
+- (party-po) Ship only the events the coverage test needs; defer the Insights section until a question needs it.
+- (party-po) State model calls and approximate tokens per post, default and worst case.
+- (party-po, NOTE) Name a cut line (general caption first, curated captions second) and decide `Brief.channels` as ignored.
+- (party-visionary) Make the caption's identity a key that can grow, e.g. (kind, channel), with room for a language.
+- (party-visionary) Guard the registry against the `Channel` enum with a test that fails when they disagree.
+- (party-visionary) Commit `get_draft` to an open keyed list, with general as a kind, so later kinds and fields are additive.
+- (party-visionary) Count the old drafts with no general caption; backfill, freeze as history, or name the one reader that hides the branch.
+- (party-visionary) Decide `Brief.channels`; if kept, mark it deprecated, stop all writers and remove it from `generate_post`.
+- (party-visionary, NOTE) Store a hash or revision of the general caption on each curated caption, for a later staleness notice.
+- (party-visionary, NOTE) Put each channel's measurable rules (word range, hashtags, link and its source field) in the registry, feeding both the prompt and a code check.
+- (party-visionary) Rebuttal: slice only after the vocabulary and the `get_draft` shape are decided, so slice 2 is additive.
