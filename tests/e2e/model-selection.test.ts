@@ -466,41 +466,10 @@ test.describe('§Y — model selection: stamps, policy and the recorder', () => 
     expect(restored.designModelSubstitutedFrom).toBeNull()
   })
 
-  // TC-MODEL-09 — AC-20 (FR-11): the scheduler and ACP use the team default.
-  test('a scheduled HOLD entry and ACP generate_post both design on the team default', async ({ request }) => {
+  // TC-MODEL-09 — AC-20 (FR-11): ACP uses the team default (the scheduler leg went with 037 T2).
+  test('ACP generate_post designs on the team default', async ({ request }) => {
     if (!MOCKED()) { test.skip(); return }
     await putPolicy(api, policy({ defaults: { DESIGN_FREEFORM: 'OPUS' } }))
-
-    // The scheduler (userId null → credential 'team'; API mode, so not gated).
-    const f = await suiteFixture(api)
-    const entryRes = await api.post(`/api/campaigns/${f.campaignId}/queue`, {
-      topic: `Models Scheduled ${Date.now()}`,
-      goal: 'Awareness',
-      tone: 'professional',
-      channels: ['INSTAGRAM'],
-      designMode: 'GENERATE',
-      generateAt: new Date(Date.now() + 24 * 3600_000).toISOString(),
-      postAction: 'HOLD',
-    })
-    expect(entryRes.status()).toBe(201)
-    const entry = await entryRes.json()
-    await prisma!.scheduledGeneration.update({
-      where: { id: entry.id },
-      data: { generateAt: new Date(Date.now() - 1000), nextRetryAt: null },
-    })
-    await clearCalls(api)
-    expect((await api.post('/api/test/generation-tick', {})).status()).toBe(200)
-    const after = await prisma!.scheduledGeneration.findUniqueOrThrow({ where: { id: entry.id } })
-    expect(after.status).toBe('COMPLETED')
-    expect(after.errorReason).toBeNull()
-    const scheduled = await read(api, after.draftId)
-    expect(scheduled.status).toBe('EXPORTED')
-    expect(scheduled.designModel).toBe(OPUS)
-    expect(await revisionModel(after.draftId!, 1)).toEqual({ model: OPUS, modelSubstitutedFrom: null })
-    const tickCalls = (await readCalls(api)).filter((c) => c.surface === 'DESIGN_FREEFORM' && c.arg === OPUS)
-    expect(tickCalls.length).toBeGreaterThan(0)
-    expect(tickCalls.every((c) => c.source === 'team')).toBe(true)
-
     // ACP generate_post, on a team API key. The `request` fixture carries no
     // session, so the key is the only credential. An unknown `model` in the
     // input is ignored (FR-11: MCP/ACP have no model input).

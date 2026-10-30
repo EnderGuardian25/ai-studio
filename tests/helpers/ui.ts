@@ -99,8 +99,7 @@ export async function tabThreeFromMain(page: Page): Promise<string[]> {
   return tabThreeWithVisibleFocus(page)
 }
 
-// A project, a campaign under it with two briefing versions, and two queue
-// entries (one PENDING, one CANCELLED), made through the API.
+// A project and a campaign under it with two briefing versions, made through the API.
 export async function mintCampaignFixture(api: ApiClient) {
   const stamp = `${Date.now()}`
   const project = await (await api.post('/api/projects', { name: `T10 Project ${stamp}` })).json()
@@ -110,19 +109,6 @@ export async function mintCampaignFixture(api: ApiClient) {
   for (const content of ['T10 briefing v1', 'T10 briefing v2, the active one']) {
     expect((await api.post(`/api/campaigns/${camp.id}/briefing`, { content })).status()).toBe(201)
   }
-  const entry = (topic: string) => ({
-    topic,
-    goal: 'Awareness',
-    tone: 'professional',
-    channels: ['INSTAGRAM', 'LINKEDIN'],
-    designMode: 'GENERATE',
-    generateAt: new Date(Date.now() + 7 * 24 * 3600_000).toISOString(),
-    postAction: 'HOLD',
-  })
-  const pending = await api.post(`/api/campaigns/${camp.id}/queue`, entry(`T10 pending ${stamp}`))
-  expect(pending.status()).toBe(201)
-  const cancelled = await (await api.post(`/api/campaigns/${camp.id}/queue`, entry(`T10 cancelled ${stamp}`))).json()
-  expect((await api.del(`/api/campaigns/${camp.id}/queue/${cancelled.id}`)).status()).toBe(204)
   return { project, camp }
 }
 

@@ -1,13 +1,13 @@
 // Post styles (027): the dataset. One idea: a post style is data, and every
-// reader (the wizard, the briefs route, the queue, MCP, ACP, the caption and
+// reader (the wizard, the briefs route, MCP, ACP, the caption and
 // image prompts) reads this one copy through src/lib/postStyles.
 //
 // THE KEY RULE (permanent):
 //  - a key is never reused for a different meaning and never renamed;
 //  - a retired style (`status: 'retired'`) stays resolvable and is hidden from
-//    pickers, so stored briefs, queue entries, campaigns and stamps keep working;
+//    pickers, so stored briefs, campaigns and stamps keep working;
 //  - a future team-owned style gets its own id column and never a bare string
-//    in Brief.postStyle, ScheduledGeneration.postStyle or Campaign.defaultPostStyle.
+//    in Brief.postStyle, Campaign.defaultPostStyle.
 //
 // THE VERSION RULE: a released version is never edited. A change adds
 // versions[n+1] and moves `current`; the committed hash table in

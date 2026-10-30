@@ -99,11 +99,9 @@ export async function generatePost(args: GeneratePostArgs, surface: 'mcp' | 'acp
   // the caller's TEAM Claude credential (and, for the IMAGE provider, the
   // team's default — see resolveImageProvider). The whole model-calling span
   // (copy → background image → design) runs inside withClaudeAuth so every
-  // `claude -p` it spawns shares that one resolved team credential, mirroring
-  // generationRunner.ts; a team with none throws the usual no-credential
-  // ClaudeCliError, caught below like any other generation failure.
-  // args.teamId ?? '' guards a malformed/legacy caller the same way the
-  // scheduler guards a pre-Task-15 null ScheduledGeneration.teamId — the
+  // `claude -p` it spawns shares that one resolved team credential; a team
+  // with none throws the usual no-credential ClaudeCliError, caught below like any other generation failure.
+  // args.teamId ?? '' guards a malformed/legacy caller — the
   // GeneratePostArgs type already requires teamId, so this is defense in depth.
   const teamId = args.teamId ?? ''
   try {

@@ -7,8 +7,9 @@ import { expectNoAxeViolations } from '../helpers/axe'
 
 // §AE — Post styles and the facts check (change 027). The SERVER cases are
 // TC-PS-01 to TC-PS-29; the UI cases (T6: the wizard, the campaign default, the
-// queue modal and held line, the draft notice) are TC-PS-30 onward, and the
-// insights section (T7, TC-PS-40) is last.
+// draft notice) are TC-PS-30 onward, and the insights section (T7, TC-PS-40) is
+// last. 037 T2 removed the queue and scheduler cases (TC-PS-07 to TC-PS-09,
+// TC-PS-17 to TC-PS-24, TC-PS-38) with scheduled generation.
 //
 // Everything runs under MOCK_AI (no model call). The facts check is exercised
 // through the mock caption seams in src/lib/testHooks.ts: a sentinel in the
@@ -16,10 +17,6 @@ import { expectNoAxeViolations } from '../helpers/axe'
 // __MOCK_FACT_ERROR__ forces the check itself to fail. Because the mock caption
 // embeds the topic, a value written in the topic (or the description, the
 // campaign briefing, a campaign document) is a STATED value and is not flagged.
-// The scheduler cases drive POST /api/test/generation-tick over HTTP and seed
-// the one case the API refuses (a stored key that does not resolve) straight
-// into the database, the way the 023 suite does.
-//
 // Serial. Two campaigns for the whole suite (A: no sources; B: a briefing and
 // a document that state values), never one per case.
 
@@ -31,8 +28,6 @@ const NOT_MOCKED = 'requires MOCK_AI + MOCK_PUPPETEER + MOCK_SOCIAL'
 
 test.describe.configure({ mode: 'serial' })
 
-const FUTURE = () => new Date(Date.now() + 24 * 3600_000).toISOString()
-const LATER = () => new Date(Date.now() + 48 * 3600_000).toISOString()
 const tag = () => `${Date.now()}${Math.floor(Math.random() * 1000)}`
 
 let admin: ApiClient
@@ -87,48 +82,6 @@ async function generate(api: ApiClient, extra: Record<string, unknown> = {}): Pr
 const pairs = (check: FactsJson | null) => (check?.flagged ?? []).map((f) => `${f.where}:${f.value}`).sort()
 const values = (check: FactsJson | null) => [...new Set((check?.flagged ?? []).map((f) => f.value))].sort()
 
-async function entryRow(id: string) {
-  return prisma!.scheduledGeneration.findUnique({ where: { id } })
-}
-
-async function makeDue(id: string) {
-  await prisma!.scheduledGeneration.update({
-    where: { id },
-    data: { generateAt: new Date(Date.now() - 1000), nextRetryAt: null },
-  })
-}
-
-// One tick claims at most two entries, so tick until this entry has left the
-// claimable states (or a few times at most).
-async function tickUntilSettled(api: ApiClient, id: string) {
-  await makeDue(id)
-  for (let i = 0; i < 6; i++) {
-    const res = await api.post('/api/test/generation-tick', {})
-    expect(res.status()).toBe(200)
-    const row = await entryRow(id)
-    if (row && (row.status !== 'PENDING' || row.retryCount > 0)) return row
-    await makeDue(id)
-  }
-  return (await entryRow(id))!
-}
-
-function entryBody(topic: string, extra: Record<string, unknown> = {}) {
-  return {
-    topic,
-    channels: ['INSTAGRAM'],
-    designMode: 'GENERATE',
-    generateAt: FUTURE(),
-    postAction: 'HOLD',
-    ...extra,
-  }
-}
-
-async function addEntry(campaignId: string, topic: string, extra: Record<string, unknown> = {}) {
-  const res = await admin.post(`/api/campaigns/${campaignId}/queue`, entryBody(topic, extra))
-  expect(res.status(), await res.text()).toBe(201)
-  return res.json() as Promise<{ id: string }>
-}
-
 test.beforeAll(async ({ request }) => {
   admin = await loginAs(request, ADMIN_EMAIL, PASSWORD)
   editor = await loginAs(request, EDITOR_EMAIL, PASSWORD)
@@ -136,19 +89,9 @@ test.beforeAll(async ({ request }) => {
   kitId = kit.id
   campA = (await (await admin.post('/api/campaigns', { name: `PS Camp A ${tag()}`, brandKitId: kitId })).json()).id
   campB = (await (await admin.post('/api/campaigns', { name: `PS Camp B ${tag()}`, brandKitId: kitId })).json()).id
-  if (dbAvailable) {
-    // Stale due entries from earlier suites would be claimed by the tick's small batch.
-    await prisma!.scheduledGeneration.updateMany({ where: { status: 'PENDING' }, data: { status: 'CANCELLED' } })
-  }
 })
 
 test.afterAll(async () => {
-  if (dbAvailable) {
-    await prisma!.scheduledGeneration.updateMany({
-      where: { campaignId: { in: [campA, campB] }, status: 'PENDING' },
-      data: { status: 'CANCELLED' },
-    })
-  }
   await admin?.dispose()
   await editor?.dispose()
 })
@@ -267,109 +210,6 @@ test.describe('Post style inputs: the campaign default', () => {
 
     // Restore campaign A for the cases below that read its default.
     await admin.patch(`/api/campaigns/${campA}`, { defaultPostStyle: null })
-  })
-})
-
-// ── The inputs: the queue ───────────────────────────────────────────────────
-
-test.describe('Post style inputs: the queue', () => {
-  test('TC-PS-07: create resolves the style (explicit, legacy goal, campaign default, General) and refuses an unknown key', async () => {
-    const explicit = await addEntry(campA, `PS q explicit ${tag()}`, { postStyle: 'promotion', goal: 'hiring' })
-    expect(await admin.get(`/api/campaigns/${campA}/queue`).then((r) => r.json())).toEqual(
-      expect.arrayContaining([expect.objectContaining({ id: explicit.id, postStyle: 'promotion' })]),
-    )
-
-    const legacy = (await (await admin.post(`/api/campaigns/${campA}/queue`, entryBody(`PS q legacy ${tag()}`, { goal: 'hiring', tone: 'Friendly' }))).json()) as {
-      id: string
-      postStyle: string
-      tone: string
-    }
-    expect(legacy.postStyle).toBe('hiring')
-    expect(legacy.tone).toBe('Friendly')
-
-    const plain = await (await admin.post(`/api/campaigns/${campA}/queue`, entryBody(`PS q plain ${tag()}`))).json()
-    expect(plain.postStyle).toBe('general')
-
-    await admin.patch(`/api/campaigns/${campA}`, { defaultPostStyle: 'tip' })
-    const viaDefault = await (await admin.post(`/api/campaigns/${campA}/queue`, entryBody(`PS q default ${tag()}`))).json()
-    expect(viaDefault.postStyle).toBe('tip')
-    await admin.patch(`/api/campaigns/${campA}`, { defaultPostStyle: null })
-
-    const before = dbAvailable ? await prisma!.scheduledGeneration.count({ where: { campaignId: campA } }) : 0
-    const unknown = await admin.post(`/api/campaigns/${campA}/queue`, entryBody(`PS q bad ${tag()}`, { postStyle: 'nope' }))
-    expect(unknown.status()).toBe(400)
-    expect((await unknown.json()).code).toBe('UNKNOWN_POST_STYLE')
-    if (dbAvailable) expect(await prisma!.scheduledGeneration.count({ where: { campaignId: campA } })).toBe(before)
-
-    for (const id of [explicit.id, legacy.id, plain.id, viaDefault.id]) await admin.del(`/api/campaigns/${campA}/queue/${id}`)
-  })
-
-  test('TC-PS-08: edit takes a style, refuses an unknown one and leaves the entry unchanged', async () => {
-    const entry = await addEntry(campA, `PS q edit ${tag()}`, { postStyle: 'general' })
-    const ok = await admin.patch(`/api/campaigns/${campA}/queue/${entry.id}`, entryBody('PS q edited', { postStyle: 'milestone', tone: 'bold' }))
-    expect(ok.status()).toBe(200)
-    const updated = await ok.json()
-    expect(updated.postStyle).toBe('milestone')
-    expect(updated.tone).toBe('bold')
-
-    const bad = await admin.patch(`/api/campaigns/${campA}/queue/${entry.id}`, entryBody('PS q edited again', { postStyle: 'nope' }))
-    expect(bad.status()).toBe(400)
-    const list = (await (await admin.get(`/api/campaigns/${campA}/queue`)).json()) as { id: string; postStyle: string; topic: string }[]
-    const row = list.find((e) => e.id === entry.id)!
-    expect(row.postStyle).toBe('milestone')
-    expect(row.topic).toBe('PS q edited')
-    await admin.del(`/api/campaigns/${campA}/queue/${entry.id}`)
-  })
-
-  test('TC-PS-08b: an edit that sends no style keeps the stored postStyle, goal and tone (a legacy null stays null)', async () => {
-    test.skip(!dbAvailable, 'needs the test database to read the stored columns')
-    const styled = await addEntry(campA, `PS keep ${tag()}`, { postStyle: 'hiring', tone: 'bold' })
-    const before = (await entryRow(styled.id))!
-    expect(before.postStyle).toBe('hiring')
-    const edit = await admin.patch(`/api/campaigns/${campA}/queue/${styled.id}`, entryBody('PS keep edited', { generateAt: LATER() }))
-    expect(edit.status()).toBe(200)
-    const after = (await entryRow(styled.id))!
-    expect(after.topic).toBe('PS keep edited')
-    expect([after.postStyle, after.goal, after.tone]).toEqual([before.postStyle, before.goal, before.tone])
-
-    // A pre-027 entry (null key, its own goal and tone) is not given a style by an edit.
-    const legacy = await addEntry(campA, `PS keep legacy ${tag()}`)
-    await prisma!.scheduledGeneration.update({ where: { id: legacy.id }, data: { postStyle: null, goal: 'Awareness', tone: 'Friendly' } })
-    expect((await admin.patch(`/api/campaigns/${campA}/queue/${legacy.id}`, entryBody('PS keep legacy edited'))).status()).toBe(200)
-    const kept = (await entryRow(legacy.id))!
-    expect([kept.postStyle, kept.goal, kept.tone]).toEqual([null, 'Awareness', 'Friendly'])
-
-    // Sending a style does re-resolve.
-    await admin.patch(`/api/campaigns/${campA}/queue/${legacy.id}`, entryBody('PS keep legacy edited', { postStyle: 'tip' }))
-    expect((await entryRow(legacy.id))!.postStyle).toBe('tip')
-    for (const e of [styled, legacy]) await admin.del(`/api/campaigns/${campA}/queue/${e.id}`)
-  })
-
-  test('TC-PS-09: batch names the failing entry, writes nothing on an error, and resolves defaults on success', async () => {
-    const before = dbAvailable ? await prisma!.scheduledGeneration.count({ where: { campaignId: campA } }) : 0
-    const bad = await admin.post(`/api/campaigns/${campA}/queue/batch`, {
-      entries: [entryBody(`PS b1 ${tag()}`), entryBody(`PS b2 ${tag()}`, { postStyle: 'nope' })],
-    })
-    expect(bad.status()).toBe(400)
-    const body = await bad.json()
-    expect(body.code).toBe('UNKNOWN_POST_STYLE')
-    expect(body.error).toBe("Entry 2: Unknown post style 'nope'")
-    if (dbAvailable) expect(await prisma!.scheduledGeneration.count({ where: { campaignId: campA } })).toBe(before)
-
-    await admin.patch(`/api/campaigns/${campA}`, { defaultPostStyle: 'event' })
-    const ok = await admin.post(`/api/campaigns/${campA}/queue/batch`, {
-      entries: [
-        entryBody(`PS b3 ${tag()}`),
-        entryBody(`PS b4 ${tag()}`, { postStyle: 'hiring' }),
-        // A pre-027 plan entry: goal and tone only.
-        entryBody(`PS b5 ${tag()}`, { goal: 'announcement', tone: 'professional' }),
-      ],
-    })
-    expect(ok.status()).toBe(201)
-    const created = (await ok.json()).created as { id: string; postStyle: string }[]
-    expect(created.map((e) => e.postStyle)).toEqual(['event', 'hiring', 'announcement'])
-    await admin.patch(`/api/campaigns/${campA}`, { defaultPostStyle: null })
-    for (const e of created) await admin.del(`/api/campaigns/${campA}/queue/${e.id}`)
   })
 })
 
@@ -495,137 +335,6 @@ test.describe('Generation and the facts check', () => {
   })
 })
 
-// ── The scheduler: the HOLD downgrade ───────────────────────────────────────
-
-test.describe('The scheduler: facts check gates auto-publish', () => {
-  test.skip(!MOCKED() || !dbAvailable, NOT_MOCKED)
-
-  const FLAGGED_REASON = 'Not published: the facts check flagged $49. Review the draft, then publish it by hand.'
-  const COULD_NOT_RUN = 'Not published: the facts check could not run. Review the draft, then publish it by hand.'
-
-  for (const postAction of ['SCHEDULE_PUBLISH', 'PUBLISH_NOW'] as const) {
-    test(`TC-PS-17 (${postAction}): a flagged check holds the post: COMPLETED with a draft, no Post row, heldReason, postAction unchanged`, async () => {
-      const extra = postAction === 'SCHEDULE_PUBLISH' ? { postAction, publishAt: LATER() } : { postAction }
-      const entry = await addEntry(campA, `__MOCK_FACT_PRICE__ PS held ${postAction} ${tag()}`, extra)
-      const after = await tickUntilSettled(admin, entry.id)
-      expect(after.status).toBe('COMPLETED')
-      expect(after.draftId).toBeTruthy()
-      expect(after.postAction).toBe(postAction)
-      expect(after.heldReason).toBe(FLAGGED_REASON)
-      expect(await prisma!.post.count({ where: { draftId: after.draftId! } })).toBe(0)
-
-      // The draft is there for a person: flagged, and the entry's own style is stamped.
-      const draft = (await (await admin.get(`/api/drafts/${after.draftId}`)).json()) as DraftJson
-      expect(draft.status).toBe('EXPORTED')
-      expect(values(draft.factsCheck)).toEqual(['$49'])
-      expect(draft.postStyle).toMatchObject({ key: 'general', version: 1 })
-    })
-  }
-
-  test('TC-PS-18: a clear check runs the post action exactly as before (the clean pair publishes)', async () => {
-    const sched = await addEntry(campA, `__MOCK_FACT_PRICE__ Only $49 sched ${tag()}`, { postAction: 'SCHEDULE_PUBLISH', publishAt: LATER() })
-    const afterSched = await tickUntilSettled(admin, sched.id)
-    expect(afterSched.status).toBe('COMPLETED')
-    expect(afterSched.heldReason).toBeNull()
-    const posts = await prisma!.post.findMany({ where: { draftId: afterSched.draftId! } })
-    expect(posts).toHaveLength(1)
-    expect(posts[0].status).toBe('SCHEDULED')
-
-    const now = await addEntry(campA, `__MOCK_FACT_PRICE__ Only $49 now ${tag()}`, { postAction: 'PUBLISH_NOW' })
-    const afterNow = await tickUntilSettled(admin, now.id)
-    expect(afterNow.status).toBe('COMPLETED')
-    expect(afterNow.heldReason).toBeNull()
-    expect(await prisma!.post.count({ where: { draftId: afterNow.draftId! } })).toBe(1)
-  })
-
-  test('TC-PS-19: a HOLD entry is unaffected by a flagged check (no post action, nothing held)', async () => {
-    const entry = await addEntry(campA, `__MOCK_FACT_PRICE__ PS hold ${tag()}`, { postAction: 'HOLD' })
-    const after = await tickUntilSettled(admin, entry.id)
-    expect(after.status).toBe('COMPLETED')
-    expect(after.heldReason).toBeNull()
-    expect(await prisma!.post.count({ where: { draftId: after.draftId! } })).toBe(0)
-  })
-
-  test('TC-PS-20: a check forced to error holds the post with the "could not run" reason', async () => {
-    const entry = await addEntry(campA, `__MOCK_FACT_ERROR__ PS err ${tag()}`, { postAction: 'PUBLISH_NOW' })
-    const after = await tickUntilSettled(admin, entry.id)
-    expect(after.status).toBe('COMPLETED')
-    expect(after.heldReason).toBe(COULD_NOT_RUN)
-    expect(await prisma!.post.count({ where: { draftId: after.draftId! } })).toBe(0)
-  })
-
-  test('TC-PS-21: a held entry is re-run through the route: heldReason is cleared and a new draft is generated', async () => {
-    const entry = await addEntry(campA, `__MOCK_FACT_PRICE__ PS rerun ${tag()}`, { postAction: 'PUBLISH_NOW' })
-    const held = await tickUntilSettled(admin, entry.id)
-    expect(held.status).toBe('COMPLETED')
-    expect(held.heldReason).toBe(FLAGGED_REASON)
-    const firstDraft = held.draftId!
-    expect(await prisma!.post.count({ where: { draftId: firstDraft } })).toBe(0)
-
-    const rerun = await admin.post(`/api/campaigns/${campA}/queue/${entry.id}/rerun`, {})
-    expect(rerun.status()).toBe(200)
-    const body = await rerun.json()
-    expect(body.status).toBe('PENDING')
-    expect(body.heldReason).toBeNull()
-    expect(body.errorReason).toBeNull()
-
-    // It regenerates: a second draft, held again for the same invented value.
-    const again = await tickUntilSettled(admin, entry.id)
-    expect(again.status).toBe('COMPLETED')
-    expect(again.draftId).toBeTruthy()
-    expect(again.draftId).not.toBe(firstDraft)
-    expect(again.heldReason).toBe(FLAGGED_REASON)
-
-    // An ordinary COMPLETED entry (nothing held) is still refused.
-    const plain = await addEntry(campA, `PS rerun plain ${tag()}`, { postAction: 'HOLD' })
-    expect((await tickUntilSettled(admin, plain.id)).status).toBe('COMPLETED')
-    expect((await admin.post(`/api/campaigns/${campA}/queue/${plain.id}/rerun`, {})).status()).toBe(409)
-  })
-
-  test('TC-PS-22: a stored key that no longer resolves fails the entry with the named reason; no brief, no draft, no Post (AC-22)', async () => {
-    const topic = `PS ghost ${tag()}`
-    const entry = await addEntry(campA, topic, { postAction: 'PUBLISH_NOW' })
-    // The API refuses an unknown key, so seed it the way a retired or removed style would be left.
-    await prisma!.scheduledGeneration.update({ where: { id: entry.id }, data: { postStyle: 'ghost' } })
-    const after = await tickUntilSettled(admin, entry.id)
-    expect(after.errorReason).toBe('Post style "ghost" is not available')
-    expect(after.status).toBe('PENDING') // the existing retry path, with that reason
-    expect(after.retryCount).toBe(1)
-    expect(after.draftId).toBeNull()
-    expect(after.briefId).toBeNull()
-    expect(after.heldReason).toBeNull()
-    expect(await prisma!.brief.count({ where: { topic } })).toBe(0)
-    expect(await prisma!.post.count({ where: { draft: { brief: { topic } } } })).toBe(0)
-    await prisma!.scheduledGeneration.update({ where: { id: entry.id }, data: { status: 'CANCELLED', nextRetryAt: null } })
-  })
-
-  test('TC-PS-23: a pre-027 entry (null key) runs with its own goal and tone, no style, and is still gated', async () => {
-    const entry = await addEntry(campA, `__MOCK_FACT_PRICE__ PS pre027 ${tag()}`, { postAction: 'PUBLISH_NOW', goal: 'Awareness', tone: 'Friendly' })
-    await prisma!.scheduledGeneration.update({
-      where: { id: entry.id },
-      data: { postStyle: null, goal: 'Awareness', tone: 'Friendly' },
-    })
-    const after = await tickUntilSettled(admin, entry.id)
-    expect(after.status).toBe('COMPLETED')
-    expect(after.heldReason).toBe(FLAGGED_REASON)
-    expect(await prisma!.post.count({ where: { draftId: after.draftId! } })).toBe(0)
-    const brief = await prisma!.brief.findUnique({ where: { id: after.briefId! } })
-    expect(brief).toMatchObject({ postStyle: null, goal: 'Awareness', tone: 'Friendly', imageStyle: 'classic' })
-    const draft = await prisma!.draft.findUnique({ where: { id: after.draftId! }, select: { postStyle: true } })
-    expect(draft!.postStyle).toBeNull()
-  })
-
-  test('TC-PS-24: a styled entry writes its key, the style goal and the entry tone to the brief; the image stays classic', async () => {
-    const entry = await addEntry(campA, `PS styled ${tag()}`, { postStyle: 'launch', tone: 'bold', postAction: 'HOLD' })
-    const after = await tickUntilSettled(admin, entry.id)
-    expect(after.status).toBe('COMPLETED')
-    const brief = await prisma!.brief.findUnique({ where: { id: after.briefId! } })
-    expect(brief).toMatchObject({ postStyle: 'launch', tone: 'bold', imageStyle: 'classic' })
-    const draft = (await (await admin.get(`/api/drafts/${after.draftId}`)).json()) as DraftJson
-    expect(draft.postStyle).toMatchObject({ key: 'launch', version: 1 })
-  })
-})
-
 // ── MCP and ACP ─────────────────────────────────────────────────────────────
 // The MCP stdio server has no HTTP surface; its tool is the same generatePost
 // function the ACP route calls (covered in tests/unit/mcpGetDraft.test.ts).
@@ -696,7 +405,7 @@ test.describe('ACP generate_post', () => {
   })
 })
 
-// ── The UI cases (027 T6): the wizard, the campaign default, the queue and the draft page ──
+// ── The UI cases (027 T6): the wizard, the campaign default and the draft page ──
 
 const WIZARD_PROMPT = 'Announce the new post styles with a short call to action for the team.'
 
@@ -1003,45 +712,6 @@ test.describe('The campaign default post style', () => {
   })
 })
 
-test.describe('The queue: the post style field and the held line', () => {
-  test.skip(!MOCKED() || !dbAvailable, NOT_MOCKED)
-
-  test('TC-PS-38: the modal sends postStyle (and no goal); an entry shows its held line, with the values in its title', async ({ page }) => {
-    await pageLogin(page)
-    await page.setViewportSize({ width: 1440, height: 1000 })
-    await page.goto(`/campaigns/${campA}`)
-    await page.getByRole('button', { name: 'Plan a post' }).click()
-    const modal = page.getByRole('dialog', { name: 'Plan a post' })
-    await expect(modal).toBeVisible()
-    const topic = `PS modal ${tag()}`
-    await modal.getByLabel('Topic').fill(topic)
-    await modal.getByTestId('queue-post-style').selectOption('event')
-    await modal.getByLabel('Generate at').fill('2031-01-01T10:00')
-    const posted = page.waitForRequest((r) => r.method() === 'POST' && new URL(r.url()).pathname === `/api/campaigns/${campA}/queue`)
-    await modal.getByRole('button', { name: 'Add to queue' }).click()
-    const body = (await posted).postDataJSON() as Record<string, unknown>
-    expect(body.postStyle).toBe('event')
-    expect('goal' in body).toBe(false)
-    await expect(page.getByText(topic)).toBeVisible()
-    const row = await prisma!.scheduledGeneration.findFirst({ where: { campaignId: campA, topic } })
-    expect(row?.postStyle).toBe('event')
-    await prisma!.scheduledGeneration.update({ where: { id: row!.id }, data: { status: 'CANCELLED' } })
-
-    // A held entry shows the amber line.
-    const heldTopic = `__MOCK_FACT_PRICE__ PS held line ${tag()}`
-    const held = await addEntry(campA, heldTopic, { postAction: 'PUBLISH_NOW' })
-    const after = await tickUntilSettled(admin, held.id)
-    expect(after.heldReason).toBeTruthy()
-    await page.reload()
-    const line = page.getByRole('row', { name: new RegExp(heldTopic) }).getByTestId('queue-held-reason')
-    await expect(line).toContainText('Not published: the facts check flagged $49')
-    await expect(line).toHaveAttribute('title', /\$49/)
-    await expectNoAxeViolations(page, 'the queue with a held entry', { settle: true })
-    await page.setViewportSize({ width: 390, height: 900 })
-    await expectNoHorizontalScroll(page, 'the campaign page with a held entry at 390px')
-  })
-})
-
 test.describe('The draft page: the facts notice and the style line', () => {
   test.skip(!MOCKED(), NOT_MOCKED)
 
@@ -1105,21 +775,18 @@ test.describe('The insights page: Post styles', () => {
     const team = await findTeamIdByName(admin, 'Bistec')
     const at = (h: number) => new Date(Date.now() - h * 3600_000).toISOString()
     const row = (name: string, postStyle: string | null, outcome: string | null, extra: Record<string, unknown> = {}, h = 1) => ({
-      name, source: name === 'scheduled_generation.settled' ? 'scheduler' : 'web', teamId: team, userId: null, outcome, at: at(h),
+      name, source: 'web', teamId: team, userId: null, outcome, at: at(h),
       payload: { postStyle, ...extra },
     })
     const gen = (style: string | null, factsStatus: string | null) =>
       row('generation.finished', style, 'ok', factsStatus ? { factsStatus, factsFlagCount: factsStatus === 'flagged' ? 2 : 0 } : {})
     const rows = [
-      // launch: chosen 3, generations 4 (2 flagged, 1 error, 1 clear), held 2
+      // launch: chosen 3, generations 4 (2 flagged, 1 error, 1 clear)
       ...Array.from({ length: 3 }, () => row('brief.submitted', 'launch', null)),
       gen('launch', 'flagged'), gen('launch', 'flagged'), gen('launch', 'error'), gen('launch', 'clear'),
-      row('scheduled_generation.settled', 'launch', 'completed', { held: true }),
-      row('scheduled_generation.settled', 'launch', 'completed', { held: true }),
-      row('scheduled_generation.settled', 'launch', 'completed', { held: false }),
       // tip: chosen 1, generations 1 (clear)
       row('brief.submitted', 'tip', null), gen('tip', 'clear'),
-      // hiring: generations 2 with no chosen brief (a queued one), 1 flagged
+      // hiring: generations 2 with no chosen brief (an MCP one), 1 flagged
       gen('hiring', 'flagged'), gen('hiring', 'clear'),
       // not counted: no style, and out of the range
       gen(null, 'flagged'),
@@ -1130,11 +797,11 @@ test.describe('The insights page: Post styles', () => {
     const api = await (await admin.get('/api/admin/insights?range=30d')).json()
     const byKey = Object.fromEntries(api.postStyles.map((r: { style: string }) => [r.style, r]))
     expect(api.postStyles).toHaveLength(8)
-    expect(byKey.launch).toMatchObject({ chosen: 3, generations: 4, flagged: 2, flagRate: 0.5, held: 2 })
-    expect(byKey.tip).toMatchObject({ chosen: 1, generations: 1, flagged: 0, flagRate: 0, held: 0 })
-    expect(byKey.hiring).toMatchObject({ chosen: 0, generations: 2, flagged: 1, flagRate: 0.5, held: 0 })
+    expect(byKey.launch).toMatchObject({ chosen: 3, generations: 4, flagged: 2, flagRate: 0.5 })
+    expect(byKey.tip).toMatchObject({ chosen: 1, generations: 1, flagged: 0, flagRate: 0 })
+    expect(byKey.hiring).toMatchObject({ chosen: 0, generations: 2, flagged: 1, flagRate: 0.5 })
     for (const k of ['general', 'promotion', 'event', 'announcement', 'milestone']) {
-      expect(byKey[k]).toMatchObject({ chosen: 0, generations: 0, flagged: 0, flagRate: null, held: 0 })
+      expect(byKey[k]).toMatchObject({ chosen: 0, generations: 0, flagged: 0, flagRate: null })
     }
 
     await pageLogin(page)
@@ -1142,6 +809,9 @@ test.describe('The insights page: Post styles', () => {
     await page.goto('/admin/insights')
     const section = page.getByTestId('section-post-styles')
     await expect(section).toBeVisible()
+    // 037 AC-16: no Held column.
+    await expect(section.getByRole('columnheader', { name: 'Held' })).toHaveCount(0)
+    await expect(section.getByRole('columnheader', { name: 'Flagged' })).toHaveCount(1)
     await expect(page.getByTestId('post-style-launch')).toContainText('3')
     await expect(page.getByTestId('post-style-rate-launch')).toHaveText('50%')
     await expect(page.getByTestId('post-style-rate-tip')).toHaveText('0%')

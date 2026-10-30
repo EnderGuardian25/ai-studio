@@ -212,12 +212,12 @@ describe('retention (FR-11)', () => {
     expect(read('src/lib/analytics/retention.ts')).not.toMatch(/from ['"]@\//)
   })
 
-  it('the worker runs a retention loop through runTick, and 023 still monitors only its two loops', () => {
+  it('the worker runs a retention loop through runTick, and it is the only loop Insights reads', () => {
     const worker = read('src/scheduler/worker.ts')
-    expect(worker).toContain('loop("retention"')
+    expect(worker).toContain('retention:')
     expect(worker).toContain('sweepAnalytics')
     expect(worker).toMatch(/runTick\(name, run\)/)
-    expect(read('src/lib/scheduler/heartbeatStatus.ts')).toContain("export type HeartbeatLoop = 'scheduler' | 'generation'")
-    expect(read('src/app/api/scheduler/status/route.ts')).not.toContain('retention')
+    expect(read('src/scheduler/loops.ts')).toContain("'retention'")
+    expect(read('src/lib/analytics/queries.ts')).toContain("where: { loop: 'retention' }")
   })
 })

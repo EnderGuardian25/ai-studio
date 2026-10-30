@@ -3,48 +3,14 @@
 import React, { useCallback, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { FileText, Loader2, Paperclip, Send, Trash2, ArrowUp, ArrowDown, CalendarClock } from 'lucide-react'
+import { FileText, Loader2, Paperclip, Send, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { Drawer } from '@/components/ui/Modal'
 import { FieldLabel } from '@/components/ui/FieldLabel'
-import { postStyleLabel, postStyleOptions } from '@/components/campaigns/postStyleOptions'
 import { ModelPicker } from '@/components/ui/ModelPicker'
 import { ApiError, apiFetch } from '@/lib/apiFetch'
 import type { ModelKey } from '@/lib/models/catalogue'
-import { CHANNEL_VALUES } from '@/lib/channels'
-import { COMPACT_FIELD, EYEBROW, FOCUS, ICON, ICON_BUTTON, SCROLL_FOCUS } from '@/components/ui/atoms'
-
-// Shape the model proposes inside a ```schedule block (see briefingAssistant.ts).
-interface SchedulePlanItem {
-  topic: string
-  postStyle: string
-  styleReplaced?: { proposed: string }
-  tone: string
-  daysFromNow: number
-  postAction: 'HOLD' | 'SCHEDULE_PUBLISH' | 'PUBLISH_NOW'
-}
-
-// An editable row in the plan the admin reviews before approving. generateAt is
-// a datetime-local string ("YYYY-MM-DDTHH:mm") for the native picker.
-interface PlanRow {
-  topic: string
-  postStyle: string
-  /** The key the assistant proposed when it was replaced (031 FR-30). */
-  proposedStyle?: string
-  tone: string
-  postAction: 'HOLD' | 'SCHEDULE_PUBLISH' | 'PUBLISH_NOW'
-  generateAt: string
-}
-
-// datetime-local value N days from now at 09:00 local.
-function localDateTimeInDays(days: number): string {
-  const d = new Date()
-  d.setDate(d.getDate() + days)
-  d.setHours(9, 0, 0, 0)
-  // Adjust for the local timezone offset so toISOString slicing keeps local time.
-  const tzOffsetMs = d.getTimezoneOffset() * 60_000
-  return new Date(d.getTime() - tzOffsetMs).toISOString().slice(0, 16)
-}
+import { EYEBROW, FOCUS, ICON, ICON_BUTTON, SCROLL_FOCUS } from '@/components/ui/atoms'
 
 // AI briefing assistant: hand in source documents, converse until the model
 // converges on a briefing draft, then Apply drops it into the briefing editor
@@ -65,7 +31,6 @@ interface ChatMessage {
   role: 'user' | 'assistant'
   content: string
   briefingDraft?: string | null
-  schedulePlan?: SchedulePlanItem[] | null
 }
 
 interface BriefingAssistantPanelProps {
@@ -92,9 +57,6 @@ export function BriefingAssistantPanel({ campaignId, open, onClose, onApply }: B
   const [input, setInput] = useState('')
   const [pending, setPending] = useState(false)
   const [uploading, setUploading] = useState(false)
-  // The plan the admin is currently reviewing (from the latest ```schedule block).
-  const [plan, setPlan] = useState<PlanRow[] | null>(null)
-  const [scheduling, setScheduling] = useState(false)
   const messageId = React.useId()
   // 008 FR-21: the header model pick. It is client state for this open chat
   // only (no remembered choice; a reload resets it). Undefined means the team
@@ -162,11 +124,7 @@ export function BriefingAssistantPanel({ campaignId, open, onClose, onApply }: B
     // Let the new message render before scrolling to it.
     setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 0)
     try {
-      const result = await apiFetch<{
-        reply: string
-        briefingDraft: string | null
-        schedulePlan: SchedulePlanItem[] | null
-      }>(
+      const result = await apiFetch<{ reply: string; briefingDraft: string | null }>(
         `/api/campaigns/${campaignId}/briefing/chat`,
         {
           method: 'POST',
@@ -180,21 +138,8 @@ export function BriefingAssistantPanel({ campaignId, open, onClose, onApply }: B
       )
       setMessages([
         ...nextMessages,
-        { role: 'assistant', content: result.reply, briefingDraft: result.briefingDraft, schedulePlan: result.schedulePlan },
+        { role: 'assistant', content: result.reply, briefingDraft: result.briefingDraft },
       ])
-      // A fresh plan supersedes any prior one under review.
-      if (result.schedulePlan?.length) {
-        setPlan(
-          result.schedulePlan.map(p => ({
-            topic: p.topic,
-            postStyle: p.postStyle,
-            proposedStyle: p.styleReplaced?.proposed,
-            tone: p.tone,
-            postAction: p.postAction,
-            generateAt: localDateTimeInDays(p.daysFromNow),
-          })),
-        )
-      }
       setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 0)
     } catch (err: unknown) {
       // A refused model pick (400, nothing ran) shows on the picker; any other
@@ -206,58 +151,6 @@ export function BriefingAssistantPanel({ campaignId, open, onClose, onApply }: B
       setInput(content)
     } finally {
       setPending(false)
-    }
-  }
-
-  function updateRow(i: number, patch: Partial<PlanRow>) {
-    setPlan(prev => (prev ? prev.map((r, idx) => (idx === i ? { ...r, ...patch } : r)) : prev))
-  }
-  function removeRow(i: number) {
-    setPlan(prev => {
-      const next = prev ? prev.filter((_, idx) => idx !== i) : prev
-      return next && next.length ? next : null
-    })
-  }
-  function moveRow(i: number, dir: -1 | 1) {
-    setPlan(prev => {
-      if (!prev) return prev
-      const j = i + dir
-      if (j < 0 || j >= prev.length) return prev
-      const next = [...prev]
-      ;[next[i], next[j]] = [next[j], next[i]]
-      return next
-    })
-  }
-
-  async function scheduleAll() {
-    if (!plan || plan.length === 0) return
-    // Channels, size, and design path default here; the AI plan only carries
-    // topic/post style/tone/date/action. Path B (GENERATE) needs no template, so it's
-    // the safe default — per-entry channel/size edits happen in the queue table.
-    const entries = plan.map(r => ({
-      topic: r.topic.trim(),
-      postStyle: r.postStyle,
-      tone: r.tone.trim() || 'professional',
-      channels: CHANNEL_VALUES,
-      aspectRatio: 'SQUARE' as const,
-      designMode: 'GENERATE' as const,
-      generateAt: new Date(r.generateAt).toISOString(),
-      postAction: r.postAction,
-    }))
-    setScheduling(true)
-    try {
-      const res = await apiFetch<{ count: number }>(`/api/campaigns/${campaignId}/queue/batch`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ entries }),
-      })
-      await queryClient.invalidateQueries({ queryKey: ['campaigns', campaignId, 'queue'] })
-      toast.success(`Scheduled ${res.count} post${res.count === 1 ? '' : 's'} for generation.`)
-      setPlan(null)
-    } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : 'Failed to schedule the plan')
-    } finally {
-      setScheduling(false)
     }
   }
 
@@ -384,108 +277,6 @@ export function BriefingAssistantPanel({ campaignId, open, onClose, onApply }: B
           )}
           <div ref={messagesEndRef} />
         </div>
-
-        {/* Schedule plan review (F4) */}
-        {plan && (
-          <div
-            tabIndex={0}
-            role="region"
-            aria-label="Proposed schedule"
-            className={`max-h-72 flex-shrink-0 overflow-y-auto border-t-2 border-fg bg-surface px-5 py-4 ${SCROLL_FOCUS}`}
-          >
-            <div className="mb-2 flex items-center gap-2">
-              <CalendarClock {...ICON} aria-hidden className="flex-shrink-0 text-fg-muted" />
-              <p className={EYEBROW}>
-                Proposed schedule ({plan.length}) — review, edit, then schedule
-              </p>
-            </div>
-            <ul className="border-t border-line-subtle">
-              {plan.map((row, i) => (
-                <li key={i} className="space-y-2 border-b border-line-subtle py-2.5">
-                  <div className="flex items-center gap-1">
-                    <input
-                      aria-label="Post topic"
-                      value={row.topic}
-                      onChange={e => updateRow(i, { topic: e.target.value })}
-                      placeholder="Post topic"
-                      className={`${COMPACT_FIELD} min-w-0 flex-1`}
-                    />
-                    <button
-                      type="button"
-                      aria-label="Move up"
-                      disabled={i === 0}
-                      onClick={() => moveRow(i, -1)}
-                      className={`${ICON_BUTTON} enabled:hover:text-fg ${FOCUS}`}
-                    >
-                      <ArrowUp {...ICON} />
-                    </button>
-                    <button
-                      type="button"
-                      aria-label="Move down"
-                      disabled={i === plan.length - 1}
-                      onClick={() => moveRow(i, 1)}
-                      className={`${ICON_BUTTON} enabled:hover:text-fg ${FOCUS}`}
-                    >
-                      <ArrowDown {...ICON} />
-                    </button>
-                    <button
-                      type="button"
-                      aria-label="Remove post"
-                      onClick={() => removeRow(i)}
-                      className={`${ICON_BUTTON} hover:text-status-failed ${FOCUS}`}
-                    >
-                      <Trash2 {...ICON} />
-                    </button>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                    <input
-                      type="datetime-local"
-                      aria-label="Generate at"
-                      value={row.generateAt}
-                      onChange={e => updateRow(i, { generateAt: e.target.value })}
-                      className={`${COMPACT_FIELD} max-w-full`}
-                    />
-                    <select
-                      aria-label="Post style"
-                      value={row.postStyle}
-                      onChange={e => updateRow(i, { postStyle: e.target.value, proposedStyle: undefined })}
-                      className={`${COMPACT_FIELD} max-w-full`}
-                    >
-                      {postStyleOptions('General', row.postStyle)
-                        .filter(o => o.value !== '')
-                        .map(o => (
-                          <option key={o.value} value={o.value}>
-                            {o.label}
-                          </option>
-                        ))}
-                    </select>
-                    <span className="break-words text-ui-2xs text-fg-muted">
-                      {row.tone} · {row.postAction === 'HOLD' ? 'hold for review' : row.postAction.toLowerCase()}
-                    </span>
-                  </div>
-                  {row.proposedStyle && (
-                    <p data-testid="style-replaced" className="text-ui-2xs text-fg-muted">
-                      Suggested style {row.proposedStyle} is not available; using {postStyleLabel(row.postStyle) ?? row.postStyle}
-                    </p>
-                  )}
-                </li>
-              ))}
-            </ul>
-            <div className="mt-3 flex flex-wrap gap-2">
-              <Button size="sm" onClick={scheduleAll} disabled={scheduling}>
-                {scheduling ? <Loader2 {...ICON} className="animate-spin" /> : <CalendarClock {...ICON} />}
-                Schedule {plan.length} post{plan.length === 1 ? '' : 's'}
-              </Button>
-              <Button variant="ghost" size="sm" onClick={() => setPlan(null)} disabled={scheduling}>
-                Discard
-              </Button>
-            </div>
-            <p className="mt-2 text-ui-2xs text-fg-muted">
-              Posts generate as HOLD drafts for review by default. Channels (both feeds) and size
-              can be adjusted per entry in the queue after scheduling.
-            </p>
-          </div>
-        )}
 
         {/* The prompt (§8.3, §8.14): a display-italic field with the ink Send
             button attached; the wrapper shows the focus outline. */}

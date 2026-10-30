@@ -186,48 +186,11 @@ test.describe('Field labels (T9)', () => {
     await expect(templates.locator('span').filter({ hasText: /^Size$/ })).toBeVisible()
   })
 
-  test('AC-11 rows 21 and 22: the queue modal labels Post specifics and the Template select', async ({ page }) => {
-    const { camp } = await mintCampaignFixture(api)
-    await page.setViewportSize({ width: 1440, height: 900 })
-    await pageLogin(page)
-    await page.goto(`/campaigns/${camp.id}`)
-    await expect(page.getByRole('heading', { name: camp.name, level: 1 })).toBeVisible()
-    await page.getByRole('button', { name: 'Plan a post' }).click()
-    const modal = page.getByRole('dialog', { name: 'Plan a post' })
-    await expect(modal).toBeVisible()
-
-    // Row 21.
-    await expectLabelled(modal, 'Post specifics', {
-      tag: 'TEXTAREA',
-      placeholder: 'What this specific post should say — the campaign briefing carries the rest.',
-    })
-
-    // Row 22: the select appears on the Template design path.
-    await modal.getByRole('tab', { name: 'Template', exact: true }).click()
-    await expectLabelled(modal, 'Template', { tag: 'SELECT' })
-    await expect(modal.getByRole('combobox', { name: 'Template', exact: true })).toBeVisible()
-  })
-
-  test('§8.3: the Channels and After generation captions name their groups', async ({ page }) => {
+  test('§8.3: the publish dialog Channels caption names its group', async ({ page }) => {
     test.skip(!MOCKED(), 'needs MOCK_AI + MOCK_PUPPETEER to mint an exported draft')
-    const { camp } = await mintCampaignFixture(api)
     const draft = await mintExportedDraft(api, `a11y-groups-${Date.now()}`)
     await page.setViewportSize({ width: 1440, height: 900 })
     await pageLogin(page)
-
-    // The queue modal: the channel checkboxes and the post-action radios.
-    await page.goto(`/campaigns/${camp.id}`)
-    await expect(page.getByRole('heading', { name: camp.name, level: 1 })).toBeVisible()
-    await page.getByRole('button', { name: 'Plan a post' }).click()
-    const modal = page.getByRole('dialog', { name: 'Plan a post' })
-    const queueChannels = modal.getByRole('group', { name: 'Channels', exact: true })
-    await expect(queueChannels).toBeVisible()
-    await expect(queueChannels.getByRole('checkbox')).toHaveCount(2)
-    const action = modal.getByRole('radiogroup', { name: 'After generation', exact: true })
-    await expect(action).toBeVisible()
-    await expect(action.getByRole('radio')).toHaveCount(3)
-    await modal.getByRole('button', { name: 'Cancel' }).click()
-    await expect(modal).toBeHidden()
 
     // The publish dialog, from the draft page.
     await page.goto(`/drafts/${draft.id}`)
@@ -642,8 +605,7 @@ test.describe('Labels: campaigns and projects (T14)', () => {
     await expectNamedByTerm(page, 'Default brand kit')
   })
 
-  test('AC-11 rows 19 and 18: the briefing assistant message and each plan row topic are named', async ({ page }) => {
-    test.skip(!MOCKED(), 'needs MOCK_AI for the assistant schedule plan')
+  test('AC-11 row 19: the briefing assistant message is named', async ({ page }) => {
     const { camp } = await mint()
     await page.setViewportSize({ width: 1440, height: 900 })
     await pageLogin(page)
@@ -655,24 +617,6 @@ test.describe('Labels: campaigns and projects (T14)', () => {
 
     // Row 19.
     await expectLabelled(drawer, 'Message', { tag: 'INPUT', placeholder: ASSISTANT_PLACEHOLDER })
-
-    // Row 18: aria-label only (A6), one per plan row, alongside "Generate at".
-    const ask = drawer.getByLabel('Message', { exact: true })
-    await ask.fill('Please schedule a short series of posts.')
-    await ask.press('Enter')
-    const plan = drawer.getByRole('region', { name: 'Proposed schedule' })
-    await expect(plan).toBeVisible({ timeout: 30_000 })
-    const rows = plan.getByRole('listitem')
-    await expect(rows).toHaveCount(2)
-    for (let i = 0; i < 2; i++) {
-      const row = rows.nth(i)
-      const topic = row.getByLabel('Post topic', { exact: true })
-      await expect(topic, `row ${i + 1} has one "Post topic" field`).toHaveCount(1)
-      await expect(topic).toHaveJSProperty('tagName', 'INPUT')
-      await expect(topic).toHaveAttribute('aria-label', 'Post topic')
-      await expect(topic.and(row.getByPlaceholder('Post topic', { exact: true }))).toHaveCount(1)
-      await expect(row.getByRole('textbox', { name: 'Post topic', exact: true })).toHaveValue(`Mock scheduled post ${i + 1}`)
-    }
   })
 })
 
@@ -923,7 +867,7 @@ test.describe('ARIA states (T17)', () => {
     return fixture
   }
 
-  test('AC-12: every tablist is named — library, /team, an open kit, a campaign and its queue modal', async ({ page }) => {
+  test('AC-12: every tablist is named — library, /team, an open kit and a campaign', async ({ page }) => {
     const kit = await mintKit()
     const { camp } = await mintCampaign()
     await page.setViewportSize({ width: 1440, height: 900 })
@@ -946,10 +890,6 @@ test.describe('ARIA states (T17)', () => {
     await page.goto(`/campaigns/${camp.id}`)
     await expect(page.getByRole('heading', { name: camp.name, level: 1 })).toBeVisible()
     await expectTablistsNamed(page, ['Briefing view'])
-    await page.getByRole('button', { name: 'Plan a post' }).click()
-    const modal = page.getByRole('dialog', { name: 'Plan a post' })
-    await expect(modal).toBeVisible()
-    await expectTablistsNamed(modal, ['Size', 'Design'])
   })
 
   test('AC-12 + AC-16: on a draft with no refine requests, "Refine requests" is a region, and the inline editor names its tablist', async ({ page }) => {

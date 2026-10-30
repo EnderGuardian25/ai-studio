@@ -13,9 +13,9 @@ import type { PostStyle } from '@/lib/postStyles/types'
 import { archetypes, type ArchetypeMap } from '@/lib/designData'
 import { TONE_OPTIONS } from '@/components/brief/constants'
 
-const SURFACES: Surface[] = ['wizard', 'briefs-api', 'queue', 'mcp', 'acp', 'regenerate']
+const SURFACES: Surface[] = ['wizard', 'briefs-api', 'mcp', 'acp', 'regenerate']
 const ATTENDED: Surface[] = ['wizard', 'briefs-api', 'regenerate']
-const UNATTENDED: Surface[] = ['queue', 'mcp', 'acp']
+const UNATTENDED: Surface[] = ['mcp', 'acp']
 
 const base = (over: Partial<ResolveInput> = {}): ResolveInput => ({
   style: null,
@@ -277,7 +277,7 @@ describe('resolvePostStyle: look fixtures (size-classic, retired-classic)', () =
   })
 
   it('retired-classic comes after the unattended and Path A checks', () => {
-    const q = run(base({ surface: 'queue', explicit: { imageStyle: 'editorial-split' } }), retired)
+    const q = run(base({ surface: 'mcp', explicit: { imageStyle: 'editorial-split' } }), retired)
     expect(q.notes).toContain('unattended-classic')
     expect(q.notes).not.toContain('retired-classic')
     const a = run(base({ path: 'A', explicit: { imageStyle: 'editorial-split' } }), retired)
@@ -395,7 +395,7 @@ describe('resolvePostStyle: missing-input-classic (025 FR-08)', () => {
     expect(kept.notes).not.toContain('missing-input-classic')
   })
 
-  it('unattended-classic still wins for queue, mcp and acp', () => {
+  it('unattended-classic still wins for mcp and acp', () => {
     for (const surface of UNATTENDED) {
       const r = pick({ surface })
       expect(r.notes).toContain('unattended-classic')

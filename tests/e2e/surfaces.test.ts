@@ -924,7 +924,7 @@ test.describe('Campaigns and projects (T10)', () => {
     await expectNoHorizontalScroll(page, 'project detail at 375px')
   })
 
-  test('AC-12 + FR-12: a campaign detail at 375px, with history, Enhance, the queue, its modal and the assistant', async ({ page }) => {
+  test('AC-12 + FR-12: a campaign detail at 375px, with history, Enhance and the assistant', async ({ page }) => {
     test.skip(!MOCKED(), 'needs MOCK_AI for Enhance and the briefing assistant')
     const { project, camp } = await mintCampaignFixture(api)
     await page.setViewportSize({ width: 375, height: 812 })
@@ -945,23 +945,11 @@ test.describe('Campaigns and projects (T10)', () => {
     expect(await crumbs.ariaSnapshot()).not.toContain(camp.name)
     await expect(page.getByRole('heading', { name: camp.name, level: 1 })).toBeVisible()
 
-    // The briefing and the queue, with the aside's three selects (027 FR-08 added the default post style).
+    // The briefing, with the aside's three selects (027 FR-08 added the default post style).
     await expect(page.getByRole('heading', { name: 'Campaign Briefing', level: 2 })).toBeVisible()
     await expect(page.getByText('T10 briefing v2, the active one')).toBeVisible()
-    await expect(page.getByRole('heading', { name: 'Planned Posts (2)', level: 2 })).toBeVisible()
     await expect(page.getByRole('combobox')).toHaveCount(3)
-    const queue = page.getByRole('region', { name: 'Planned posts' })
-    await expect(queue.getByRole('button', { name: 'Edit' })).toHaveCount(1)
-    await expect(queue.getByRole('button', { name: 'Cancel' })).toHaveCount(1)
-    await expect(queue.getByRole('button', { name: 'Re-run' })).toHaveCount(1)
     await expectNoHorizontalScroll(page, 'campaign detail at 375px')
-    // The table is wider than the viewport: its region scrolls by keyboard.
-    await queue.focus()
-    await expect(queue).toBeFocused()
-    expect(await queue.evaluate((el) => el.scrollWidth > el.clientWidth)).toBe(true)
-    await page.keyboard.press('ArrowRight')
-    await expect.poll(() => queue.evaluate((el) => el.scrollLeft)).toBeGreaterThan(0)
-
     // History: the version rows, with Restore on the inactive one.
     await page.getByRole('tab', { name: 'History' }).click()
     const history = page.getByRole('region', { name: 'Briefing history' })
@@ -980,18 +968,7 @@ test.describe('Campaigns and projects (T10)', () => {
     await expectNoHorizontalScroll(page, 'briefing Enhance before/after at 375px')
     await page.getByRole('button', { name: 'Discard', exact: true }).click()
 
-    // The queue entry modal.
-    await page.getByRole('button', { name: 'Plan a post' }).click()
-    const modal = page.getByRole('dialog', { name: 'Plan a post' })
-    await expect(modal.getByRole('textbox', { name: 'Topic' })).toBeVisible()
-    await expect(modal.getByRole('checkbox')).toHaveCount(2)
-    await expect(modal.getByRole('radio')).toHaveCount(3)
-    await expect(modal.getByRole('button', { name: 'Add to queue' })).toBeDisabled()
-    await expectNoHorizontalScroll(page, 'queue entry modal at 375px')
-    await modal.getByRole('button', { name: 'Cancel' }).click()
-    await expect(modal).toBeHidden()
-
-    // The assistant: a briefing reply with Apply, then a schedule plan.
+    // The assistant: a briefing reply with Apply.
     await page.getByRole('button', { name: 'Draft with AI' }).click()
     const drawer = page.getByRole('dialog', { name: 'Draft briefing with AI' })
     await expect(drawer.getByRole('button', { name: 'Add document' })).toBeVisible()
@@ -1003,15 +980,7 @@ test.describe('Campaigns and projects (T10)', () => {
     await ask.fill('A T10 campaign for final-year students.')
     await ask.press('Enter')
     await expect(drawer.getByRole('button', { name: 'Apply this draft to the editor' })).toBeVisible({ timeout: 30_000 })
-    await ask.fill('Please schedule a short series of posts.')
-    await ask.press('Enter')
-    const plan = drawer.getByRole('region', { name: 'Proposed schedule' })
-    await expect(plan).toBeVisible({ timeout: 30_000 })
-    for (const name of ['Move up', 'Move down', 'Remove post']) {
-      await expect(plan.getByRole('button', { name })).toHaveCount(2)
-    }
-    await expect(plan.getByRole('button', { name: 'Schedule 2 posts' })).toBeVisible()
-    await expectNoHorizontalScroll(page, 'briefing assistant with a plan at 375px')
+    await expectNoHorizontalScroll(page, 'briefing assistant at 375px')
     await drawer.getByRole('button', { name: 'Apply this draft to the editor' }).click()
     await expect(drawer).toBeHidden()
     await expect(page.locator('textarea')).toHaveValue(/Mock campaign briefing draft/)

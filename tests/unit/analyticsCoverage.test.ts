@@ -5,7 +5,7 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { AspectRatio, CaptionRoute, Channel, DraftAction } from '@prisma/client'
-import { CATALOGUE, EVENT_NAMES } from '@/lib/analytics/catalogue'
+import { CATALOGUE, EVENT_NAMES, RETIRED_EVENT_NAMES } from '@/lib/analytics/catalogue'
 import { MODEL_KEYS } from '@/lib/models/catalogue'
 import { INSTRUCTION_CLASS_KEYS } from '@/lib/agent/instructionClasses'
 import { archetypes, FALLBACK_REASONS } from '@/lib/designData'
@@ -60,6 +60,14 @@ describe('analytics coverage guard (006 FR-13, AC-03)', () => {
     for (const source of SOURCES) {
       const carriers = EVENT_NAMES.filter((n) => (CATALOGUE[n].source as readonly string[]).includes(source))
       expect(carriers.length, `source ${source}`).toBeGreaterThan(0)
+    }
+  })
+
+  it('keeps every retired event name out of the catalogue (037 D6)', () => {
+    expect([...RETIRED_EVENT_NAMES]).toContain('scheduled_generation.settled')
+    for (const name of RETIRED_EVENT_NAMES) {
+      expect(EVENT_NAMES as readonly string[], name).not.toContain(name)
+      expect(name in CATALOGUE, name).toBe(false)
     }
   })
 

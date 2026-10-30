@@ -16,7 +16,6 @@ import { ADMIN_EMAIL, expectNoHorizontalScroll, pageLogin } from '../helpers/ui'
 //   __VERIFY_PASS__ / __VERIFY_FAIL_ALWAYS__   the mock verifier
 //   conflict_test          a brand-kit conflict on refine
 //   __FAIL_ALWAYS__        a publish that always fails (in the topic)
-//   POST /api/test/generation-tick   one scheduled-generation tick
 // New in this suite (all in the analytics seam): { failNext: n } makes the next
 // n event inserts fail; { seed: [...] } inserts rows with an explicit `at`;
 // { sweep: true } runs the retention sweep once.
@@ -90,11 +89,6 @@ async function createBrief(api: ApiClient, topic: string, campaignId?: string) {
   })
   expect(res.status()).toBe(201)
   return res.json()
-}
-
-async function createCampaign(api: ApiClient, name: string): Promise<{ id: string }> {
-  const kit = await (await api.post('/api/admin/brandkits', { name: `${name} Kit`, colors: ['#0284c7'] })).json()
-  return (await api.post('/api/campaigns', { name, brandKitId: kit.id })).json()
 }
 
 // A rendered, EXPORTED draft; the captions it carries are remembered so the
@@ -320,31 +314,6 @@ test.describe('§AD — product observability', () => {
     expect(failed[0].outcome).toBe('failed')
   })
 
-  test('TC-OBS-09: a scheduled generation writes generation.finished (scheduler) and scheduled_generation.settled', async () => {
-    if (!MOCKED() || !dbAvailable) { test.skip(); return }
-    const camp = await createCampaign(admin, `Obs Sched ${Date.now()}`)
-    const entry = await (await admin.post(`/api/campaigns/${camp.id}/queue`, {
-      topic: `Obs scheduled ${Date.now()}`,
-      goal: 'Awareness',
-      tone: 'professional',
-      channels: ['INSTAGRAM'],
-      designMode: 'GENERATE',
-      generateAt: new Date(Date.now() + 24 * 3600_000).toISOString(),
-      postAction: 'HOLD',
-    })).json()
-    await prisma!.scheduledGeneration.update({ where: { id: entry.id }, data: { generateAt: new Date(Date.now() - 1000), nextRetryAt: null } })
-    await clearStore(admin)
-    expect((await admin.post('/api/test/generation-tick', {})).status()).toBe(200)
-
-    const list = await events(admin)
-    const finished = byName(list, 'generation.finished')
-    const settled = byName(list, 'scheduled_generation.settled')
-    expect(finished).toHaveLength(1)
-    expect(finished[0]).toMatchObject({ source: 'scheduler', outcome: 'ok', userId: null })
-    expect(settled).toHaveLength(1)
-    expect(settled[0]).toMatchObject({ source: 'scheduler', outcome: 'completed' })
-  })
-
   // ── Failure isolation (AC-08) ────────────────────────────────────────────
 
   test('TC-OBS-10: with the store failing, a generation, a refine and a publish still finish the same, and the loss is counted', async () => {
@@ -568,27 +537,17 @@ test.describe('§AD — product observability', () => {
     expect(await sweep(admin)).toBe(0)
   })
 
-  test('TC-OBS-16: the retention loop does not disturb the scheduler banner, and its own health shows on the page', async ({ page }) => {
-    if (!MOCKED() || !dbAvailable) { test.skip(); return }
-    expect((await admin.post('/api/test/worker-heartbeat', { loop: 'scheduler', startedAgoMs: 20_000, endedAgoMs: 10_000 })).status()).toBe(200)
-    expect((await admin.post('/api/test/worker-heartbeat', { loop: 'generation', startedAgoMs: 20_000, endedAgoMs: 10_000 })).status()).toBe(200)
-    // a retention loop that stopped an hour ago: it must not turn the banner on
-    await prisma!.workerHeartbeat.upsert({
-      where: { loop: 'retention' },
-      create: { loop: 'retention', lastTickStartedAt: new Date(Date.now() - 3_600_000), lastTickEndedAt: new Date(Date.now() - 3_599_000) },
-      update: { lastTickStartedAt: new Date(Date.now() - 3_600_000), lastTickEndedAt: new Date(Date.now() - 3_599_000) },
-    })
-    const status = await (await admin.get('/api/scheduler/status')).json()
-    expect(status.offline).toBe(false)
-    expect(status.loops.map((l: { loop: string }) => l.loop)).toEqual(['scheduler', 'generation'])
-
+  test('TC-OBS-16: the retention loop health shows on the page', async ({ page }) => {
+    if (!MOCKED()) { test.skip(); return }
+    // a retention loop that stopped an hour ago
+    expect((await admin.post('/api/test/worker-heartbeat', { loop: 'retention', startedAgoMs: 3_600_000, endedAgoMs: 3_599_000 })).status()).toBe(200)
     await pageLogin(page)
     await page.goto('/admin/insights')
     await expect(page.getByTestId('retention-loop-state')).toHaveText('stale')
-    await prisma!.workerHeartbeat.update({ where: { loop: 'retention' }, data: { lastTickStartedAt: new Date(), lastTickEndedAt: new Date() } })
+    expect((await admin.post('/api/test/worker-heartbeat', { loop: 'retention', startedAgoMs: 20_000, endedAgoMs: 10_000 })).status()).toBe(200)
     await page.reload()
     await expect(page.getByTestId('retention-loop-state')).toHaveText('online')
-    await prisma!.workerHeartbeat.delete({ where: { loop: 'retention' } })
+    await admin.post('/api/test/worker-heartbeat', { clear: true })
   })
 
   // ── Deletes (AC-14) ──────────────────────────────────────────────────────
@@ -991,7 +950,7 @@ test.describe('§AD — product observability', () => {
 
   // ── Post styles (027 FR-14, AC-14) ───────────────────────────────────────
 
-  test('TC-OBS-31: brief.submitted, generation.finished and scheduled_generation.settled carry the post style, the facts status and held; none holds a flagged value', async () => {
+  test('TC-OBS-31: brief.submitted and generation.finished carry the post style and the facts status; none holds a flagged value', async () => {
     if (!MOCKED() || !dbAvailable) { test.skip(); return }
     const generate = async (topic: string, postStyle: string) => {
       const res = await admin.post('/api/briefs', { topic, postStyle, channels: ['INSTAGRAM'], designMode: 'GENERATE', copyProviderKey: 'cli' })
@@ -1016,33 +975,8 @@ test.describe('§AD — product observability', () => {
     const [c] = await waitEvents(admin, { draftId: clear.id }, 'generation.finished', 1)
     expect(c.payload).toMatchObject({ postStyle: 'tip', factsStatus: 'clear', factsFlagCount: 0 })
 
-    // The scheduler: a flagged check holds a PUBLISH_NOW entry, a HOLD entry is not held.
-    const camp = await createCampaign(admin, `Obs Style Sched ${Date.now()}`)
-    const addEntry = async (topic: string, postAction: string) => {
-      const entry = await (await admin.post(`/api/campaigns/${camp.id}/queue`, {
-        topic, postStyle: 'launch', channels: ['INSTAGRAM'], designMode: 'GENERATE',
-        generateAt: new Date(Date.now() + 24 * 3600_000).toISOString(), postAction,
-      })).json()
-      await prisma!.scheduledGeneration.update({ where: { id: entry.id }, data: { generateAt: new Date(Date.now() - 1000), nextRetryAt: null } })
-      return entry.id as string
-    }
-    await clearStore(admin)
-    await addEntry(`__MOCK_FACT_PRICE__ Obs held ${Date.now()}`, 'PUBLISH_NOW')
-    expect((await admin.post('/api/test/generation-tick', {})).status()).toBe(200)
-    const heldEvent = byName(await events(admin), 'scheduled_generation.settled')
-    expect(heldEvent).toHaveLength(1)
-    expect(heldEvent[0]).toMatchObject({ outcome: 'completed' })
-    expect(heldEvent[0].payload).toMatchObject({ postStyle: 'launch', held: true })
-
-    await clearStore(admin)
-    await addEntry(`Obs hold ${Date.now()}`, 'HOLD')
-    expect((await admin.post('/api/test/generation-tick', {})).status()).toBe(200)
-    const holdEvent = byName(await events(admin), 'scheduled_generation.settled')
-    expect(holdEvent).toHaveLength(1)
-    expect(holdEvent[0].payload).toMatchObject({ postStyle: 'launch', held: false })
-
     // NFR-05: the invented values the mock wrote never reach an event.
-    for (const e of [...submitted, f, c, ...heldEvent, ...holdEvent]) {
+    for (const e of [...submitted, f, c]) {
       const text = JSON.stringify(e.payload)
       expect(text, `${e.name} payload`).not.toContain('$49')
       expect(text, `${e.name} payload`).not.toContain('30 March 2027')

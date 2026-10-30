@@ -6,7 +6,7 @@ import { getStyle } from './styles'
 import { stampFor, type PostStyleStamp } from './stamp'
 import { matchToneOption, type PostStyle, type Rule } from './types'
 
-export type Surface = 'wizard' | 'briefs-api' | 'queue' | 'mcp' | 'acp' | 'regenerate'
+export type Surface = 'wizard' | 'briefs-api' | 'mcp' | 'acp' | 'regenerate'
 export type ResolveNote =
   | 'default-unavailable'
   | 'unattended-classic'
@@ -42,7 +42,7 @@ export type ResolveResult =
     }
   | { ok: false; code: 'UNKNOWN_POST_STYLE'; message: string }
 
-const UNATTENDED: ReadonlySet<Surface> = new Set<Surface>(['queue', 'mcp', 'acp'])
+const UNATTENDED: ReadonlySet<Surface> = new Set<Surface>(['mcp', 'acp'])
 
 // The one place a pre-027 goal is read (decided 2026-10-24). Anything not listed
 // maps to nothing, so resolution continues to the campaign default, then general.

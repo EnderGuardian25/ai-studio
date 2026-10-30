@@ -310,46 +310,6 @@ test.describe('§AB — the caption credential route', () => {
     expect(await prisma!.brief.count({ where: { teamId: t.teamId } })).toBe(before)
   })
 
-  // TC-ROUTE-06 — AC-14 (E2E half): the scheduler follows the team route.
-  test('TC-ROUTE-06: a scheduled entry runs on the team route, and fails naming it once the row is gone', async () => {
-    const anthropic = await addRow(t.api, 'anthropic')
-    await putRoute(t.api, 'API_KEY')
-    const camp = await (await t.api.post('/api/campaigns', { name: `Route Camp ${Date.now()}`, brandKitId: t.kitId })).json()
-    const entryBody = (topic: string) => ({
-      topic,
-      goal: 'Awareness',
-      tone: 'professional',
-      channels: ['INSTAGRAM'],
-      designMode: 'GENERATE',
-      generateAt: new Date(Date.now() + 24 * 3600_000).toISOString(),
-      postAction: 'HOLD',
-    })
-    const makeDueAndTick = async (entryId: string) => {
-      await prisma!.scheduledGeneration.update({
-        where: { id: entryId },
-        data: { generateAt: new Date(Date.now() - 1000), nextRetryAt: null },
-      })
-      expect((await t.api.post('/api/test/generation-tick', {})).status()).toBe(200)
-    }
-
-    const ok = await (await t.api.post(`/api/campaigns/${camp.id}/queue`, entryBody(`Route 06a ${Date.now()}`))).json()
-    await makeDueAndTick(ok.id)
-    const done = await prisma!.scheduledGeneration.findUniqueOrThrow({ where: { id: ok.id } })
-    expect(done.draftId).toBeTruthy()
-    const calls = await copyCalls(t.api)
-    expect(calls.length).toBeGreaterThan(0)
-    for (const c of calls) expect(c.route).toBe('API_KEY')
-
-    expect((await t.api.del(`/api/admin/providers/${anthropic.id}`)).ok()).toBe(true)
-    await clearCalls(t.api)
-    const bad = await (await t.api.post(`/api/campaigns/${camp.id}/queue`, entryBody(`Route 06b ${Date.now()}`))).json()
-    await makeDueAndTick(bad.id)
-    const failed = await prisma!.scheduledGeneration.findUniqueOrThrow({ where: { id: bad.id } })
-    expect(failed.draftId).toBeNull()
-    expect(failed.errorReason).toContain('API key route')
-    expect(await copyCalls(t.api)).toEqual([])
-  })
-
   // TC-ROUTE-07 — AC-08: the Opus gate's credential tier for captions.
   test('TC-ROUTE-07: /api/models reports captionCredential "team" on API_KEY and the plain credential otherwise', async () => {
     await addRow(t.api, 'anthropic')

@@ -205,17 +205,6 @@ export const CATALOGUE = {
       headlineState: z.enum(HEADLINE_STATES).optional(),
     }),
   },
-  'scheduled_generation.settled': {
-    schemaVersion: 1,
-    source: ['scheduler'],
-    outcomes: ['completed', 'retry', 'failed'],
-    schema: z.object({
-      retryCount: z.number().int().min(0).optional(),
-      errorReason: failureReason.optional(),
-      postStyle: z.enum(POST_STYLE_KEYS).nullable().optional(),
-      held: z.boolean().optional(),
-    }),
-  },
   'wizard.step': {
     schemaVersion: 1,
     source: ['web'],
@@ -241,6 +230,13 @@ export const CATALOGUE = {
     schema: z.object({ reason: z.enum(['expired', 'discarded']), step: wizardStep.nullable().optional() }),
   },
 } as const satisfies Record<string, EventDef>
+
+/**
+ * Event names that once existed and are gone from CATALOGUE. A retired name is
+ * never reused for a different meaning: old rows with it stay in the store until
+ * retention sweeps them, and nothing reads them (037 D6).
+ */
+export const RETIRED_EVENT_NAMES = ['scheduled_generation.settled'] as const
 
 export type EventName = keyof typeof CATALOGUE
 export const EVENT_NAMES = Object.keys(CATALOGUE) as EventName[]

@@ -13,7 +13,6 @@ import { apiFetch } from '@/lib/apiFetch'
 import { useCurrentUser } from '@/lib/hooks/useCurrentUser'
 import { ASIDE_BLOCK, CRUMB_CURRENT, CRUMB_LINK } from '@/components/campaigns/classes'
 import { CampaignBriefingSection } from '@/components/campaigns/CampaignBriefingSection'
-import { ScheduledQueueSection } from '@/components/campaigns/ScheduledQueueSection'
 import { postStyleLabel, postStyleOptions } from '@/components/campaigns/postStyleOptions'
 import type { Campaign, BrandKitSummary, ProjectSummary, ResolvedBrandKitResponse } from '@/lib/api-types'
 
@@ -157,15 +156,9 @@ export default function CampaignDetailPage() {
       <PageTitle className="mb-10 break-words">{campaign.name}</PageTitle>
 
       <div className="grid grid-cols-1 gap-x-12 gap-y-10 lg:grid-cols-[minmax(0,1fr)_280px]">
-        {/* The briefing and the queue, numbered sections ruled apart (§8.14). */}
+        {/* The briefing, a numbered section ruled apart (§8.14). */}
         <div className="min-w-0 divide-y divide-line-subtle border-t-2 border-fg">
           <CampaignBriefingSection campaignId={params.id} isTeamAdmin={isTeamAdmin} />
-
-          <ScheduledQueueSection
-            campaignId={params.id}
-            resolvedKitId={resolved?.kit?.id ?? null}
-            isTeamAdmin={isTeamAdmin}
-          />
         </div>
 
         {/* Brand kit, details, briefs and projects: ruled blocks in the aside. */}

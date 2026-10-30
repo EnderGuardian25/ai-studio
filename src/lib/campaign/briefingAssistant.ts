@@ -1,6 +1,4 @@
 import Anthropic from '@anthropic-ai/sdk'
-import { z } from 'zod'
-import { PostGenerationAction } from '@prisma/client'
 import { resolveAnthropicApiKey } from '@/providers/registry'
 import { isCliMode, pipelineMode } from '@/lib/agent/config'
 import { runClaudeCli, stripCodeFences } from '@/lib/agent/claudeCli'
@@ -14,8 +12,6 @@ import { collectCampaignDocsContext, collectCampaignDocImageUrls } from '@/lib/c
 import { runVisionModel } from '@/lib/agent/vision'
 import { resolveBrandKit } from '@/lib/brandkit/resolve'
 import { fenceUntrusted, UNTRUSTED_CONTENT_GUARD } from '@/lib/agent/untrusted'
-import { prisma } from '@/lib/prisma'
-import { activeStyles, legacyGoalStyle, type PostStyle } from '@/lib/postStyles'
 import { MOCK_AI, buildMockBriefingReply, buildMockBriefingEnhance } from '@/lib/testHooks'
 
 // The AI briefing assistant: a multi-turn chat that converges on a campaign
@@ -160,120 +156,9 @@ export function extractBriefingBlock(text: string): string | null {
   return content ? content : null
 }
 
-// ── Auto-scheduling plan (F4) ────────────────────────────────────────────────
-// When the admin asks to "generate posts as per a scheme", the model proposes a
-// posting plan inside a ```schedule fenced block. The app renders it as an
-// editable list the admin approves, then batch-creates ScheduledGeneration rows.
-// The model emits only topic/goal/tone/cadence/action per post; channels, size,
-// and design path default from the campaign at approval time.
-const SCHEDULE_FENCE = /```schedule\s*\n([\s\S]*?)```/g
-
-const schedulePlanItemSchema = z.object({
-  topic: z.string().trim().min(1),
-  // 031 FR-30: the post style is checked against the active styles by
-  // normalisePlan, never here (a bad key must be replaced, not drop the plan).
-  // A non-string is read as absent (.catch); an over-long key is capped in normalisePlan.
-  postStyle: z.string().trim().optional().catch(undefined),
-  // A goal from an older chat is still read: ignored when postStyle is present,
-  // else mapped through legacyGoalStyle.
-  goal: z.string().trim().optional(),
-  tone: z.string().trim().min(1).default('professional'),
-  // Cadence as an offset from approval time — the client renders an editable
-  // date, so absolute timestamps the model can't know reliably are avoided.
-  daysFromNow: z.number().int().min(0).max(365).default(1),
-  postAction: z.nativeEnum(PostGenerationAction).default('HOLD'),
-})
-export type RawSchedulePlanItem = z.infer<typeof schedulePlanItemSchema>
-
-/** A plan row as the panel receives it: the style is always an active key. */
-export interface SchedulePlanItem {
-  topic: string
-  postStyle: string
-  tone: string
-  daysFromNow: number
-  postAction: PostGenerationAction
-  /** Set when the proposed key was missing, unknown or retired and was replaced. */
-  styleReplaced?: { proposed: string }
-}
-
-const schedulePlanSchema = z.object({ posts: z.array(schedulePlanItemSchema).min(1).max(50) })
-
-// Pull the LAST ```schedule block, parse + validate its shape. Returns null when
-// there is no block or the JSON/shape is invalid (a malformed plan is simply
-// ignored rather than surfaced — the assistant can be asked to try again). The
-// post styles are NOT checked here; see normalisePlan.
-export function extractSchedulePlan(text: string): RawSchedulePlanItem[] | null {
-  let match: RegExpExecArray | null = null
-  for (const m of text.matchAll(SCHEDULE_FENCE)) match = m
-  const raw = match?.[1]?.trim()
-  if (!raw) return null
-  try {
-    const parsed = schedulePlanSchema.safeParse(JSON.parse(raw))
-    return parsed.success ? parsed.data.posts : null
-  } catch {
-    return null
-  }
-}
-
-/**
- * 031 FR-30: every row leaves with an active post style. A missing, unknown or
- * retired key becomes the campaign default (when that is active) or `general`,
- * and the row records what was proposed. A legacy `goal` stands in for a missing
- * key, through the one mapping in the post styles module.
- */
-export function normalisePlan(
-  items: readonly RawSchedulePlanItem[],
-  ctx: { defaultStyle: string | null; styles?: readonly PostStyle[] },
-): SchedulePlanItem[] {
-  const active = ctx.styles ?? activeStyles()
-  const isActive = (k: string) => active.some((s) => s.key === k)
-  const fallback =
-    ctx.defaultStyle && isActive(ctx.defaultStyle)
-      ? ctx.defaultStyle
-      : (active.find((s) => s.key === 'general')?.key ?? 'general')
-  return items.map((it) => {
-    const { goal, postStyle, ...rest } = it
-    const explicit = postStyle?.trim().slice(0, 40) || undefined
-    const key = explicit ?? legacyGoalStyle(goal)
-    if (key && isActive(key)) return { ...rest, postStyle: key }
-    // A legacy goal that maps to nothing is not a proposal; only a proposed key is reported.
-    return explicit
-      ? { ...rest, postStyle: fallback, styleReplaced: { proposed: explicit } }
-      : { ...rest, postStyle: fallback }
-  })
-}
-
-const SCHEDULE_INTRO =
-  'When the admin asks you to PLAN or SCHEDULE a series of posts (a "scheme", e.g. "4 posts a week for the next month, one per service line"), infer a sensible count, cadence, and per-post topics from their request and the campaign context, then propose the plan inside a fenced block that starts with ```schedule and ends with ```. Inside it put ONLY minified-or-pretty JSON of the shape {"posts":[{"topic":string,"postStyle":string,"tone":string,"daysFromNow":integer,"postAction":"HOLD"|"SCHEDULE_PUBLISH"|"PUBLISH_NOW"}]}.'
-
-/**
- * 031 FR-31: the schedule grammar for the system prompt. The style list is read
- * from the dataset at call time (`activeStyles`), never written out here.
- */
-export function scheduleGrammarText(styles: readonly PostStyle[] = activeStyles()): string {
-  const list = styles.map((s) => `- ${s.key}: ${s.label}. ${s.summary}`).join('\n')
-  return [
-    SCHEDULE_INTRO,
-    'postStyle must be exactly one of these keys, chosen per post for what that post is for:',
-    list,
-    'daysFromNow is the whole-day offset from today for that post. Default postAction to "HOLD" unless the admin explicitly asks to auto-publish. Briefly summarise the plan in prose above the block; the app turns the block into an editable, approvable schedule.',
-  ].join('\n')
-}
-
-async function loadDefaultStyle(campaignId: string): Promise<string | null> {
-  const c = await prisma.campaign.findUnique({ where: { id: campaignId }, select: { defaultPostStyle: true } })
-  return c?.defaultPostStyle ?? null
-}
-
-async function planOf(campaignId: string, reply: string): Promise<SchedulePlanItem[] | null> {
-  const raw = extractSchedulePlan(reply)
-  return raw ? normalisePlan(raw, { defaultStyle: await loadDefaultStyle(campaignId) }) : null
-}
-
 export interface BriefingChatResult {
   reply: string
   briefingDraft: string | null
-  schedulePlan: SchedulePlanItem[] | null
 }
 
 export async function runBriefingChat(
@@ -292,7 +177,6 @@ export async function runBriefingChat(
     return {
       reply,
       briefingDraft: extractBriefingBlock(reply),
-      schedulePlan: await planOf(campaignId, reply),
     }
   }
 
@@ -305,7 +189,6 @@ export async function runBriefingChat(
     'The briefing is free-text context injected into every AI post generation under this campaign, on top of the brand voice: it should cover the campaign\'s goal, audience, key messages, offers/CTAs, tone adjustments, and any do/don\'t rules.',
     'Interview the admin: ask focused questions about gaps, propose concrete wording, and refine based on their answers. Ground everything in the source documents when they are provided.',
     'When proposing or refining the BRIEFING, include your current best complete briefing draft inside a fenced code block that starts with ```briefing and ends with ``` — the app extracts that block so the admin can apply it to the editor. Keep the draft plain text (no markdown headers inside the block), roughly 100-300 words.',
-    scheduleGrammarText(),
     imageUrls.length > 0
       ? 'Reference images uploaded by the marketing team are attached — treat their content (products, layouts, moods, text) as campaign source material alongside the documents.'
       : '',
@@ -335,7 +218,6 @@ export async function runBriefingChat(
   return {
     reply,
     briefingDraft: extractBriefingBlock(reply),
-    schedulePlan: await planOf(campaignId, reply),
   }
 }
 

@@ -131,52 +131,6 @@ export interface CampaignBriefing {
   createdAt: string
 }
 
-// GET/POST /api/campaigns/[id]/queue — scheduled-generation queue entries
-export type GenerationStatus = 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'CANCELLED'
-export type PostGenerationAction = 'HOLD' | 'SCHEDULE_PUBLISH' | 'PUBLISH_NOW'
-
-export interface ScheduledGeneration {
-  id: string
-  campaignId: string
-  createdById: string
-  topic: string
-  description: string | null
-  goal: string
-  tone: string
-  // 027 FR-06: the resolved key (null = a pre-027 entry).
-  postStyle: string | null
-  channels: Channel[]
-  aspectRatio: AspectRatio
-  designMode: DesignMode
-  templateId: string | null
-  template: { id: string; name: string } | null
-  generateAt: string
-  postAction: PostGenerationAction
-  publishAt: string | null
-  status: GenerationStatus
-  errorReason: string | null
-  // 027 FR-12: why an auto-publish action was not run (null = nothing held).
-  heldReason: string | null
-  retryCount: number
-  nextRetryAt: string | null
-  briefId: string | null
-  draftId: string | null
-  createdAt: string
-  updatedAt: string
-}
-
-// GET /api/scheduler/status
-export interface SchedulerLoopStatus {
-  loop: 'scheduler' | 'generation'
-  state: 'online' | 'offline' | 'never'
-  lastSeenAt: string | null
-}
-
-export interface SchedulerStatus {
-  loops: SchedulerLoopStatus[]
-  offline: boolean
-}
-
 // GET /api/campaigns/[id]/brandkit
 export type BrandKitSource = 'explicit' | 'campaign' | 'project' | 'system'
 

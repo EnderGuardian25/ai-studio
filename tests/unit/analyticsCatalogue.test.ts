@@ -47,11 +47,9 @@ describe('analytics catalogue (006 FR-02, FR-03)', () => {
     expect(r.success && r.data.failureReason).toHaveLength(FAILURE_REASON_MAX)
   })
 
-  it('redacts publish and scheduled-generation reasons too', () => {
+  it('redacts publish reasons too', () => {
     const p = parse('publish.settled', { channel: 'LINKEDIN', terminal: true, errorReason: 'sk-secret999 rejected' })
-    const s = parse('scheduled_generation.settled', { errorReason: 'http://10.0.0.1:9000/x' })
     expect(p.success && p.data.errorReason).toBe('<redacted> rejected')
-    expect(s.success && s.data.errorReason).toBe('<url>')
   })
 
   it('strips unknown keys, so stray text never reaches a row (NFR-04)', () => {

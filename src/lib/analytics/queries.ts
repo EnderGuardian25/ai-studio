@@ -20,13 +20,15 @@
 //                    step's count over step 0's.
 //   durations      = successful (`ok`) events only, p50 and p90 by surface.
 import { prisma } from '@/lib/prisma'
-import { OFFLINE_THRESHOLD_MS } from '@/lib/scheduler/heartbeatStatus'
 import { getStyle, POST_STYLE_KEYS } from '@/lib/postStyles'
 
 export const RANGES = ['7d', '30d', '90d'] as const
 export type InsightsRange = (typeof RANGES)[number]
 export const DEFAULT_RANGE: InsightsRange = '30d'
 const DAY_MS = 86_400_000
+
+/** Three missed 60 s polls: how long the retention loop may stay silent before Insights calls it stalled. */
+export const OFFLINE_THRESHOLD_MS = 180_000
 
 export interface DateRange {
   from: Date
@@ -128,7 +130,6 @@ export interface PostStyleRow {
   chosen: number
   generations: number
   flagged: number
-  held: number
 }
 
 /**
@@ -147,7 +148,6 @@ export function shapePostStyles(rows: PostStyleRow[]) {
       generations,
       flagged,
       flagRate: ratio(flagged, generations),
-      held: r?.held ?? 0,
     }
   })
 }
@@ -326,10 +326,9 @@ async function postStyles({ from, to }: DateRange) {
     SELECT payload->>'postStyle' AS style,
            (count(*) FILTER (WHERE name = 'brief.submitted'))::int AS chosen,
            (count(*) FILTER (WHERE name = 'generation.finished'))::int AS generations,
-           (count(*) FILTER (WHERE name = 'generation.finished' AND payload->>'factsStatus' = 'flagged'))::int AS flagged,
-           (count(*) FILTER (WHERE name = 'scheduled_generation.settled' AND payload->>'held' = 'true'))::int AS held
+           (count(*) FILTER (WHERE name = 'generation.finished' AND payload->>'factsStatus' = 'flagged'))::int AS flagged
     FROM "AnalyticsEvent"
-    WHERE name IN ('brief.submitted', 'generation.finished', 'scheduled_generation.settled')
+    WHERE name IN ('brief.submitted', 'generation.finished')
       AND payload->>'postStyle' IS NOT NULL
       AND "at" >= ${from} AND "at" < ${to}
     GROUP BY 1`

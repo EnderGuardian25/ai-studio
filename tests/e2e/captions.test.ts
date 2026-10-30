@@ -271,7 +271,7 @@ test.describe('§W — per-channel captions', () => {
   })
 
   // TC-CAP-07 — AC-18 (FR-15): WhatsApp is in no channel input (API half).
-  test('briefs and queue entries reject a WhatsApp channel with 400', async () => {
+  test('briefs reject a WhatsApp channel with 400', async () => {
     const camp = await suiteCampaign(api)
     const brief = await api.post('/api/briefs', {
       topic: `Cap WA brief ${Date.now()}`,
@@ -283,21 +283,10 @@ test.describe('§W — per-channel captions', () => {
       campaignId: camp,
     })
     expect(brief.status()).toBe(400)
-
-    const entry = await api.post(`/api/campaigns/${camp}/queue`, {
-      topic: `Cap WA queue ${Date.now()}`,
-      goal: 'Awareness',
-      tone: 'professional',
-      channels: ['WHATSAPP'],
-      designMode: 'GENERATE',
-      generateAt: new Date(Date.now() + 7 * 24 * 3600_000).toISOString(),
-      postAction: 'HOLD',
-    })
-    expect(entry.status()).toBe(400)
   })
 
   // TC-CAP-08 — AC-18 (FR-15): the two pickers offer Instagram and LinkedIn only.
-  test('the publish dialog and the queue modal show exactly Instagram and LinkedIn', async ({ page }) => {
+  test('the publish dialog shows exactly Instagram and LinkedIn', async ({ page }) => {
     if (!MOCKED()) { test.skip(); return }
     const draft = await exportedDraft(api, `Cap Pickers ${Date.now()}`)
     await page.setViewportSize({ width: 1440, height: 900 })
@@ -316,10 +305,6 @@ test.describe('§W — per-channel captions', () => {
     await expect(page.getByRole('button', { name: 'View full screen', exact: true })).toBeVisible({ timeout: 20_000 })
     await page.getByRole('button', { name: /^publish$/i }).click()
     await expectTwoChannels(page.getByRole('dialog', { name: 'Publish post' }))
-
-    await page.goto(`/campaigns/${await suiteCampaign(api)}`)
-    await page.getByRole('button', { name: 'Plan a post' }).click()
-    await expectTwoChannels(page.getByRole('dialog', { name: 'Plan a post' }))
   })
 
   // TC-CAP-09 — AC-20 (FR-11, FR-12): one draft-level caption claim.
