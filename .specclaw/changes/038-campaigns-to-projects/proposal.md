@@ -98,3 +98,12 @@ This is change 2 of 3. It depends on 037, which removes the campaign queue.
 - (party-visionary) Rebuttal: an in-place rename of Campaign leaves two "project" entities; reuse the briefing and document machinery under the existing Project instead.
 - (party-visionary, NOTE) Key the briefing store and routes on an owner, and give the briefing a fallback tier (or say why none).
 - (party-visionary, NOTE) Keep `visibility.ts` as the only read predicate, with a boundary test against inline team filters.
+
+### Decisions after the party review (user, 2026-10-30)
+
+- **Scope (party-po BLOCK):** the full move, as approved. The existing `Project` table gains the briefing, documents and default post style, and `Campaign` is dropped; a rename of Campaign is rejected because it would leave two project entities. The briefing assistant, chat, Improve and upgrade routes move too, re-keyed onto projects. The plan adds a "cheaper variant considered" note.
+- **Post moves (party-security BLOCK 3):** snapshot at generation. Each draft records the project, briefing version, kit and post style it was generated with. Moving a post only relabels it. Regenerate, refine and the facts check use the recorded inputs; only a new post, or an explicit "apply the new project's defaults" by the author or a team admin, reads the current project. Any member can still assign and move.
+- **Migration (party-security BLOCK 4):** fail closed, as in 037. It refuses when campaign rows exist unless the operator acknowledges, and the docs name a `pg_dump` first. An operator-run, logged script deletes the stored campaign document objects after the drop has committed; it refuses without an explicit `DATABASE_URL`. Nothing runs automatically.
+- **Edit rights (party-architect and party-security BLOCK 1):** `canView` (any team member) and `canEditPost` (author or team admin, via `hasRole`). The ~24 callers of `visibility.ts` are sorted into these tiers, a coverage test gives every post action a tier, and E2E cases show a non-author editor in the same team gets 403. The rule: anything that calls a model, writes the post's content, or changes which inputs a later generation uses is author or admin only.
+- **Project ids (party-security BLOCK 2):** every project id from the wizard, assign, move and MCP/ACP `generate_post` is checked against the caller's team, with 404 otherwise. `generate_post` refuses the retired campaign field with a named 400.
+- The WARN and NOTE findings are settled in the plan.

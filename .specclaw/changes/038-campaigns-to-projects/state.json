@@ -1,0 +1,9 @@
+{
+  "change": "038-campaigns-to-projects",
+  "phase": "proposal",
+  "branch": "",
+  "size": "architectural",
+  "phases": {
+    "proposal": { "status": "approved", "at": "2026-10-30T13:57:06Z" }
+  }
+}
