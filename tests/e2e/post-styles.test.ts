@@ -393,11 +393,11 @@ test.describe('ACP generate_post', () => {
     expect(noTopic.status()).toBe(400)
   })
 
-  test('TC-PS-29: the manifest is 1.2.0, lists postStyle, and no longer requires goal or tone', async ({ request }) => {
+  test('TC-PS-29: the manifest is 2.0.0, lists postStyle, and no longer requires goal or tone', async ({ request }) => {
     const res = await request.get('/api/acp/manifest', { headers: { 'x-bistec-api-key': key } })
     expect(res.status()).toBe(200)
     const manifest = await res.json()
-    expect(manifest.version).toBe('1.2.0')
+    expect(manifest.version).toBe('2.0.0')
     const cap = manifest.capabilities.find((c: { name: string }) => c.name === 'generate_post')
     expect(cap.input.required).toEqual(['topic', 'channels', 'designMode'])
     expect(cap.input.properties.postStyle.enum).toContain('general')

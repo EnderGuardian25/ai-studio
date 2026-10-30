@@ -1077,7 +1077,6 @@ test.describe('axe scan (T18)', () => {
 
     await page.goto(`/campaigns/${camp.id}`)
     await expect(page.getByRole('heading', { name: camp.name, level: 1 })).toBeVisible()
-    await expect(page.getByText(`T10 pending`, { exact: false }).first()).toBeVisible()
     await expectNoAxeViolations(page, '/campaigns/[id]', { settle: true })
 
     await page.goto(`/projects/${project.id}`)

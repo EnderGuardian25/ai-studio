@@ -106,7 +106,7 @@ Add Download first, then remove scheduled generation, then the publishing UI, th
 
 ### Wave 6: docs and the full gate
 
-- [ ] `T6` — Docs, the full E2E mock run and CI
+- [x] `T6` — Docs, the full E2E mock run and CI
   - Files: docs/social-publishing-setup.md, CLAUDE.md, README.md, docs/deploy.md, docs/cold-start.md, docs/mcp-acp-guide.md, docs/e2e-test-plan.md, .env.example
   - Estimate: medium
   - Depends: T5

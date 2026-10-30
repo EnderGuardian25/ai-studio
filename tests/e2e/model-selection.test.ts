@@ -648,7 +648,7 @@ test.describe('§Y — /team → Models', () => {
     // The switch: named, described, and disabled in API mode.
     const gate = models.getByRole('checkbox', { name: 'Opus requires a personal token', exact: true })
     await expect(gate).toBeDisabled()
-    await expect(gate).toHaveAccessibleDescription(/Scheduled posts, MCP and ACP always use the team token\..*Only applies in CLI mode\./)
+    await expect(gate).toHaveAccessibleDescription(/MCP and ACP always use the team token\..*Only applies in CLI mode\./)
     await expectNoAxeViolations(page, '/team (Models section)')
 
     // Untick Opus and save: the GET shows it, and Opus is now a "New" entry.

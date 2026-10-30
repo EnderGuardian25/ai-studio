@@ -86,9 +86,19 @@ test.describe('Retention health (§Z)', () => {
     }
   })
 
-  test('a call with no session is refused (the seam stays admin-gated)', async ({ request }) => {
+  test('a call with no session is refused (the seam stays admin-gated)', async ({ playwright }) => {
     if (!MOCKED()) { test.skip(); return }
-    const res = await request.post('/api/test/worker-heartbeat', { data: { clear: true } })
-    expect([401, 403]).toContain(res.status())
+    // The proxy redirects a cookie-less request to /login, so a bogus session
+    // cookie is what reaches the route's own check.
+    const anon = await playwright.request.newContext({
+      baseURL: process.env.TEST_BASE_URL,
+      extraHTTPHeaders: { cookie: 'better-auth.session_token=not-a-real-session' },
+    })
+    try {
+      const res = await anon.post('/api/test/worker-heartbeat', { data: { clear: true } })
+      expect([401, 403]).toContain(res.status())
+    } finally {
+      await anon.dispose()
+    }
   })
 })

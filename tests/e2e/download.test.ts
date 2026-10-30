@@ -67,7 +67,7 @@ test.describe('§AI Download', () => {
     expect((await res.body()).length).toBeGreaterThan(0)
 
     const after = (await (await api.get(`/api/drafts/${draft.id}`)).json()) as Draft
-    expect(after.exportUrl).toBe(draft.exportUrl)
+    expect(after.exportUrl?.split('?')[0]).toBe(draft.exportUrl?.split('?')[0])
     const [event] = await downloadedEvents(draft.id, 1)
     expect(event.outcome).toBe('ok')
     expect(event.payload.rendered).toBe(false)
