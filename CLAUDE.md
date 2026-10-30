@@ -39,13 +39,12 @@ This repo contains planning documents for **bistec-studio**, an internal marketi
     - a "Posts this month" KPI;
     - the removal is accepted as one-way. The tag `pre-037-publishing` (`ea8e7f2e`, pushed) is the last commit with publishing.
   - **038 campaigns become projects.** Approved (architectural). Its party panel ran on 2026-10-30 (deep, 5 seats, 2 rounds): CHANGES_REQUESTED, 33 findings upheld (6 BLOCK), all in [`party-report.md`](.specclaw/changes/038-campaigns-to-projects/party-report.md). The user's decisions on the BLOCKs are in the proposal's "Decisions after the party review": the full move onto the existing `Project`; inputs snapshotted on the draft at generation, so a move only relabels; a fail-closed migration plus an operator-run sweep of campaign document objects; `canView` and `canEditPost`; and project ids checked against the caller's team.
-  - **039 general caption plus curated Instagram, LinkedIn and Facebook captions.** The user approved the proposal. Its panel is resolved (deep, 5 seats) but has not run.
-  - **The next task is to run the 039 panel** (the 038 panel is done). The user chose panels on all three changes and approved the bill (10 spawns per change: 6 opus, 4 sonnet), so no further spend question is needed for 039.
-    - The procedure is `/specclaw:propose` step 4: round 1 blind and in parallel, then round 2 with all round-1 files, then `tally`, `report` and `spawn-budget record`.
-    - Write each seat's final message verbatim to `party/findings-r1/<role>.md` (then `findings-r2/`).
-    - Append the upheld findings to the proposal's Open Questions, and ask the user to decide the blocking ones.
-    - Then record `specclaw-set-phase .specclaw 039-<slug> proposal approved --size architectural` (038's was recorded on 2026-10-30).
-    - Then `/specclaw:plan` 037, build, verify; then 038, then 039.
+  - **039 general caption plus curated Instagram, LinkedIn and Facebook captions.** Approved (architectural). Its party panel ran on 2026-10-30 (deep, 5 seats, 2 rounds): CHANGES_REQUESTED, 34 findings upheld (3 BLOCK), all in [`party-report.md`](.specclaw/changes/039-general-and-curated-captions/party-report.md). The user's decisions are in the proposal's "Decisions after the party review":
+    - a caption-kind column (`GENERAL` or `CURATED`), with only `FACEBOOK` added to `Channel`;
+    - an https Website field on the brand kit, which code inserts into the Facebook call to action;
+    - one-step undo per caption, with soft delete;
+    - `Brief.channels` ignored and deprecated, with no migration.
+  - **All three panels are done. The next task is `/specclaw:plan` 037**, then build and verify it; then 038, then 039, each planned, built and verified in turn.
   - **The user's decisions for the program (2026-10-28; most are in the three proposals):**
     - **Posts and projects:**
       - Every member of a team sees every post. Only the author and team admins edit, refine, regenerate, change the kit of or delete a post.

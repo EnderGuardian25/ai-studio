@@ -104,3 +104,11 @@ This is change 3 of 3. It depends on 037 (Download replaces Export, and publishi
 - (party-visionary, NOTE) Store a hash or revision of the general caption on each curated caption, for a later staleness notice.
 - (party-visionary, NOTE) Put each channel's measurable rules (word range, hashtags, link and its source field) in the registry, feeding both the prompt and a code check.
 - (party-visionary) Rebuttal: slice only after the vocabulary and the `get_draft` shape are decided, so slice 2 is additive.
+
+### Decisions after the party review (user, 2026-10-30)
+
+- **Caption kind (party-visionary BLOCK):** a caption-kind column. Each caption row has a kind, `GENERAL` or `CURATED`. A curated row has a channel (Instagram, LinkedIn or Facebook); the general row has none. Only `FACEBOOK` is added to the `Channel` enum, which keeps meaning "a platform". `get_draft` (MCP and ACP) returns an open list of captions, each with its kind, channel, text and facts check, so later kinds or a language field are additive.
+- **Facebook link (party-security BLOCK 1):** a team admin sets an https Website URL on the brand kit (a new kit field). Code puts that exact link into the Facebook call to action; the model never writes a URL. A kit with no website gives a call to action with no link, and the card says so.
+- **Caption undo (party-security BLOCK 2):** one-step undo per caption. Each caption keeps its previous text; regenerate, edit and delete save it first, and an Undo button on the caption restores it. Delete is soft, so Undo brings it back. A failed regenerate keeps the old text, as today.
+- **`Brief.channels`:** ignored and marked deprecated, with no migration. Every writer stops setting it, `generate_post` drops the input, and the schema comment marks it so nobody reuses it.
+- The WARN and NOTE findings are settled in the plan.
