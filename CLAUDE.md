@@ -32,12 +32,12 @@ This repo contains planning documents for **bistec-studio**, an internal marketi
 - **`main` holds PR #1 (merged by the user on 2026-10-28, `4cd1f94f`).** `v2` was fast-forwarded to it and work continues on `v2`. `main` is not touched again without the user's go-ahead.
 - **Change 036 (browser tab title "ai-studio") is VERIFIED PASS (2026-10-28, 3 of 3; CI green on `c74a6fa3`, run 40714132579: E2E 601/3/0/0).** Only the root metadata title in `src/app/layout.tsx` changed. The ACP and MCP server names and the model prompt text still say "bistec-studio" on purpose. Report: [`verify-report.md`](.specclaw/changes/036-browser-title-ai-studio/verify-report.md).
 - **Change 040 (template viewer) is VERIFIED PASS (2026-10-30, 7 of 7; CI green on `3c54e7c9`, run 41060132423: E2E 606/3/0/0).** The user added it before the 037–039 program. A template name on the kit page opens a preview; the wizard previews the selected template and the Path B style reference. The preview is `src/components/ui/TemplatePreview.tsx`, a `sandbox=""` iframe scaled from `dimensionsFor`. The wizard reads one template from `GET /api/templates/[id]`, which is team-scoped. Placeholders show unfilled. Report: [`verify-report.md`](.specclaw/changes/040-template-viewer/verify-report.md).
-- **Change 037 (remove scheduling and publishing) is BUILT (T1 to T6, 2026-10-31). Pick up here: `/specclaw:verify 037`, then `/specclaw:plan` 038.**
+- **Change 037 (remove scheduling and publishing) is VERIFIED PASS (2026-10-31, 20 of 20; CI green on `87302710`, run 41105198334: E2E 552/3/0/0). Pick up here: `/specclaw:plan` 038.** Report: [`verify-report.md`](.specclaw/changes/037-remove-scheduling-publishing/verify-report.md). The user amended AC-19 at verify to name three more deleted unit suites (`postStylesApi`, `schedulerStatusRoute`, `captionResolve`).
   - Removed: scheduling, publishing, the campaign queue and the generation loop, the social clients and channel tokens, `/api/posts`, `/api/team/channels`, the Export route, `publish_post` (MCP and ACP are `2.0.0`), the `MOCK_SOCIAL` seams and `docs/social-publishing-setup.md`. Download replaces Export (`GET /api/drafts/[id]/download`). The library filters by brand kit and post style. The dashboard shows "Posts this month".
   - The schema loses `Post`, `ChannelToken`, `ScheduledGeneration`, their enums and `DraftStatus.PUBLISHED`. Migration `20261031120000_remove_scheduling_publishing` is **fail-closed**: it refuses to run while any of those rows exists. The operator runs `scripts/clear-publishing-data.mjs` first (dry run, then `--yes`); the sequence, the `migrate resolve --rolled-back` recovery and the manual revoke of Instagram and LinkedIn app access are in [`docs/deploy.md`](docs/deploy.md) and [`docs/cold-start.md`](docs/cold-start.md). The down script is `prisma/rollback/037-remove-scheduling-publishing.down.sql` (schema only).
   - **The local `ai_studio` database still needs those operator steps.** The user runs `npm run db:migrate` themselves. `ai_studio_test` is already at head.
   - The worker container keeps the name `scheduler` and runs only analytics retention.
-  - 037 AC-17's end-to-end case is TC-DL-06 (Path A) and TC-DL-07 (Path B) in `tests/e2e/download.test.ts`. The full mock run and the push belong to T6's orchestrator step.
+  - 037 AC-17's end-to-end case is TC-DL-06 (Path A) and TC-DL-07 (Path B) in `tests/e2e/download.test.ts`.
 - **The 037–039 program (user, 2026-10-28).** The product becomes generate a post image, download it, copy a caption. There are three architectural changes, built in this order:
   - **037 remove scheduling and publishing.** Approved. Its party panel ran (deep, 5 seats, 2 rounds): CHANGES_REQUESTED, 28 findings upheld (2 BLOCK), all in [`party-report.md`](.specclaw/changes/037-remove-scheduling-publishing/party-report.md). The user's decisions after it are in the proposal's "Decisions after the party review":
     - one change, with the table drop and enum rebuild now, behind a fail-closed migration;
@@ -50,7 +50,7 @@ This repo contains planning documents for **bistec-studio**, an internal marketi
     - an https Website field on the brand kit, which code inserts into the Facebook call to action;
     - one-step undo per caption, with soft delete;
     - `Brief.channels` ignored and deprecated, with no migration.
-  - **All three panels are done.** 037 is built and awaits verify; then plan, build and verify 038, then 039, each in turn.
+  - **All three panels are done.** 037 is verified. Next: plan, build and verify 038, then 039, each in turn.
   - **The user's decisions for the program (2026-10-28; most are in the three proposals):**
     - **Posts and projects:**
       - Every member of a team sees every post. Only the author and team admins edit, refine, regenerate, change the kit of or delete a post.
@@ -153,7 +153,7 @@ Before writing any backend code, API routes, Prisma models, or provider logic, r
 
 ## Architecture decisions to remember
 
-> The 037–039 program (see "Current state") removed scheduling and publishing (037, built). Campaigns, projects and captions still describe the code as it is until 038 and 039 are built.
+> The 037–039 program (see "Current state") removed scheduling and publishing (037, verified). Campaigns, projects and captions still describe the code as it is until 038 and 039 are built.
 
 - All AI calls are **server-side only** — the browser never calls an AI API or Puppeteer directly
 - **Roles are hierarchical:** `SUPER_ADMIN > ADMIN > EDITOR`; every check goes through `hasRole()` (`src/lib/roles.ts`) — never compare role strings directly. Super-admins pass every admin gate. User management (`/admin/users`) is super-admin-only; "delete" = deactivate (`User.disabled`, sessions revoked, sign-in blocked).

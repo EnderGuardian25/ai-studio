@@ -198,6 +198,7 @@ These close the proposal's Open Questions.
 - **AC-19 (gates):** `tsc`, lint, the unit suite and the full E2E mock suite pass in CI. Suites removed:
   - E2E: `publish.test.ts`, `campaign-scheduling.test.ts`, `export.test.ts` (replaced by `download.test.ts`) and `scheduler-heartbeat.test.ts` (replaced by `retention-health.test.ts`).
   - Unit: `jobRunner`, `generationRunner`, `heartbeatStatus`, `analyticsScheduledGeneration`, `postStylesHold`, `postStylesQueueRoutes`, `queueSchema` and `schedulePlan`.
+  - Unit, added at verify (2026-10-31, user decision): `postStylesApi` and `schedulerStatusRoute` (T2; they tested only the queue schema and `/api/scheduler/status`), and `captionResolve` (T4; it tested only `resolveCaptionForPublish`, deleted with `src/lib/captions/resolve.ts`).
 
   No other suite is deleted; the rest are edited.
 
