@@ -190,7 +190,7 @@ beforeEach(() => {
 
 describe('generation v1 "Original design" revision', () => {
   it('sync path (MCP/ACP, scheduler): the v1 row and the draft carry the same stamp', async () => {
-    await generateDraftForBrief(brief, { userId: null, teamId: 'team1', source: 'scheduler' })
+    await generateDraftForBrief(brief, { userId: null, teamId: 'team1', source: 'mcp' })
     expect(db.revisionCreates).toHaveLength(1)
     expect(db.revisionCreates[0]).toMatchObject({ revisionNumber: 1, instruction: 'Original design', ...STAMP, ...FREEFORM })
     expect(db.draftWrites.find((w) => w.op === 'create')!.data).toMatchObject({ ...STAMP, ...DRAFT_FREEFORM })
@@ -228,7 +228,7 @@ describe('030 rendered-text stamp: generation', () => {
   const painted = { headline: { text: 'the headline', verified: true } }
 
   it('sync and async generation stamp the revision and the draft from the check', async () => {
-    await generateDraftForBrief(brief, { userId: null, teamId: 'team1', source: 'scheduler' })
+    await generateDraftForBrief(brief, { userId: null, teamId: 'team1', source: 'mcp' })
     expect(db.revisionCreates[0].renderedText).toEqual(painted)
     expect(db.draftWrites.find((w) => w.op === 'create')!.data.renderedText).toEqual(painted)
 
@@ -242,7 +242,7 @@ describe('030 rendered-text stamp: generation', () => {
 
   it('a failed check is stamped unverified with its reason, on both rows', async () => {
     db.check = 'not-found'
-    await generateDraftForBrief(brief, { userId: null, teamId: 'team1', source: 'scheduler' })
+    await generateDraftForBrief(brief, { userId: null, teamId: 'team1', source: 'mcp' })
     const want = { headline: { text: 'the headline', verified: false, reason: 'not-found' } }
     expect(db.revisionCreates[0].renderedText).toEqual(want)
     expect(db.draftWrites.find((w) => w.op === 'create')!.data.renderedText).toEqual(want)
@@ -263,7 +263,7 @@ describe('030 rendered-text stamp: generation', () => {
 describe('031 render notes: generation', () => {
   it('sync and async generation stamp the revision and the draft from the font check', async () => {
     db.fontsMissing = ['Abhaya Libre']
-    await generateDraftForBrief(brief, { userId: null, teamId: 'team1', source: 'scheduler' })
+    await generateDraftForBrief(brief, { userId: null, teamId: 'team1', source: 'mcp' })
     expect(db.revisionCreates[0].renderNotes).toEqual({ fontsMissing: ['Abhaya Libre'] })
     expect(db.draftWrites.find((w) => w.op === 'create')!.data.renderNotes).toEqual({ fontsMissing: ['Abhaya Libre'] })
 

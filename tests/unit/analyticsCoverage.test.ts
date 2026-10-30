@@ -2,17 +2,18 @@
 // action, a channel or a source has no event that can carry it, and when a
 // payload copies a vocabulary that already has an owner.
 import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { AspectRatio, CaptionRoute, Channel, DraftAction } from '@prisma/client'
-import { CATALOGUE, EVENT_NAMES, RETIRED_EVENT_NAMES } from '@/lib/analytics/catalogue'
+import { CATALOGUE, EVENT_NAMES, RETIRED_EVENT_NAMES, RETIRED_SOURCES } from '@/lib/analytics/catalogue'
 import { MODEL_KEYS } from '@/lib/models/catalogue'
 import { INSTRUCTION_CLASS_KEYS } from '@/lib/agent/instructionClasses'
 import { archetypes, FALLBACK_REASONS } from '@/lib/designData'
 import { POST_STYLE_KEYS } from '@/lib/postStyles'
 import { HEADLINE_CHECKS, HEADLINE_STATES } from '@/lib/renderedText/vocab'
 
-const SOURCES = ['web', 'scheduler', 'mcp'] as const
+// Live sources; `scheduler` is retired (037 D5, RETIRED_SOURCES).
+const SOURCES = ['web', 'mcp'] as const
 
 // Every value that has an owner elsewhere. A quoted copy of one of these inside
 // the catalogue means a vocabulary was copied rather than imported.
@@ -52,7 +53,7 @@ describe('analytics coverage guard (006 FR-13, AC-03)', () => {
 
   it('has an event that carries every Channel value', () => {
     for (const channel of Object.values(Channel)) {
-      expect(CATALOGUE['publish.settled'].schema.safeParse({ channel, terminal: true }).success).toBe(true)
+      expect(CATALOGUE['draft_action.settled'].schema.safeParse({ action: 'REGENERATE_COPY', channel }).success, channel).toBe(true)
     }
   })
 
@@ -63,8 +64,15 @@ describe('analytics coverage guard (006 FR-13, AC-03)', () => {
     }
   })
 
+  it('retires the scheduler source: no event carries it (037 D5)', () => {
+    expect([...RETIRED_SOURCES]).toEqual(['scheduler'])
+    for (const name of EVENT_NAMES) {
+      expect(CATALOGUE[name].source as readonly string[], name).not.toContain('scheduler')
+    }
+  })
+
   it('keeps every retired event name out of the catalogue (037 D6)', () => {
-    expect([...RETIRED_EVENT_NAMES]).toContain('scheduled_generation.settled')
+    expect([...RETIRED_EVENT_NAMES]).toEqual(expect.arrayContaining(['scheduled_generation.settled', 'publish.settled']))
     for (const name of RETIRED_EVENT_NAMES) {
       expect(EVENT_NAMES as readonly string[], name).not.toContain(name)
       expect(name in CATALOGUE, name).toBe(false)
@@ -105,19 +113,27 @@ describe('analytics coverage guard (006 FR-13, AC-03)', () => {
 // 030 FR-18: every headline state and check has an event field that can carry it,
 // and no payload of these events can hold the headline text (NFR-05).
 describe('analytics coverage guard: the headline vocabularies (030 FR-18)', () => {
-  it('carries every HEADLINE_STATES value in publish.settled and draft.headline_edited', () => {
-    for (const headlineState of HEADLINE_STATES) {
-      expect(
-        CATALOGUE['publish.settled'].schema.safeParse({ channel: 'LINKEDIN', terminal: true, headlineState }).success,
-        `publish.settled ${headlineState}`,
-      ).toBe(true)
-      expect(
-        CATALOGUE['draft.headline_edited'].schema.safeParse({ via: 'edit', state: headlineState, scheduledPending: false })
-          .success,
-        `draft.headline_edited ${headlineState}`,
-      ).toBe(true)
+  it('carries every HEADLINE_STATES value in draft.headline_edited, at schemaVersion 2 without scheduledPending (037 D5)', () => {
+    expect(CATALOGUE['draft.headline_edited'].schemaVersion).toBe(2)
+    for (const state of HEADLINE_STATES) {
+      const parsed = CATALOGUE['draft.headline_edited'].schema.safeParse({ via: 'edit', state, scheduledPending: false })
+      expect(parsed.success, `draft.headline_edited ${state}`).toBe(true)
+      expect(JSON.stringify(parsed.success && parsed.data)).not.toContain('scheduledPending')
     }
-    expect(CATALOGUE['publish.settled'].schema.safeParse({ channel: 'LINKEDIN', terminal: true, headlineState: 'x' }).success).toBe(false)
+    expect(CATALOGUE['draft.headline_edited'].schema.safeParse({ via: 'edit', state: 'x' }).success).toBe(false)
+  })
+
+  it('draft.downloaded has exactly one emitter file in src (037 D7)', () => {
+    const hits: string[] = []
+    const walk = (dir: string) => {
+      for (const e of readdirSync(dir, { withFileTypes: true })) {
+        const full = join(dir, e.name)
+        if (e.isDirectory()) walk(full)
+        else if (/\.tsx?$/.test(e.name) && /track\(\s*['"]draft\.downloaded['"]/.test(readFileSync(full, 'utf8'))) hits.push(full)
+      }
+    }
+    walk(join(process.cwd(), 'src'))
+    expect(hits).toHaveLength(1)
   })
 
   it('carries every HEADLINE_CHECKS value in generation.finished', () => {
@@ -135,8 +151,7 @@ describe('analytics coverage guard: the headline vocabularies (030 FR-18)', () =
   it('no payload schema of these events accepts a headline text field (NFR-05)', () => {
     const TEXT = { headline: 'Secret line', text: 'Secret line', renderedHeadline: 'Secret line', renderedText: { headline: { text: 'Secret line' } } }
     const bases: Record<string, Record<string, unknown>> = {
-      'draft.headline_edited': { via: 'edit', state: 'stale', scheduledPending: true },
-      'publish.settled': { channel: 'LINKEDIN', terminal: true, headlineState: 'stale' },
+      'draft.headline_edited': { via: 'edit', state: 'stale' },
       'generation.finished': { headlineCheck: 'painted' },
     }
     for (const [name, base] of Object.entries(bases)) {

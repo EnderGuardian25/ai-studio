@@ -15,12 +15,11 @@ import { ADMIN_EMAIL, expectNoHorizontalScroll, pageLogin } from '../helpers/ui'
 //   __FAIL_GEN_ALWAYS__    a generation that always fails
 //   __VERIFY_PASS__ / __VERIFY_FAIL_ALWAYS__   the mock verifier
 //   conflict_test          a brand-kit conflict on refine
-//   __FAIL_ALWAYS__        a publish that always fails (in the topic)
 // New in this suite (all in the analytics seam): { failNext: n } makes the next
 // n event inserts fail; { seed: [...] } inserts rows with an explicit `at`;
 // { sweep: true } runs the retention sweep once.
 
-const MOCKED = () => !!(process.env.MOCK_AI && process.env.MOCK_PUPPETEER && process.env.MOCK_SOCIAL)
+const MOCKED = () => !!(process.env.MOCK_AI && process.env.MOCK_PUPPETEER)
 const PASSWORD = 'BistecStudio2026!'
 const EDITOR_EMAIL = 'editor@bisteccare.lk'
 const CLIENTX_EMAIL = 'clientx.admin@users.bistec.internal'
@@ -294,29 +293,9 @@ test.describe('§AD — product observability', () => {
     expect(restored[0].payload).toEqual({ from: 2, to: 1 })
   })
 
-  test('TC-OBS-08: a publish writes one publish.settled per attempt: published, and failed', async () => {
-    if (!MOCKED()) { test.skip(); return }
-    const ok = await exportedDraft(admin, `Obs Publish ${Date.now()}`)
-    await clearStore(admin)
-    const post = await admin.post('/api/posts', { draftId: ok.id, channel: 'INSTAGRAM' })
-    expect(post.status()).toBe(201)
-    const published = byName(await events(admin, { draftId: ok.id as string }), 'publish.settled')
-    expect(published).toHaveLength(1)
-    expect(published[0]).toMatchObject({ outcome: 'published', source: 'web' })
-    expect(published[0].payload).toMatchObject({ channel: 'INSTAGRAM', terminal: true })
-
-    const bad = await exportedDraft(admin, `__FAIL_ALWAYS__ obs publish ${Date.now()}`)
-    await clearStore(admin)
-    const failedPost = await admin.post('/api/posts', { draftId: bad.id, channel: 'INSTAGRAM' })
-    expect(failedPost.status()).toBeGreaterThanOrEqual(400)
-    const failed = byName(await events(admin, { draftId: bad.id as string }), 'publish.settled')
-    expect(failed).toHaveLength(1)
-    expect(failed[0].outcome).toBe('failed')
-  })
-
   // ── Failure isolation (AC-08) ────────────────────────────────────────────
 
-  test('TC-OBS-10: with the store failing, a generation, a refine and a publish still finish the same, and the loss is counted', async () => {
+  test('TC-OBS-10: with the store failing, a generation and a refine still finish the same, and the loss is counted', async () => {
     if (!MOCKED()) { test.skip(); return }
     // generation. The brief is created first: POST /api/briefs now writes its own
     // brief.submitted event, which would take the one failure meant for the generation.
@@ -340,13 +319,6 @@ test.describe('§AD — product observability', () => {
     await waitDrop(admin, 'draft_action.settled', 1)
     expect(byName(await events(admin, { draftId: draft.id }), 'draft_action.settled')).toHaveLength(0)
 
-    // publish: the post is still PUBLISHED
-    expect((await admin.post('/api/test/analytics-events', { failNext: 1 })).status()).toBe(200)
-    const post = await admin.post('/api/posts', { draftId: draft.id, channel: 'INSTAGRAM' })
-    expect(post.status()).toBe(201)
-    expect((await post.json()).status).toBe('PUBLISHED')
-    await waitDrop(admin, 'publish.settled', 1)
-    expect(byName(await events(admin, { draftId: draft.id }), 'publish.settled')).toHaveLength(0)
     expect((await admin.post('/api/test/analytics-events', { failNext: 0 })).status()).toBe(200)
   })
 

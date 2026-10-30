@@ -14,9 +14,9 @@ const WHERE_LABEL: Record<FactWhere, string> = {
   LINKEDIN: 'LinkedIn caption',
 }
 
-export const FLAGGED_ADVICE = 'These are not in your brief, campaign or brand voice. Check them before publishing.'
+export const FLAGGED_ADVICE = 'These are not in your brief, campaign or brand voice. Check them before you download it.'
 export const ERROR_MESSAGE =
-  'The facts check could not run for this post. Check the numbers and dates yourself before publishing.'
+  'The facts check could not run for this post. Check the numbers and dates yourself before you download it.'
 
 export function factsNoticeFor(check: FactsCheck | null | undefined): FactsNotice | null {
   if (!check) return null

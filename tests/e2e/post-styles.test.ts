@@ -20,11 +20,11 @@ import { expectNoAxeViolations } from '../helpers/axe'
 // Serial. Two campaigns for the whole suite (A: no sources; B: a briefing and
 // a document that state values), never one per case.
 
-const MOCKED = () => !!(process.env.MOCK_AI && process.env.MOCK_PUPPETEER && process.env.MOCK_SOCIAL)
+const MOCKED = () => !!(process.env.MOCK_AI && process.env.MOCK_PUPPETEER)
 const ADMIN_EMAIL = 'admin@bisteccare.lk'
 const EDITOR_EMAIL = 'editor@bisteccare.lk'
 const PASSWORD = 'BistecStudio2026!'
-const NOT_MOCKED = 'requires MOCK_AI + MOCK_PUPPETEER + MOCK_SOCIAL'
+const NOT_MOCKED = 'requires MOCK_AI + MOCK_PUPPETEER'
 
 test.describe.configure({ mode: 'serial' })
 
@@ -715,7 +715,7 @@ test.describe('The campaign default post style', () => {
 test.describe('The draft page: the facts notice and the style line', () => {
   test.skip(!MOCKED(), NOT_MOCKED)
 
-  test('TC-PS-39: a flagged draft shows the notice, a clear one does not, the check that could not run says so, and Publish stays enabled', async ({ page }) => {
+  test('TC-PS-39: a flagged draft shows the notice, a clear one does not, the check that could not run says so, and Download stays enabled', async ({ page }) => {
     await pageLogin(page)
     await page.setViewportSize({ width: 1440, height: 900 })
 
@@ -729,8 +729,8 @@ test.describe('The draft page: the facts notice and the style line', () => {
     await expect(notice).toContainText('$49')
     await expect(notice).toContainText('30 March 2027')
     await expect(notice).toContainText('(Instagram caption)')
-    await expect(notice).toContainText('These are not in your brief, campaign or brand voice. Check them before publishing.')
-    await expect(page.getByRole('button', { name: /^publish$/i })).toBeEnabled()
+    await expect(notice).toContainText('These are not in your brief, campaign or brand voice. Check them before you download it.')
+    await expect(page.getByRole('button', { name: 'Download', exact: true })).toBeEnabled()
     await expect(page.getByTestId('post-style-line')).toHaveText('Post style: Promotion / deal')
     await expectNoAxeViolations(page, '/drafts/[id] with the facts notice', { settle: true })
     await page.setViewportSize({ width: 390, height: 900 })
@@ -758,7 +758,7 @@ test.describe('The draft page: the facts notice and the style line', () => {
     expect(errored.factsCheck?.status).toBe('error')
     await page.goto(`/drafts/${errored.id}`)
     await expect(page.getByTestId('facts-check-notice')).toContainText('The facts check could not run for this post.')
-    await expect(page.getByRole('button', { name: /^publish$/i })).toBeEnabled()
+    await expect(page.getByRole('button', { name: 'Download', exact: true })).toBeEnabled()
   })
 })
 

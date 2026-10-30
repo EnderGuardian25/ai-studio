@@ -17,14 +17,6 @@ export function draftVisibilityWhere(u: TeamAuthedUser) {
   }
 }
 
-export function postVisibilityWhere(u: TeamAuthedUser) {
-  if (isTeamWide(u)) return { teamId: u.teamId }
-  return {
-    teamId: u.teamId,
-    OR: [{ userId: u.userId }, { draft: { brief: { campaignId: { not: null } } } }],
-  }
-}
-
 export function canAccessContent(
   u: TeamAuthedUser,
   item: { teamId: string | null; ownerId: string | null; campaignId: string | null },

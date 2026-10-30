@@ -8,7 +8,7 @@ import { loginAs } from '../helpers/api'
 //   table (team-tenancy Task 13 — replaces the old BISTEC_API_KEYS /
 //   BISTEC_ADMIN_API_KEYS comma-separated env allow-lists, removed in
 //   Task 18). Missing/invalid/revoked → 401 (fails closed).
-//   GET  /api/acp/manifest → 200 AGENT_MANIFEST (capabilities generate_post, publish_post)
+//   GET  /api/acp/manifest → 200 AGENT_MANIFEST (capability generate_post; publish_post was removed by 037)
 //   POST /api/acp/run {capability, input} → {output} | 400 (bad input) | 422 (failure)
 //   /api/acp is exempt from the session middleware — the key check governs.
 //
@@ -66,7 +66,8 @@ test.describe('ACP surface', () => {
       expect(manifest.name).toBe('bistec-studio')
       const names = (manifest.capabilities ?? []).map((c: { name: string }) => c.name)
       expect(names).toContain('generate_post')
-      expect(names).toContain('publish_post')
+      expect(names).not.toContain('publish_post')
+      expect(manifest.version).toBe('2.0.0')
     })
 
     // TC-ACP-03 — run input validation → 400. Guards M6.
@@ -78,12 +79,13 @@ test.describe('ACP surface', () => {
       })
       expect(gen.status()).toBe(400)
 
-      // publish_post missing channel.
+      // publish_post is gone (037): an unknown capability, never a 2xx.
       const pub = await request.post('/api/acp/run', {
         headers: { 'x-bistec-api-key': plaintextKey },
-        data: { capability: 'publish_post', input: { draftId: 'x' } },
+        data: { capability: 'publish_post', input: { draftId: 'x', channel: 'INSTAGRAM' } },
       })
       expect(pub.status()).toBe(400)
+      expect((await pub.json()).error).toMatch(/Unknown capability/)
 
       // Missing capability entirely.
       const noCap = await request.post('/api/acp/run', {
@@ -123,8 +125,9 @@ test.describe('ACP surface', () => {
         headers: { 'x-bistec-api-key': plaintextKey },
         data: { capability: 'publish_post', input: { draftId: body.output.draftId, channel: 'BOGUS' } },
       })
-      // Malformed channel → 400 from validatePublishInput, proving the route
-      // reached validation with this key's auth accepted (not a 401/404 short-circuit).
+      // publish_post is refused as an unknown capability (400), proving the
+      // route reached dispatch with this key's auth accepted (not a 401/404
+      // short-circuit) and that no 2xx exists for it.
       expect(readBack.status()).toBe(400)
     })
   })

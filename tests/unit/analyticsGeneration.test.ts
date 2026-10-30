@@ -163,9 +163,9 @@ describe('generation.finished (FR-04)', () => {
   })
 
   it('sync ok (scheduler / MCP): one event carrying the caller source and the new draft id', async () => {
-    await generateDraftForBrief(brief, { userId: null, teamId: 'team1', source: 'scheduler' })
+    await generateDraftForBrief(brief, { userId: null, teamId: 'team1', source: 'mcp' })
     expect(db.events).toHaveLength(1)
-    expect(db.events[0]).toMatchObject({ source: 'scheduler', userId: null, draftId: 'd1', outcome: 'ok' })
+    expect(db.events[0]).toMatchObject({ source: 'mcp', userId: null, draftId: 'd1', outcome: 'ok' })
     db.events = []
     await generateDraftForBrief(brief, { userId: null, teamId: 'team1', source: 'mcp' })
     expect(db.events[0]).toMatchObject({ source: 'mcp' })
@@ -203,7 +203,7 @@ describe('generation.finished (FR-04)', () => {
     expect(failing).toEqual(base)
     expect(failing.at(-1)).toEqual({ op: 'update', status: 'EXPORTED' })
 
-    const sync = async () => (await generateDraftForBrief(brief, { userId: null, teamId: 'team1', source: 'scheduler' })).draft.id
+    const sync = async () => (await generateDraftForBrief(brief, { userId: null, teamId: 'team1', source: 'mcp' })).draft.id
     db.failInsert = false
     const okId = await sync()
     db.failInsert = true
@@ -251,7 +251,7 @@ describe('generation.finished headlineCheck (030 FR-17)', () => {
 
   it('the sync lifecycle (scheduler, MCP) carries it as well', async () => {
     db.headlineCheck = 'not-visible'
-    await generateDraftForBrief(brief, { userId: null, teamId: 'team1', source: 'scheduler' })
+    await generateDraftForBrief(brief, { userId: null, teamId: 'team1', source: 'mcp' })
     expect(db.events[0].payload).toMatchObject({ headlineCheck: 'not-visible' })
   })
 })

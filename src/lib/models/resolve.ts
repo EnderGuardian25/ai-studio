@@ -5,7 +5,7 @@
 //
 // Pure and client-safe: imports the catalogue only. No I/O, no clock, no env
 // read — the policy, the credential tier, the mode and CLAUDE_CLI_MODEL are
-// inputs (the recovery.ts / captions/resolve.ts split).
+// inputs (the recovery.ts split).
 //
 // Tiers, first match wins, each checked against the effective set at call time:
 //   1. the explicit request — a miss is refused (the route's 400);

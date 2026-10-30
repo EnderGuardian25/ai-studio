@@ -7,12 +7,8 @@
  *
  *   MOCK_AI         — stub copy provider + design agent (no Anthropic/OpenAI calls)
  *   MOCK_PUPPETEER  — skip Chromium, return a fixed PNG
- *   MOCK_SOCIAL     — skip the Instagram/LinkedIn HTTP calls, return a fake platformId
- *   MOCK_SOCIAL_FAIL — make the mock publishers throw (for FAILED/retry coverage)
  */
 
-import { createHash } from 'node:crypto'
-import type { Channel } from '@prisma/client'
 import type { ConstrainTarget, InstructionClass } from '@/lib/agent/instructionClasses'
 // Type-only — erased at compile time (tsconfig isolatedModules), so this does
 // not create a runtime import cycle with refineVerify.ts, which imports this
@@ -30,8 +26,6 @@ import { HEADLINE_MAX } from '@/lib/captions/headline'
 
 export const MOCK_AI = process.env.MOCK_AI === 'true'
 export const MOCK_PUPPETEER = process.env.MOCK_PUPPETEER === 'true'
-export const MOCK_SOCIAL = process.env.MOCK_SOCIAL === 'true'
-export const MOCK_SOCIAL_FAIL = process.env.MOCK_SOCIAL_FAIL === 'true'
 
 // ── 012 FR-21: the mock caption reply seam ──────────────────────────────────
 
@@ -71,9 +65,8 @@ export function shouldMockFactError(topic: string): boolean {
  * and a sign-off — the shape a real model drifts into — so the REAL extractor
  * (extractCaptionReply) parses every mock reply.
  *
- * Each caption embeds the brief topic, so the existing topic sentinels still
- * reach whatever reads a caption (__FAIL_ALWAYS__ / __FAIL_ONCE__ for the
- * publishers).
+ * Each caption embeds the brief topic, so the topic sentinels still reach
+ * whatever reads a caption.
  *
  * A "__DROP_CAPTION_<TARGET>__" sentinel in the topic omits that key, ONLY in
  * a reply that requests every channel (a generation or "Regenerate all"). So
@@ -118,52 +111,9 @@ export function buildMockCaptionReply(topic: string, targets: readonly CaptionTa
   ].join('\n')
 }
 
-// Per-caption record so a __FAIL_ONCE__ post fails the first publish attempt and
-// succeeds on retry — state lives for the life of the serve process. Backed by
-// globalThis (not a plain module-scope `const`): Next.js/Turbopack can give
-// different API route bundles their own instance of this module in dev mode
-// (each route is compiled somewhat independently), which would silently
-// split this Set across the "first attempt" route and the "retry" route and
-// break the once-then-succeed contract (observed: retry.test flakiness where
-// __FAIL_ONCE__ failed on both the first attempt AND the retry). A
-// globalThis-backed singleton survives that split.
-const mockFailedOnce: Set<string> = ((globalThis as Record<string, unknown>).__mockFailedOnce ??=
-  new Set<string>()) as Set<string>
-
-/**
- * Decide whether a mocked publish should throw. Active only when MOCK_SOCIAL is
- * set (the publishers gate on that). Precedence:
- *   - MOCK_SOCIAL_FAIL (global env)      → always fail (legacy behaviour, kept)
- *   - caption contains "__FAIL_ALWAYS__" → always fail (deterministic FAILED)
- *   - caption contains "__FAIL_ONCE__"   → fail first attempt, succeed after
- *   - otherwise                          → succeed
- * The caption must be unique per post (use a unique brief topic) for __FAIL_ONCE__.
- */
-export function shouldMockPublishFail(caption: string): boolean {
-  if (MOCK_SOCIAL_FAIL) return true
-  if (caption.includes('__FAIL_ALWAYS__')) return true
-  if (caption.includes('__FAIL_ONCE__')) {
-    if (mockFailedOnce.has(caption)) return false
-    mockFailedOnce.add(caption)
-    return true
-  }
-  return false
-}
-
-/**
- * The mock publishers' platformId (012 FR-21): `mock-<channel>-<Date.now()>-`
- * then the first 12 hex of sha256(caption), so an E2E can prove which text a
- * channel received. The `mock-<channel>-<timestamp>` prefix is unchanged.
- */
-export function mockPlatformId(channel: Channel, caption: string): string {
-  const hash = createHash('sha256').update(caption).digest('hex').slice(0, 12)
-  return `mock-${channel.toLowerCase()}-${Date.now()}-${hash}`
-}
-
 // Per-prompt record so a __FAIL_GEN_ONCE__ generation fails its first attempt
-// and succeeds on retry — state for the life of the serve process. Same
-// globalThis-backed pattern as mockFailedOnce above, for the same reason: the
-// initial generation (assemble-a/b's route) and the retry (drafts/[id]/retry's
+// and succeeds on retry — state for the life of the serve process. Backed
+// by globalThis (not a module-scope const): the initial generation (assemble-a/b's route) and the retry (drafts/[id]/retry's
 // route) are different Next.js route files, which can end up as separate
 // Turbopack dev-mode module instances of this file.
 const mockGenFailedOnce: Set<string> = ((globalThis as Record<string, unknown>).__mockGenFailedOnce ??=
@@ -176,8 +126,6 @@ const mockGenFailedOnce: Set<string> = ((globalThis as Record<string, unknown>).
  *   - "__FAIL_GEN_ALWAYS__" → always fail (deterministic FAILED)
  *   - "__FAIL_GEN_ONCE__"   → fail first attempt, succeed on retry (F1 retry path)
  * The topic must be unique per draft for __FAIL_GEN_ONCE__ to isolate its state.
- * The async-generation retry/FAILED counterpart to
- * shouldMockPublishFail.
  */
 export function shouldMockGenerateFail(promptContext: string): boolean {
   if (promptContext.includes('__FAIL_GEN_ALWAYS__')) return true

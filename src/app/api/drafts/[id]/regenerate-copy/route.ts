@@ -122,6 +122,9 @@ export const POST = withTeamAuth<{ id: string }>(async (req, { params }, user) =
     // failure settles pass none, so a row keeps the stamp of the text it keeps.
     const trace = newActionTrace()
     trace.fields.model = { model: model.key, modelId: model.arg, substitutedFrom: model.substitutedFrom }
+    // 037 D5: a single-caption regenerate names its channel on the settle event
+    // (startDraftAction spreads trace.fields into the payload).
+    if (targets.length === 1 && targets[0] !== 'HEADLINE') trace.fields.channel = targets[0]
     await startDraftAction(
       draft.id,
       user.userId,

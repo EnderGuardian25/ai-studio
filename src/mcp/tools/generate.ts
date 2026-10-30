@@ -155,7 +155,7 @@ export async function getDraft(args: { id: string; teamId: string }) {
       factsCheck: true,
     },
   })
-  // Task 13 (reviewer follow-up): same team-bound guard as publishPost — a
+  // Task 13 (reviewer follow-up): same team-bound guard as the other tools: a
   // draft belonging to a different team (or the pre-tenancy null) reads as
   // "not found" rather than leaking its existence/content across tenants.
   if (!draft || draft.teamId !== args.teamId) throw new Error(`Draft ${args.id} not found`)

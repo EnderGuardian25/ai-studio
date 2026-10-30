@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { resolveApiKey } from '@/mcp/auth'
 import { generatePost } from '@/mcp/tools/generate'
-import { publishPost } from '@/mcp/tools/publish'
 
 export const maxDuration = 120
 
@@ -42,15 +41,6 @@ export async function POST(req: NextRequest) {
           )
           return NextResponse.json({ output: result })
         }
-        case 'publish_post': {
-          const err = validatePublishInput(input)
-          if (err) return NextResponse.json({ error: err }, { status: 400 })
-          const result = await publishPost({
-            ...(input as Parameters<typeof publishPost>[0]),
-            teamId: key.teamId,
-          })
-          return NextResponse.json({ output: result })
-        }
         default:
           return NextResponse.json({ error: `Unknown capability: ${capability}` }, { status: 400 })
       }
@@ -82,16 +72,6 @@ function validateGenerateInput(input: Record<string, unknown>): string | null {
   }
   if (!Array.isArray(input.channels) || input.channels.length === 0) {
     return 'channels must be a non-empty array'
-  }
-  return null
-}
-
-function validatePublishInput(input: Record<string, unknown>): string | null {
-  if (typeof input.draftId !== 'string' || !input.draftId.trim()) {
-    return 'draftId is required'
-  }
-  if (input.channel !== 'INSTAGRAM' && input.channel !== 'LINKEDIN') {
-    return 'channel must be INSTAGRAM or LINKEDIN'
   }
   return null
 }

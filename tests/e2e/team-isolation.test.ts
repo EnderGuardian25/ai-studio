@@ -126,24 +126,6 @@ test.describe('Cross-tenant isolation (D7)', () => {
     expect((clientxProjects as { id: string }[]).map((p) => p.id)).not.toContain(bistecProjectId)
   })
 
-  test('/api/posts as ClientX contains zero Bistec ids', async () => {
-    // Mint a Bistec post so /api/posts has a real Bistec row to prove absent.
-    // Read the id straight off the create response (201) / the conflict body
-    // (409, if a prior run already created one) rather than scanning the
-    // list — /api/posts caps pageSize at 50 and the whole catalog can leave
-    // Bistec with far more than 50 posts by the time this suite runs.
-    const publish = await bistecAdmin.post('/api/posts', {
-      draftId: bistecUncategorizedDraftId,
-      channel: 'LINKEDIN',
-    })
-    expect([201, 409]).toContain(publish.status())
-    const bistecPostId = (await publish.json()).postId as string
-    expect(bistecPostId).toBeTruthy()
-
-    const clientxPosts = await (await clientxAdmin.get('/api/posts?pageSize=50')).json()
-    expect((clientxPosts.posts as { id: string }[]).map((p) => p.id)).not.toContain(bistecPostId)
-  })
-
   test('/api/templates as ClientX contains zero Bistec ids', async () => {
     // "Hearts Talk" is a pre-existing Bistec-team kit with a template (seeded
     // by scripts/seed-hearts-talk.mjs, stamped onto the "Bistec" team).
@@ -360,9 +342,8 @@ test.describe('Cross-tenant isolation (D7)', () => {
       // Bistec admin cannot.
       expect((await bistecAdmin.get(`/api/drafts/${newDraftId}`)).status()).toBe(404)
 
-      // The same key must not surface Bistec data: publish_post against a
-      // Bistec draft id is treated as "not found" (team-bound machine caller,
-      // Task 13) — surfaced as ACP's generic 422 failure envelope.
+      // The same key must not surface Bistec data. publish_post is gone (037),
+      // so it is refused as an unknown capability whatever draft id it names.
       const crossTeamPublish = await request.post('/api/acp/run', {
         headers: { 'x-bistec-api-key': plaintextKey },
         data: {
@@ -370,8 +351,8 @@ test.describe('Cross-tenant isolation (D7)', () => {
           input: { draftId: bistecUncategorizedDraftId, channel: 'INSTAGRAM' },
         },
       })
-      expect(crossTeamPublish.status()).toBe(422)
-      expect((await crossTeamPublish.json()).error).toContain('not found')
+      expect(crossTeamPublish.status()).toBe(400)
+      expect((await crossTeamPublish.json()).error).toContain('Unknown capability')
     } finally {
       await clientxAdmin.del(`/api/team/api-keys/${created.id}`)
     }

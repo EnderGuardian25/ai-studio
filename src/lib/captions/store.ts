@@ -10,7 +10,6 @@ import { prisma } from '@/lib/prisma'
 import { CAPTION_CHANNELS, type CaptionTarget } from '@/lib/channels'
 import type { FieldResult } from '@/lib/captions/extract'
 import { settleCaptionRow, type CaptionStamp } from '@/lib/captions/actionTargets'
-import { resolveCaptionForPublish, type CaptionResolution } from '@/lib/captions/resolve'
 import { claimData, claimWhere, logLostClaim, newClaimId, type DraftClaim } from '@/lib/drafts/claim'
 import { refreshFactsCheck } from '@/lib/factsCheck/refresh'
 import { postStyleColumn } from '@/lib/drafts/revisions'
@@ -79,49 +78,6 @@ export async function loadDraftCaptions(
     rows = await findRows(draftId, db)
   }
   return { captions: orderByRegistry(rows) }
-}
-
-// ── Publishing (FR-14) ──────────────────────────────────────────────────────
-
-// The publish-time decision for one channel: the draft's row for it, through
-// the loader, run through the pure resolver. A missing draft has no row, so it
-// is refused like one.
-export async function loadCaptionForPublish(
-  draftId: string,
-  channel: Channel,
-  db: PrismaClient = prisma,
-): Promise<CaptionResolution> {
-  const loaded = await loadDraftCaptions(draftId, db)
-  return resolveCaptionForPublish(channel, loaded?.captions.find((r) => r.channel === channel))
-}
-
-// The text the posts routes show for a post's channel, or '' (FR-13).
-export async function loadCaptionText(
-  draftId: string,
-  channel: Channel,
-  db: PrismaClient = prisma,
-): Promise<string> {
-  const loaded = await loadDraftCaptions(draftId, db)
-  return loaded?.captions.find((r) => r.channel === channel)?.text ?? ''
-}
-
-// loadCaptionText for a page of posts in one query (017 FR-06): the text keyed
-// `${draftId}/${channel}`. A missing row reads as '', the value loadCaptionText
-// returns for it; the fill is left to the single-draft readers.
-export async function loadCaptionTexts(
-  posts: readonly { draftId: string; channel: Channel }[],
-  db: PrismaClient = prisma,
-): Promise<Map<string, string>> {
-  const draftIds = [...new Set(posts.map((p) => p.draftId))]
-  const rows =
-    draftIds.length === 0
-      ? []
-      : await db.draftCaption.findMany({
-          where: { draftId: { in: draftIds } },
-          select: { draftId: true, channel: true, text: true },
-        })
-  const byKey = new Map(rows.map((r) => [`${r.draftId}/${r.channel}`, r.text]))
-  return new Map(posts.map((p) => [`${p.draftId}/${p.channel}`, byKey.get(`${p.draftId}/${p.channel}`) ?? '']))
 }
 
 // ── Writers ─────────────────────────────────────────────────────────────────

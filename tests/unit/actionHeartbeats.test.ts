@@ -259,7 +259,7 @@ describe('async generation (runGenerationForDraft)', () => {
 
 describe('sync generation (generateDraftForBrief: the scheduler, MCP, ACP)', () => {
   it("runs the caller's onBeforeDesign after the background step, right before the design", async () => {
-    await generateDraftForBrief(brief() as never, { userId: null, teamId: 'team1', source: 'scheduler' }, {
+    await generateDraftForBrief(brief() as never, { userId: null, teamId: 'team1', source: 'mcp' }, {
       onBeforeDesign: async () => {
         h.log.push('hook')
       },
@@ -268,7 +268,7 @@ describe('sync generation (generateDraftForBrief: the scheduler, MCP, ACP)', () 
   })
 
   it('without a hook, behaves as before', async () => {
-    await generateDraftForBrief(brief() as never, { userId: null, teamId: 'team1', source: 'scheduler' })
+    await generateDraftForBrief(brief() as never, { userId: null, teamId: 'team1', source: 'mcp' })
     expect(h.log).toEqual(['background', 'design', 'draft created', 'revision'])
   })
 })

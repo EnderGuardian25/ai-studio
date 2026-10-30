@@ -77,8 +77,6 @@ test.describe('Authentication & RBAC', () => {
     expect((await editor.del(`/api/campaigns/${camp.id}`)).status()).toBe(403)
     expect((await editor.patch(`/api/projects/${proj.id}`, { name: 'hijack' })).status()).toBe(403)
     expect((await editor.del(`/api/projects/${proj.id}`)).status()).toBe(403)
-    // POST /api/posts is admin-only — requireRole fires before draft validation.
-    expect((await editor.post('/api/posts', { draftId: 'x', channel: 'INSTAGRAM' })).status()).toBe(403)
     // Any /api/admin/* write.
     expect((await editor.post('/api/admin/brandkits', { name: 'nope' })).status()).toBe(403)
   })

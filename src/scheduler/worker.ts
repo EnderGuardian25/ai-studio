@@ -1,4 +1,5 @@
-import { runScheduledJobs } from "../lib/scheduler/jobRunner"
+// The "scheduler" container: the name is historical (037 D9). It runs only
+// analytics retention.
 import { runTick } from "../lib/scheduler/heartbeat"
 import { sweepAnalytics } from "../lib/analytics/retention"
 import { LOOPS, type LoopName } from "./loops"
@@ -21,7 +22,6 @@ async function loop(name: LoopName, run: () => Promise<void>) {
 // What each named loop runs. Typed on LoopName, so a loop added to ./loops
 // without a runner here does not compile.
 const RUNNERS: Record<LoopName, () => Promise<void>> = {
-  scheduler: runScheduledJobs,
   // 006 FR-11: analytics retention. Writes its own WorkerHeartbeat row ("retention")
   // through runTick; Insights reads it as the Health line.
   retention: async () => {

@@ -10,8 +10,8 @@
 //   - Vocabularies are IMPORTED (Prisma enums, MODEL_KEYS, the instruction
 //     classes, the 009 archetypes and fallback reasons), never copied, so a new
 //     value cannot drift silently (tests/unit/analyticsCoverage.test.ts).
-//   - A change that adds a draft action, a channel, a generation path or a
-//     publish path OWNS its events: it adds them here, in the same change.
+//   - A change that adds a draft action, a channel or a generation path OWNS
+//     its events: it adds them here, in the same change.
 //   - No payload field holds prompt text, model output, a caption, the headline
 //     or HTML (NFR-04). The one user text is `instruction`, capped. Unknown
 //     keys are stripped by the schemas, so a stray field never reaches the row.
@@ -89,7 +89,7 @@ interface EventDef {
 export const CATALOGUE = {
   'generation.finished': {
     schemaVersion: 1,
-    source: ['web', 'scheduler', 'mcp'],
+    source: ['web', 'mcp'],
     outcomes: ['ok', 'failed'],
     schema: z.object({
       path: z.enum(['A', 'B']).optional(),
@@ -124,6 +124,8 @@ export const CATALOGUE = {
     outcomes: ['ok', 'not-applied', 'conflict', 'failed'],
     schema: z.object({
       action: z.nativeEnum(DraftAction),
+      // 037 D5: the caption channel a regenerate-copy settle names; additive.
+      channel: z.nativeEnum(Channel).optional(),
       model: modelFragment.optional(),
       instruction: capped(INSTRUCTION_MAX).optional(),
       attempts: z.array(refineAttempt).max(2).optional(),
@@ -157,15 +159,15 @@ export const CATALOGUE = {
     schema: z.object({ from: z.number().int().min(0), to: z.number().int().min(0) }),
   },
   // 030 FR-15: a headline change, with how the image stands afterwards. No text.
+  // v2 (037): `scheduledPending` is gone with scheduling.
   'draft.headline_edited': {
-    schemaVersion: 1,
+    schemaVersion: 2,
     source: ['web'],
     outcomes: [],
     schema: z.object({
       // 031 FR-43: 'apply' is additive; the schemaVersion stays.
       via: z.enum(['edit', 'regenerate', 'apply']),
       state: z.enum(HEADLINE_STATES),
-      scheduledPending: z.boolean(),
     }),
   },
   // 031 FR-43: an Apply to image that reached a verdict. No text.
@@ -190,19 +192,6 @@ export const CATALOGUE = {
       factsStatus: z.enum(FACTS_STATUSES).nullable(),
       headlineState: z.enum(HEADLINE_STATES),
       failure: z.enum(DOWNLOAD_FAILURES).optional(),
-    }),
-  },
-  'publish.settled': {
-    schemaVersion: 1,
-    source: ['web', 'mcp', 'scheduler'],
-    outcomes: ['published', 'failed', 'retry-scheduled'],
-    schema: z.object({
-      channel: z.nativeEnum(Channel),
-      terminal: z.boolean(),
-      retryCount: z.number().int().min(0).optional(),
-      errorReason: failureReason.optional(),
-      // 030 FR-16: what the image showed of the headline at the attempt.
-      headlineState: z.enum(HEADLINE_STATES).optional(),
     }),
   },
   'wizard.step': {
@@ -236,7 +225,15 @@ export const CATALOGUE = {
  * never reused for a different meaning: old rows with it stay in the store until
  * retention sweeps them, and nothing reads them (037 D6).
  */
-export const RETIRED_EVENT_NAMES = ['scheduled_generation.settled'] as const
+export const RETIRED_EVENT_NAMES = ['scheduled_generation.settled', 'publish.settled'] as const
+
+/**
+ * Sources that once existed and no event carries any more (037 D5). The
+ * `scheduler` source is the publish scheduler and the scheduled-generation
+ * loop; both are gone. A retired source is never reused for a different
+ * meaning: old rows keep it until retention sweeps them.
+ */
+export const RETIRED_SOURCES = ['scheduler'] as const
 
 export type EventName = keyof typeof CATALOGUE
 export const EVENT_NAMES = Object.keys(CATALOGUE) as EventName[]

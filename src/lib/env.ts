@@ -126,8 +126,6 @@ const envSchema = z.object({
   // src/lib/testHooks.ts (see the note at the top of this file).
   MOCK_AI: z.string().optional(),
   MOCK_PUPPETEER: z.string().optional(),
-  MOCK_SOCIAL: z.string().optional(),
-  MOCK_SOCIAL_FAIL: z.string().optional(),
 
   // --- App (server-side reads only; the client bundle inlines its own copy) ---
   NEXT_PUBLIC_APP_URL: z.string().optional(),

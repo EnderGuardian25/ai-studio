@@ -353,7 +353,7 @@ describe('runGenerationForDraft (async)', () => {
 describe('generateDraftForBrief (sync: scheduler, MCP, ACP)', () => {
   it('throws HeadlineMissingError before any design is paid for, and creates no draft', async () => {
     h.reply = json({ headline: '   ', instagram: 'IG text', linkedin: 'LI text' })
-    await expect(generateDraftForBrief(brief, { userId: null, teamId: 'team1', source: 'scheduler' })).rejects.toThrow(
+    await expect(generateDraftForBrief(brief, { userId: null, teamId: 'team1', source: 'mcp' })).rejects.toThrow(
       SENTENCE('empty'),
     )
     expect(h.pathB).not.toHaveBeenCalled()
@@ -362,7 +362,7 @@ describe('generateDraftForBrief (sync: scheduler, MCP, ACP)', () => {
 
   it('creates the draft with its headline, two rows and revision 1 in one transaction', async () => {
     h.reply = json({ headline: 'H', instagram: 'IG text' })
-    await generateDraftForBrief(brief, { userId: null, teamId: 'team1', source: 'scheduler' })
+    await generateDraftForBrief(brief, { userId: null, teamId: 'team1', source: 'mcp' })
     expect(h.pathB.mock.calls[0][2]).toBe('H')
     expect(db.draftCreates[0]).toMatchObject({
       headline: 'H',
@@ -450,7 +450,7 @@ describe('generation on the resolver (008)', () => {
   it('sync: a stored request since disallowed is substituted, not thrown — the scheduler/MCP run completes', async () => {
     db.policy = policyRow(['HAIKU', 'SONNET'])
     const stored = { ...(brief as object), captionModel: 'OPUS', designModel: 'OPUS' } as never
-    await expect(generateDraftForBrief(stored, { userId: null, teamId: 'team1', source: 'scheduler' })).resolves.toBeDefined()
+    await expect(generateDraftForBrief(stored, { userId: null, teamId: 'team1', source: 'mcp' })).resolves.toBeDefined()
     expect(db.draftCreates[0]).toMatchObject({
       headline: 'Applications are open',
       headlineModel: 'claude-haiku-4-5',
@@ -475,7 +475,7 @@ describe('generation on the resolver (008)', () => {
 
   it('the sync path throws it instead, and creates no draft', async () => {
     db.policy = policyRow([])
-    await expect(generateDraftForBrief(brief, { userId: null, teamId: 'team1', source: 'scheduler' })).rejects.toThrow(/No model is allowed/)
+    await expect(generateDraftForBrief(brief, { userId: null, teamId: 'team1', source: 'mcp' })).rejects.toThrow(/No model is allowed/)
     expect(db.draftCreates).toHaveLength(0)
   })
 })

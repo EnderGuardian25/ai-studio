@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest'
 import {
   briefVisibilityWhere,
   draftVisibilityWhere,
-  postVisibilityWhere,
   canAccessContent,
 } from '@/lib/authz/visibility'
 
@@ -13,7 +12,6 @@ describe('visibility where-shapes', () => {
   it('team admin sees the whole team', () => {
     expect(briefVisibilityWhere(admin)).toEqual({ teamId: 't1' })
     expect(draftVisibilityWhere(admin)).toEqual({ teamId: 't1' })
-    expect(postVisibilityWhere(admin)).toEqual({ teamId: 't1' })
   })
   it('editor sees own things plus anything under a campaign', () => {
     expect(briefVisibilityWhere(editor)).toEqual({
@@ -23,10 +21,6 @@ describe('visibility where-shapes', () => {
     expect(draftVisibilityWhere(editor)).toEqual({
       teamId: 't1',
       OR: [{ brief: { userId: 'e' } }, { brief: { campaignId: { not: null } } }],
-    })
-    expect(postVisibilityWhere(editor)).toEqual({
-      teamId: 't1',
-      OR: [{ userId: 'e' }, { draft: { brief: { campaignId: { not: null } } } }],
     })
   })
 })

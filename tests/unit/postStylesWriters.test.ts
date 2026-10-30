@@ -143,7 +143,7 @@ const brief = (over: Record<string, unknown> = {}) =>
     ...over,
   }) as never
 
-const actor = { userId: null, teamId: 'team1', source: 'scheduler' } as const
+const actor = { userId: null, teamId: 'team1', source: 'mcp' } as const
 
 beforeEach(() => {
   db.draftWrites = []

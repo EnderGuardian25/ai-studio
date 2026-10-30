@@ -95,7 +95,6 @@ export function SizeDesignStep({
     <div>
       <StepHead index={1} title={<>Size &amp; Design</>}>
         Choose the post size, which brand kit to use, and how the design is generated.
-        You&apos;ll pick where to publish (Instagram / LinkedIn) at publish time.
       </StepHead>
 
       {/* Post style (027 FR-07): above the size and design choices, so the image

@@ -9,8 +9,8 @@ import { activeStyles } from '@/lib/postStyles'
 // change to a capability's schema.
 export const AGENT_MANIFEST = {
   name: 'bistec-studio',
-  description: 'On-brand social media post generation and publishing for Instagram and LinkedIn.',
-  version: '1.2.0',
+  description: 'On-brand social media post generation for Instagram and LinkedIn.',
+  version: '2.0.0',
   capabilities: [
     {
       name: 'generate_post',
@@ -92,24 +92,6 @@ export const AGENT_MANIFEST = {
               },
             },
           },
-        },
-      },
-    },
-    {
-      name: 'publish_post',
-      description: 'Publish a generated draft to Instagram or LinkedIn.',
-      input: {
-        type: 'object',
-        required: ['draftId', 'channel'],
-        properties: {
-          draftId: { type: 'string' },
-          channel: { type: 'string', enum: ['INSTAGRAM', 'LINKEDIN'] },
-        },
-      },
-      output: {
-        type: 'object',
-        properties: {
-          platformId: { type: 'string' },
         },
       },
     },

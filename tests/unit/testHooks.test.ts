@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-// testHooks.ts snapshots its MOCK_* env vars at module load, and
-// shouldMockPublishFail keeps per-caption __FAIL_ONCE__ state at module level —
-// so every scenario gets a fresh module instance via resetModules + dynamic import.
+// testHooks.ts snapshots its MOCK_* env vars at module load, and the generation
+// seams keep per-prompt __FAIL_GEN_ONCE__ state at module level — so every
+// scenario gets a fresh module instance via resetModules + dynamic import.
 async function loadHooks(env: Record<string, string> = {}) {
   vi.resetModules()
   vi.unstubAllEnvs()
@@ -14,39 +14,23 @@ beforeEach(() => {
   vi.unstubAllEnvs()
 })
 
-describe('shouldMockPublishFail', () => {
-  it('succeeds by default (no sentinel, no env)', async () => {
-    const hooks = await loadHooks({ MOCK_SOCIAL: 'true' })
-    expect(hooks.shouldMockPublishFail('a perfectly normal caption')).toBe(false)
+describe('MOCK_* flags', () => {
+  it('are dormant unless exactly "true"', async () => {
+    for (const v of ['1', 'TRUE', 'false']) {
+      const hooks = await loadHooks({ MOCK_AI: v, MOCK_PUPPETEER: v })
+      expect(hooks.MOCK_AI).toBe(false)
+      expect(hooks.MOCK_PUPPETEER).toBe(false)
+    }
+    const on = await loadHooks({ MOCK_AI: 'true', MOCK_PUPPETEER: 'true' })
+    expect(on.MOCK_AI).toBe(true)
+    expect(on.MOCK_PUPPETEER).toBe(true)
   })
 
-  it('__FAIL_ALWAYS__ sentinel always fails', async () => {
-    const hooks = await loadHooks({ MOCK_SOCIAL: 'true' })
-    const caption = 'post __FAIL_ALWAYS__ x'
-    expect(hooks.shouldMockPublishFail(caption)).toBe(true)
-    expect(hooks.shouldMockPublishFail(caption)).toBe(true)
-  })
-
-  it('__FAIL_ONCE__ fails the first attempt then succeeds (per unique caption)', async () => {
-    const hooks = await loadHooks({ MOCK_SOCIAL: 'true' })
-    const caption = 'retry-me __FAIL_ONCE__ unique-1'
-    expect(hooks.shouldMockPublishFail(caption)).toBe(true)
-    expect(hooks.shouldMockPublishFail(caption)).toBe(false)
-    // A different caption gets its own first failure
-    expect(hooks.shouldMockPublishFail('retry-me __FAIL_ONCE__ unique-2')).toBe(true)
-  })
-
-  it('MOCK_SOCIAL_FAIL env forces failure regardless of caption', async () => {
+  it('MOCK_SOCIAL and MOCK_SOCIAL_FAIL are gone (037)', async () => {
     const hooks = await loadHooks({ MOCK_SOCIAL: 'true', MOCK_SOCIAL_FAIL: 'true' })
-    expect(hooks.MOCK_SOCIAL_FAIL).toBe(true)
-    expect(hooks.shouldMockPublishFail('no sentinel at all')).toBe(true)
-  })
-
-  it('MOCK_* flags are dormant unless exactly "true"', async () => {
-    const hooks = await loadHooks({ MOCK_SOCIAL: '1', MOCK_SOCIAL_FAIL: 'TRUE' })
-    expect(hooks.MOCK_SOCIAL).toBe(false)
-    expect(hooks.MOCK_SOCIAL_FAIL).toBe(false)
-    expect(hooks.shouldMockPublishFail('plain')).toBe(false)
+    expect(hooks).not.toHaveProperty('MOCK_SOCIAL')
+    expect(hooks).not.toHaveProperty('MOCK_SOCIAL_FAIL')
+    expect(hooks).not.toHaveProperty('shouldMockPublishFail')
   })
 })
 

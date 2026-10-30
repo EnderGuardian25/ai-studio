@@ -396,17 +396,6 @@ export interface DraftDetail {
 
 // ── Library (drafts + posts) ────────────────────────────────────────────
 
-// PostRecord as embedded in a library draft tile.
-export interface PostRecord {
-  id: string
-  channel: string
-  status: string
-  scheduledAt: string | null
-  publishedAt: string | null
-  platformId: string | null
-  errorReason: string | null
-}
-
 // GET /api/library — one row of the `drafts` array.
 export interface DraftRecord {
   id: string
@@ -480,18 +469,6 @@ export interface AdminProvider {
   isEnabled: boolean
   isDefault: boolean
   createdAt: string
-}
-
-// ── Admin: social channels ──────────────────────────────────────────────
-
-export interface ChannelStatus {
-  connected: boolean
-  updatedAt?: string
-}
-
-export interface ChannelMap {
-  INSTAGRAM: ChannelStatus
-  LINKEDIN: ChannelStatus
 }
 
 // ── Admin: brand kits ────────────────────────────────────────────────────

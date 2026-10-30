@@ -4,7 +4,6 @@ import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprot
 import { resolveApiKey } from './auth'
 import { createBrandKit, setBrandKitPrompt, uploadBrandTemplate, listBrandKits, getBrandKit } from './tools/brandkit'
 import { generatePost, getDraft } from './tools/generate'
-import { publishPost } from './tools/publish'
 import { env } from '@/lib/env'
 import { activeStyles } from '@/lib/postStyles'
 
@@ -14,7 +13,7 @@ import { activeStyles } from '@/lib/postStyles'
 const API_KEY = env.MCP_API_KEY ?? null
 
 const server = new Server(
-  { name: 'bistec-studio', version: '1.0.0' },
+  { name: 'bistec-studio', version: '2.0.0' },
   { capabilities: { tools: {} } }
 )
 
@@ -114,18 +113,6 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
         required: ['id'],
       },
     },
-    {
-      name: 'publish_post',
-      description: 'Publish a draft to Instagram or LinkedIn.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          draftId: { type: 'string' },
-          channel: { type: 'string', enum: ['INSTAGRAM', 'LINKEDIN'] },
-        },
-        required: ['draftId', 'channel'],
-      },
-    },
   ],
 }))
 
@@ -156,8 +143,8 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         }
 
       // C2 (final review): thread key.teamId into every brand-kit tool, same
-      // anti-spoof pattern as create_brand_kit/generate_post/get_draft/
-      // publish_post below — args is spread FIRST so a caller-supplied teamId
+      // anti-spoof pattern as create_brand_kit/generate_post/get_draft
+      // below — args is spread FIRST so a caller-supplied teamId
       // in the tool arguments can never override the ApiKey's real team.
       case 'set_brand_kit_prompt':
         return {
@@ -208,16 +195,6 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             type: 'text',
             text: JSON.stringify(
               await getDraft({ ...(args as unknown as Omit<Parameters<typeof getDraft>[0], 'teamId'>), teamId: key.teamId })
-            ),
-          }],
-        }
-
-      case 'publish_post':
-        return {
-          content: [{
-            type: 'text',
-            text: JSON.stringify(
-              await publishPost({ ...(args as Parameters<typeof publishPost>[0]), teamId: key.teamId })
             ),
           }],
         }
